@@ -1,0 +1,305 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import {
+  farmerLeadPayloadFromForm,
+  validateFarmerLeadPayload
+} from "@/lib/farmer-leads/form-data";
+import type {
+  FarmerLead,
+  FarmerLeadInsert,
+  FarmerLeadUpdate
+} from "@/lib/farmer-leads/types";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentInternalUser } from "@/lib/users/current-user";
+import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
+import { canConfirmPayment } from "@/lib/users/permissions";
+
+function redirectWithError(path: string, message: string): never {
+  redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function canOwnLead(role: string | null) {
+  return role === "Salesperson" || role === "RSM";
+}
+
+export async function createFarmerLeadAction(formData: FormData) {
+  const supabase = await createClient();
+  const payload = farmerLeadPayloadFromForm(formData, {
+    includeOwnerFields: false,
+    requireLeadCode: true
+  }) as FarmerLeadInsert;
+  const validationError = validateFarmerLeadPayload(payload);
+
+  if (validationError) {
+    redirectWithError("/farmer-leads/new", validationError);
+  }
+
+  const profile = await requireModuleWriteAccess(
+    supabase,
+    "/farmer-leads/new",
+    "farmer-leads"
+  );
+
+  if (payload.payment_confirmed && !canConfirmPayment(profile)) {
+    redirectWithError(
+      "/farmer-leads/new",
+      "Only Accounts or Admin can confirm payment."
+    );
+  }
+
+  payload.created_by_user_id = profile.id;
+
+  if (canOwnLead(profile.role)) {
+    if (!profile.region_id) {
+      redirectWithError(
+        "/farmer-leads/new",
+        "Your user profile needs a region before creating leads."
+      );
+    }
+
+    payload.region_id = profile.region_id;
+    payload.owner_user_id = profile.id;
+    payload.rsm_user_id =
+      profile.role === "RSM"
+        ? profile.id
+        : (profile.reports_to_user_id ?? profile.id);
+  } else {
+    const { data: region, error: regionError } = await supabase
+      .from("regions")
+      .select("id, rsm_user_id")
+      .eq("state", payload.state)
+      .eq("is_active", true)
+      .order("region_name", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (regionError) {
+      redirectWithError("/farmer-leads/new", regionError.message);
+    }
+
+    let assignedRsmId = region?.rsm_user_id ?? null;
+
+    if (!assignedRsmId) {
+      const { data: stateRsm, error: stateRsmError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("role", "RSM")
+        .eq("state", payload.state)
+        .eq("is_active", true)
+        .order("full_name", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (stateRsmError) {
+        redirectWithError("/farmer-leads/new", stateRsmError.message);
+      }
+
+      assignedRsmId = stateRsm?.id ?? null;
+    }
+
+    if (!region?.id || !assignedRsmId) {
+      redirectWithError(
+        "/farmer-leads/new",
+        "Assign an active region and RSM to the selected state before creating leads from this role."
+      );
+    }
+
+    payload.region_id = region.id;
+    payload.owner_user_id = assignedRsmId;
+    payload.rsm_user_id = assignedRsmId;
+  }
+
+  if (payload.payment_confirmed) {
+    payload.payment_confirmed_by_user_id = profile.id;
+    payload.payment_confirmed_date = todayDate();
+  }
+
+  const ownerAndRsmIds = Array.from(
+    new Set([payload.owner_user_id, payload.rsm_user_id].filter(Boolean))
+  ) as string[];
+  const { data: ownerUsers } = ownerAndRsmIds.length
+    ? await supabase
+        .from("users")
+        .select("id, role, is_active")
+        .in("id", ownerAndRsmIds)
+    : { data: [] };
+  const ownerUser = ownerUsers?.find((user) => user.id === payload.owner_user_id);
+  const rsmUser = ownerUsers?.find((user) => user.id === payload.rsm_user_id);
+
+  if (!ownerUser?.is_active || !canOwnLead(ownerUser.role)) {
+    redirectWithError(
+      "/farmer-leads/new",
+      "Lead owner must be an active Salesperson or RSM."
+    );
+  }
+
+  if (!rsmUser?.is_active || rsmUser.role !== "RSM") {
+    redirectWithError("/farmer-leads/new", "RSM must be an active RSM.");
+  }
+
+  const { data, error } = await supabase
+    .from("farmer_leads")
+    .insert(payload)
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    redirectWithError(
+      "/farmer-leads/new",
+      error?.message ?? "Lead was not created."
+    );
+  }
+
+  revalidatePath("/farmer-leads");
+  redirect(`/farmer-leads/${data.id}`);
+}
+
+export async function updateFarmerLeadAction(id: string, formData: FormData) {
+  const supabase = await createClient();
+  const profile = await requireModuleWriteAccess(
+    supabase,
+    `/farmer-leads/${id}/edit`,
+    "farmer-leads"
+  );
+  const payload = farmerLeadPayloadFromForm(formData, {
+    includeOwnerFields: true,
+    requireLeadCode: false
+  }) as FarmerLeadUpdate;
+  const validationError = validateFarmerLeadPayload(payload);
+
+  if (validationError) {
+    redirectWithError(`/farmer-leads/${id}/edit`, validationError);
+  }
+
+  const { data: existingData, error: existingError } = await supabase
+    .from("farmer_leads")
+    .select("id, payment_confirmed")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .single();
+
+  if (existingError || !existingData) {
+    redirectWithError(`/farmer-leads/${id}/edit`, "Lead was not found.");
+  }
+
+  const existing = existingData as Pick<FarmerLead, "id" | "payment_confirmed">;
+
+  if (
+    payload.payment_confirmed !== existing.payment_confirmed &&
+    !canConfirmPayment(profile)
+  ) {
+    redirectWithError(
+      `/farmer-leads/${id}/edit`,
+      "Only Accounts or Admin can change payment confirmation."
+    );
+  }
+
+  if (
+    payload.payment_confirmed &&
+    payload.payment_confirmed !== existing.payment_confirmed
+  ) {
+    payload.payment_confirmed_by_user_id = profile.id;
+    payload.payment_confirmed_date = todayDate();
+  }
+
+  if (!payload.payment_confirmed) {
+    payload.payment_confirmed_by_user_id = null;
+    payload.payment_confirmed_date = null;
+  }
+
+  const ownerAndRsmIds = Array.from(
+    new Set([payload.owner_user_id, payload.rsm_user_id].filter(Boolean))
+  ) as string[];
+  const { data: ownerUsers } = ownerAndRsmIds.length
+    ? await supabase
+        .from("users")
+        .select("id, role, is_active")
+        .in("id", ownerAndRsmIds)
+    : { data: [] };
+  const ownerUser = ownerUsers?.find((user) => user.id === payload.owner_user_id);
+  const rsmUser = ownerUsers?.find((user) => user.id === payload.rsm_user_id);
+
+  if (!ownerUser?.is_active || !canOwnLead(ownerUser.role)) {
+    redirectWithError(
+      `/farmer-leads/${id}/edit`,
+      "Lead owner must be an active Salesperson or RSM."
+    );
+  }
+
+  if (!rsmUser?.is_active || rsmUser.role !== "RSM") {
+    redirectWithError(`/farmer-leads/${id}/edit`, "RSM must be an active RSM.");
+  }
+
+  const { error } = await supabase
+    .from("farmer_leads")
+    .update(payload)
+    .eq("id", id);
+
+  if (error) {
+    redirectWithError(`/farmer-leads/${id}/edit`, error.message);
+  }
+
+  revalidatePath("/farmer-leads");
+  revalidatePath(`/farmer-leads/${id}`);
+  redirect(`/farmer-leads/${id}`);
+}
+
+export async function deleteFarmerLeadAction(id: string) {
+  const supabase = await createClient();
+  await requireModuleWriteAccess(
+    supabase,
+    `/farmer-leads/${id}/edit`,
+    "farmer-leads"
+  );
+  const { error } = await supabase
+    .from("farmer_leads")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("deleted_at", null);
+
+  if (error) {
+    redirectWithError(`/farmer-leads/${id}/edit`, error.message);
+  }
+
+  revalidatePath("/farmer-leads");
+  redirect("/farmer-leads");
+}
+
+export async function confirmFarmerLeadPaymentAction(id: string) {
+  const supabase = await createClient();
+  const profile = await getCurrentInternalUser(
+    supabase,
+    `/farmer-leads/${id}`
+  );
+
+  if (!canConfirmPayment(profile)) {
+    redirectWithError(
+      `/farmer-leads/${id}`,
+      "Only Accounts or Admin can confirm payment."
+    );
+  }
+
+  const { error } = await supabase
+    .from("farmer_leads")
+    .update({
+      payment_confirmed: true,
+      payment_confirmed_by_user_id: profile.id,
+      payment_confirmed_date: todayDate()
+    })
+    .eq("id", id)
+    .is("deleted_at", null);
+
+  if (error) {
+    redirectWithError(`/farmer-leads/${id}`, error.message);
+  }
+
+  revalidatePath("/farmer-leads");
+  revalidatePath(`/farmer-leads/${id}`);
+  redirect(`/farmer-leads/${id}`);
+}

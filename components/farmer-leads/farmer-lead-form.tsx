@@ -1,0 +1,436 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import { useFormStatus } from "react-dom";
+import { ArrowLeft, Save } from "lucide-react";
+import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
+import {
+  defaultFunnelStage,
+  defaultIrrigationType,
+  defaultLeadSource,
+  defaultLeadStatus,
+  defaultLeadType,
+  defaultPrimaryCrop,
+  funnelStageOptions,
+  irrigationTypeOptions,
+  leadSourceOptions,
+  leadStatusOptions,
+  primaryCropOptions
+} from "@/lib/farmer-leads/options";
+import type { FarmerLead } from "@/lib/farmer-leads/types";
+
+type FarmerLeadFormProps = {
+  action: (formData: FormData) => void | Promise<void>;
+  cancelHref: string;
+  error?: string | null;
+  includeOwnerFields?: boolean;
+  lead?: FarmerLead;
+  mode: "create" | "edit";
+};
+
+function inputClassName() {
+  return "h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100";
+}
+
+function textAreaClassName() {
+  return "min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100";
+}
+
+function SubmitButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+      disabled={pending}
+      type="submit"
+    >
+      <Save className="h-4 w-4" aria-hidden="true" />
+      {pending ? "Saving..." : label}
+    </button>
+  );
+}
+
+function dateValue(value?: string | null) {
+  return value ? value.slice(0, 10) : "";
+}
+
+function defaultDateValue(value?: string | null) {
+  return dateValue(value) || new Date().toISOString().slice(0, 10);
+}
+
+export function FarmerLeadForm({
+  action,
+  cancelHref,
+  error,
+  includeOwnerFields = false,
+  lead,
+  mode
+}: FarmerLeadFormProps) {
+  const [primaryCrop, setPrimaryCrop] = useState(
+    lead?.primary_crop ?? defaultPrimaryCrop
+  );
+  const [stateValue, setStateValue] = useState(lead?.state ?? "");
+  const [districtValue, setDistrictValue] = useState(lead?.district ?? "");
+
+  return (
+    <form action={action} className="space-y-6">
+      <input
+        name="lead_type"
+        type="hidden"
+        value={defaultLeadType}
+      />
+
+      {error ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-slate-950">Lead details</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="lead_code"
+            >
+              Lead code
+            </label>
+            <input
+              className={inputClassName()}
+              defaultValue={lead?.lead_code ?? ""}
+              id="lead_code"
+              name="lead_code"
+              placeholder={mode === "create" ? "Auto-generated if blank" : ""}
+              type="text"
+            />
+          </div>
+
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="farmer_name"
+            >
+              Farmer name
+            </label>
+            <input
+              className={inputClassName()}
+              defaultValue={lead?.farmer_name ?? ""}
+              id="farmer_name"
+              name="farmer_name"
+              placeholder="Farmer full name"
+              required
+              type="text"
+            />
+          </div>
+
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="mobile_number"
+            >
+              Mobile number
+            </label>
+            <input
+              className={inputClassName()}
+              defaultValue={lead?.mobile_number ?? ""}
+              id="mobile_number"
+              name="mobile_number"
+              placeholder="10-digit mobile"
+              required
+              type="tel"
+            />
+          </div>
+
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="village"
+            >
+              Village
+            </label>
+            <input
+              className={inputClassName()}
+              defaultValue={lead?.village ?? ""}
+              id="village"
+              name="village"
+              placeholder="Village"
+              required
+              type="text"
+            />
+          </div>
+
+          <StateDistrictSelect
+            districtValue={districtValue}
+            onDistrictChange={setDistrictValue}
+            onStateChange={setStateValue}
+            required
+            stateValue={stateValue}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-slate-950">
+          Status and crop
+        </h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="lead_status"
+            >
+              Lead status
+            </label>
+            <select
+              className={inputClassName()}
+              defaultValue={lead?.lead_status ?? defaultLeadStatus}
+              id="lead_status"
+              name="lead_status"
+            >
+              {leadStatusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="funnel_stage"
+            >
+              Funnel stage
+            </label>
+            <select
+              className={inputClassName()}
+              defaultValue={lead?.funnel_stage ?? defaultFunnelStage}
+              id="funnel_stage"
+              name="funnel_stage"
+            >
+              {funnelStageOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="lead_source"
+            >
+              Lead source
+            </label>
+            <select
+              className={inputClassName()}
+              defaultValue={lead?.lead_source ?? defaultLeadSource}
+              id="lead_source"
+              name="lead_source"
+            >
+              {leadSourceOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="primary_crop"
+            >
+              Primary crop
+            </label>
+            <select
+              className={inputClassName()}
+              id="primary_crop"
+              name="primary_crop"
+              onChange={(event) => setPrimaryCrop(event.target.value)}
+              required
+              value={primaryCrop}
+            >
+              {primaryCropOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="irrigation_type"
+            >
+              Irrigation type
+            </label>
+            <select
+              className={inputClassName()}
+              defaultValue={lead?.irrigation_type ?? defaultIrrigationType}
+              id="irrigation_type"
+              name="irrigation_type"
+              required
+            >
+              {irrigationTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {primaryCrop === "Other" ? (
+            <div className="md:col-span-2">
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="other_primary_crop"
+              >
+                Other primary crop
+              </label>
+              <input
+                className={inputClassName()}
+                defaultValue={lead?.other_primary_crop ?? ""}
+                id="other_primary_crop"
+                name="other_primary_crop"
+                placeholder="Enter crop name"
+                required
+                type="text"
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-slate-950">
+          Follow-up and progress
+        </h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="next_action_date"
+            >
+              Next action date
+            </label>
+            <input
+              className={inputClassName()}
+              defaultValue={defaultDateValue(
+                lead?.next_action_date ?? lead?.followup_due_date
+              )}
+              id="next_action_date"
+              name="next_action_date"
+              required
+              type="date"
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
+              <input
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
+                defaultChecked={Boolean(lead?.payment_confirmed)}
+                name="payment_confirmed"
+                type="checkbox"
+              />
+              Payment confirmed
+            </label>
+            <label className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
+              <input
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
+                defaultChecked={Boolean(lead?.installation_completed)}
+                name="installation_completed"
+                type="checkbox"
+              />
+              Device installed
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {includeOwnerFields ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="text-base font-semibold text-slate-950">
+            Assignment
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            Owner assignment is for Salesperson or RSM users when role rules are
+            active.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="owner_user_id"
+              >
+                Owner user ID
+              </label>
+              <input
+                className={inputClassName()}
+                defaultValue={lead?.owner_user_id ?? ""}
+                id="owner_user_id"
+                name="owner_user_id"
+                placeholder="Salesperson or RSM user ID"
+                type="text"
+              />
+            </div>
+
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="rsm_user_id"
+              >
+                RSM user ID
+              </label>
+              <input
+                className={inputClassName()}
+                defaultValue={lead?.rsm_user_id ?? ""}
+                id="rsm_user_id"
+                name="rsm_user_id"
+                placeholder="RSM user ID"
+                type="text"
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          New leads are assigned to the right RSM or Salesperson automatically.
+        </div>
+      )}
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <label
+          className="mb-1.5 block text-sm font-medium text-slate-700"
+          htmlFor="remarks"
+        >
+          Remarks
+        </label>
+        <textarea
+          className={textAreaClassName()}
+          defaultValue={lead?.remarks ?? ""}
+          id="remarks"
+          name="remarks"
+          placeholder="Field notes, context, or next action"
+        />
+      </div>
+
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Link
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+          href={cancelHref}
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Cancel
+        </Link>
+        <SubmitButton label={mode === "create" ? "Create lead" : "Save lead"} />
+      </div>
+    </form>
+  );
+}
