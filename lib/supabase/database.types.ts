@@ -2026,6 +2026,70 @@ export type Database = {
         };
         Returns: Json;
       };
+      get_farmer_leads_page_kpis: {
+        Args: {
+          p_q?: string | null;
+          p_lead_status?: string | null;
+          p_funnel_stage?: string | null;
+          p_state?: string | null;
+          p_district?: string | null;
+          p_owner_user_id?: string | null;
+          p_rsm_user_id?: string | null;
+          p_lead_source?: string | null;
+          p_primary_crop?: string | null;
+        };
+        Returns: Json;
+      };
+      get_installations_page_kpis: {
+        Args: {
+          p_q?: string | null;
+          p_installation_status?: string | null;
+          p_installation_type?: string | null;
+          p_product_model?: string | null;
+          p_state?: string | null;
+          p_district?: string | null;
+          p_rsm_user_id?: string | null;
+          p_region_id?: string | null;
+          p_dealer_id?: string | null;
+          p_institution_id?: string | null;
+          p_pilot_id?: string | null;
+        };
+        Returns: Json;
+      };
+      get_institutions_page_kpis: {
+        Args: {
+          p_q?: string | null;
+          p_organization_type?: string | null;
+          p_institution_status?: string | null;
+          p_primary_state?: string | null;
+          p_priority?: string | null;
+          p_account_owner_user_id?: string | null;
+          p_rsm_user_id?: string | null;
+          p_rd_head_user_id?: string | null;
+          p_scale_up_status?: string | null;
+          p_opportunity_type?: string | null;
+        };
+        Returns: Json;
+      };
+      get_pilots_page_kpis: {
+        Args: {
+          p_q?: string | null;
+          p_pilot_type?: string | null;
+          p_pilot_status?: string | null;
+          p_pilot_result_status?: string | null;
+          p_crop?: string | null;
+          p_state?: string | null;
+          p_district?: string | null;
+          p_pilot_owner_user_id?: string | null;
+          p_research_assistant_user_id?: string | null;
+          p_agronomist_user_id?: string | null;
+          p_rd_head_user_id?: string | null;
+          p_institution_id?: string | null;
+          p_dealer_id?: string | null;
+          p_scale_up_recommended?: boolean | null;
+        };
+        Returns: Json;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

@@ -36,6 +36,16 @@ type FarmerLeadsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+type FarmerLeadKpis = {
+  totalLeads: number;
+  openLeads: number;
+  wonLeads: number;
+  lostLeads: number;
+  followUpsDue: number;
+  paymentConfirmed: number;
+  deviceInstalled: number;
+};
+
 const filterColumns = [
   "lead_status",
   "funnel_stage",
@@ -61,6 +71,16 @@ const listSelectColumns = [
   "other_primary_crop",
   "followup_due_date"
 ].join(",");
+
+const defaultKpis: FarmerLeadKpis = {
+  totalLeads: 0,
+  openLeads: 0,
+  wonLeads: 0,
+  lostLeads: 0,
+  followUpsDue: 0,
+  paymentConfirmed: 0,
+  deviceInstalled: 0
+};
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -99,6 +119,28 @@ function formatDate(value: string | null) {
 
 function display(value: string | null | undefined) {
   return value || "Not set";
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function readKpis(value: unknown): FarmerLeadKpis {
+  if (!value || typeof value !== "object") {
+    return defaultKpis;
+  }
+
+  const row = value as Record<string, unknown>;
+
+  return {
+    totalLeads: numberValue(row.totalLeads),
+    openLeads: numberValue(row.openLeads),
+    wonLeads: numberValue(row.wonLeads),
+    lostLeads: numberValue(row.lostLeads),
+    followUpsDue: numberValue(row.followUpsDue),
+    paymentConfirmed: numberValue(row.paymentConfirmed),
+    deviceInstalled: numberValue(row.deviceInstalled)
+  };
 }
 
 function readFilters(
@@ -181,92 +223,30 @@ export default async function FarmerLeadsPage({
     }
   }
 
-  const { data, error, count } = await timeAsync(
-    "farmer leads list query",
-    () => query
-  );
+  const [listResult, kpiResult] = await Promise.all([
+    timeAsync("farmer leads list query", () => query),
+    timeAsync("farmer leads kpi summary rpc", () =>
+      supabase.rpc("get_farmer_leads_page_kpis", {
+        p_q: cleanedSearch || null,
+        p_lead_status: filters.lead_status || null,
+        p_funnel_stage: filters.funnel_stage || null,
+        p_state: filters.state || null,
+        p_district: filters.district || null,
+        p_owner_user_id: filters.owner_user_id || null,
+        p_rsm_user_id: filters.rsm_user_id || null,
+        p_lead_source: filters.lead_source || null,
+        p_primary_crop: filters.primary_crop || null
+      })
+    )
+  ]);
+  const { data, error, count } = listResult;
   const leads = (data ?? []) as unknown as FarmerLead[];
 
-  async function countWith(kind: "total" | "open" | "won" | "lost" | "due" | "payment" | "installed") {
-    let countQuery = supabase
-      .from("farmer_leads")
-      .select("id", { count: "exact", head: true });
-
-    if (scope.noRecords) {
-      countQuery = countQuery.is("id", null);
-    }
-
-    if (scope.orFilter) {
-      countQuery = countQuery.or(scope.orFilter);
-    }
-
-    if (cleanedSearch) {
-      countQuery = countQuery.or(
-        [
-          `farmer_name.ilike.%${cleanedSearch}%`,
-          `mobile_number.ilike.%${cleanedSearch}%`,
-          `lead_code.ilike.%${cleanedSearch}%`,
-          `village.ilike.%${cleanedSearch}%`
-        ].join(",")
-      );
-    }
-
-    for (const column of filterColumns) {
-      if (filters[column]) {
-        countQuery = countQuery.eq(column, filters[column]);
-      }
-    }
-
-    if (kind === "open") {
-      countQuery = countQuery.eq("lead_status", "Open");
-    }
-
-    if (kind === "won") {
-      countQuery = countQuery.eq("lead_status", "Won");
-    }
-
-    if (kind === "lost") {
-      countQuery = countQuery.eq("lead_status", "Lost");
-    }
-
-    if (kind === "due") {
-      countQuery = countQuery.lte(
-        "followup_due_date",
-        new Date().toISOString().slice(0, 10)
-      );
-    }
-
-    if (kind === "payment") {
-      countQuery = countQuery.eq("payment_confirmed", true);
-    }
-
-    if (kind === "installed") {
-      countQuery = countQuery.eq("installation_completed", true);
-    }
-
-    const { count: leadCount } = await countQuery;
-    return leadCount ?? 0;
+  if (kpiResult.error) {
+    console.error("[Farmer Leads] KPI summary RPC unavailable", kpiResult.error);
   }
 
-  const [
-    totalLeads,
-    openLeads,
-    wonLeads,
-    lostLeads,
-    followUpsDue,
-    paymentConfirmed,
-    deviceInstalled
-  ] = await timeAsync("farmer leads kpi counts", () =>
-    Promise.all([
-      countWith("total"),
-      countWith("open"),
-      countWith("won"),
-      countWith("lost"),
-      countWith("due"),
-      countWith("payment"),
-      countWith("installed")
-    ])
-  );
+  const kpis = readKpis(kpiResult.data);
 
   return (
     <section>
@@ -297,17 +277,17 @@ export default async function FarmerLeadsPage({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-        <KpiCard icon={CheckCircle2} label="Total Leads" value={totalLeads} />
-        <KpiCard icon={CalendarClock} label="Open Leads" value={openLeads} />
-        <KpiCard icon={CheckCircle2} label="Won Leads" value={wonLeads} />
-        <KpiCard icon={XCircle} label="Lost Leads" value={lostLeads} />
-        <KpiCard icon={CalendarClock} label="Follow-ups Due" value={followUpsDue} />
+        <KpiCard icon={CheckCircle2} label="Total Leads" value={kpis.totalLeads} />
+        <KpiCard icon={CalendarClock} label="Open Leads" value={kpis.openLeads} />
+        <KpiCard icon={CheckCircle2} label="Won Leads" value={kpis.wonLeads} />
+        <KpiCard icon={XCircle} label="Lost Leads" value={kpis.lostLeads} />
+        <KpiCard icon={CalendarClock} label="Follow-ups Due" value={kpis.followUpsDue} />
         <KpiCard
           icon={CircleDollarSign}
           label="Payment Confirmed"
-          value={paymentConfirmed}
+          value={kpis.paymentConfirmed}
         />
-        <KpiCard icon={Wrench} label="Device Installed" value={deviceInstalled} />
+        <KpiCard icon={Wrench} label="Device Installed" value={kpis.deviceInstalled} />
       </div>
 
       <form

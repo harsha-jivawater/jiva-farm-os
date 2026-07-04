@@ -47,6 +47,17 @@ type PilotsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+type PilotKpis = {
+  total: number;
+  active: number;
+  installed: number;
+  visitPending: number;
+  finalPending: number;
+  finalReviewed: number;
+  scaleUp: number;
+  successful: number;
+};
+
 const filterColumns = [
   "pilot_type",
   "pilot_status",
@@ -61,13 +72,6 @@ const filterColumns = [
   "institution_id",
   "dealer_id"
 ] as const;
-
-const kpiSelectColumns = [
-  "id",
-  "pilot_status",
-  "installation_completed",
-  "scale_up_recommended"
-].join(",");
 
 const listSelectColumns = [
   "id",
@@ -91,6 +95,17 @@ const listSelectColumns = [
   "next_visit_due_date",
   "scale_up_recommended"
 ].join(",");
+
+const defaultKpis: PilotKpis = {
+  total: 0,
+  active: 0,
+  installed: 0,
+  visitPending: 0,
+  finalPending: 0,
+  finalReviewed: 0,
+  scaleUp: 0,
+  successful: 0
+};
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -140,6 +155,35 @@ function readFilters(
 
 function searchValue(value: string) {
   return value.replace(/[,%()]/g, " ").trim();
+}
+
+function scaleUpFilterValue(value: string) {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function readKpis(value: unknown): PilotKpis {
+  if (!value || typeof value !== "object") {
+    return defaultKpis;
+  }
+
+  const row = value as Record<string, unknown>;
+
+  return {
+    total: numberValue(row.total),
+    active: numberValue(row.active),
+    installed: numberValue(row.installed),
+    visitPending: numberValue(row.visitPending),
+    finalPending: numberValue(row.finalPending),
+    finalReviewed: numberValue(row.finalReviewed),
+    scaleUp: numberValue(row.scaleUp),
+    successful: numberValue(row.successful)
+  };
 }
 
 function KpiCard({
@@ -206,25 +250,11 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
       ? DISTRICTS_BY_STATE[filters.state as keyof typeof DISTRICTS_BY_STATE]
       : [];
 
-  let allPilotsQuery = supabase
-    .from("pilots")
-    .select(kpiSelectColumns)
-    .is("deleted_at", null)
-    .limit(1000);
-
-  if (scope.noRecords) {
-    allPilotsQuery = allPilotsQuery.is("id", null);
-  }
-
-  if (scope.orFilter) {
-    allPilotsQuery = allPilotsQuery.or(scope.orFilter);
-  }
-
   const [
     { data: users },
     { data: institutions },
     { data: dealers },
-    { data: allPilots }
+    kpiResult
   ] = await timeAsync("pilots option and kpi queries", () =>
     Promise.all([
       supabase
@@ -244,7 +274,25 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
         .is("deleted_at", null)
         .order("dealer_name", { ascending: true })
         .limit(200),
-      allPilotsQuery
+      supabase.rpc("get_pilots_page_kpis", {
+        p_q: cleanedSearch || null,
+        p_pilot_type: filters.pilot_type || null,
+        p_pilot_status: filters.pilot_status || null,
+        p_pilot_result_status: filters.pilot_result_status || null,
+        p_crop: filters.crop || null,
+        p_state: filters.state || null,
+        p_district: filters.district || null,
+        p_pilot_owner_user_id: filters.pilot_owner_user_id || null,
+        p_research_assistant_user_id:
+          filters.research_assistant_user_id || null,
+        p_agronomist_user_id: filters.agronomist_user_id || null,
+        p_rd_head_user_id: filters.rd_head_user_id || null,
+        p_institution_id: filters.institution_id || null,
+        p_dealer_id: filters.dealer_id || null,
+        p_scale_up_recommended: scaleUpFilterValue(
+          filters.scale_up_recommended
+        )
+      })
     ])
   );
 
@@ -301,36 +349,12 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
     institutionsList.map((institution) => [institution.id, institution])
   );
   const dealerMap = new Map(dealersList.map((dealer) => [dealer.id, dealer]));
-  const allPilotRows = (allPilots ?? []) as unknown as Pilot[];
-  const activeStatuses = new Set([
-    "Approved",
-    "Device Assigned",
-    "Device Dispatched",
-    "Device Installed",
-    "Monitoring Active",
-    "Visit Report Pending",
-    "Final Report Pending",
-    "Final Report Submitted"
-  ]);
-  const kpis = {
-    total: allPilotRows.length,
-    active: allPilotRows.filter((pilot) => activeStatuses.has(pilot.pilot_status))
-      .length,
-    installed: allPilotRows.filter((pilot) => pilot.installation_completed).length,
-    visitPending: allPilotRows.filter(
-      (pilot) => pilot.pilot_status === "Visit Report Pending"
-    ).length,
-    finalPending: allPilotRows.filter(
-      (pilot) => pilot.pilot_status === "Final Report Pending"
-    ).length,
-    finalReviewed: allPilotRows.filter(
-      (pilot) => pilot.pilot_status === "Final Report Reviewed"
-    ).length,
-    scaleUp: allPilotRows.filter((pilot) => pilot.scale_up_recommended).length,
-    successful: allPilotRows.filter(
-      (pilot) => pilot.pilot_status === "Closed - Successful"
-    ).length
-  };
+
+  if (kpiResult.error) {
+    console.error("[Pilots] KPI summary RPC unavailable", kpiResult.error);
+  }
+
+  const kpis = readKpis(kpiResult.data);
 
   return (
     <section>

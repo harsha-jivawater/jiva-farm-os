@@ -30,9 +30,9 @@ import {
   formatDate,
   type Institution,
   type InstitutionFilters,
-  type InstitutionMeeting,
   type UserOption
 } from "@/lib/institutions/types";
+import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
@@ -42,6 +42,17 @@ import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
 type InstitutionsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+type InstitutionKpis = {
+  total: number;
+  active: number;
+  due: number;
+  meetingsThisMonth: number;
+  rdHeadMeetings: number;
+  pilotProposals: number;
+  scaleUp: number;
+  parkedLost: number;
 };
 
 const filterColumns = [
@@ -55,14 +66,6 @@ const filterColumns = [
   "scale_up_status",
   "opportunity_type"
 ] as const;
-
-const kpiSelectColumns = [
-  "id",
-  "institution_status",
-  "next_action_date",
-  "proposal_shared",
-  "scale_up_status"
-].join(",");
 
 const listSelectColumns = [
   "id",
@@ -80,6 +83,17 @@ const listSelectColumns = [
   "next_action_date",
   "scale_up_status"
 ].join(",");
+
+const defaultKpis: InstitutionKpis = {
+  total: 0,
+  active: 0,
+  due: 0,
+  meetingsThisMonth: 0,
+  rdHeadMeetings: 0,
+  pilotProposals: 0,
+  scaleUp: 0,
+  parkedLost: 0
+};
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -133,21 +147,27 @@ function searchValue(value: string) {
   return value.replace(/[,%()]/g, " ").trim();
 }
 
-function todayDate() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function monthStartDate() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
+function readKpis(value: unknown): InstitutionKpis {
+  if (!value || typeof value !== "object") {
+    return defaultKpis;
+  }
 
-  return `${year}-${month}-01`;
+  const row = value as Record<string, unknown>;
+
+  return {
+    total: numberValue(row.total),
+    active: numberValue(row.active),
+    due: numberValue(row.due),
+    meetingsThisMonth: numberValue(row.meetingsThisMonth),
+    rdHeadMeetings: numberValue(row.rdHeadMeetings),
+    pilotProposals: numberValue(row.pilotProposals),
+    scaleUp: numberValue(row.scaleUp),
+    parkedLost: numberValue(row.parkedLost)
+  };
 }
 
 function KpiCard({
@@ -214,31 +234,30 @@ export default async function InstitutionalPartnersPage({
   );
   const canWrite = canWriteModule(currentUser, "institutional-partners");
   const scope = await institutionScope(supabase, currentUser);
-  const today = todayDate();
-  const monthStart = monthStartDate();
 
-  let allInstitutionsQuery = supabase
-    .from("institutions")
-    .select(kpiSelectColumns)
-    .is("deleted_at", null)
-    .limit(1000);
-
-  if (scope.noRecords) {
-    allInstitutionsQuery = allInstitutionsQuery.is("id", null);
-  }
-
-  if (scope.orFilter) {
-    allInstitutionsQuery = allInstitutionsQuery.or(scope.orFilter);
-  }
-
-  const [{ data: users }, { data: allInstitutions }] = await Promise.all([
-    supabase
-      .from("users")
-      .select("id, full_name, role, secondary_role")
-      .eq("is_active", true)
-      .order("full_name", { ascending: true }),
-    allInstitutionsQuery
-  ]);
+  const [{ data: users }, kpiResult] = await timeAsync(
+    "institution option and kpi queries",
+    () =>
+      Promise.all([
+        supabase
+          .from("users")
+          .select("id, full_name, role, secondary_role")
+          .eq("is_active", true)
+          .order("full_name", { ascending: true }),
+        supabase.rpc("get_institutions_page_kpis", {
+          p_q: cleanedSearch || null,
+          p_organization_type: filters.organization_type || null,
+          p_institution_status: filters.institution_status || null,
+          p_primary_state: filters.primary_state || null,
+          p_priority: filters.priority || null,
+          p_account_owner_user_id: filters.account_owner_user_id || null,
+          p_rsm_user_id: filters.rsm_user_id || null,
+          p_rd_head_user_id: filters.rd_head_user_id || null,
+          p_scale_up_status: filters.scale_up_status || null,
+          p_opportunity_type: filters.opportunity_type || null
+        })
+      ])
+  );
 
   let query = supabase
     .from("institutions")
@@ -279,62 +298,15 @@ export default async function InstitutionalPartnersPage({
   const institutions = (data ?? []) as unknown as Institution[];
   const usersList = (users ?? []) as UserOption[];
   const userMap = new Map(usersList.map((user) => [user.id, user]));
-  const allInstitutionRows = (allInstitutions ?? []) as unknown as Institution[];
-  const scopedInstitutionIds = allInstitutionRows.map(
-    (institution) => institution.id
-  );
-  const { data: allMeetings } = scopedInstitutionIds.length
-    ? await supabase
-        .from("institution_meetings")
-        .select("id, meeting_date, rd_head_user_id")
-        .in("institution_id", scopedInstitutionIds)
-        .gte("meeting_date", monthStart)
-        .limit(1000)
-    : { data: [] };
-  const thisMonthMeetings = (allMeetings ?? []) as Pick<
-    InstitutionMeeting,
-    "id" | "meeting_date" | "rd_head_user_id"
-  >[];
 
-  const activeScaleUpStatuses = new Set([
-    "Discussion Active",
-    "Proposal Shared",
-    "Commercial Negotiation",
-    "PO / Approval Pending",
-    "Order Received",
-    "Installation Started",
-    "Active Scale-up"
-  ]);
+  if (kpiResult.error) {
+    console.error(
+      "[Institutional Partners] KPI summary RPC unavailable",
+      kpiResult.error
+    );
+  }
 
-  const parkedLostStatuses = new Set(["Parked", "Lost"]);
-  const kpis = {
-    total: allInstitutionRows.length,
-    active: allInstitutionRows.filter(
-      (institution) => institution.institution_status === "Active Account"
-    ).length,
-    due: allInstitutionRows.filter(
-      (institution) =>
-        institution.next_action_date <= today &&
-        !parkedLostStatuses.has(institution.institution_status)
-    ).length,
-    meetingsThisMonth: thisMonthMeetings.length,
-    rdHeadMeetings: thisMonthMeetings.filter(
-      (meeting) => Boolean(meeting.rd_head_user_id)
-    ).length,
-    pilotProposals: allInstitutionRows.filter(
-      (institution) =>
-        institution.institution_status === "Pilot Proposal Shared" ||
-        institution.proposal_shared === "Yes"
-    ).length,
-    scaleUp: allInstitutionRows.filter((institution) =>
-      activeScaleUpStatuses.has(institution.scale_up_status)
-    ).length,
-    parkedLost: allInstitutionRows.filter(
-      (institution) =>
-        parkedLostStatuses.has(institution.institution_status) ||
-        parkedLostStatuses.has(institution.scale_up_status)
-    ).length
-  };
+  const kpis = readKpis(kpiResult.data);
 
   return (
     <section>

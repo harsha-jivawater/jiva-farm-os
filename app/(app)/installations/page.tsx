@@ -48,6 +48,17 @@ type RegionOption = {
   region_name: string;
 };
 
+type InstallationKpis = {
+  totalInstallations: number;
+  installed: number;
+  verified: number;
+  followupPending: number;
+  issueReported: number;
+  closed: number;
+  pilotInstallations: number;
+  dealerFarmerInstallations: number;
+};
+
 const filterColumns = [
   "installation_status",
   "installation_type",
@@ -78,6 +89,17 @@ const listSelectColumns = [
   "followup_due_date"
 ].join(",");
 
+const defaultKpis: InstallationKpis = {
+  totalInstallations: 0,
+  installed: 0,
+  verified: 0,
+  followupPending: 0,
+  issueReported: 0,
+  closed: 0,
+  pilotInstallations: 0,
+  dealerFarmerInstallations: 0
+};
+
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -99,6 +121,29 @@ function optionFilterValue(
 
 function searchValue(value: string) {
   return value.replace(/[,%()]/g, " ").trim();
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function readKpis(value: unknown): InstallationKpis {
+  if (!value || typeof value !== "object") {
+    return defaultKpis;
+  }
+
+  const row = value as Record<string, unknown>;
+
+  return {
+    totalInstallations: numberValue(row.totalInstallations),
+    installed: numberValue(row.installed),
+    verified: numberValue(row.verified),
+    followupPending: numberValue(row.followupPending),
+    issueReported: numberValue(row.issueReported),
+    closed: numberValue(row.closed),
+    pilotInstallations: numberValue(row.pilotInstallations),
+    dealerFarmerInstallations: numberValue(row.dealerFarmerInstallations)
+  };
 }
 
 function readFilters(
@@ -210,110 +255,32 @@ export default async function InstallationsPage({
     }
   }
 
-  const { data, error, count } = await timeAsync(
-    "installations list query",
-    () => query
-  );
+  const [listResult, kpiResult] = await Promise.all([
+    timeAsync("installations list query", () => query),
+    timeAsync("installations kpi summary rpc", () =>
+      supabase.rpc("get_installations_page_kpis", {
+        p_q: cleanedSearch || null,
+        p_installation_status: filters.installation_status || null,
+        p_installation_type: filters.installation_type || null,
+        p_product_model: filters.product_model || null,
+        p_state: filters.state || null,
+        p_district: filters.district || null,
+        p_rsm_user_id: filters.rsm_user_id || null,
+        p_region_id: filters.region_id || null,
+        p_dealer_id: filters.dealer_id || null,
+        p_institution_id: filters.institution_id || null,
+        p_pilot_id: filters.pilot_id || null
+      })
+    )
+  ]);
+  const { data, error, count } = listResult;
   const installations = (data ?? []) as unknown as Installation[];
 
-  async function countWith(
-    kind:
-      | "total"
-      | "installed"
-      | "verified"
-      | "followupPending"
-      | "issueReported"
-      | "closed"
-      | "pilot"
-      | "dealerFarmer"
-  ) {
-    let countQuery = supabase
-      .from("installations")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null);
-
-    if (scope.noRecords) {
-      countQuery = countQuery.is("id", null);
-    }
-
-    if (scope.orFilter) {
-      countQuery = countQuery.or(scope.orFilter);
-    }
-
-    if (cleanedSearch) {
-      countQuery = countQuery.or(
-        [
-          `installation_code.ilike.%${cleanedSearch}%`,
-          `farmer_name_snapshot.ilike.%${cleanedSearch}%`,
-          `farmer_mobile_snapshot.ilike.%${cleanedSearch}%`,
-          `serial_number_snapshot.ilike.%${cleanedSearch}%`,
-          `village.ilike.%${cleanedSearch}%`
-        ].join(",")
-      );
-    }
-
-    for (const column of filterColumns) {
-      if (filters[column]) {
-        countQuery = countQuery.eq(column, filters[column]);
-      }
-    }
-
-    if (kind === "installed") {
-      countQuery = countQuery.eq("installation_status", "Installed");
-    }
-
-    if (kind === "verified") {
-      countQuery = countQuery.eq("installation_status", "Verified");
-    }
-
-    if (kind === "followupPending") {
-      countQuery = countQuery.eq("installation_status", "Follow-up Pending");
-    }
-
-    if (kind === "issueReported") {
-      countQuery = countQuery.eq("installation_status", "Issue Reported");
-    }
-
-    if (kind === "closed") {
-      countQuery = countQuery.eq("installation_status", "Closed");
-    }
-
-    if (kind === "pilot") {
-      countQuery = countQuery.eq("installation_type", "Pilot Installation");
-    }
-
-    if (kind === "dealerFarmer") {
-      countQuery = countQuery.eq(
-        "installation_type",
-        "Dealer Farmer Installation"
-      );
-    }
-
-    const { count: installationCount } = await countQuery;
-    return installationCount ?? 0;
+  if (kpiResult.error) {
+    console.error("[Installations] KPI summary RPC unavailable", kpiResult.error);
   }
 
-  const [
-    totalInstallations,
-    installed,
-    verified,
-    followupPending,
-    issueReported,
-    closed,
-    pilotInstallations,
-    dealerFarmerInstallations
-  ] = await timeAsync("installations kpi counts", () =>
-    Promise.all([
-      countWith("total"),
-      countWith("installed"),
-      countWith("verified"),
-      countWith("followupPending"),
-      countWith("issueReported"),
-      countWith("closed"),
-      countWith("pilot"),
-      countWith("dealerFarmer")
-    ])
-  );
+  const kpis = readKpis(kpiResult.data);
 
   const userOptions = (users ?? []) as UserOption[];
   const regionOptions = (regions ?? []) as RegionOption[];
@@ -341,30 +308,30 @@ export default async function InstallationsPage({
         <KpiCard
           icon={Wrench}
           label="Total Installations"
-          value={totalInstallations}
+          value={kpis.totalInstallations}
         />
-        <KpiCard icon={Wrench} label="Installed" value={installed} />
-        <KpiCard icon={CheckCircle2} label="Verified" value={verified} />
+        <KpiCard icon={Wrench} label="Installed" value={kpis.installed} />
+        <KpiCard icon={CheckCircle2} label="Verified" value={kpis.verified} />
         <KpiCard
           icon={AlertTriangle}
           label="Follow-up Pending"
-          value={followupPending}
+          value={kpis.followupPending}
         />
         <KpiCard
           icon={AlertTriangle}
           label="Issue Reported"
-          value={issueReported}
+          value={kpis.issueReported}
         />
-        <KpiCard icon={CheckCircle2} label="Closed" value={closed} />
+        <KpiCard icon={CheckCircle2} label="Closed" value={kpis.closed} />
         <KpiCard
           icon={Wrench}
           label="Pilot Installations"
-          value={pilotInstallations}
+          value={kpis.pilotInstallations}
         />
         <KpiCard
           icon={Tractor}
           label="Dealer Farmer Installations"
-          value={dealerFarmerInstallations}
+          value={kpis.dealerFarmerInstallations}
         />
       </div>
 
