@@ -1,15 +1,21 @@
 # Jiva Farm Devices OS
 
-Internal web app shell for managing farmer leads, dealers, partners, pilots, installations, pilot devices, and KPIs.
+Internal operating system for managing Jiva Water farmer leads, dealers, institutional partners, pilots, devices, dispatches, installations, follow-ups, users, regions, and KPIs.
+
+## Project documentation
+
+- [Project status](docs/PROJECT_STATUS.md)
+- [Operations guide](docs/OPERATIONS_GUIDE.md)
+- [Changelog](docs/CHANGELOG.md)
 
 ## What is included
 
 - Next.js App Router with TypeScript
 - Tailwind CSS styling
-- Supabase authentication structure
+- Supabase authentication and database structure
 - Protected dashboard area
 - Responsive sidebar navigation
-- Placeholder pages for each starting module
+- Production modules for sales, operations, pilots, devices, follow-ups, internal users, regions, and reporting
 
 ## Local setup
 
