@@ -66,6 +66,141 @@ type ChartDatum = {
   value: number;
 };
 
+type SummaryFilterRegion = Pick<Region, "id" | "region_name" | "is_active">;
+type SummaryFilterUser = Pick<User, "id" | "full_name" | "is_active">;
+
+type RsmSummaryRow = {
+  id: string;
+  rsm: string;
+  region: string;
+  target: number;
+  installed: number;
+  achievement: number;
+  leads: number;
+  sales: number;
+  dealerInstallations: number;
+  institutionalPilots: number;
+};
+
+type AgronomistSummaryRow = {
+  id: string;
+  name: string;
+  activePilots: number;
+  visitsCompleted: number;
+  reportsSubmitted: number;
+  scaleUpRecommended: number;
+};
+
+type ResearchAssistantSummaryRow = {
+  id: string;
+  name: string;
+  manager: string;
+  assignedPilots: number;
+  visitsCompleted: number;
+  reportsSubmitted: number;
+};
+
+type KpiDashboardSummary = {
+  filters: {
+    regions: SummaryFilterRegion[];
+    rsmUsers: SummaryFilterUser[];
+  };
+  management: {
+    fyDeviceTarget: number;
+    fyEnd: string;
+    devicesInstalledFy: number;
+    monthlyInstallations: number;
+    weeklyInstallations: number;
+    warehouseStock: number;
+    dealerStock: number;
+    activePilots: number;
+    activeDealers: number;
+    activeInstitutionalPartners: number;
+  };
+  sales: {
+    newLeadsThisMonth: number;
+    openLeads: number;
+    wonLeads: number;
+    lostLeads: number;
+    paymentConfirmed: number;
+    deviceInstalledLeads: number;
+    followupsCompleted: number;
+    followupsDue: number;
+  };
+  dealers: {
+    totalDealers: number;
+    activeDealers: number;
+    dormantDealers: number;
+    trainedDealers: number;
+    dealerStock: number;
+    dealerInstallations: number;
+    monthlyInstallations: number;
+    monthlyTarget: number;
+  };
+  institutions: {
+    totalInstitutions: number;
+    activeInstitutionalPartners: number;
+    institutionalMeetingsThisMonth: number;
+    rdHeadMeetingsThisMonth: number;
+    pilotProposalsShared: number;
+    institutionalPilotsStarted: number;
+    scaleUpOpportunities: number;
+    parkedLostInstitutions: number;
+  };
+  pilots: {
+    totalPilots: number;
+    activePilotsInRange: number;
+    pilotVisitsCompleted: number;
+    visitReportsSubmitted: number;
+    finalPilotReportsApproved: number;
+    reportsPending: number;
+    scaleUpRecommendedPilots: number;
+    closedSuccessfulPilots: number;
+  };
+  agronomist: {
+    activeOwnPilots: number;
+    activeTeamPilots: number;
+    visitsCompleted: number;
+    reportsSubmitted: number;
+    finalReportsPending: number;
+    scaleUpRecommended: number;
+  };
+  researchAssistant: {
+    leadsCreated: number;
+    assignedPilots: number;
+    visitsCompleted: number;
+    reportsSubmitted: number;
+    followupsCompleted: number;
+  };
+  rdHead: {
+    totalActivePilots: number;
+    finalReportsPendingReview: number;
+    finalReportsApproved: number;
+    scaleUpRecommended: number;
+    agronomistRows: AgronomistSummaryRow[];
+    researchAssistantRows: ResearchAssistantSummaryRow[];
+  };
+  stock: {
+    total: number;
+    warehouse: number;
+    dealer: number;
+    dispatched: number;
+    installedFarmer: number;
+    installedPilot: number;
+    returned: number;
+    damagedHold: number;
+  };
+  rsmRows: RsmSummaryRow[];
+  charts: {
+    installationsByMonth: ChartDatum[];
+    installationsByProduct: ChartDatum[];
+    leadsByFunnelStage: ChartDatum[];
+    devicesByStatus: ChartDatum[];
+    pilotsByStatus: ChartDatum[];
+    institutionalMeetingsByMonth: ChartDatum[];
+  };
+};
+
 type RecordContext = {
   states?: Array<string | null | undefined>;
   regionIds?: Array<string | null | undefined>;
@@ -473,8 +608,8 @@ function FiltersForm({
   rsmUsers
 }: {
   filters: DashboardFilters;
-  regions: Region[];
-  rsmUsers: User[];
+  regions: SummaryFilterRegion[];
+  rsmUsers: SummaryFilterUser[];
 }) {
   return (
     <form
@@ -602,6 +737,730 @@ function FiltersForm({
   );
 }
 
+function KpiDashboardSummaryView({
+  currentUser,
+  filters,
+  summary
+}: {
+  currentUser: User;
+  filters: DashboardFilters;
+  summary: KpiDashboardSummary;
+}) {
+  const canSeeManagementSections = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "Sales Head"
+  ]);
+  const canSeeSalesSections = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "RSM"
+  ]);
+  const canSeeDealerSections = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "RSM"
+  ]);
+  const canSeeInstitutionalSections = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "RSM",
+    "R&D Head",
+    "Agronomist"
+  ]);
+  const canSeePilotSections = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "R&D Head",
+    "Agronomist"
+  ]);
+  const canSeeStockSections = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "Sales Head"
+  ]);
+  const fyAchievement =
+    summary.management.fyDeviceTarget > 0
+      ? (summary.management.devicesInstalledFy /
+          summary.management.fyDeviceTarget) *
+        100
+      : 0;
+  const dealerTargetAchievement =
+    summary.dealers.monthlyTarget > 0
+      ? (summary.dealers.monthlyInstallations /
+          summary.dealers.monthlyTarget) *
+        100
+      : 0;
+  const dealerActualVsTargetValue =
+    summary.dealers.monthlyTarget > 0
+      ? formatPercent(dealerTargetAchievement)
+      : "Target not set";
+  const dealerActualVsTargetHelper =
+    summary.dealers.monthlyTarget > 0
+      ? `${formatNumber(summary.dealers.monthlyInstallations)} actual / ${formatNumber(
+          summary.dealers.monthlyTarget
+        )} target`
+      : `${formatNumber(summary.dealers.monthlyInstallations)} actual / target not set`;
+  const deviceStatusCounts = new Map(
+    summary.charts.devicesByStatus.map((item) => [item.label, item.value])
+  );
+  const devicesByStatus = deviceStatusOptions.map((option) => ({
+    label: option.label,
+    value:
+      deviceStatusCounts.get(option.value) ??
+      deviceStatusCounts.get(option.label) ??
+      0
+  }));
+
+  return (
+    <section>
+      <PageHeader
+        eyebrow="Management"
+        title="KPI Dashboard"
+        description="Track FY device progress, sales funnel health, partner activity, pilots, stock, and dispatch movement in one place."
+      />
+      <p className="mt-2 text-sm leading-6 text-slate-500">
+        {dashboardScopeText(currentUser)}
+      </p>
+
+      <FiltersForm
+        filters={filters}
+        regions={summary.filters.regions}
+        rsmUsers={summary.filters.rsmUsers}
+      />
+
+      <div className="mt-6 space-y-8">
+        {canSeeManagementSections ? (
+          <section>
+            <SectionTitle title="Management KPI Summary" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <KpiCard
+                icon={Target}
+                label="FY Device Target"
+                value={formatNumber(summary.management.fyDeviceTarget)}
+                helper={`By ${summary.management.fyEnd}`}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Devices Installed This FY"
+                value={formatNumber(summary.management.devicesInstalledFy)}
+              />
+              <KpiCard
+                icon={Percent}
+                label="FY Target Achievement"
+                value={formatPercent(fyAchievement)}
+              />
+              <KpiCard
+                icon={CalendarClock}
+                label="Monthly Installations"
+                value={formatNumber(summary.management.monthlyInstallations)}
+              />
+              <KpiCard
+                icon={Activity}
+                label="Weekly Installations"
+                value={formatNumber(summary.management.weeklyInstallations)}
+              />
+              <KpiCard
+                icon={Warehouse}
+                label="Warehouse Stock"
+                value={formatNumber(summary.management.warehouseStock)}
+              />
+              <KpiCard
+                icon={Store}
+                label="Dealer Stock"
+                value={formatNumber(summary.management.dealerStock)}
+              />
+              <KpiCard
+                icon={Gauge}
+                label="Active Pilots"
+                value={formatNumber(summary.management.activePilots)}
+              />
+              <KpiCard
+                icon={UsersRound}
+                label="Active Dealers"
+                value={formatNumber(summary.management.activeDealers)}
+              />
+              <KpiCard
+                icon={Building2}
+                label="Active Institutional Partners"
+                value={formatNumber(
+                  summary.management.activeInstitutionalPartners
+                )}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {canSeeSalesSections ? (
+          <section>
+            <SectionTitle title="Sales Funnel KPIs" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+              <KpiCard
+                icon={Tractor}
+                label="New Leads This Month"
+                value={formatNumber(summary.sales.newLeadsThisMonth)}
+              />
+              <KpiCard
+                icon={Activity}
+                label="Open Leads"
+                value={formatNumber(summary.sales.openLeads)}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Won Leads"
+                value={formatNumber(summary.sales.wonLeads)}
+              />
+              <KpiCard
+                icon={XCircle}
+                label="Lost Leads"
+                value={formatNumber(summary.sales.lostLeads)}
+              />
+              <KpiCard
+                icon={ClipboardCheck}
+                label="Payment Confirmed"
+                value={formatNumber(summary.sales.paymentConfirmed)}
+              />
+              <KpiCard
+                icon={Package}
+                label="Device Installed Leads"
+                value={formatNumber(summary.sales.deviceInstalledLeads)}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="15-Day Follow-ups Completed"
+                value={formatNumber(summary.sales.followupsCompleted)}
+              />
+              <KpiCard
+                icon={CalendarClock}
+                label="Follow-ups Due"
+                value={formatNumber(summary.sales.followupsDue)}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {canSeeSalesSections ? (
+          <section>
+            <SectionTitle title="RSM Performance" />
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">RSM</th>
+                      <th className="px-4 py-3">Region</th>
+                      <th className="px-4 py-3">FY Target</th>
+                      <th className="px-4 py-3">Devices Installed This FY</th>
+                      <th className="px-4 py-3">Achievement %</th>
+                      <th className="px-4 py-3">Leads Generated</th>
+                      <th className="px-4 py-3">Sales Completed</th>
+                      <th className="px-4 py-3">Dealer Installations</th>
+                      <th className="px-4 py-3">
+                        Institutional Pilots Started
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {summary.rsmRows.length === 0 ? (
+                      <tr>
+                        <td
+                          className="px-4 py-6 text-center text-sm text-slate-500"
+                          colSpan={9}
+                        >
+                          No data yet
+                        </td>
+                      </tr>
+                    ) : (
+                      summary.rsmRows.map((row) => (
+                        <tr key={row.id}>
+                          <td className="px-4 py-3 font-medium text-slate-950">
+                            {row.rsm}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {row.region || "Not set"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {formatNumber(row.target)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {formatNumber(row.installed)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {formatPercent(row.achievement)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {formatNumber(row.leads)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {formatNumber(row.sales)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {formatNumber(row.dealerInstallations)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {formatNumber(row.institutionalPilots)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {canSeeDealerSections ? (
+          <section>
+            <SectionTitle title="Dealer KPIs" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+              <KpiCard
+                icon={Store}
+                label="Total Dealers"
+                value={formatNumber(summary.dealers.totalDealers)}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Active Dealers"
+                value={formatNumber(summary.dealers.activeDealers)}
+              />
+              <KpiCard
+                icon={RotateCcw}
+                label="Dormant Dealers"
+                value={formatNumber(summary.dealers.dormantDealers)}
+              />
+              <KpiCard
+                icon={ClipboardCheck}
+                label="Dealers Trained"
+                value={formatNumber(summary.dealers.trainedDealers)}
+              />
+              <KpiCard
+                icon={Package}
+                label="Dealer Stock"
+                value={formatNumber(summary.dealers.dealerStock)}
+              />
+              <KpiCard
+                icon={Tractor}
+                label="Dealer Installations"
+                value={formatNumber(summary.dealers.dealerInstallations)}
+              />
+              <KpiCard
+                icon={TrendingUp}
+                label="Dealer Actual vs Target"
+                value={dealerActualVsTargetValue}
+                helper={dealerActualVsTargetHelper}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {canSeeInstitutionalSections ? (
+          <section>
+            <SectionTitle title="Institutional KPIs" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+              <KpiCard
+                icon={Building2}
+                label="Total Institutions"
+                value={formatNumber(summary.institutions.totalInstitutions)}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Active Institutional Partners"
+                value={formatNumber(
+                  summary.institutions.activeInstitutionalPartners
+                )}
+              />
+              <KpiCard
+                icon={CalendarClock}
+                label="Institutional Meetings This Month"
+                value={formatNumber(
+                  summary.institutions.institutionalMeetingsThisMonth
+                )}
+              />
+              <KpiCard
+                icon={UsersRound}
+                label="R&D Head Meetings This Month"
+                value={formatNumber(
+                  summary.institutions.rdHeadMeetingsThisMonth
+                )}
+              />
+              <KpiCard
+                icon={ClipboardCheck}
+                label="Pilot Proposals Shared"
+                value={formatNumber(summary.institutions.pilotProposalsShared)}
+              />
+              <KpiCard
+                icon={Gauge}
+                label="Institutional Pilots Started"
+                value={formatNumber(
+                  summary.institutions.institutionalPilotsStarted
+                )}
+              />
+              <KpiCard
+                icon={TrendingUp}
+                label="Scale-up Opportunities"
+                value={formatNumber(summary.institutions.scaleUpOpportunities)}
+              />
+              <KpiCard
+                icon={XCircle}
+                label="Parked / Lost"
+                value={formatNumber(summary.institutions.parkedLostInstitutions)}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {canSeePilotSections ? (
+          <section>
+            <SectionTitle title="Pilot and R&D KPIs" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+              <KpiCard
+                icon={Gauge}
+                label="Total Pilots"
+                value={formatNumber(summary.pilots.totalPilots)}
+              />
+              <KpiCard
+                icon={Activity}
+                label="Active Pilots"
+                value={formatNumber(summary.pilots.activePilotsInRange)}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Pilot Visits Completed"
+                value={formatNumber(summary.pilots.pilotVisitsCompleted)}
+              />
+              <KpiCard
+                icon={ClipboardCheck}
+                label="Visit Reports Submitted"
+                value={formatNumber(summary.pilots.visitReportsSubmitted)}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Final Pilot Reports Approved"
+                value={formatNumber(summary.pilots.finalPilotReportsApproved)}
+              />
+              <KpiCard
+                icon={CalendarClock}
+                label="Reports Pending"
+                value={formatNumber(summary.pilots.reportsPending)}
+              />
+              <KpiCard
+                icon={TrendingUp}
+                label="Scale-up Recommended Pilots"
+                value={formatNumber(summary.pilots.scaleUpRecommendedPilots)}
+              />
+              <KpiCard
+                icon={Target}
+                label="Closed Successful Pilots"
+                value={formatNumber(summary.pilots.closedSuccessfulPilots)}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {hasRole(currentUser, "Agronomist") ? (
+          <section>
+            <SectionTitle title="Agronomist Team KPIs" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <KpiCard
+                icon={Gauge}
+                label="Active Pilots Managed"
+                value={formatNumber(summary.agronomist.activeOwnPilots)}
+              />
+              <KpiCard
+                icon={UsersRound}
+                label="Active Team Pilots"
+                value={formatNumber(summary.agronomist.activeTeamPilots)}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Team Visits Completed"
+                value={formatNumber(summary.agronomist.visitsCompleted)}
+              />
+              <KpiCard
+                icon={ClipboardCheck}
+                label="Team Reports Submitted"
+                value={formatNumber(summary.agronomist.reportsSubmitted)}
+              />
+              <KpiCard
+                icon={CalendarClock}
+                label="Final Reports Pending"
+                value={formatNumber(summary.agronomist.finalReportsPending)}
+              />
+              <KpiCard
+                icon={TrendingUp}
+                label="Scale-up Recommended"
+                value={formatNumber(summary.agronomist.scaleUpRecommended)}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {hasRole(currentUser, "Research Assistant") ? (
+          <section>
+            <SectionTitle title="Research Assistant KPIs" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <KpiCard
+                icon={Tractor}
+                label="Leads Created"
+                value={formatNumber(summary.researchAssistant.leadsCreated)}
+              />
+              <KpiCard
+                icon={Gauge}
+                label="Assigned Pilots"
+                value={formatNumber(summary.researchAssistant.assignedPilots)}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Visits Completed"
+                value={formatNumber(summary.researchAssistant.visitsCompleted)}
+              />
+              <KpiCard
+                icon={ClipboardCheck}
+                label="Reports Submitted"
+                value={formatNumber(summary.researchAssistant.reportsSubmitted)}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Follow-ups Completed"
+                value={formatNumber(
+                  summary.researchAssistant.followupsCompleted
+                )}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {hasAnyRole(currentUser, ["Admin", "Management", "R&D Head"]) ? (
+          <section>
+            <SectionTitle
+              title="R&D Head Performance"
+              description="Agronomist and Research Assistant pilot activity for the selected dashboard filters."
+            />
+            <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <KpiCard
+                icon={Gauge}
+                label="Total Active Pilots"
+                value={formatNumber(summary.rdHead.totalActivePilots)}
+              />
+              <KpiCard
+                icon={CalendarClock}
+                label="Final Reports Pending Review"
+                value={formatNumber(summary.rdHead.finalReportsPendingReview)}
+              />
+              <KpiCard
+                icon={CheckCircle2}
+                label="Final Reports Approved"
+                value={formatNumber(summary.rdHead.finalReportsApproved)}
+              />
+              <KpiCard
+                icon={TrendingUp}
+                label="Scale-up Recommended"
+                value={formatNumber(summary.rdHead.scaleUpRecommended)}
+              />
+            </div>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 px-4 py-3">
+                  <h3 className="text-sm font-semibold text-slate-950">
+                    Agronomist-wise Pilot Performance
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3">Agronomist</th>
+                        <th className="px-4 py-3">Active pilots</th>
+                        <th className="px-4 py-3">Visits</th>
+                        <th className="px-4 py-3">Reports</th>
+                        <th className="px-4 py-3">Scale-up</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {summary.rdHead.agronomistRows.length ? (
+                        summary.rdHead.agronomistRows.map((row) => (
+                          <tr key={row.id}>
+                            <td className="px-4 py-3 font-medium text-slate-950">
+                              {row.name}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatNumber(row.activePilots)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatNumber(row.visitsCompleted)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatNumber(row.reportsSubmitted)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatNumber(row.scaleUpRecommended)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            className="px-4 py-6 text-center text-sm text-slate-500"
+                            colSpan={5}
+                          >
+                            No data yet
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 px-4 py-3">
+                  <h3 className="text-sm font-semibold text-slate-950">
+                    Research Assistant Visit / Report Performance
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3">Research Assistant</th>
+                        <th className="px-4 py-3">Reports to</th>
+                        <th className="px-4 py-3">Pilots</th>
+                        <th className="px-4 py-3">Visits</th>
+                        <th className="px-4 py-3">Reports</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {summary.rdHead.researchAssistantRows.length ? (
+                        summary.rdHead.researchAssistantRows.map((row) => (
+                          <tr key={row.id}>
+                            <td className="px-4 py-3 font-medium text-slate-950">
+                              {row.name}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {row.manager}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatNumber(row.assignedPilots)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatNumber(row.visitsCompleted)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatNumber(row.reportsSubmitted)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            className="px-4 py-6 text-center text-sm text-slate-500"
+                            colSpan={5}
+                          >
+                            No data yet
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {canSeeStockSections ? (
+          <section>
+            <SectionTitle title="Stock and Dispatch KPIs" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+              <KpiCard
+                icon={Package}
+                label="Total Devices"
+                value={formatNumber(summary.stock.total)}
+              />
+              <KpiCard
+                icon={Warehouse}
+                label="Warehouse Stock"
+                value={formatNumber(summary.stock.warehouse)}
+              />
+              <KpiCard
+                icon={Store}
+                label="With Dealer"
+                value={formatNumber(summary.stock.dealer)}
+              />
+              <KpiCard
+                icon={Truck}
+                label="Dispatched"
+                value={formatNumber(summary.stock.dispatched)}
+              />
+              <KpiCard
+                icon={Tractor}
+                label="Installed at Farmer Site"
+                value={formatNumber(summary.stock.installedFarmer)}
+              />
+              <KpiCard
+                icon={RadioTower}
+                label="Installed for Pilot"
+                value={formatNumber(summary.stock.installedPilot)}
+              />
+              <KpiCard
+                icon={RotateCcw}
+                label="Returned"
+                value={formatNumber(summary.stock.returned)}
+              />
+              <KpiCard
+                icon={XCircle}
+                label="Damaged / Hold"
+                value={formatNumber(summary.stock.damagedHold)}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        <section>
+          <SectionTitle title="Charts" />
+          <div className="grid gap-4 lg:grid-cols-2">
+            {canSeeSalesSections ? (
+              <>
+                <ChartCard
+                  title="Installations by Month"
+                  data={summary.charts.installationsByMonth}
+                />
+                <ChartCard
+                  title="Installations by Product"
+                  data={summary.charts.installationsByProduct}
+                />
+                <ChartCard
+                  title="Leads by Funnel Stage"
+                  data={summary.charts.leadsByFunnelStage}
+                />
+              </>
+            ) : null}
+            {canSeeStockSections ? (
+              <ChartCard title="Devices by Status" data={devicesByStatus} />
+            ) : null}
+            {canSeePilotSections ? (
+              <ChartCard
+                title="Pilots by Status"
+                data={summary.charts.pilotsByStatus}
+              />
+            ) : null}
+            {canSeeInstitutionalSections ? (
+              <ChartCard
+                title="Institutional Meetings by Month"
+                data={summary.charts.institutionalMeetingsByMonth}
+              />
+            ) : null}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
 export default async function KpiDashboardPage({
   searchParams
 }: KpiDashboardPageProps) {
@@ -619,6 +1478,31 @@ export default async function KpiDashboardPage({
           rsmUserId: currentUser.id
         }
       : parsedFilters;
+  const { data: summaryData, error: summaryError } = await timeAsync(
+    "kpi dashboard summary rpc",
+    () =>
+      supabase.rpc("get_kpi_dashboard_summary", {
+        p_start_date: filters.startDate,
+        p_end_date: filters.endDate,
+        p_state: filters.state || null,
+        p_region_id: filters.regionId || null,
+        p_rsm_user_id: filters.rsmUserId || null,
+        p_product_model: filters.productModel || null,
+        p_crop: filters.crop || null
+      })
+  );
+
+  if (summaryError) {
+    console.error("[KPI Dashboard] Summary RPC unavailable", summaryError);
+  } else if (summaryData) {
+    return (
+      <KpiDashboardSummaryView
+        currentUser={currentUser}
+        filters={filters}
+        summary={summaryData as unknown as KpiDashboardSummary}
+      />
+    );
+  }
 
   const [
     devices,

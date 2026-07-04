@@ -2006,7 +2006,20 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      get_kpi_dashboard_summary: {
+        Args: {
+          p_start_date?: string | null;
+          p_end_date?: string | null;
+          p_state?: string | null;
+          p_region_id?: string | null;
+          p_rsm_user_id?: string | null;
+          p_product_model?: string | null;
+          p_crop?: string | null;
+        };
+        Returns: Json;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
