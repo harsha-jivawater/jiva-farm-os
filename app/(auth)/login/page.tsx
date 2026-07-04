@@ -1,6 +1,6 @@
 import { Leaf } from "lucide-react";
 import { redirect } from "next/navigation";
-import { signInAction } from "@/app/auth-actions";
+import { requestPasswordResetAction, signInAction } from "@/app/auth-actions";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -11,6 +11,7 @@ import {
 type LoginPageProps = {
   searchParams: Promise<{
     error?: string;
+    message?: string;
     setup?: string;
   }>;
 };
@@ -35,6 +36,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const configured = isSupabaseConfigured();
   const errorMessage = getErrorMessage(params.error);
+  const successMessage = params.message;
 
   if (configured) {
     const supabase = await createClient();
@@ -85,6 +87,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </div>
           ) : null}
 
+          {successMessage ? (
+            <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
+              {successMessage}
+            </div>
+          ) : null}
+
           <form action={signInAction} className="space-y-4">
             <div>
               <label
@@ -128,6 +136,37 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               Sign in
             </button>
           </form>
+
+          <details className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+            <summary className="cursor-pointer text-sm font-semibold text-brand-700">
+              Forgot password?
+            </summary>
+            <form action={requestPasswordResetAction} className="mt-4 space-y-3">
+              <div>
+                <label
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  htmlFor="reset_email"
+                >
+                  Work email
+                </label>
+                <input
+                  autoComplete="email"
+                  className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                  id="reset_email"
+                  name="reset_email"
+                  placeholder="name@jivawater.com"
+                  type="email"
+                />
+              </div>
+              <button
+                className="min-h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                disabled={!configured}
+                type="submit"
+              >
+                Send reset link
+              </button>
+            </form>
+          </details>
 
           <p className="mt-4 text-sm leading-6 text-slate-500">
             Accounts are managed internally through Supabase authentication.

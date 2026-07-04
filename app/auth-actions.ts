@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -47,4 +48,37 @@ export async function signOutAction() {
 
   revalidatePath("/", "layout");
   redirect("/login");
+}
+
+export async function requestPasswordResetAction(formData: FormData) {
+  const email = String(formData.get("reset_email") ?? "").trim().toLowerCase();
+
+  if (!isSupabaseConfigured()) {
+    redirect("/login?error=missing-supabase-config");
+  }
+
+  if (!email) {
+    redirect("/login?error=Enter your email address to reset your password.");
+  }
+
+  if (!isJivawaterEmail(email)) {
+    redirect(`/login?error=${encodeURIComponent(INTERNAL_EMAIL_DOMAIN_MESSAGE)}`);
+  }
+
+  const headerStore = await headers();
+  const origin =
+    headerStore.get("origin") ??
+    `${headerStore.get("x-forwarded-proto") ?? "http"}://${headerStore.get("host") ?? ""}`;
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/update-password`
+  });
+
+  if (error) {
+    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect(
+    "/login?message=If the email is active, a password reset link has been sent."
+  );
 }
