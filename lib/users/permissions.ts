@@ -52,7 +52,8 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Agronomist",
     "Accounts",
     "Stock / Dispatch",
-    "R&D Head"
+    "R&D Head",
+    "Viewer"
   ],
   devices: [
     "Admin",
@@ -61,7 +62,8 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Accounts",
     "Stock / Dispatch",
     "Agronomist",
-    "R&D Head"
+    "R&D Head",
+    "Viewer"
   ],
   dispatches: [
     "Admin",
@@ -70,7 +72,8 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Sales Head",
     "RSM",
     "Agronomist",
-    "R&D Head"
+    "R&D Head",
+    "Viewer"
   ],
   dealers: [
     "Admin",
@@ -79,7 +82,8 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Salesperson",
     "Management",
     "Agronomist",
-    "R&D Head"
+    "R&D Head",
+    "Viewer"
   ],
   "institutional-partners": [
     "Admin",
@@ -87,7 +91,8 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Sales Head",
     "RSM",
     "R&D Head",
-    "Agronomist"
+    "Agronomist",
+    "Viewer"
   ],
   pilots: [
     "Admin",
@@ -97,7 +102,8 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Research Assistant",
     "Sales Head",
     "RSM",
-    "Salesperson"
+    "Salesperson",
+    "Viewer"
   ],
   installations: [
     "Admin",
@@ -107,7 +113,8 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Stock / Dispatch",
     "Management",
     "Agronomist",
-    "R&D Head"
+    "R&D Head",
+    "Viewer"
   ],
   "follow-ups": [
     "Admin",
@@ -117,7 +124,8 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Research Assistant",
     "Agronomist",
     "Management",
-    "R&D Head"
+    "R&D Head",
+    "Viewer"
   ],
   "monitoring-devices": [
     "Admin",
@@ -137,7 +145,8 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Salesperson",
     "Research Assistant",
     "Accounts",
-    "Stock / Dispatch"
+    "Stock / Dispatch",
+    "Viewer"
   ],
   "internal-users": ["Admin"],
   regions: ["Admin", "Sales Head", "Management"]

@@ -749,19 +749,22 @@ function KpiDashboardSummaryView({
   const canSeeManagementSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
-    "Sales Head"
+    "Sales Head",
+    "Viewer"
   ]);
   const canSeeSalesSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
     "Sales Head",
-    "RSM"
+    "RSM",
+    "Viewer"
   ]);
   const canSeeDealerSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
     "Sales Head",
-    "RSM"
+    "RSM",
+    "Viewer"
   ]);
   const canSeeInstitutionalSections = hasAnyRole(currentUser, [
     "Admin",
@@ -769,19 +772,22 @@ function KpiDashboardSummaryView({
     "Sales Head",
     "RSM",
     "R&D Head",
-    "Agronomist"
+    "Agronomist",
+    "Viewer"
   ]);
   const canSeePilotSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
     "Sales Head",
     "R&D Head",
-    "Agronomist"
+    "Agronomist",
+    "Viewer"
   ]);
   const canSeeStockSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
-    "Sales Head"
+    "Sales Head",
+    "Viewer"
   ]);
   const fyAchievement =
     summary.management.fyDeviceTarget > 0
@@ -2575,19 +2581,22 @@ export default async function KpiDashboardPage({
   const canSeeManagementSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
-    "Sales Head"
+    "Sales Head",
+    "Viewer"
   ]);
   const canSeeSalesSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
     "Sales Head",
-    "RSM"
+    "RSM",
+    "Viewer"
   ]);
   const canSeeDealerSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
     "Sales Head",
-    "RSM"
+    "RSM",
+    "Viewer"
   ]);
   const canSeeInstitutionalSections = hasAnyRole(currentUser, [
     "Admin",
@@ -2595,19 +2604,22 @@ export default async function KpiDashboardPage({
     "Sales Head",
     "RSM",
     "R&D Head",
-    "Agronomist"
+    "Agronomist",
+    "Viewer"
   ]);
   const canSeePilotSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
     "Sales Head",
     "R&D Head",
-    "Agronomist"
+    "Agronomist",
+    "Viewer"
   ]);
   const canSeeStockSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
-    "Sales Head"
+    "Sales Head",
+    "Viewer"
   ]);
 
   return (

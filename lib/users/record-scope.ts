@@ -21,7 +21,8 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Sales Head",
     "RSM",
     "R&D Head",
-    "Agronomist"
+    "Agronomist",
+    "Viewer"
   ],
   "farmer-leads": [
     "Admin",
@@ -29,7 +30,8 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Sales Head",
     "Accounts",
     "Stock / Dispatch",
-    "R&D Head"
+    "R&D Head",
+    "Viewer"
   ],
   devices: [
     "Admin",
@@ -37,26 +39,34 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Sales Head",
     "Accounts",
     "Stock / Dispatch",
-    "R&D Head"
+    "R&D Head",
+    "Viewer"
   ],
   dispatches: [
     "Admin",
     "Accounts",
     "Stock / Dispatch",
     "Sales Head",
-    "R&D Head"
+    "R&D Head",
+    "Viewer"
   ],
-  dealers: ["Admin", "Management", "Sales Head", "R&D Head"],
-  "institutional-partners": ["Admin", "Management", "Sales Head"],
-  pilots: ["Admin", "Management", "Sales Head", "R&D Head"],
+  dealers: ["Admin", "Management", "Sales Head", "R&D Head", "Viewer"],
+  "institutional-partners": [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "Viewer"
+  ],
+  pilots: ["Admin", "Management", "Sales Head", "R&D Head", "Viewer"],
   installations: [
     "Admin",
     "Management",
     "Sales Head",
     "Stock / Dispatch",
-    "R&D Head"
+    "R&D Head",
+    "Viewer"
   ],
-  "follow-ups": ["Admin", "Management", "Sales Head", "R&D Head"],
+  "follow-ups": ["Admin", "Management", "Sales Head", "R&D Head", "Viewer"],
   "monitoring-devices": [
     "Admin",
     "Management",
@@ -70,7 +80,8 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Sales Head",
     "RSM",
     "R&D Head",
-    "Agronomist"
+    "Agronomist",
+    "Viewer"
   ],
   "internal-users": ["Admin"],
   regions: ["Admin", "Management", "Sales Head"]
