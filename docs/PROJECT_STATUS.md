@@ -27,6 +27,7 @@
 - Help/SOP
 - Password change/reset
 - Force first-login password change
+- CSV import for Farmer Leads and Devices
 
 ## Branding Status
 
@@ -47,6 +48,7 @@
 - Vercel should deploy from `main`.
 - Supabase production schema should stay aligned with committed migrations.
 - QA seed tools should remain disabled in production unless intentionally enabled for controlled testing.
+- CSV import templates are available under `public/templates/`.
 
 ## Documentation Habit
 

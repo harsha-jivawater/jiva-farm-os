@@ -1,0 +1,2 @@
+serial_number,product_model,device_status,stock_entry_source,stock_entry_date,current_holder_type,current_state,current_district,current_location_text,device_code,remarks
+SAMPLE-DEVICE-001,Vipasa,In Warehouse,Production,2026-07-04,Warehouse,Karnataka,Bangalore Urban,Jiva warehouse,,Sample row - remove before import

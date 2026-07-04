@@ -8,6 +8,7 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
+  Upload,
   Wrench,
   XCircle
 } from "lucide-react";
@@ -276,13 +277,22 @@ export default async function FarmerLeadsPage({
           description="Capture, search, filter, and manage farmer interest for Jiva Farm device operations."
         />
         {canWrite ? (
-          <Link
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
-            href="/farmer-leads/new"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add lead
-          </Link>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              href="/farmer-leads/import"
+            >
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              Import CSV
+            </Link>
+            <Link
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+              href="/farmer-leads/new"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add lead
+            </Link>
+          </div>
         ) : null}
       </div>
 

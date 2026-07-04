@@ -34,6 +34,8 @@ After Vercel deploys, verify:
 - https://www.jivawater.org/help
 - https://www.jivawater.org/account/password
 - https://www.jivawater.org/auth/update-password
+- https://www.jivawater.org/farmer-leads/import
+- https://www.jivawater.org/devices/import
 
 Also sign in with an Admin account and confirm:
 
@@ -51,6 +53,16 @@ Also sign in with an Admin account and confirm:
 - Always create and commit migrations for schema changes.
 - Do not apply rollback or draft SQL files unless specifically required.
 - Keep production `NEXT_PUBLIC_ENABLE_QA_SEED` unset or `false`.
+
+## CSV Import Notes
+
+- Farmer Leads import route: `/farmer-leads/import`
+- Devices import route: `/devices/import`
+- Farmer Leads template: `/templates/farmer-leads-import-template.csv`
+- Devices template: `/templates/devices-import-template.csv`
+- Imports must be previewed before confirmation.
+- Import actions revalidate rows on the server and respect the signed-in user's normal permissions and RLS scope.
+- Do not bulk insert data directly in Supabase unless there is a reviewed operational reason.
 
 ## Documentation Rule
 

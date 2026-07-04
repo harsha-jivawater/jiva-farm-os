@@ -4,6 +4,8 @@ Simple reverse chronological record of major Jiva Farm OS work.
 
 ## 2026-07-04
 
+- Added preview-first CSV import for Farmer Leads and Devices.
+- Added downloadable CSV import templates for Farmer Leads and Devices.
 - Added polished loading states for login and app route transitions.
 - Cleaned the Jiva Water PNG logo so it renders without a dark background.
 - Updated login wording and removed the Supabase authentication note.
