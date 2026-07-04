@@ -66,7 +66,7 @@ export function AppShell({
             href={mustChangePassword ? "/account/password" : "/dashboard"}
             onClick={() => setIsOpen(false)}
           >
-            <BrandLogo className="max-h-14 w-[200px]" priority />
+            <BrandLogo className="max-h-14 w-[190px]" priority />
           </Link>
           <button
             aria-label="Close navigation"
@@ -211,7 +211,7 @@ export function AppShell({
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
           <div className="flex min-w-0 justify-center">
-            <BrandLogo className="max-h-12 w-[180px]" priority />
+            <BrandLogo className="max-h-12 w-[170px]" priority />
           </div>
           <div aria-hidden="true" />
         </header>
