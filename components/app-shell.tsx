@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
-import { HelpCircle, KeyRound, Leaf, LogOut, Menu, X } from "lucide-react";
+import { HelpCircle, KeyRound, LogOut, Menu, X } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { navigationItems, teamItems } from "@/lib/navigation";
 import { CurrentUserProvider, type CurrentInternalUser } from "@/components/auth/current-user-context";
 import { canViewModule } from "@/lib/users/permissions";
@@ -49,21 +50,11 @@ export function AppShell({
       >
         <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4">
           <Link
-            className="flex min-w-0 items-center gap-3"
+            className="flex min-w-0 items-center"
             href="/dashboard"
             onClick={() => setIsOpen(false)}
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-600 text-white">
-              <Leaf className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-slate-950">
-                Jiva Farm
-              </span>
-              <span className="block truncate text-xs text-slate-500">
-                Devices OS
-              </span>
-            </span>
+            <BrandLogo className="max-h-14 w-[190px]" priority />
           </Link>
           <button
             aria-label="Close navigation"
@@ -197,12 +188,7 @@ export function AppShell({
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
-          <div className="min-w-0 text-right">
-            <p className="truncate text-sm font-semibold text-slate-950">
-              Jiva Farm
-            </p>
-            <p className="truncate text-xs text-slate-500">Devices OS</p>
-          </div>
+          <BrandLogo className="max-h-12 w-[170px]" priority />
         </header>
 
         <main className="min-h-screen min-w-0">

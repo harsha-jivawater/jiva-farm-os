@@ -1,6 +1,6 @@
-import { Leaf } from "lucide-react";
 import { redirect } from "next/navigation";
 import { requestPasswordResetAction, signInAction } from "@/app/auth-actions";
+import { BrandLogo } from "@/components/brand-logo";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -59,18 +59,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
       <section className="w-full max-w-md">
-        <div className="mb-6 flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-md bg-brand-600 text-white shadow-soft">
-            <Leaf className="h-6 w-6" aria-hidden="true" />
-          </span>
-          <div>
-            <p className="text-sm font-medium text-slate-500">
-              Jiva Farm Devices OS
-            </p>
-            <h1 className="text-2xl font-semibold text-slate-950">
-              Internal login
-            </h1>
-          </div>
+        <div className="mb-6">
+          <BrandLogo className="max-h-16 w-[220px]" priority />
+          <h1 className="mt-4 text-2xl font-semibold text-slate-950">
+            Internal login
+          </h1>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
