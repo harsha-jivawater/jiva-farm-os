@@ -98,7 +98,7 @@ export default async function DealerDetailPage({
   ] = await Promise.all([
     supabase
       .from("users")
-      .select("id, full_name, role")
+      .select("id, full_name, role, secondary_role")
       .in("id", [dealer.dealer_owner_user_id, dealer.rsm_user_id]),
     supabase
       .from("regions")

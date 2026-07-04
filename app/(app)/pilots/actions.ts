@@ -27,7 +27,7 @@ import type {
   VisitReportUpdate
 } from "@/lib/pilots/types";
 import { createClient } from "@/lib/supabase/server";
-import { isAdmin } from "@/lib/users/permissions";
+import { hasAnyRole } from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import type { InternalUser } from "@/lib/users/types";
 
@@ -63,12 +63,12 @@ async function userHasRole(
 
   const { data } = await supabase
     .from("users")
-    .select("id, role")
+    .select("id, role, secondary_role")
     .eq("id", userId)
     .eq("is_active", true)
     .single();
 
-  return Boolean(data && roles.includes(data.role));
+  return Boolean(data && hasAnyRole(data, roles));
 }
 
 async function hasApprovedFinalReportByRdHead(
@@ -96,12 +96,11 @@ async function hasApprovedFinalReportByRdHead(
 
   const { data: reviewers } = await supabase
     .from("users")
-    .select("id")
+    .select("id, role, secondary_role")
     .in("id", reviewerIds)
-    .eq("is_active", true)
-    .in("role", finalPilotReportApproverRoles);
+    .eq("is_active", true);
 
-  return Boolean(reviewers?.length);
+  return Boolean(reviewers?.some((reviewer) => hasAnyRole(reviewer, finalPilotReportApproverRoles)));
 }
 
 function isFinalPilotReportApproval(payload: VisitReportUpdate) {
@@ -112,14 +111,17 @@ function isFinalPilotReportApproval(payload: VisitReportUpdate) {
 }
 
 function canApproveFinalPilotReport(
-  profile: Pick<InternalUser, "role"> | null | undefined
+  profile:
+    | Pick<InternalUser, "role" | "secondary_role">
+    | null
+    | undefined
 ) {
-  return profile?.role === "R&D Head" || isAdmin(profile);
+  return hasAnyRole(profile, ["R&D Head", "Admin"]);
 }
 
 function stampFinalPilotReportApproval(
   payload: VisitReportUpdate,
-  profile: Pick<InternalUser, "id" | "role">,
+  profile: Pick<InternalUser, "id" | "role" | "secondary_role">,
   errorPath: string
 ) {
   if (!isFinalPilotReportApproval(payload)) {

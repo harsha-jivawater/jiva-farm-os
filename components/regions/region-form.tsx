@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Save } from "lucide-react";
 import type { Region, RegionUserOption } from "@/lib/regions/types";
+import { hasRole } from "@/lib/users/permissions";
 import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
 type RegionFormProps = {
@@ -19,7 +20,7 @@ export function RegionForm({
   users
 }: RegionFormProps) {
   const activeRsmUsers = users.filter(
-    (user) => user.is_active && user.role === "RSM"
+    (user) => user.is_active && hasRole(user, "RSM")
   );
 
   return (

@@ -21,7 +21,7 @@ export default async function EditRegionPage({
     supabase.from("regions").select("*").eq("id", id).single(),
     supabase
       .from("users")
-      .select("id, full_name, role, is_active")
+      .select("id, full_name, role, secondary_role, is_active")
       .eq("is_active", true)
       .eq("role", "RSM")
       .order("full_name")

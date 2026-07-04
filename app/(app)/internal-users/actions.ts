@@ -20,7 +20,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import {
   canDeactivateUsers,
-  canManageInternalUsers
+  canManageInternalUsers,
+  hasRole
 } from "@/lib/users/permissions";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -161,7 +162,7 @@ async function transferResponsibilities({
   if (result.error) throw new Error(result.error.message);
   collectIds(result.data, summarySets.farmerLeads);
 
-  if (oldUser.role === "RSM") {
+  if (hasRole(oldUser, "RSM")) {
     result = await supabase
       .from("farmer_leads")
       .update({ rsm_user_id: replacementUserId })
@@ -193,7 +194,7 @@ async function transferResponsibilities({
   if (result.error) throw new Error(result.error.message);
   collectIds(result.data, summarySets.dealers);
 
-  if (oldUser.role === "RSM") {
+  if (hasRole(oldUser, "RSM")) {
     result = await supabase
       .from("dealers")
       .update({ rsm_user_id: replacementUserId })
@@ -215,7 +216,7 @@ async function transferResponsibilities({
   if (result.error) throw new Error(result.error.message);
   collectIds(result.data, summarySets.institutions);
 
-  if (oldUser.role === "RSM") {
+  if (hasRole(oldUser, "RSM")) {
     result = await supabase
       .from("institutions")
       .update({ rsm_user_id: replacementUserId })
@@ -227,7 +228,7 @@ async function transferResponsibilities({
     collectIds(result.data, summarySets.institutions);
   }
 
-  if (oldUser.role === "Sales Head") {
+  if (hasRole(oldUser, "Sales Head")) {
     result = await supabase
       .from("institutions")
       .update({ sales_head_user_id: replacementUserId })
@@ -239,7 +240,7 @@ async function transferResponsibilities({
     collectIds(result.data, summarySets.institutions);
   }
 
-  if (oldUser.role === "R&D Head") {
+  if (hasRole(oldUser, "R&D Head")) {
     result = await supabase
       .from("institutions")
       .update({ rd_head_user_id: replacementUserId })
@@ -409,7 +410,7 @@ async function transferResponsibilities({
   if (result.error) throw new Error(result.error.message);
   collectIds(result.data, summarySets.installations);
 
-  if (oldUser.role === "RSM") {
+  if (hasRole(oldUser, "RSM")) {
     result = await supabase
       .from("installations")
       .update({ rsm_user_id: replacementUserId })
@@ -442,11 +443,14 @@ export async function createInternalUserAction(formData: FormData) {
   const payload = internalUserPayloadFromForm(formData) as InternalUserInsert;
   const { data: activeUsers } = await supabase
     .from("users")
-    .select("id, role, is_active")
+    .select("id, role, secondary_role, is_active")
     .eq("is_active", true);
   const validationError = validateInternalUserPayload(
     payload,
-    (activeUsers ?? []) as Pick<InternalUser, "id" | "role" | "is_active">[]
+    (activeUsers ?? []) as Pick<
+      InternalUser,
+      "id" | "role" | "secondary_role" | "is_active"
+    >[]
   );
 
   if (validationError) {
@@ -484,12 +488,15 @@ export async function updateInternalUserAction(id: string, formData: FormData) {
   const payload = internalUserPayloadFromForm(formData) as InternalUserUpdate;
   const { data: activeUsers } = await supabase
     .from("users")
-    .select("id, role, is_active")
+    .select("id, role, secondary_role, is_active")
     .eq("is_active", true)
     .neq("id", id);
   const validationError = validateInternalUserPayload(
     payload,
-    (activeUsers ?? []) as Pick<InternalUser, "id" | "role" | "is_active">[]
+    (activeUsers ?? []) as Pick<
+      InternalUser,
+      "id" | "role" | "secondary_role" | "is_active"
+    >[]
   );
 
   if (validationError) {

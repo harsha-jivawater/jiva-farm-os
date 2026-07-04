@@ -61,7 +61,7 @@ export default async function EditVisitReportPage({
       .single(),
     supabase
       .from("users")
-      .select("id, full_name, role")
+      .select("id, full_name, role, secondary_role")
       .eq("is_active", true)
       .order("full_name", { ascending: true }),
     supabase
@@ -98,7 +98,8 @@ export default async function EditVisitReportPage({
           currentUser={{
             id: currentUser.id,
             full_name: currentUser.full_name,
-            role: currentUser.role
+            role: currentUser.role,
+            secondary_role: currentUser.secondary_role
           }}
           pilot={pilotRow}
           report={report as VisitReport}

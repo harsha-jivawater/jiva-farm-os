@@ -70,7 +70,7 @@ export default async function EditMeetingPage({
       .order("created_at", { ascending: false }),
     supabase
       .from("users")
-      .select("id, full_name, role")
+      .select("id, full_name, role, secondary_role")
       .eq("is_active", true)
       .order("full_name", { ascending: true })
   ]);

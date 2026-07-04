@@ -14,6 +14,7 @@ import {
   reportTypeOptions
 } from "@/lib/pilots/options";
 import { labelForRole } from "@/lib/users/options";
+import { hasAnyRole } from "@/lib/users/permissions";
 import type {
   Pilot,
   PilotVisit,
@@ -191,8 +192,10 @@ export function VisitReportForm({
   users,
   visits
 }: VisitReportFormProps) {
-  const canApproveFinalPilotReport =
-    currentUser.role === "R&D Head" || currentUser.role === "Admin";
+  const canApproveFinalPilotReport = hasAnyRole(currentUser, [
+    "R&D Head",
+    "Admin"
+  ]);
   const reviewer = report?.reviewed_by_user_id && report.report_status === "Approved"
     ? users.find((user) => user.id === report.reviewed_by_user_id)
     : null;
@@ -203,9 +206,7 @@ export function VisitReportForm({
       report?.report_status === "Approved"
   );
   const submittedByUsers = users.filter((user) =>
-    ["Agronomist", "Research Assistant", "R&D Head", "Admin"].includes(
-      user.role
-    )
+    hasAnyRole(user, ["Agronomist", "Research Assistant", "R&D Head", "Admin"])
   );
 
   return (

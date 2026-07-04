@@ -1,6 +1,11 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { InternalUser } from "@/lib/users/types";
-import { roleOf, type ModuleKey, type UserRole } from "@/lib/users/permissions";
+import {
+  hasAnyRole,
+  hasRole,
+  type ModuleKey,
+  type UserRole
+} from "@/lib/users/permissions";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -98,7 +103,7 @@ function scopeFromFilters(filters: Array<string | null>): RecordScope {
 }
 
 export function hasFullRecordAccess(user: InternalUser, module: ModuleKey) {
-  return fullRecordAccessRoles[module].includes(roleOf(user));
+  return hasAnyRole(user, fullRecordAccessRoles[module]);
 }
 
 export async function loadDirectReportIds(
@@ -106,18 +111,22 @@ export async function loadDirectReportIds(
   managerId: string,
   roles: string[] = []
 ) {
-  let query = supabase
+  const { data } = await supabase
     .from("users")
-    .select("id")
+    .select("id, role, secondary_role")
     .eq("reports_to_user_id", managerId)
     .eq("is_active", true);
 
-  if (roles.length) {
-    query = query.in("role", roles);
-  }
-
-  const { data } = await query;
-  return unique((data ?? []).map((user) => user.id));
+  return unique(
+    (data ?? [])
+      .filter(
+        (user) =>
+          roles.length === 0 ||
+          roles.includes(user.role) ||
+          roles.includes(user.secondary_role ?? "")
+      )
+      .map((user) => user.id)
+  );
 }
 
 async function leadIdsForScope(
@@ -125,37 +134,37 @@ async function leadIdsForScope(
   user: InternalUser,
   directReportIds: string[]
 ) {
-  const role = roleOf(user);
+  const filters: Array<string | null> = [];
 
-  if (role === "Salesperson") {
+  if (hasRole(user, "Salesperson")) {
     const { data } = await supabase
       .from("farmer_leads")
       .select("id")
       .eq("owner_user_id", user.id)
       .is("deleted_at", null);
-    return unique((data ?? []).map((lead) => lead.id));
+    filters.push(...unique((data ?? []).map((lead) => lead.id)));
   }
 
-  if (role === "Research Assistant") {
+  if (hasRole(user, "Research Assistant")) {
     const { data } = await supabase
       .from("farmer_leads")
       .select("id")
       .eq("created_by_user_id", user.id)
       .is("deleted_at", null);
-    return unique((data ?? []).map((lead) => lead.id));
+    filters.push(...unique((data ?? []).map((lead) => lead.id)));
   }
 
-  if (role === "Agronomist") {
+  if (hasRole(user, "Agronomist")) {
     const userIds = unique([user.id, ...directReportIds]);
     const { data } = await supabase
       .from("farmer_leads")
       .select("id")
       .in("created_by_user_id", userIds)
       .is("deleted_at", null);
-    return unique((data ?? []).map((lead) => lead.id));
+    filters.push(...unique((data ?? []).map((lead) => lead.id)));
   }
 
-  if (role === "RSM") {
+  if (hasRole(user, "RSM")) {
     const { data } = await supabase
       .from("farmer_leads")
       .select("id")
@@ -167,10 +176,10 @@ async function leadIdsForScope(
         ]).join(",")
       )
       .is("deleted_at", null);
-    return unique((data ?? []).map((lead) => lead.id));
+    filters.push(...unique((data ?? []).map((lead) => lead.id)));
   }
 
-  return [];
+  return unique(filters);
 }
 
 export async function loadManagedPilotIds(
@@ -178,13 +187,13 @@ export async function loadManagedPilotIds(
   user: InternalUser,
   directReportIds: string[] = []
 ) {
-  const role = roleOf(user);
-
   if (hasFullRecordAccess(user, "pilots")) {
     return [];
   }
 
-  if (role === "Research Assistant") {
+  const filters: string[] = [];
+
+  if (hasRole(user, "Research Assistant")) {
     const { data } = await supabase
       .from("pilots")
       .select("id")
@@ -196,10 +205,10 @@ export async function loadManagedPilotIds(
         ]).join(",")
       )
       .is("deleted_at", null);
-    return unique((data ?? []).map((pilot) => pilot.id));
+    filters.push(...unique((data ?? []).map((pilot) => pilot.id)));
   }
 
-  if (role === "Agronomist") {
+  if (hasRole(user, "Agronomist")) {
     const userIds = unique([user.id, ...directReportIds]);
     const { data } = await supabase
       .from("pilots")
@@ -213,10 +222,10 @@ export async function loadManagedPilotIds(
         ]).join(",")
       )
       .is("deleted_at", null);
-    return unique((data ?? []).map((pilot) => pilot.id));
+    filters.push(...unique((data ?? []).map((pilot) => pilot.id)));
   }
 
-  return [];
+  return unique(filters);
 }
 
 export async function farmerLeadScope(
@@ -227,25 +236,25 @@ export async function farmerLeadScope(
     return {};
   }
 
-  const role = roleOf(user);
+  const filters: Array<string | null> = [];
 
-  if (role === "RSM") {
-    return scopeFromFilters([
+  if (hasRole(user, "RSM")) {
+    filters.push(
       eqFilter("rsm_user_id", user.id),
       eqFilter("region_id", user.region_id),
       eqFilter("state", user.state)
-    ]);
+    );
   }
 
-  if (role === "Salesperson") {
-    return scopeFromFilters([eqFilter("owner_user_id", user.id)]);
+  if (hasRole(user, "Salesperson")) {
+    filters.push(eqFilter("owner_user_id", user.id));
   }
 
-  if (role === "Research Assistant") {
-    return scopeFromFilters([eqFilter("created_by_user_id", user.id)]);
+  if (hasRole(user, "Research Assistant")) {
+    filters.push(eqFilter("created_by_user_id", user.id));
   }
 
-  if (role === "Agronomist") {
+  if (hasRole(user, "Agronomist")) {
     const directReportIds = await loadDirectReportIds(supabase, user.id, [
       "Research Assistant"
     ]);
@@ -256,13 +265,13 @@ export async function farmerLeadScope(
     );
     const userIds = unique([user.id, ...directReportIds]);
 
-    return scopeFromFilters([
+    filters.push(
       inFilter("created_by_user_id", userIds),
       inFilter("linked_pilot_id", managedPilotIds)
-    ]);
+    );
   }
 
-  return { noRecords: true };
+  return scopeFromFilters(filters);
 }
 
 export async function dealerScope(
@@ -273,21 +282,21 @@ export async function dealerScope(
     return {};
   }
 
-  const role = roleOf(user);
+  const filters: Array<string | null> = [];
 
-  if (role === "RSM") {
-    return scopeFromFilters([
+  if (hasRole(user, "RSM")) {
+    filters.push(
       eqFilter("rsm_user_id", user.id),
       eqFilter("region_id", user.region_id),
       eqFilter("state", user.state)
-    ]);
+    );
   }
 
-  if (role === "Salesperson") {
-    return scopeFromFilters([eqFilter("dealer_owner_user_id", user.id)]);
+  if (hasRole(user, "Salesperson")) {
+    filters.push(eqFilter("dealer_owner_user_id", user.id));
   }
 
-  if (role === "Agronomist") {
+  if (hasRole(user, "Agronomist")) {
     const directReportIds = await loadDirectReportIds(supabase, user.id, [
       "Research Assistant"
     ]);
@@ -320,10 +329,10 @@ export async function dealerScope(
       ...(leadDealers ?? []).map((lead) => lead.linked_dealer_id)
     ]);
 
-    return scopeFromFilters([inFilter("id", dealerIds)]);
+    filters.push(inFilter("id", dealerIds));
   }
 
-  return { noRecords: true };
+  return scopeFromFilters(filters);
 }
 
 export async function institutionScope(
@@ -334,21 +343,21 @@ export async function institutionScope(
     return {};
   }
 
-  const role = roleOf(user);
+  const filters: Array<string | null> = [];
 
-  if (role === "RSM") {
-    return scopeFromFilters([
+  if (hasRole(user, "RSM")) {
+    filters.push(
       eqFilter("rsm_user_id", user.id),
       eqFilter("primary_region_id", user.region_id),
       eqFilter("primary_state", user.state)
-    ]);
+    );
   }
 
-  if (role === "R&D Head") {
-    return scopeFromFilters([eqFilter("rd_head_user_id", user.id)]);
+  if (hasRole(user, "R&D Head")) {
+    filters.push(eqFilter("rd_head_user_id", user.id));
   }
 
-  if (role === "Agronomist") {
+  if (hasRole(user, "Agronomist")) {
     const directReportIds = await loadDirectReportIds(supabase, user.id, [
       "Research Assistant"
     ]);
@@ -368,13 +377,13 @@ export async function institutionScope(
       (data ?? []).map((pilot) => pilot.institution_id)
     );
 
-    return scopeFromFilters([
+    filters.push(
       eqFilter("technical_owner_user_id", user.id),
       inFilter("id", institutionIds)
-    ]);
+    );
   }
 
-  return { noRecords: true };
+  return scopeFromFilters(filters);
 }
 
 export async function pilotScope(
@@ -385,47 +394,47 @@ export async function pilotScope(
     return {};
   }
 
-  const role = roleOf(user);
+  const filters: Array<string | null> = [];
 
-  if (role === "Research Assistant") {
-    return scopeFromFilters([
+  if (hasRole(user, "Research Assistant")) {
+    filters.push(
       eqFilter("pilot_owner_user_id", user.id),
       eqFilter("research_assistant_user_id", user.id),
       eqFilter("created_by_user_id", user.id)
-    ]);
+    );
   }
 
-  if (role === "Agronomist") {
+  if (hasRole(user, "Agronomist")) {
     const directReportIds = await loadDirectReportIds(supabase, user.id, [
       "Research Assistant"
     ]);
     const userIds = unique([user.id, ...directReportIds]);
 
-    return scopeFromFilters([
+    filters.push(
       eqFilter("pilot_owner_user_id", user.id),
       eqFilter("agronomist_user_id", user.id),
       eqFilter("created_by_user_id", user.id),
       inFilter("research_assistant_user_id", userIds)
-    ]);
+    );
   }
 
-  if (role === "RSM") {
+  if (hasRole(user, "RSM")) {
     const leadIds = await leadIdsForScope(supabase, user, []);
 
-    return scopeFromFilters([
+    filters.push(
       eqFilter("rsm_user_id", user.id),
       eqFilter("region_id", user.region_id),
       eqFilter("state", user.state),
       inFilter("farmer_lead_id", leadIds)
-    ]);
+    );
   }
 
-  if (role === "Salesperson") {
+  if (hasRole(user, "Salesperson")) {
     const leadIds = await leadIdsForScope(supabase, user, []);
-    return scopeFromFilters([inFilter("farmer_lead_id", leadIds)]);
+    filters.push(inFilter("farmer_lead_id", leadIds));
   }
 
-  return { noRecords: true };
+  return scopeFromFilters(filters);
 }
 
 export async function followupScope(
@@ -436,28 +445,29 @@ export async function followupScope(
     return {};
   }
 
-  const role = roleOf(user);
+  const isAgronomist = hasRole(user, "Agronomist");
   const directReportIds =
-    role === "Agronomist"
+    isAgronomist
       ? await loadDirectReportIds(supabase, user.id, ["Research Assistant"])
       : [];
   const leadIds = await leadIdsForScope(supabase, user, directReportIds);
+  const filters: Array<string | null> = [];
 
-  if (role === "RSM") {
-    return scopeFromFilters([
+  if (hasRole(user, "RSM")) {
+    filters.push(
       eqFilter("followup_owner_user_id", user.id),
       inFilter("farmer_lead_id", leadIds)
-    ]);
+    );
   }
 
-  if (role === "Salesperson" || role === "Research Assistant") {
-    return scopeFromFilters([
+  if (hasRole(user, "Salesperson") || hasRole(user, "Research Assistant")) {
+    filters.push(
       eqFilter("followup_owner_user_id", user.id),
       inFilter("farmer_lead_id", leadIds)
-    ]);
+    );
   }
 
-  if (role === "Agronomist") {
+  if (isAgronomist) {
     const userIds = unique([user.id, ...directReportIds]);
     const managedPilotIds = await loadManagedPilotIds(
       supabase,
@@ -475,14 +485,14 @@ export async function followupScope(
       (pilotInstallations ?? []).map((installation) => installation.id)
     );
 
-    return scopeFromFilters([
+    filters.push(
       inFilter("followup_owner_user_id", userIds),
       inFilter("farmer_lead_id", leadIds),
       inFilter("installation_id", installationIds)
-    ]);
+    );
   }
 
-  return { noRecords: true };
+  return scopeFromFilters(filters);
 }
 
 export async function installationScope(
@@ -493,25 +503,25 @@ export async function installationScope(
     return {};
   }
 
-  const role = roleOf(user);
+  const filters: Array<string | null> = [];
 
-  if (role === "RSM") {
-    return scopeFromFilters([
+  if (hasRole(user, "RSM")) {
+    filters.push(
       eqFilter("rsm_user_id", user.id),
       eqFilter("region_id", user.region_id),
       eqFilter("state", user.state)
-    ]);
+    );
   }
 
-  if (role === "Salesperson") {
+  if (hasRole(user, "Salesperson")) {
     const leadIds = await leadIdsForScope(supabase, user, []);
-    return scopeFromFilters([
+    filters.push(
       eqFilter("installed_by_user_id", user.id),
       inFilter("farmer_lead_id", leadIds)
-    ]);
+    );
   }
 
-  if (role === "Agronomist") {
+  if (hasRole(user, "Agronomist")) {
     const directReportIds = await loadDirectReportIds(supabase, user.id, [
       "Research Assistant"
     ]);
@@ -521,13 +531,13 @@ export async function installationScope(
       directReportIds
     );
     const leadIds = await leadIdsForScope(supabase, user, directReportIds);
-    return scopeFromFilters([
+    filters.push(
       inFilter("pilot_id", managedPilotIds),
       inFilter("farmer_lead_id", leadIds)
-    ]);
+    );
   }
 
-  return { noRecords: true };
+  return scopeFromFilters(filters);
 }
 
 export async function deviceScope(
@@ -538,7 +548,7 @@ export async function deviceScope(
     return {};
   }
 
-  if (roleOf(user) === "Agronomist") {
+  if (hasRole(user, "Agronomist")) {
     const directReportIds = await loadDirectReportIds(supabase, user.id, [
       "Research Assistant"
     ]);
@@ -565,13 +575,13 @@ export async function dispatchScope(
     return {};
   }
 
-  const role = roleOf(user);
+  const filters: Array<string | null> = [];
 
-  if (role === "RSM") {
-    return scopeFromFilters([eqFilter("destination_state", user.state)]);
+  if (hasRole(user, "RSM")) {
+    filters.push(eqFilter("destination_state", user.state));
   }
 
-  if (role === "Agronomist") {
+  if (hasRole(user, "Agronomist")) {
     const directReportIds = await loadDirectReportIds(supabase, user.id, [
       "Research Assistant"
     ]);
@@ -581,13 +591,13 @@ export async function dispatchScope(
       directReportIds
     );
     const leadIds = await leadIdsForScope(supabase, user, directReportIds);
-    return scopeFromFilters([
+    filters.push(
       inFilter("linked_pilot_id", managedPilotIds),
       inFilter("destination_pilot_id", managedPilotIds),
       inFilter("linked_farmer_lead_id", leadIds),
       inFilter("destination_farmer_lead_id", leadIds)
-    ]);
+    );
   }
 
-  return { noRecords: true };
+  return scopeFromFilters(filters);
 }

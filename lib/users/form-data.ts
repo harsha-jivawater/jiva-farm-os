@@ -12,6 +12,7 @@ import {
   managerRolesForRole,
   userRoleOptions
 } from "@/lib/users/options";
+import { hasAnyRole } from "@/lib/users/permissions";
 import type { InternalUser } from "@/lib/users/types";
 
 function text(formData: FormData, key: string) {
@@ -31,12 +32,14 @@ export function internalUserPayloadFromForm(
   formData: FormData
 ): InternalUserInsert | InternalUserUpdate {
   const role = text(formData, "role") || defaultUserRole;
+  const secondaryRole = nullableText(formData, "secondary_role");
 
   return {
     full_name: text(formData, "full_name"),
     email: normalizeInternalEmail(text(formData, "email")),
     phone: nullableText(formData, "phone"),
     role,
+    secondary_role: secondaryRole,
     region_id: nullableText(formData, "region_id"),
     state: nullableText(formData, "state"),
     reports_to_user_id: nullableText(formData, "reports_to_user_id"),
@@ -49,7 +52,10 @@ export function internalUserPayloadFromForm(
 
 export function validateInternalUserPayload(
   payload: InternalUserInsert | InternalUserUpdate,
-  activeUsers: Pick<InternalUser, "id" | "role" | "is_active">[] = []
+  activeUsers: Pick<
+    InternalUser,
+    "id" | "role" | "secondary_role" | "is_active"
+  >[] = []
 ) {
   if (!payload.full_name) {
     return "Full name is required.";
@@ -72,6 +78,17 @@ export function validateInternalUserPayload(
     return "Select a valid role.";
   }
 
+  if (
+    payload.secondary_role &&
+    !userRoleOptions.some((option) => option.value === payload.secondary_role)
+  ) {
+    return "Select a valid secondary role.";
+  }
+
+  if (payload.secondary_role && payload.secondary_role === payload.role) {
+    return "Secondary role must be different from the primary role.";
+  }
+
   const managerRoles = managerRolesForRole(payload.role);
 
   if (managerRoles.length > 0) {
@@ -86,7 +103,7 @@ export function validateInternalUserPayload(
       (user) => user.id === payload.reports_to_user_id
     );
 
-    if (!manager?.is_active || !managerRoles.includes(manager.role)) {
+    if (!manager?.is_active || !hasAnyRole(manager, managerRoles)) {
       return `${roleLabel} must report to an active ${managerRoleLabels}.`;
     }
   }

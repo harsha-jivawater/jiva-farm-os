@@ -29,9 +29,8 @@ export default async function NewDealerPage({
   const [{ data: users }, { data: regions }] = await Promise.all([
     supabase
       .from("users")
-      .select("id, full_name, role")
+      .select("id, full_name, role, secondary_role")
       .eq("is_active", true)
-      .in("role", ["Sales Head", "RSM", "Salesperson", "Admin"])
       .order("full_name", { ascending: true }),
     supabase
       .from("regions")

@@ -44,7 +44,7 @@ export default async function NewPilotPage({ searchParams }: NewPilotPageProps) 
       .limit(500),
     supabase
       .from("users")
-      .select("id, full_name, role")
+      .select("id, full_name, role, secondary_role")
       .eq("is_active", true)
       .order("full_name", { ascending: true }),
     supabase

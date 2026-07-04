@@ -28,6 +28,7 @@ export type UserOption = {
   id: string;
   full_name: string;
   role: string;
+  secondary_role: string | null;
 };
 
 export type RegionOption = {

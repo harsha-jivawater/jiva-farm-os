@@ -18,6 +18,7 @@ import type {
   UserOption
 } from "@/lib/institutions/types";
 import { labelForRole } from "@/lib/users/options";
+import { hasRole } from "@/lib/users/permissions";
 
 type MeetingFormProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -174,10 +175,12 @@ export function MeetingForm({
   meeting,
   users
 }: MeetingFormProps) {
-  const salesHeads = users.filter((user) => salesHeadRoles.has(user.role));
-  const rsmUsers = users.filter((user) => user.role === "RSM");
-  const rdHeads = users.filter((user) => user.role === "R&D Head");
-  const agronomists = users.filter((user) => user.role === "Agronomist");
+  const salesHeads = users.filter((user) =>
+    Array.from(salesHeadRoles).some((role) => hasRole(user, role))
+  );
+  const rsmUsers = users.filter((user) => hasRole(user, "RSM"));
+  const rdHeads = users.filter((user) => hasRole(user, "R&D Head"));
+  const agronomists = users.filter((user) => hasRole(user, "Agronomist"));
 
   return (
     <form action={action} className="space-y-4">

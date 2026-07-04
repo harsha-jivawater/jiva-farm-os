@@ -8,6 +8,7 @@ import {
   managerRolesForRole,
   userRoleOptions
 } from "@/lib/users/options";
+import { hasAnyRole } from "@/lib/users/permissions";
 import type { InternalUser, Region } from "@/lib/users/types";
 import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
@@ -33,7 +34,7 @@ export function UserForm({
   const managerRoles = managerRolesForRole(selectedRole);
   const managerOptions =
     managerRoles.length > 0
-      ? activeUsers.filter((item) => managerRoles.includes(item.role))
+      ? activeUsers.filter((item) => hasAnyRole(item, managerRoles))
       : activeUsers;
 
   return (
@@ -79,7 +80,7 @@ export function UserForm({
           </label>
 
           <label className="grid gap-1 text-sm font-medium text-slate-700">
-            Role
+            Primary Role
             <select
               className="min-h-10 rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-950 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
               name="role"
@@ -93,6 +94,25 @@ export function UserForm({
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="grid gap-1 text-sm font-medium text-slate-700">
+            Secondary Role
+            <select
+              className="min-h-10 rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-950 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              defaultValue={user?.secondary_role ?? ""}
+              name="secondary_role"
+            >
+              <option value="">No secondary role</option>
+              {userRoleOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs font-normal text-slate-500">
+              Optional. Adds access without removing the primary role.
+            </span>
           </label>
 
           <label className="grid gap-1 text-sm font-medium text-slate-700">

@@ -36,7 +36,7 @@ export default async function RegionsPage({ searchParams }: RegionsPageProps) {
       .select("*")
       .order("is_active", { ascending: false })
       .order("region_name", { ascending: true }),
-    supabase.from("users").select("id, full_name, role").order("full_name")
+    supabase.from("users").select("id, full_name, role, secondary_role").order("full_name")
   ]);
   let regions = (regionsData ?? []) as Region[];
 

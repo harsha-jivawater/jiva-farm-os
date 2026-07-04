@@ -146,7 +146,7 @@ export default async function InstallationsPage({
   const [{ data: users }, { data: regions }] = await Promise.all([
     supabase
       .from("users")
-      .select("id, full_name, role")
+      .select("id, full_name, role, secondary_role")
       .eq("is_active", true)
       .order("full_name", { ascending: true }),
     supabase

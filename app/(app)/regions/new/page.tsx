@@ -15,7 +15,7 @@ export default async function NewRegionPage({
   const supabase = await createClient();
   const { data: users } = await supabase
     .from("users")
-    .select("id, full_name, role, is_active")
+    .select("id, full_name, role, secondary_role, is_active")
     .eq("is_active", true)
     .eq("role", "RSM")
     .order("full_name");

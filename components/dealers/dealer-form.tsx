@@ -25,6 +25,7 @@ import {
 } from "@/lib/dealers/options";
 import type { Dealer, RegionOption, UserOption } from "@/lib/dealers/types";
 import { labelForRole } from "@/lib/users/options";
+import { hasRole } from "@/lib/users/permissions";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
 
 type DealerFormProps = {
@@ -148,8 +149,10 @@ export function DealerForm({
   const [selectedCrops, setSelectedCrops] = useState<string[]>(initialCrops);
   const [clientError, setClientError] = useState<string | null>(null);
   const showOtherCrops = selectedCrops.includes("Other");
-  const dealerOwners = users.filter((user) => dealerOwnerRoles.has(user.role));
-  const rsmUsers = users.filter((user) => user.role === "RSM");
+  const dealerOwners = users.filter((user) =>
+    Array.from(dealerOwnerRoles).some((role) => hasRole(user, role))
+  );
+  const rsmUsers = users.filter((user) => hasRole(user, "RSM"));
   const missingSetup =
     dealerOwners.length === 0 || rsmUsers.length === 0 || regions.length === 0;
 

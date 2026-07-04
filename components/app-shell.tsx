@@ -146,6 +146,9 @@ export function AppShell({
             </p>
             <p className="truncate text-xs text-slate-500">
               {labelForRole(currentUser.role)}
+              {currentUser.secondary_role
+                ? ` + ${labelForRole(currentUser.secondary_role)}`
+                : ""}
             </p>
           </div>
           <form action={signOutAction}>

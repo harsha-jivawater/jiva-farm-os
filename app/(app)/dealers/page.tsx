@@ -39,7 +39,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canCreateDealer, canWriteModule } from "@/lib/users/permissions";
+import { canCreateDealer, canWriteModule, hasRole } from "@/lib/users/permissions";
 import { dealerScope } from "@/lib/users/record-scope";
 import {
   DISTRICTS_BY_STATE,
@@ -194,7 +194,7 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
   const [{ data: users }, { data: regions }] = await Promise.all([
     supabase
       .from("users")
-      .select("id, full_name, role")
+      .select("id, full_name, role, secondary_role")
       .eq("is_active", true)
       .order("full_name", { ascending: true }),
     supabase
@@ -488,7 +488,7 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
             >
               <option value="">All RSMs</option>
               {((users ?? []) as UserOption[])
-                .filter((user) => user.role === "RSM")
+                .filter((user) => hasRole(user, "RSM"))
                 .map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.full_name} · {labelForRole(user.role)}

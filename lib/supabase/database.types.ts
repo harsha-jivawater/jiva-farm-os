@@ -1942,6 +1942,7 @@ export type Database = {
           email: string;
           phone: string | null;
           role: string;
+          secondary_role: string | null;
           region_id: string | null;
           state: string | null;
           reports_to_user_id: string | null;
@@ -1963,6 +1964,7 @@ export type Database = {
           email: string;
           phone?: string | null;
           role: string;
+          secondary_role?: string | null;
           region_id?: string | null;
           state?: string | null;
           reports_to_user_id?: string | null;
@@ -1984,6 +1986,7 @@ export type Database = {
           email?: string;
           phone?: string | null;
           role?: string;
+          secondary_role?: string | null;
           region_id?: string | null;
           state?: string | null;
           reports_to_user_id?: string | null;

@@ -11,6 +11,7 @@ import {
   visitTypeOptions
 } from "@/lib/pilots/options";
 import { labelForRole } from "@/lib/users/options";
+import { hasRole } from "@/lib/users/permissions";
 import type { PilotVisit, UserOption, VisitReport } from "@/lib/pilots/types";
 
 type PilotVisitFormProps = {
@@ -180,8 +181,10 @@ export function PilotVisitForm({
   users,
   visit
 }: PilotVisitFormProps) {
-  const visitUsers = users.filter((user) => visitUserRoles.has(user.role));
-  const rdHeads = users.filter((user) => user.role === "R&D Head");
+  const visitUsers = users.filter((user) =>
+    Array.from(visitUserRoles).some((role) => hasRole(user, role))
+  );
+  const rdHeads = users.filter((user) => hasRole(user, "R&D Head"));
   const measurementFields = [
     ["treatment_soil_moisture_reading", "Treatment soil moisture"],
     ["control_soil_moisture_reading", "Control soil moisture"],

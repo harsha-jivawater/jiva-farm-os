@@ -28,6 +28,7 @@ import { primaryCropOptions } from "@/lib/farmer-leads/options";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
+import { hasAnyRole, hasRole } from "@/lib/users/permissions";
 import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
 type Tables = Database["public"]["Tables"];
@@ -371,28 +372,28 @@ function SectionTitle({
   );
 }
 
-function dashboardScopeText(role: string) {
-  if (["Admin", "Management", "Sales Head"].includes(role)) {
+function dashboardScopeText(user: User) {
+  if (hasAnyRole(user, ["Admin", "Management", "Sales Head"])) {
     return "Showing all company data available to your role.";
   }
 
-  if (role === "RSM") {
+  if (hasRole(user, "RSM")) {
     return "Showing data for your assigned region/state.";
   }
 
-  if (role === "Salesperson") {
+  if (hasRole(user, "Salesperson")) {
     return "Showing data assigned to you.";
   }
 
-  if (role === "R&D Head") {
+  if (hasRole(user, "R&D Head")) {
     return "Showing pilot and operational data available to R&D Head.";
   }
 
-  if (role === "Accounts") {
+  if (hasRole(user, "Accounts")) {
     return "Showing accounts and operational data available to Accounts.";
   }
 
-  if (role === "Stock / Dispatch") {
+  if (hasRole(user, "Stock / Dispatch")) {
     return "Showing customer service, device, dispatch, and installation data available to your team.";
   }
 
@@ -585,7 +586,7 @@ export default async function KpiDashboardPage({
   const currentUser = await getCurrentInternalUser(supabase, "/kpi-dashboard");
   const parsedFilters = parseFilters(params);
   const filters =
-    currentUser.role === "RSM"
+    hasRole(currentUser, "RSM")
       ? {
           ...parsedFilters,
           rsmUserId: currentUser.id
@@ -687,7 +688,7 @@ export default async function KpiDashboardPage({
     .filter(
       (user) =>
         user.is_active &&
-        user.role === "Research Assistant" &&
+        hasRole(user, "Research Assistant") &&
         user.reports_to_user_id === currentUser.id
     )
     .map((user) => user.id);
@@ -716,7 +717,7 @@ export default async function KpiDashboardPage({
   );
 
   function isPilotAllowedByDashboardRole(pilot: Pilot) {
-    if (currentUser.role === "Agronomist") {
+    if (hasRole(currentUser, "Agronomist")) {
       return dashboardAgronomistPilotIds.has(pilot.id);
     }
 
@@ -724,11 +725,11 @@ export default async function KpiDashboardPage({
   }
 
   function isInstitutionAllowedByDashboardRole(institution: Institution) {
-    if (currentUser.role === "R&D Head") {
+    if (hasRole(currentUser, "R&D Head")) {
       return institution.rd_head_user_id === currentUser.id;
     }
 
-    if (currentUser.role === "Agronomist") {
+    if (hasRole(currentUser, "Agronomist")) {
       return (
         institution.technical_owner_user_id === currentUser.id ||
         dashboardAgronomistInstitutionIds.has(institution.id)
@@ -1028,10 +1029,10 @@ export default async function KpiDashboardPage({
   ) {
     const institution = institutionById.get(meeting.institution_id);
     const roleAllowed =
-      currentUser.role === "R&D Head"
+      hasRole(currentUser, "R&D Head")
         ? meeting.rd_head_user_id === currentUser.id ||
           institution?.rd_head_user_id === currentUser.id
-        : currentUser.role === "Agronomist"
+        : hasRole(currentUser, "Agronomist")
           ? meeting.agronomist_user_id === currentUser.id ||
             Boolean(
               institution && isInstitutionAllowedByDashboardRole(institution)
@@ -1062,7 +1063,7 @@ export default async function KpiDashboardPage({
   ) {
     const pilot = pilotById.get(visit.pilot_id);
     const roleAllowed =
-      currentUser.role === "Agronomist"
+      hasRole(currentUser, "Agronomist")
         ? dashboardAgronomistTeamIds.includes(visit.visited_by_user_id) ||
           Boolean(pilot && isPilotAllowedByDashboardRole(pilot))
         : true;
@@ -1082,7 +1083,7 @@ export default async function KpiDashboardPage({
   ) {
     const pilot = report.pilot_id ? pilotById.get(report.pilot_id) : null;
     const roleAllowed =
-      currentUser.role === "Agronomist"
+      hasRole(currentUser, "Agronomist")
         ? dashboardAgronomistTeamIds.includes(report.submitted_by_user_id) ||
           Boolean(pilot && isPilotAllowedByDashboardRole(pilot))
         : true;
@@ -1299,7 +1300,7 @@ export default async function KpiDashboardPage({
     .filter(
       (user) =>
         user.is_active &&
-        user.role === "Research Assistant" &&
+        hasRole(user, "Research Assistant") &&
         user.reports_to_user_id === currentUser.id
     )
     .map((user) => user.id);
@@ -1394,12 +1395,12 @@ export default async function KpiDashboardPage({
       report.report_status !== "Approved"
   ).length;
   const agronomistPerformanceRows = users
-    .filter((user) => user.role === "Agronomist" && user.is_active)
+    .filter((user) => hasRole(user, "Agronomist") && user.is_active)
     .map((agronomist) => {
       const teamRaIds = users
         .filter(
           (user) =>
-            user.role === "Research Assistant" &&
+            hasRole(user, "Research Assistant") &&
             user.is_active &&
             user.reports_to_user_id === agronomist.id
         )
@@ -1444,7 +1445,7 @@ export default async function KpiDashboardPage({
       };
     });
   const researchAssistantPerformanceRows = users
-    .filter((user) => user.role === "Research Assistant" && user.is_active)
+    .filter((user) => hasRole(user, "Research Assistant") && user.is_active)
     .map((assistant) => {
       const assignedPilots = filteredPilots.filter(
         (pilot) =>
@@ -1503,7 +1504,7 @@ export default async function KpiDashboardPage({
   const rsmIds = Array.from(
     new Set(
       [
-        ...users.filter((user) => user.role === "RSM").map((user) => user.id),
+        ...users.filter((user) => hasRole(user, "RSM")).map((user) => user.id),
         ...farmerLeads.map((lead) => lead.rsm_user_id),
         ...installations.map((installation) => installation.rsm_user_id),
         ...dealers.map((dealer) => dealer.rsm_user_id),
@@ -1607,41 +1608,45 @@ export default async function KpiDashboardPage({
     (meeting) => meeting.meeting_date
   );
   const activeRsmUsers = users.filter(
-    (user) => user.role === "RSM" && user.is_active
+    (user) => hasRole(user, "RSM") && user.is_active
   );
-  const canSeeManagementSections = ["Admin", "Management", "Sales Head"].includes(
-    currentUser.role
-  );
-  const canSeeSalesSections = [
+  const canSeeManagementSections = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "Sales Head"
+  ]);
+  const canSeeSalesSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
     "Sales Head",
     "RSM"
-  ].includes(currentUser.role);
-  const canSeeDealerSections = [
+  ]);
+  const canSeeDealerSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
     "Sales Head",
     "RSM"
-  ].includes(currentUser.role);
-  const canSeeInstitutionalSections = [
+  ]);
+  const canSeeInstitutionalSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
     "Sales Head",
     "RSM",
     "R&D Head",
     "Agronomist"
-  ].includes(currentUser.role);
-  const canSeePilotSections = [
+  ]);
+  const canSeePilotSections = hasAnyRole(currentUser, [
     "Admin",
     "Management",
     "Sales Head",
     "R&D Head",
     "Agronomist"
-  ].includes(currentUser.role);
-  const canSeeStockSections = ["Admin", "Management", "Sales Head"].includes(
-    currentUser.role
-  );
+  ]);
+  const canSeeStockSections = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "Sales Head"
+  ]);
 
   return (
     <section>
@@ -1651,7 +1656,7 @@ export default async function KpiDashboardPage({
         description="Track FY device progress, sales funnel health, partner activity, pilots, stock, and dispatch movement in one place."
       />
       <p className="mt-2 text-sm leading-6 text-slate-500">
-        {dashboardScopeText(currentUser.role)}
+        {dashboardScopeText(currentUser)}
       </p>
 
       <FiltersForm
@@ -1961,7 +1966,7 @@ export default async function KpiDashboardPage({
         </section>
         ) : null}
 
-        {currentUser.role === "Agronomist" ? (
+        {hasRole(currentUser, "Agronomist") ? (
           <section>
             <SectionTitle title="Agronomist Team KPIs" />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -1999,7 +2004,7 @@ export default async function KpiDashboardPage({
           </section>
         ) : null}
 
-        {currentUser.role === "Research Assistant" ? (
+        {hasRole(currentUser, "Research Assistant") ? (
           <section>
             <SectionTitle title="Research Assistant KPIs" />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -2032,7 +2037,7 @@ export default async function KpiDashboardPage({
           </section>
         ) : null}
 
-        {["Admin", "Management", "R&D Head"].includes(currentUser.role) ? (
+        {hasAnyRole(currentUser, ["Admin", "Management", "R&D Head"]) ? (
           <section>
             <SectionTitle
               title="R&D Head Performance"

@@ -179,84 +179,120 @@ const moduleWriteRoles: Record<ModuleKey, readonly UserRole[]> = {
   regions: ["Admin", "Sales Head"]
 };
 
+type RoleCapableUser = Pick<InternalUser, "role"> &
+  Partial<Pick<InternalUser, "secondary_role">>;
+
 export function roleOf(user: Pick<InternalUser, "role"> | null | undefined) {
   return (user?.role ?? "Viewer") as UserRole;
 }
 
-export function isAdmin(user: Pick<InternalUser, "role"> | null | undefined) {
-  return roleOf(user) === "Admin";
+export function getEffectiveRoles(
+  user: RoleCapableUser | null | undefined
+): UserRole[] {
+  const roles = [user?.role, user?.secondary_role].filter(Boolean) as UserRole[];
+  return roles.length ? Array.from(new Set(roles)) : ["Viewer"];
+}
+
+export function hasRole(
+  user: RoleCapableUser | null | undefined,
+  role: UserRole | string
+) {
+  return getEffectiveRoles(user).includes(role as UserRole);
+}
+
+export function hasAnyRole(
+  user: RoleCapableUser | null | undefined,
+  roles: readonly (UserRole | string)[]
+) {
+  const effectiveRoles = getEffectiveRoles(user);
+  return roles.some((role) => effectiveRoles.includes(role as UserRole));
+}
+
+export function isAdmin(user: RoleCapableUser | null | undefined) {
+  return hasRole(user, "Admin");
 }
 
 export function canViewModule(
-  user: Pick<InternalUser, "role"> | null | undefined,
+  user: RoleCapableUser | null | undefined,
   module: ModuleKey
 ) {
-  return moduleViewRoles[module].includes(roleOf(user));
+  return hasAnyRole(user, moduleViewRoles[module]);
 }
 
 export function canWriteModule(
-  user: Pick<InternalUser, "role"> | null | undefined,
+  user: RoleCapableUser | null | undefined,
   module: ModuleKey
 ) {
-  return isAdmin(user) || moduleWriteRoles[module].includes(roleOf(user));
+  return isAdmin(user) || hasAnyRole(user, moduleWriteRoles[module]);
 }
 
 export function canManageInternalUsers(
-  user: Pick<InternalUser, "role"> | null | undefined
+  user: RoleCapableUser | null | undefined
 ) {
   return isAdmin(user);
 }
 
 export function canDeactivateUsers(
-  user: Pick<InternalUser, "role"> | null | undefined
+  user: RoleCapableUser | null | undefined
 ) {
   return isAdmin(user);
 }
 
 export function canDeactivateRegions(
-  user: Pick<InternalUser, "role"> | null | undefined
+  user: RoleCapableUser | null | undefined
 ) {
   return isAdmin(user);
 }
 
 export function canConfirmPayment(
-  user: Pick<InternalUser, "role" | "can_confirm_payment"> | null | undefined
+  user:
+    | (RoleCapableUser & Pick<InternalUser, "can_confirm_payment">)
+    | null
+    | undefined
 ) {
-  return Boolean(user?.can_confirm_payment) || roleOf(user) === "Accounts" || isAdmin(user);
+  return Boolean(user?.can_confirm_payment) || hasRole(user, "Accounts") || isAdmin(user);
 }
 
 export function canManageDispatch(
-  user: Pick<InternalUser, "role" | "can_manage_dispatch"> | null | undefined
+  user:
+    | (RoleCapableUser & Pick<InternalUser, "can_manage_dispatch">)
+    | null
+    | undefined
 ) {
-  return Boolean(user?.can_manage_dispatch) || roleOf(user) === "Stock / Dispatch" || isAdmin(user);
+  return Boolean(user?.can_manage_dispatch) || hasRole(user, "Stock / Dispatch") || isAdmin(user);
 }
 
 export function canCreateDealer(
-  user: Pick<InternalUser, "role"> | null | undefined
+  user: RoleCapableUser | null | undefined
 ) {
-  return ["Admin", "RSM"].includes(roleOf(user));
+  return hasAnyRole(user, ["Admin", "RSM"]);
 }
 
 export function canEditDealerProfile(
-  user: Pick<InternalUser, "role"> | null | undefined
+  user: RoleCapableUser | null | undefined
 ) {
-  return ["Admin", "RSM"].includes(roleOf(user));
+  return hasAnyRole(user, ["Admin", "RSM"]);
 }
 
 export function canApproveDealer(
-  user: Pick<InternalUser, "role"> | null | undefined
+  user: RoleCapableUser | null | undefined
 ) {
-  return ["Admin", "Sales Head"].includes(roleOf(user));
+  return hasAnyRole(user, ["Admin", "Sales Head"]);
 }
 
-export function canSeeAllRecords(user: Pick<InternalUser, "role">) {
-  return ["Admin", "Management", "Sales Head", "R&D Head", "Accounts", "Stock / Dispatch"].includes(
-    roleOf(user)
-  );
+export function canSeeAllRecords(user: RoleCapableUser) {
+  return hasAnyRole(user, [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "R&D Head",
+    "Accounts",
+    "Stock / Dispatch"
+  ]);
 }
 
-export function hasReadOnlyRole(user: Pick<InternalUser, "role">) {
-  return roleOf(user) === "Viewer" || roleOf(user) === "Management";
+export function hasReadOnlyRole(user: RoleCapableUser) {
+  return hasRole(user, "Viewer") || hasRole(user, "Management");
 }
 
 export function moduleDeniedMessage(moduleLabel: string) {

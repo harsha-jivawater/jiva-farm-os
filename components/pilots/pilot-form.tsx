@@ -34,6 +34,7 @@ import type {
   UserOption
 } from "@/lib/pilots/types";
 import { labelForRole } from "@/lib/users/options";
+import { hasRole } from "@/lib/users/permissions";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
 
 type PilotFormProps = {
@@ -299,13 +300,15 @@ export function PilotForm({
     () => devices.find((device) => device.id === pilot?.device_id),
     [devices, pilot?.device_id]
   );
-  const pilotUsers = users.filter((user) => pilotOwnerRoles.has(user.role));
-  const rsmUsers = users.filter((user) => user.role === "RSM");
-  const researchAssistants = users.filter(
-    (user) => user.role === "Research Assistant"
+  const pilotUsers = users.filter((user) =>
+    Array.from(pilotOwnerRoles).some((role) => hasRole(user, role))
   );
-  const agronomists = users.filter((user) => user.role === "Agronomist");
-  const rdHeads = users.filter((user) => user.role === "R&D Head");
+  const rsmUsers = users.filter((user) => hasRole(user, "RSM"));
+  const researchAssistants = users.filter(
+    (user) => hasRole(user, "Research Assistant")
+  );
+  const agronomists = users.filter((user) => hasRole(user, "Agronomist"));
+  const rdHeads = users.filter((user) => hasRole(user, "R&D Head"));
   const [selectedFarmerLeadId, setSelectedFarmerLeadId] = useState(
     pilot?.farmer_lead_id ?? initialFarmer?.id ?? ""
   );

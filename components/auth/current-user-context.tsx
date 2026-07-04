@@ -7,6 +7,7 @@ export type CurrentInternalUser = {
   full_name: string;
   email: string;
   role: string;
+  secondary_role: string | null;
   region_id: string | null;
   state: string | null;
   reports_to_user_id: string | null;

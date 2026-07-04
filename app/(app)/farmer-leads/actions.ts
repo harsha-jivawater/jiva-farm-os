@@ -14,7 +14,7 @@ import type {
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
-import { canConfirmPayment } from "@/lib/users/permissions";
+import { canConfirmPayment, hasAnyRole, hasRole } from "@/lib/users/permissions";
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -24,8 +24,8 @@ function todayDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function canOwnLead(role: string | null) {
-  return role === "Salesperson" || role === "RSM";
+function canOwnLead(user: { role: string; secondary_role?: string | null } | null | undefined) {
+  return hasAnyRole(user, ["Salesperson", "RSM"]);
 }
 
 export async function createFarmerLeadAction(formData: FormData) {
@@ -55,7 +55,7 @@ export async function createFarmerLeadAction(formData: FormData) {
 
   payload.created_by_user_id = profile.id;
 
-  if (canOwnLead(profile.role)) {
+  if (canOwnLead(profile)) {
     if (!profile.region_id) {
       redirectWithError(
         "/farmer-leads/new",
@@ -66,7 +66,7 @@ export async function createFarmerLeadAction(formData: FormData) {
     payload.region_id = profile.region_id;
     payload.owner_user_id = profile.id;
     payload.rsm_user_id =
-      profile.role === "RSM"
+      hasRole(profile, "RSM")
         ? profile.id
         : (profile.reports_to_user_id ?? profile.id);
   } else {
@@ -126,20 +126,20 @@ export async function createFarmerLeadAction(formData: FormData) {
   const { data: ownerUsers } = ownerAndRsmIds.length
     ? await supabase
         .from("users")
-        .select("id, role, is_active")
+        .select("id, role, secondary_role, is_active")
         .in("id", ownerAndRsmIds)
     : { data: [] };
   const ownerUser = ownerUsers?.find((user) => user.id === payload.owner_user_id);
   const rsmUser = ownerUsers?.find((user) => user.id === payload.rsm_user_id);
 
-  if (!ownerUser?.is_active || !canOwnLead(ownerUser.role)) {
+  if (!ownerUser?.is_active || !canOwnLead(ownerUser)) {
     redirectWithError(
       "/farmer-leads/new",
       "Lead owner must be an active Salesperson or RSM."
     );
   }
 
-  if (!rsmUser?.is_active || rsmUser.role !== "RSM") {
+  if (!rsmUser?.is_active || !hasRole(rsmUser, "RSM")) {
     redirectWithError("/farmer-leads/new", "RSM must be an active RSM.");
   }
 
@@ -219,20 +219,20 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
   const { data: ownerUsers } = ownerAndRsmIds.length
     ? await supabase
         .from("users")
-        .select("id, role, is_active")
+        .select("id, role, secondary_role, is_active")
         .in("id", ownerAndRsmIds)
     : { data: [] };
   const ownerUser = ownerUsers?.find((user) => user.id === payload.owner_user_id);
   const rsmUser = ownerUsers?.find((user) => user.id === payload.rsm_user_id);
 
-  if (!ownerUser?.is_active || !canOwnLead(ownerUser.role)) {
+  if (!ownerUser?.is_active || !canOwnLead(ownerUser)) {
     redirectWithError(
       `/farmer-leads/${id}/edit`,
       "Lead owner must be an active Salesperson or RSM."
     );
   }
 
-  if (!rsmUser?.is_active || rsmUser.role !== "RSM") {
+  if (!rsmUser?.is_active || !hasRole(rsmUser, "RSM")) {
     redirectWithError(`/farmer-leads/${id}/edit`, "RSM must be an active RSM.");
   }
 

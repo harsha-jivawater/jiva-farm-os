@@ -36,7 +36,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canWriteModule } from "@/lib/users/permissions";
+import { canWriteModule, hasRole } from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
 import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
@@ -209,7 +209,7 @@ export default async function InstitutionalPartnersPage({
   const [{ data: users }, { data: allInstitutions }] = await Promise.all([
     supabase
       .from("users")
-      .select("id, full_name, role")
+      .select("id, full_name, role, secondary_role")
       .eq("is_active", true)
       .order("full_name", { ascending: true }),
     allInstitutionsQuery
@@ -450,7 +450,7 @@ export default async function InstitutionalPartnersPage({
           >
             <option value="">All RSMs</option>
             {usersList
-              .filter((user) => user.role === "RSM")
+              .filter((user) => hasRole(user, "RSM"))
               .map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.full_name}
@@ -464,7 +464,7 @@ export default async function InstitutionalPartnersPage({
           >
             <option value="">All R&D Heads</option>
             {usersList
-              .filter((user) => user.role === "R&D Head")
+              .filter((user) => hasRole(user, "R&D Head"))
               .map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.full_name}

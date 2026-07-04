@@ -35,6 +35,7 @@ import type {
   UserOption
 } from "@/lib/institutions/types";
 import { labelForRole } from "@/lib/users/options";
+import { hasRole } from "@/lib/users/permissions";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
 
 type InstitutionFormProps = {
@@ -240,12 +241,16 @@ export function InstitutionForm({
   const [selectedCropFocus, setSelectedCropFocus] =
     useState<string[]>(initialCropFocus);
   const [clientError, setClientError] = useState<string | null>(null);
-  const accountOwners = users.filter((user) => accountOwnerRoles.has(user.role));
-  const salesHeads = users.filter((user) => salesHeadRoles.has(user.role));
-  const rsmUsers = users.filter((user) => user.role === "RSM");
-  const rdHeads = users.filter((user) => user.role === "R&D Head");
+  const accountOwners = users.filter((user) =>
+    Array.from(accountOwnerRoles).some((role) => hasRole(user, role))
+  );
+  const salesHeads = users.filter((user) =>
+    Array.from(salesHeadRoles).some((role) => hasRole(user, role))
+  );
+  const rsmUsers = users.filter((user) => hasRole(user, "RSM"));
+  const rdHeads = users.filter((user) => hasRole(user, "R&D Head"));
   const technicalOwners = users.filter((user) =>
-    technicalOwnerRoles.has(user.role)
+    Array.from(technicalOwnerRoles).some((role) => hasRole(user, role))
   );
   const missingSetup = accountOwners.length === 0 || salesHeads.length === 0;
   const selectedRegions = institution?.regions_covered ?? [];

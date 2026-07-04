@@ -187,6 +187,11 @@ export default async function InternalUsersPage({
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {labelForRole(user.role)}
+                        {user.secondary_role ? (
+                          <span className="mt-1 block text-xs text-slate-500">
+                            Secondary: {labelForRole(user.secondary_role)}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {user.region_id
