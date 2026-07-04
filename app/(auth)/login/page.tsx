@@ -22,6 +22,10 @@ function getErrorMessage(error?: string) {
     return null;
   }
 
+  if (error === "Please log in before continuing.") {
+    return null;
+  }
+
   if (error === "missing-supabase-config") {
     return "Supabase is not connected yet. Add your Supabase URL and anon key to .env.local.";
   }
