@@ -6,12 +6,15 @@ import { createClient } from "@/lib/supabase/client";
 
 type PasswordFormProps = {
   mode: "change" | "reset";
+  mustChangePassword?: boolean;
 };
 
 type FormStatus =
   | { type: "idle"; message: string }
   | { type: "error"; message: string }
   | { type: "success"; message: string };
+
+const TEMPORARY_PASSWORD = "Jiva@1234";
 
 function validatePassword(newPassword: string, confirmPassword: string) {
   if (!newPassword || !confirmPassword) {
@@ -24,6 +27,10 @@ function validatePassword(newPassword: string, confirmPassword: string) {
 
   if (newPassword !== confirmPassword) {
     return "Passwords do not match.";
+  }
+
+  if (newPassword === TEMPORARY_PASSWORD) {
+    return "Choose a password different from the temporary password.";
   }
 
   return null;
@@ -80,7 +87,10 @@ async function prepareRecoverySession() {
   return null;
 }
 
-export function PasswordForm({ mode }: PasswordFormProps) {
+export function PasswordForm({
+  mode,
+  mustChangePassword = false
+}: PasswordFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isRecoveryReady, setIsRecoveryReady] = useState(mode === "change");
@@ -143,17 +153,36 @@ export function PasswordForm({ mode }: PasswordFormProps) {
         return;
       }
 
+      if (mustChangePassword || mode === "reset") {
+        const { error: profileError } = await supabase.rpc(
+          "mark_current_user_password_changed"
+        );
+
+        if (profileError) {
+          setStatus({ type: "error", message: profileError.message });
+          return;
+        }
+      }
+
       setStatus({
         type: "success",
         message:
           mode === "change"
-            ? "Your password has been changed."
+            ? mustChangePassword
+              ? "Your password has been changed. Taking you to Home..."
+              : "Your password has been changed."
             : "Your password has been reset. Redirecting you to login..."
       });
 
       if (mode === "reset") {
         await supabase.auth.signOut();
         router.replace("/login?message=Password updated. Please sign in.");
+        return;
+      }
+
+      if (mustChangePassword) {
+        router.replace("/dashboard");
+        router.refresh();
       }
     });
   }

@@ -458,6 +458,7 @@ export async function createInternalUserAction(formData: FormData) {
   }
 
   payload.is_active = true;
+  payload.must_change_password = true;
 
   const { data, error } = await supabase
     .from("users")
