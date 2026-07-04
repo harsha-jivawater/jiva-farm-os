@@ -35,7 +35,8 @@ export default async function NewDispatchPage({
     )
     .is("deleted_at", null)
     .in("device_status", [...preferredDispatchDeviceStatuses])
-    .order("serial_number", { ascending: true });
+    .order("serial_number", { ascending: true })
+    .limit(200);
 
   return (
     <section>

@@ -49,6 +49,23 @@ const filterColumns = [
   "destination_district"
 ] as const;
 
+const listSelectColumns = [
+  "id",
+  "dispatch_code",
+  "zoho_invoice_reference",
+  "serial_number_snapshot",
+  "product_model",
+  "dispatch_status",
+  "dispatch_type",
+  "destination_name_snapshot",
+  "destination_address",
+  "destination_district",
+  "destination_state",
+  "payment_confirmed",
+  "payment_requirement_type",
+  "dispatch_date"
+].join(",");
+
 const loadErrorMessage = "Unable to load records. Please contact Admin.";
 const queryTimeoutMs = 8_000;
 
@@ -175,10 +192,10 @@ export default async function DispatchesPage({
 
   let query = supabase
     .from("dispatches")
-    .select("*")
+    .select(listSelectColumns)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(50);
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -217,7 +234,7 @@ export default async function DispatchesPage({
       throw error;
     }
 
-    dispatches = (data ?? []) as Dispatch[];
+    dispatches = (data ?? []) as unknown as Dispatch[];
     resultCount = dispatches.length;
     totalDispatches = dispatches.length;
     pendingPayment = dispatches.filter(

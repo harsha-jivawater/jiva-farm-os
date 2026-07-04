@@ -56,6 +56,31 @@ const filterColumns = [
   "opportunity_type"
 ] as const;
 
+const kpiSelectColumns = [
+  "id",
+  "institution_status",
+  "next_action_date",
+  "proposal_shared",
+  "scale_up_status"
+].join(",");
+
+const listSelectColumns = [
+  "id",
+  "organization_name",
+  "institution_code",
+  "organization_type",
+  "institution_status",
+  "primary_state",
+  "main_contact_person",
+  "main_contact_number",
+  "account_owner_user_id",
+  "rsm_user_id",
+  "rd_head_user_id",
+  "priority",
+  "next_action_date",
+  "scale_up_status"
+].join(",");
+
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -194,7 +219,7 @@ export default async function InstitutionalPartnersPage({
 
   let allInstitutionsQuery = supabase
     .from("institutions")
-    .select("*")
+    .select(kpiSelectColumns)
     .is("deleted_at", null)
     .limit(1000);
 
@@ -217,10 +242,10 @@ export default async function InstitutionalPartnersPage({
 
   let query = supabase
     .from("institutions")
-    .select("*", { count: "exact" })
+    .select(listSelectColumns, { count: "exact" })
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(500);
+    .limit(50);
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -251,10 +276,10 @@ export default async function InstitutionalPartnersPage({
   }
 
   const { data, error, count } = await query;
-  const institutions = (data ?? []) as Institution[];
+  const institutions = (data ?? []) as unknown as Institution[];
   const usersList = (users ?? []) as UserOption[];
   const userMap = new Map(usersList.map((user) => [user.id, user]));
-  const allInstitutionRows = (allInstitutions ?? []) as Institution[];
+  const allInstitutionRows = (allInstitutions ?? []) as unknown as Institution[];
   const scopedInstitutionIds = allInstitutionRows.map(
     (institution) => institution.id
   );

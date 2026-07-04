@@ -102,20 +102,80 @@ export default async function EditInstallationPage({
         .select(farmerLeadColumns)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
-        .limit(300),
+        .limit(150),
       supabase
         .from("devices")
         .select(deviceColumns)
         .is("deleted_at", null)
         .order("serial_number", { ascending: true })
-        .limit(500),
+        .limit(200),
       supabase
         .from("dispatches")
         .select(dispatchColumns)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
-        .limit(300)
+        .limit(150)
     ]);
+  let farmerLeadOptions = (farmerLeads ??
+    []) as unknown as InstallationFarmerLeadOption[];
+  let deviceOptions = (devices ?? []) as unknown as InstallationDeviceOption[];
+  let dispatchOptions = (dispatches ??
+    []) as unknown as InstallationDispatchOption[];
+
+  const [
+    { data: selectedFarmerLead },
+    { data: selectedDevice },
+    { data: selectedDispatch }
+  ] = await Promise.all([
+    installation.farmer_lead_id &&
+    !farmerLeadOptions.some((lead) => lead.id === installation.farmer_lead_id)
+      ? supabase
+          .from("farmer_leads")
+          .select(farmerLeadColumns)
+          .eq("id", installation.farmer_lead_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    installation.device_id &&
+    !deviceOptions.some((device) => device.id === installation.device_id)
+      ? supabase
+          .from("devices")
+          .select(deviceColumns)
+          .eq("id", installation.device_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    installation.dispatch_id &&
+    !dispatchOptions.some(
+      (dispatch) => dispatch.id === installation.dispatch_id
+    )
+      ? supabase
+          .from("dispatches")
+          .select(dispatchColumns)
+          .eq("id", installation.dispatch_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null })
+  ]);
+
+  if (selectedFarmerLead) {
+    farmerLeadOptions = [
+      selectedFarmerLead as unknown as InstallationFarmerLeadOption,
+      ...farmerLeadOptions
+    ];
+  }
+
+  if (selectedDevice) {
+    deviceOptions = [
+      selectedDevice as unknown as InstallationDeviceOption,
+      ...deviceOptions
+    ];
+  }
+
+  if (selectedDispatch) {
+    dispatchOptions = [
+      selectedDispatch as unknown as InstallationDispatchOption,
+      ...dispatchOptions
+    ];
+  }
+
   const updateAction = updateInstallationAction.bind(null, installation.id);
 
   return (
@@ -128,14 +188,10 @@ export default async function EditInstallationPage({
       <InstallationForm
         action={updateAction}
         cancelHref={`/installations/${installation.id}`}
-        devices={(devices ?? []) as unknown as InstallationDeviceOption[]}
-        dispatches={
-          (dispatches ?? []) as unknown as InstallationDispatchOption[]
-        }
+        devices={deviceOptions}
+        dispatches={dispatchOptions}
         error={query.error}
-        farmerLeads={
-          (farmerLeads ?? []) as unknown as InstallationFarmerLeadOption[]
-        }
+        farmerLeads={farmerLeadOptions}
         installation={installation}
         mode="edit"
       />

@@ -70,19 +70,19 @@ export default async function NewInstallationPage({
         .select(farmerLeadColumns)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
-        .limit(300),
+        .limit(150),
       supabase
         .from("devices")
         .select(deviceColumns)
         .is("deleted_at", null)
         .order("serial_number", { ascending: true })
-        .limit(500),
+        .limit(200),
       supabase
         .from("dispatches")
         .select(dispatchColumns)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
-        .limit(300)
+        .limit(150)
     ]);
 
   return (

@@ -45,6 +45,21 @@ const filterColumns = [
   "primary_crop"
 ] as const;
 
+const listSelectColumns = [
+  "id",
+  "farmer_name",
+  "lead_code",
+  "mobile_number",
+  "village",
+  "district",
+  "state",
+  "lead_status",
+  "funnel_stage",
+  "primary_crop",
+  "other_primary_crop",
+  "followup_due_date"
+].join(",");
+
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -135,9 +150,9 @@ export default async function FarmerLeadsPage({
 
   let query = supabase
     .from("farmer_leads")
-    .select("*", { count: "exact" })
+    .select(listSelectColumns, { count: "exact" })
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(50);
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -165,7 +180,7 @@ export default async function FarmerLeadsPage({
   }
 
   const { data, error, count } = await query;
-  const leads = (data ?? []) as FarmerLead[];
+  const leads = (data ?? []) as unknown as FarmerLead[];
 
   async function countWith(kind: "total" | "open" | "won" | "lost" | "due" | "payment" | "installed") {
     let countQuery = supabase

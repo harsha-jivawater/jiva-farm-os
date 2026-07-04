@@ -69,7 +69,8 @@ export default async function EditDispatchPage({
     .select(deviceSelectColumns)
     .is("deleted_at", null)
     .in("device_status", [...preferredDispatchDeviceStatuses])
-    .order("serial_number", { ascending: true });
+    .order("serial_number", { ascending: true })
+    .limit(200);
   let devices = (preferredDevices ?? []) as unknown as DispatchDeviceOption[];
 
   if (!devices.some((device) => device.id === dispatch.device_id)) {

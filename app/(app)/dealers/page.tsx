@@ -62,6 +62,22 @@ const filterColumns = [
   "priority"
 ] as const;
 
+const listSelectColumns = [
+  "id",
+  "dealer_name",
+  "dealer_code",
+  "firm_name",
+  "contact_number",
+  "dealer_type",
+  "dealer_status",
+  "state",
+  "district",
+  "taluk_or_territory",
+  "training_status",
+  "dealer_agreement_status",
+  "priority"
+].join(",");
+
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -205,10 +221,10 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
 
   let query = supabase
     .from("dealers")
-    .select("*", { count: "exact" })
+    .select(listSelectColumns, { count: "exact" })
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(500);
+    .limit(50);
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -238,7 +254,7 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
   }
 
   const { data, error, count } = await query;
-  const dealers = (data ?? []) as Dealer[];
+  const dealers = (data ?? []) as unknown as Dealer[];
   const dealerIds = dealers.map((dealer) => dealer.id);
   const monthStart = new Date();
   monthStart.setDate(1);

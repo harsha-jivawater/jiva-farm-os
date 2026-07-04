@@ -35,13 +35,13 @@ export default async function NewPilotPage({ searchParams }: NewPilotPageProps) 
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(500),
+      .limit(200),
     supabase
       .from("devices")
       .select("id, serial_number, device_code, product_model, device_status")
       .is("deleted_at", null)
       .order("serial_number", { ascending: true })
-      .limit(500),
+      .limit(200),
     supabase
       .from("users")
       .select("id, full_name, role, secondary_role")
@@ -56,12 +56,14 @@ export default async function NewPilotPage({ searchParams }: NewPilotPageProps) 
       .from("institutions")
       .select("id, institution_code, organization_name")
       .is("deleted_at", null)
-      .order("organization_name", { ascending: true }),
+      .order("organization_name", { ascending: true })
+      .limit(200),
     supabase
       .from("dealers")
       .select("id, dealer_code, dealer_name, firm_name")
       .is("deleted_at", null)
       .order("dealer_name", { ascending: true })
+      .limit(200)
   ]);
 
   return (

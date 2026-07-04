@@ -47,6 +47,20 @@ const filterColumns = [
   "current_district"
 ] as const;
 
+const listSelectColumns = [
+  "id",
+  "serial_number",
+  "device_code",
+  "product_model",
+  "device_status",
+  "current_holder_type",
+  "current_holder_name_snapshot",
+  "current_location_text",
+  "current_district",
+  "current_state",
+  "stock_entry_date"
+].join(",");
+
 const loadErrorMessage = "Unable to load records. Please contact Admin.";
 const queryTimeoutMs = 8_000;
 
@@ -157,10 +171,10 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
 
   let query = supabase
     .from("devices")
-    .select("*")
+    .select(listSelectColumns)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(50);
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -193,7 +207,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
       throw error;
     }
 
-    devices = (data ?? []) as Device[];
+    devices = (data ?? []) as unknown as Device[];
     resultCount = devices.length;
     totalDevices = devices.length;
     inWarehouse = devices.filter(

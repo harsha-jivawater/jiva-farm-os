@@ -24,6 +24,13 @@ type EditPilotPageProps = {
   }>;
 };
 
+const farmerLeadColumns =
+  "id, lead_code, farmer_name, mobile_number, state, district, taluk, village, primary_crop, other_primary_crop, crop_stage, irrigation_type, water_source, soil_type, crop_area_acres, linked_dealer_id, linked_institution_id, rsm_user_id, region_id";
+const deviceColumns =
+  "id, serial_number, device_code, product_model, device_status";
+const institutionColumns = "id, institution_code, organization_name";
+const dealerColumns = "id, dealer_code, dealer_name, firm_name";
+
 export default async function EditPilotPage({
   params,
   searchParams
@@ -59,18 +66,16 @@ export default async function EditPilotPage({
     pilotQuery.single(),
     supabase
       .from("farmer_leads")
-      .select(
-        "id, lead_code, farmer_name, mobile_number, state, district, taluk, village, primary_crop, other_primary_crop, crop_stage, irrigation_type, water_source, soil_type, crop_area_acres, linked_dealer_id, linked_institution_id, rsm_user_id, region_id"
-      )
+      .select(farmerLeadColumns)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(500),
+      .limit(200),
     supabase
       .from("devices")
-      .select("id, serial_number, device_code, product_model, device_status")
+      .select(deviceColumns)
       .is("deleted_at", null)
       .order("serial_number", { ascending: true })
-      .limit(500),
+      .limit(200),
     supabase
       .from("users")
       .select("id, full_name, role, secondary_role")
@@ -82,14 +87,16 @@ export default async function EditPilotPage({
       .order("region_name", { ascending: true }),
     supabase
       .from("institutions")
-      .select("id, institution_code, organization_name")
+      .select(institutionColumns)
       .is("deleted_at", null)
-      .order("organization_name", { ascending: true }),
+      .order("organization_name", { ascending: true })
+      .limit(200),
     supabase
       .from("dealers")
-      .select("id, dealer_code, dealer_name, firm_name")
+      .select(dealerColumns)
       .is("deleted_at", null)
       .order("dealer_name", { ascending: true })
+      .limit(200)
   ]);
 
   if (error || !pilot) {
@@ -97,6 +104,74 @@ export default async function EditPilotPage({
   }
 
   const pilotRow = pilot as Pilot;
+  let farmerLeadOptions = (farmerLeads ?? []) as PilotFarmerLeadOption[];
+  let deviceOptions = (devices ?? []) as PilotDeviceOption[];
+  let institutionOptions = (institutions ?? []) as PilotInstitutionOption[];
+  let dealerOptions = (dealers ?? []) as PilotDealerOption[];
+  const [
+    { data: selectedFarmerLead },
+    { data: selectedDevice },
+    { data: selectedInstitution },
+    { data: selectedDealer }
+  ] = await Promise.all([
+    pilotRow.farmer_lead_id &&
+    !farmerLeadOptions.some((lead) => lead.id === pilotRow.farmer_lead_id)
+      ? supabase
+          .from("farmer_leads")
+          .select(farmerLeadColumns)
+          .eq("id", pilotRow.farmer_lead_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    pilotRow.device_id &&
+    !deviceOptions.some((device) => device.id === pilotRow.device_id)
+      ? supabase
+          .from("devices")
+          .select(deviceColumns)
+          .eq("id", pilotRow.device_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    pilotRow.institution_id &&
+    !institutionOptions.some(
+      (institution) => institution.id === pilotRow.institution_id
+    )
+      ? supabase
+          .from("institutions")
+          .select(institutionColumns)
+          .eq("id", pilotRow.institution_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    pilotRow.dealer_id &&
+    !dealerOptions.some((dealer) => dealer.id === pilotRow.dealer_id)
+      ? supabase
+          .from("dealers")
+          .select(dealerColumns)
+          .eq("id", pilotRow.dealer_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null })
+  ]);
+
+  if (selectedFarmerLead) {
+    farmerLeadOptions = [
+      selectedFarmerLead as PilotFarmerLeadOption,
+      ...farmerLeadOptions
+    ];
+  }
+
+  if (selectedDevice) {
+    deviceOptions = [selectedDevice as PilotDeviceOption, ...deviceOptions];
+  }
+
+  if (selectedInstitution) {
+    institutionOptions = [
+      selectedInstitution as PilotInstitutionOption,
+      ...institutionOptions
+    ];
+  }
+
+  if (selectedDealer) {
+    dealerOptions = [selectedDealer as PilotDealerOption, ...dealerOptions];
+  }
+
   const updateAction = updatePilotAction.bind(null, pilotRow.id);
 
   return (
@@ -109,11 +184,11 @@ export default async function EditPilotPage({
       <PilotForm
         action={updateAction}
         cancelHref={`/pilots/${pilotRow.id}`}
-        dealers={(dealers ?? []) as PilotDealerOption[]}
-        devices={(devices ?? []) as PilotDeviceOption[]}
+        dealers={dealerOptions}
+        devices={deviceOptions}
         error={query.error}
-        farmerLeads={(farmerLeads ?? []) as PilotFarmerLeadOption[]}
-        institutions={(institutions ?? []) as PilotInstitutionOption[]}
+        farmerLeads={farmerLeadOptions}
+        institutions={institutionOptions}
         pilot={pilotRow}
         regions={(regions ?? []) as RegionOption[]}
         users={(users ?? []) as UserOption[]}

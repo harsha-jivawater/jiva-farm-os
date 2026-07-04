@@ -61,6 +61,36 @@ const filterColumns = [
   "dealer_id"
 ] as const;
 
+const kpiSelectColumns = [
+  "id",
+  "pilot_status",
+  "installation_completed",
+  "scale_up_recommended"
+].join(",");
+
+const listSelectColumns = [
+  "id",
+  "pilot_code",
+  "pilot_name",
+  "pilot_type",
+  "pilot_status",
+  "pilot_result_status",
+  "farmer_name_snapshot",
+  "farmer_mobile_snapshot",
+  "institution_id",
+  "dealer_id",
+  "crop",
+  "village",
+  "district",
+  "state",
+  "pilot_owner_user_id",
+  "research_assistant_user_id",
+  "agronomist_user_id",
+  "rd_head_user_id",
+  "next_visit_due_date",
+  "scale_up_recommended"
+].join(",");
+
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -177,7 +207,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
 
   let allPilotsQuery = supabase
     .from("pilots")
-    .select("*")
+    .select(kpiSelectColumns)
     .is("deleted_at", null)
     .limit(1000);
 
@@ -199,21 +229,23 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
       .from("institutions")
       .select("id, institution_code, organization_name")
       .is("deleted_at", null)
-      .order("organization_name", { ascending: true }),
+      .order("organization_name", { ascending: true })
+      .limit(200),
     supabase
       .from("dealers")
       .select("id, dealer_code, dealer_name, firm_name")
       .is("deleted_at", null)
-      .order("dealer_name", { ascending: true }),
+      .order("dealer_name", { ascending: true })
+      .limit(200),
     allPilotsQuery
   ]);
 
   let query = supabase
     .from("pilots")
-    .select("*", { count: "exact" })
+    .select(listSelectColumns, { count: "exact" })
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(500);
+    .limit(50);
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -249,7 +281,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   }
 
   const { data, error, count } = await query;
-  const pilots = (data ?? []) as Pilot[];
+  const pilots = (data ?? []) as unknown as Pilot[];
   const usersList = (users ?? []) as UserOption[];
   const institutionsList = (institutions ?? []) as PilotInstitutionOption[];
   const dealersList = (dealers ?? []) as PilotDealerOption[];
@@ -258,7 +290,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
     institutionsList.map((institution) => [institution.id, institution])
   );
   const dealerMap = new Map(dealersList.map((dealer) => [dealer.id, dealer]));
-  const allPilotRows = (allPilots ?? []) as Pilot[];
+  const allPilotRows = (allPilots ?? []) as unknown as Pilot[];
   const activeStatuses = new Set([
     "Approved",
     "Device Assigned",

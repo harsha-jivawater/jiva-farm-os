@@ -60,6 +60,23 @@ const filterColumns = [
   "pilot_id"
 ] as const;
 
+const listSelectColumns = [
+  "id",
+  "installation_code",
+  "installation_date",
+  "farmer_name_snapshot",
+  "farmer_mobile_snapshot",
+  "serial_number_snapshot",
+  "product_model",
+  "installation_status",
+  "installation_type",
+  "village",
+  "district",
+  "gps_latitude",
+  "gps_longitude",
+  "followup_due_date"
+].join(",");
+
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -157,10 +174,10 @@ export default async function InstallationsPage({
 
   let query = supabase
     .from("installations")
-    .select("*", { count: "exact" })
+    .select(listSelectColumns, { count: "exact" })
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(50);
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -189,7 +206,7 @@ export default async function InstallationsPage({
   }
 
   const { data, error, count } = await query;
-  const installations = (data ?? []) as Installation[];
+  const installations = (data ?? []) as unknown as Installation[];
 
   async function countWith(
     kind:

@@ -51,6 +51,24 @@ const filterColumns = [
   "outcome"
 ] as const;
 
+const listSelectColumns = [
+  "id",
+  "followup_code",
+  "followup_due_date",
+  "followup_type",
+  "followup_status",
+  "followup_method",
+  "outcome",
+  "followup_summary",
+  "farmer_lead_id",
+  "installation_id",
+  "escalation_required",
+  "issue_observed",
+  "fitment_inspection_status",
+  "repeat_purchase_interest",
+  "referral_interest"
+].join(",");
+
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -192,10 +210,10 @@ export default async function FollowupsPage({
     (async () => {
       let query = supabase
         .from("followups")
-        .select("*")
+        .select(listSelectColumns)
         .is("deleted_at", null)
         .order("followup_due_date", { ascending: true })
-        .limit(500);
+        .limit(50);
 
       if (scope.noRecords) {
         query = query.is("id", null);
@@ -231,7 +249,7 @@ export default async function FollowupsPage({
     })()
   ]);
 
-  const followups = (followupsResult.data ?? []) as Followup[];
+  const followups = (followupsResult.data ?? []) as unknown as Followup[];
   const farmerLeadIds = Array.from(
     new Set(followups.map((followup) => followup.farmer_lead_id).filter(Boolean))
   ) as string[];

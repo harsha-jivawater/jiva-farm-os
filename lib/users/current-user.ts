@@ -1,5 +1,6 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
-import type { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import type { InternalUser } from "@/lib/users/types";
 import {
   INTERNAL_EMAIL_DOMAIN_MESSAGE,
@@ -17,9 +18,44 @@ type CurrentUserOptions = {
 const inactiveOrMissingProfileMessage =
   "Your internal user profile is not active or has not been created. Please contact Admin.";
 
+const currentUserSelectColumns = [
+  "id",
+  "full_name",
+  "email",
+  "role",
+  "secondary_role",
+  "region_id",
+  "state",
+  "reports_to_user_id",
+  "can_create_leads",
+  "can_own_pilots",
+  "can_confirm_payment",
+  "can_manage_dispatch",
+  "is_active"
+].join(",");
+
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
+
+const getProfileByEmail = cache(async (normalizedEmail: string) => {
+  const supabase = await createClient();
+  const exactMatch = await supabase
+    .from("users")
+    .select(currentUserSelectColumns)
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (exactMatch.error || exactMatch.data) {
+    return exactMatch;
+  }
+
+  return supabase
+    .from("users")
+    .select(currentUserSelectColumns)
+    .ilike("email", normalizedEmail)
+    .maybeSingle();
+});
 
 export async function getCurrentInternalUser(
   supabase: SupabaseClient,
@@ -38,15 +74,14 @@ export async function getCurrentInternalUser(
     redirectWithError(errorPath, "Please log in before continuing.");
   }
 
-  if (!isJivawaterEmail(user.email)) {
+  const normalizedEmail = user.email?.trim().toLowerCase() ?? "";
+
+  if (!isJivawaterEmail(normalizedEmail)) {
     redirectWithError(errorPath, INTERNAL_EMAIL_DOMAIN_MESSAGE);
   }
 
-  const { data: profileByEmail, error: emailError } = await supabase
-    .from("users")
-    .select("*")
-    .ilike("email", user.email ?? "")
-    .maybeSingle();
+  const { data: profileByEmail, error: emailError } =
+    await getProfileByEmail(normalizedEmail);
 
   if (emailError) {
     redirectWithError(errorPath, emailError.message);
