@@ -25,6 +25,7 @@ import {
   type Installation,
   type InstallationFilters
 } from "@/lib/installations/types";
+import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
@@ -160,17 +161,21 @@ export default async function InstallationsPage({
   const scope = await installationScope(supabase, currentUser);
   const cleanedSearch = searchValue(filters.q);
 
-  const [{ data: users }, { data: regions }] = await Promise.all([
-    supabase
-      .from("users")
-      .select("id, full_name, role, secondary_role")
-      .eq("is_active", true)
-      .order("full_name", { ascending: true }),
-    supabase
-      .from("regions")
-      .select("id, region_name")
-      .order("region_name", { ascending: true })
-  ]);
+  const [{ data: users }, { data: regions }] = await timeAsync(
+    "installations filter option queries",
+    () =>
+      Promise.all([
+        supabase
+          .from("users")
+          .select("id, full_name, role, secondary_role")
+          .eq("is_active", true)
+          .order("full_name", { ascending: true }),
+        supabase
+          .from("regions")
+          .select("id, region_name")
+          .order("region_name", { ascending: true })
+      ])
+  );
 
   let query = supabase
     .from("installations")
@@ -205,7 +210,10 @@ export default async function InstallationsPage({
     }
   }
 
-  const { data, error, count } = await query;
+  const { data, error, count } = await timeAsync(
+    "installations list query",
+    () => query
+  );
   const installations = (data ?? []) as unknown as Installation[];
 
   async function countWith(
@@ -294,16 +302,18 @@ export default async function InstallationsPage({
     closed,
     pilotInstallations,
     dealerFarmerInstallations
-  ] = await Promise.all([
-    countWith("total"),
-    countWith("installed"),
-    countWith("verified"),
-    countWith("followupPending"),
-    countWith("issueReported"),
-    countWith("closed"),
-    countWith("pilot"),
-    countWith("dealerFarmer")
-  ]);
+  ] = await timeAsync("installations kpi counts", () =>
+    Promise.all([
+      countWith("total"),
+      countWith("installed"),
+      countWith("verified"),
+      countWith("followupPending"),
+      countWith("issueReported"),
+      countWith("closed"),
+      countWith("pilot"),
+      countWith("dealerFarmer")
+    ])
+  );
 
   const userOptions = (users ?? []) as UserOption[];
   const regionOptions = (regions ?? []) as RegionOption[];

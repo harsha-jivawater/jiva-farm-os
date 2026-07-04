@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import type { InternalUser } from "@/lib/users/types";
 import {
@@ -40,26 +41,30 @@ function redirectWithError(path: string, message: string): never {
 
 const getProfileByEmail = cache(async (normalizedEmail: string) => {
   const supabase = await createClient();
-  const exactMatch = await supabase
-    .from("users")
-    .select(currentUserSelectColumns)
-    .eq("email", normalizedEmail)
-    .maybeSingle();
+  const exactMatch = await timeAsync("current user exact profile lookup", () =>
+    supabase
+      .from("users")
+      .select(currentUserSelectColumns)
+      .eq("email", normalizedEmail)
+      .maybeSingle()
+  );
 
   if (exactMatch.error || exactMatch.data) {
     return exactMatch;
   }
 
-  return supabase
-    .from("users")
-    .select(currentUserSelectColumns)
-    .ilike("email", normalizedEmail)
-    .maybeSingle();
+  return timeAsync("current user fallback profile lookup", () =>
+    supabase
+      .from("users")
+      .select(currentUserSelectColumns)
+      .ilike("email", normalizedEmail)
+      .maybeSingle()
+  );
 });
 
 const getAuthenticatedUser = cache(async () => {
   const supabase = await createClient();
-  return supabase.auth.getUser();
+  return timeAsync("current user auth lookup", () => supabase.auth.getUser());
 });
 
 export async function getCurrentInternalUser(
@@ -85,8 +90,10 @@ export async function getCurrentInternalUser(
     redirectWithError(errorPath, INTERNAL_EMAIL_DOMAIN_MESSAGE);
   }
 
-  const { data: profileByEmail, error: emailError } =
-    await getProfileByEmail(normalizedEmail);
+  const { data: profileByEmail, error: emailError } = await timeAsync(
+    "current user profile load",
+    () => getProfileByEmail(normalizedEmail)
+  );
 
   if (emailError) {
     redirectWithError(errorPath, emailError.message);

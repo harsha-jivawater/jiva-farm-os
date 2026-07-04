@@ -11,6 +11,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
@@ -138,7 +139,7 @@ export default async function DashboardPage() {
 
   if (canViewModule(currentUser, "farmer-leads")) {
     cardTasks.push(
-      (async () => {
+      timeAsync("dashboard farmer leads card", async () => {
         const scope = await farmerLeadScope(supabase, currentUser);
         const query = applyScope(
           supabase
@@ -159,13 +160,13 @@ export default async function DashboardPage() {
           module: "farmer-leads",
           value: await countSafely("leads needing follow-up", query)
         };
-      })()
+      })
     );
   }
 
   if (canViewModule(currentUser, "dispatches")) {
     cardTasks.push(
-      (async () => {
+      timeAsync("dashboard dispatch cards", async () => {
         const scope = await dispatchScope(supabase, currentUser);
         const paymentQuery = applyScope(
           supabase
@@ -208,13 +209,13 @@ export default async function DashboardPage() {
             value: approvedDispatches
           }
         ];
-      })()
+      })
     );
   }
 
   if (canViewModule(currentUser, "installations")) {
     cardTasks.push(
-      (async () => {
+      timeAsync("dashboard installations card", async () => {
         const scope = await installationScope(supabase, currentUser);
         const query = applyScope(
           supabase
@@ -234,13 +235,13 @@ export default async function DashboardPage() {
           module: "installations",
           value: await countSafely("installations planned", query)
         };
-      })()
+      })
     );
   }
 
   if (canViewModule(currentUser, "devices")) {
     cardTasks.push(
-      (async () => {
+      timeAsync("dashboard devices card", async () => {
         const scope = await deviceScope(supabase, currentUser);
         const query = applyScope(
           supabase
@@ -260,13 +261,13 @@ export default async function DashboardPage() {
           module: "devices",
           value: await countSafely("devices in warehouse", query)
         };
-      })()
+      })
     );
   }
 
   if (canViewModule(currentUser, "follow-ups")) {
     cardTasks.push(
-      (async () => {
+      timeAsync("dashboard followups card", async () => {
         const scope = await followupScope(supabase, currentUser);
         const query = applyScope(
           supabase
@@ -287,13 +288,13 @@ export default async function DashboardPage() {
           module: "follow-ups",
           value: await countSafely("overdue post installation follow-ups", query)
         };
-      })()
+      })
     );
   }
 
   if (canViewModule(currentUser, "pilots")) {
     cardTasks.push(
-      (async () => {
+      timeAsync("dashboard pilots card", async () => {
         const scope = await pilotScope(supabase, currentUser);
         const query = applyScope(
           supabase
@@ -313,11 +314,13 @@ export default async function DashboardPage() {
           module: "pilots",
           value: await countSafely("active pilots", query)
         };
-      })()
+      })
     );
   }
 
-  const cardResults = await Promise.allSettled(cardTasks);
+  const cardResults = await timeAsync("dashboard cards", () =>
+    Promise.allSettled(cardTasks)
+  );
   const visibleCards = cardResults.flatMap((result) => {
     if (result.status === "rejected") {
       console.error("[Home] Card group unavailable", result.reason);

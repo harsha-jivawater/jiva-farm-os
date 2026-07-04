@@ -32,6 +32,7 @@ import {
   type PilotInstitutionOption,
   type UserOption
 } from "@/lib/pilots/types";
+import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
@@ -219,26 +220,33 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
     allPilotsQuery = allPilotsQuery.or(scope.orFilter);
   }
 
-  const [{ data: users }, { data: institutions }, { data: dealers }, { data: allPilots }] = await Promise.all([
-    supabase
-      .from("users")
-      .select("id, full_name, role, secondary_role")
-      .eq("is_active", true)
-      .order("full_name", { ascending: true }),
-    supabase
-      .from("institutions")
-      .select("id, institution_code, organization_name")
-      .is("deleted_at", null)
-      .order("organization_name", { ascending: true })
-      .limit(200),
-    supabase
-      .from("dealers")
-      .select("id, dealer_code, dealer_name, firm_name")
-      .is("deleted_at", null)
-      .order("dealer_name", { ascending: true })
-      .limit(200),
-    allPilotsQuery
-  ]);
+  const [
+    { data: users },
+    { data: institutions },
+    { data: dealers },
+    { data: allPilots }
+  ] = await timeAsync("pilots option and kpi queries", () =>
+    Promise.all([
+      supabase
+        .from("users")
+        .select("id, full_name, role, secondary_role")
+        .eq("is_active", true)
+        .order("full_name", { ascending: true }),
+      supabase
+        .from("institutions")
+        .select("id, institution_code, organization_name")
+        .is("deleted_at", null)
+        .order("organization_name", { ascending: true })
+        .limit(200),
+      supabase
+        .from("dealers")
+        .select("id, dealer_code, dealer_name, firm_name")
+        .is("deleted_at", null)
+        .order("dealer_name", { ascending: true })
+        .limit(200),
+      allPilotsQuery
+    ])
+  );
 
   let query = supabase
     .from("pilots")
@@ -280,7 +288,10 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
     query = query.eq("scale_up_recommended", false);
   }
 
-  const { data, error, count } = await query;
+  const { data, error, count } = await timeAsync(
+    "pilots list query",
+    () => query
+  );
   const pilots = (data ?? []) as unknown as Pilot[];
   const usersList = (users ?? []) as UserOption[];
   const institutionsList = (institutions ?? []) as PilotInstitutionOption[];

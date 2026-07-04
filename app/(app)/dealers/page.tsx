@@ -36,6 +36,7 @@ import {
   type RegionOption,
   type UserOption
 } from "@/lib/dealers/types";
+import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
@@ -207,17 +208,21 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
       ? DISTRICTS_BY_STATE[filters.state as keyof typeof DISTRICTS_BY_STATE]
       : [];
 
-  const [{ data: users }, { data: regions }] = await Promise.all([
-    supabase
-      .from("users")
-      .select("id, full_name, role, secondary_role")
-      .eq("is_active", true)
-      .order("full_name", { ascending: true }),
-    supabase
-      .from("regions")
-      .select("id, region_name")
-      .order("region_name", { ascending: true })
-  ]);
+  const [{ data: users }, { data: regions }] = await timeAsync(
+    "dealers filter option queries",
+    () =>
+      Promise.all([
+        supabase
+          .from("users")
+          .select("id, full_name, role, secondary_role")
+          .eq("is_active", true)
+          .order("full_name", { ascending: true }),
+        supabase
+          .from("regions")
+          .select("id, region_name")
+          .order("region_name", { ascending: true })
+      ])
+  );
 
   let query = supabase
     .from("dealers")
@@ -253,7 +258,10 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
     }
   }
 
-  const { data, error, count } = await query;
+  const { data, error, count } = await timeAsync(
+    "dealers list query",
+    () => query
+  );
   const dealers = (data ?? []) as unknown as Dealer[];
   const dealerIds = dealers.map((dealer) => dealer.id);
   const monthStart = new Date();
@@ -261,32 +269,34 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
   const monthStartDate = monthStart.toISOString().slice(0, 10);
 
   const [{ data: stockDevices }, { data: installations }, { data: dispatches }] =
-    await Promise.all([
-      dealerIds.length
-        ? supabase
-            .from("devices")
-            .select("id, current_holder_id")
-            .eq("current_holder_type", "Dealer")
-            .in("current_holder_id", dealerIds)
-            .is("deleted_at", null)
-        : Promise.resolve({ data: [] }),
-      dealerIds.length
-        ? supabase
-            .from("installations")
-            .select("id, dealer_id")
-            .in("dealer_id", dealerIds)
-            .is("deleted_at", null)
-        : Promise.resolve({ data: [] }),
-      dealerIds.length
-        ? supabase
-            .from("dispatches")
-            .select("id, destination_dealer_id")
-            .eq("destination_type", "Dealer")
-            .in("destination_dealer_id", dealerIds)
-            .gte("dispatch_date", monthStartDate)
-            .is("deleted_at", null)
-        : Promise.resolve({ data: [] })
-    ]);
+    await timeAsync("dealers related count queries", () =>
+      Promise.all([
+        dealerIds.length
+          ? supabase
+              .from("devices")
+              .select("id, current_holder_id")
+              .eq("current_holder_type", "Dealer")
+              .in("current_holder_id", dealerIds)
+              .is("deleted_at", null)
+          : Promise.resolve({ data: [] }),
+        dealerIds.length
+          ? supabase
+              .from("installations")
+              .select("id, dealer_id")
+              .in("dealer_id", dealerIds)
+              .is("deleted_at", null)
+          : Promise.resolve({ data: [] }),
+        dealerIds.length
+          ? supabase
+              .from("dispatches")
+              .select("id, destination_dealer_id")
+              .eq("destination_type", "Dealer")
+              .in("destination_dealer_id", dealerIds)
+              .gte("dispatch_date", monthStartDate)
+              .is("deleted_at", null)
+          : Promise.resolve({ data: [] })
+      ])
+    );
 
   const stockCounts = countById(
     (stockDevices ?? []) as Pick<Device, "id" | "current_holder_id">[],

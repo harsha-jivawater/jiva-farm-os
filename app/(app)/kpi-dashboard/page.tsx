@@ -25,6 +25,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { deviceStatusOptions, productModelOptions } from "@/lib/devices/options";
 import { primaryCropOptions } from "@/lib/farmer-leads/options";
+import { timeAsync } from "@/lib/perf";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -633,98 +634,126 @@ export default async function KpiDashboardPage({
     visitReports,
     regions,
     users
-  ] = await Promise.all([
-    fetchAll<Device>((from, to) =>
-      supabase
-        .from("devices")
-        .select(deviceSelectColumns)
-        .is("deleted_at", null)
-        .range(from, to) as unknown as PromiseLike<QueryResult<Device>>
-    ),
-    fetchAll<Dispatch>((from, to) =>
-      supabase
-        .from("dispatches")
-        .select(dispatchSelectColumns)
-        .is("deleted_at", null)
-        .range(from, to) as unknown as PromiseLike<QueryResult<Dispatch>>
-    ),
-    fetchAll<FarmerLead>((from, to) =>
-      supabase
-        .from("farmer_leads")
-        .select(farmerLeadSelectColumns)
-        .is("deleted_at", null)
-        .range(from, to) as unknown as PromiseLike<QueryResult<FarmerLead>>
-    ),
-    fetchAll<Followup>((from, to) =>
-      supabase
-        .from("followups")
-        .select(followupSelectColumns)
-        .is("deleted_at", null)
-        .range(from, to) as unknown as PromiseLike<QueryResult<Followup>>
-    ),
-    fetchAll<Installation>((from, to) =>
-      supabase
-        .from("installations")
-        .select(installationSelectColumns)
-        .is("deleted_at", null)
-        .range(from, to) as unknown as PromiseLike<QueryResult<Installation>>
-    ),
-    fetchAll<Dealer>((from, to) =>
-      supabase
-        .from("dealers")
-        .select(dealerSelectColumns)
-        .is("deleted_at", null)
-        .range(from, to) as unknown as PromiseLike<QueryResult<Dealer>>
-    ),
-    fetchAll<Institution>((from, to) =>
-      supabase
-        .from("institutions")
-        .select(institutionSelectColumns)
-        .is("deleted_at", null)
-        .range(from, to) as unknown as PromiseLike<QueryResult<Institution>>
-    ),
-    fetchAll<InstitutionMeeting>((from, to) =>
-      supabase
-        .from("institution_meetings")
-        .select(institutionMeetingSelectColumns)
-        .range(from, to) as unknown as PromiseLike<QueryResult<InstitutionMeeting>>
-    ),
-    fetchAll<Pilot>((from, to) =>
-      supabase
-        .from("pilots")
-        .select(pilotSelectColumns)
-        .is("deleted_at", null)
-        .range(from, to) as unknown as PromiseLike<QueryResult<Pilot>>
-    ),
-    fetchAll<PilotVisit>((from, to) =>
-      supabase
-        .from("pilot_visits")
-        .select(pilotVisitSelectColumns)
-        .is("deleted_at", null)
-        .range(from, to) as unknown as PromiseLike<QueryResult<PilotVisit>>
-    ),
-    fetchAll<VisitReport>((from, to) =>
-      supabase
-        .from("visit_reports")
-        .select(visitReportSelectColumns)
-        .is("deleted_at", null)
-        .range(from, to) as unknown as PromiseLike<QueryResult<VisitReport>>
-    ),
-    fetchAll<Region>((from, to) =>
-      supabase
-        .from("regions")
-        .select(regionSelectColumns)
-        .order("region_name")
-        .range(from, to) as unknown as PromiseLike<QueryResult<Region>>
-    ),
-    fetchAll<User>((from, to) =>
-      supabase
-        .from("users")
-        .select(userSelectColumns)
-        .order("full_name")
-        .range(from, to) as unknown as PromiseLike<QueryResult<User>>
-    )
-  ]);
+  ] = await timeAsync("kpi dashboard all query groups", () =>
+    Promise.all([
+      timeAsync("kpi dashboard devices query", () =>
+        fetchAll<Device>((from, to) =>
+          supabase
+            .from("devices")
+            .select(deviceSelectColumns)
+            .is("deleted_at", null)
+            .range(from, to) as unknown as PromiseLike<QueryResult<Device>>
+        )
+      ),
+      timeAsync("kpi dashboard dispatches query", () =>
+        fetchAll<Dispatch>((from, to) =>
+          supabase
+            .from("dispatches")
+            .select(dispatchSelectColumns)
+            .is("deleted_at", null)
+            .range(from, to) as unknown as PromiseLike<QueryResult<Dispatch>>
+        )
+      ),
+      timeAsync("kpi dashboard farmer leads query", () =>
+        fetchAll<FarmerLead>((from, to) =>
+          supabase
+            .from("farmer_leads")
+            .select(farmerLeadSelectColumns)
+            .is("deleted_at", null)
+            .range(from, to) as unknown as PromiseLike<QueryResult<FarmerLead>>
+        )
+      ),
+      timeAsync("kpi dashboard followups query", () =>
+        fetchAll<Followup>((from, to) =>
+          supabase
+            .from("followups")
+            .select(followupSelectColumns)
+            .is("deleted_at", null)
+            .range(from, to) as unknown as PromiseLike<QueryResult<Followup>>
+        )
+      ),
+      timeAsync("kpi dashboard installations query", () =>
+        fetchAll<Installation>((from, to) =>
+          supabase
+            .from("installations")
+            .select(installationSelectColumns)
+            .is("deleted_at", null)
+            .range(from, to) as unknown as PromiseLike<QueryResult<Installation>>
+        )
+      ),
+      timeAsync("kpi dashboard dealers query", () =>
+        fetchAll<Dealer>((from, to) =>
+          supabase
+            .from("dealers")
+            .select(dealerSelectColumns)
+            .is("deleted_at", null)
+            .range(from, to) as unknown as PromiseLike<QueryResult<Dealer>>
+        )
+      ),
+      timeAsync("kpi dashboard institutions query", () =>
+        fetchAll<Institution>((from, to) =>
+          supabase
+            .from("institutions")
+            .select(institutionSelectColumns)
+            .is("deleted_at", null)
+            .range(from, to) as unknown as PromiseLike<QueryResult<Institution>>
+        )
+      ),
+      timeAsync("kpi dashboard institution meetings query", () =>
+        fetchAll<InstitutionMeeting>((from, to) =>
+          supabase
+            .from("institution_meetings")
+            .select(institutionMeetingSelectColumns)
+            .range(from, to) as unknown as PromiseLike<QueryResult<InstitutionMeeting>>
+        )
+      ),
+      timeAsync("kpi dashboard pilots query", () =>
+        fetchAll<Pilot>((from, to) =>
+          supabase
+            .from("pilots")
+            .select(pilotSelectColumns)
+            .is("deleted_at", null)
+            .range(from, to) as unknown as PromiseLike<QueryResult<Pilot>>
+        )
+      ),
+      timeAsync("kpi dashboard pilot visits query", () =>
+        fetchAll<PilotVisit>((from, to) =>
+          supabase
+            .from("pilot_visits")
+            .select(pilotVisitSelectColumns)
+            .is("deleted_at", null)
+            .range(from, to) as unknown as PromiseLike<QueryResult<PilotVisit>>
+        )
+      ),
+      timeAsync("kpi dashboard visit reports query", () =>
+        fetchAll<VisitReport>((from, to) =>
+          supabase
+            .from("visit_reports")
+            .select(visitReportSelectColumns)
+            .is("deleted_at", null)
+            .range(from, to) as unknown as PromiseLike<QueryResult<VisitReport>>
+        )
+      ),
+      timeAsync("kpi dashboard regions query", () =>
+        fetchAll<Region>((from, to) =>
+          supabase
+            .from("regions")
+            .select(regionSelectColumns)
+            .order("region_name")
+            .range(from, to) as unknown as PromiseLike<QueryResult<Region>>
+        )
+      ),
+      timeAsync("kpi dashboard users query", () =>
+        fetchAll<User>((from, to) =>
+          supabase
+            .from("users")
+            .select(userSelectColumns)
+            .order("full_name")
+            .range(from, to) as unknown as PromiseLike<QueryResult<User>>
+        )
+      )
+    ])
+  );
 
   const leadById = new Map(farmerLeads.map((lead) => [lead.id, lead]));
   const pilotById = new Map(pilots.map((pilot) => [pilot.id, pilot]));

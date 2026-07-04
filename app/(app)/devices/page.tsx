@@ -29,6 +29,7 @@ import {
   type Device,
   type DeviceFilters
 } from "@/lib/devices/types";
+import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canWriteModule } from "@/lib/users/permissions";
@@ -201,7 +202,9 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
   }
 
   try {
-    const { data, error } = await withQueryTimeout(query, "devices list");
+    const { data, error } = await timeAsync("devices list query", () =>
+      withQueryTimeout(query, "devices list")
+    );
 
     if (error) {
       throw error;

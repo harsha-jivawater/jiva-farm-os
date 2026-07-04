@@ -29,6 +29,7 @@ import {
   type DispatchFilters
 } from "@/lib/dispatches/types";
 import { productModelOptions } from "@/lib/devices/options";
+import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canWriteModule } from "@/lib/users/permissions";
@@ -228,7 +229,9 @@ export default async function DispatchesPage({
   }
 
   try {
-    const { data, error } = await withQueryTimeout(query, "dispatches list");
+    const { data, error } = await timeAsync("dispatches list query", () =>
+      withQueryTimeout(query, "dispatches list")
+    );
 
     if (error) {
       throw error;

@@ -25,6 +25,7 @@ import {
   leadStatusOptions,
   primaryCropOptions
 } from "@/lib/farmer-leads/options";
+import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canWriteModule } from "@/lib/users/permissions";
@@ -179,7 +180,10 @@ export default async function FarmerLeadsPage({
     }
   }
 
-  const { data, error, count } = await query;
+  const { data, error, count } = await timeAsync(
+    "farmer leads list query",
+    () => query
+  );
   const leads = (data ?? []) as unknown as FarmerLead[];
 
   async function countWith(kind: "total" | "open" | "won" | "lost" | "due" | "payment" | "installed") {
@@ -251,15 +255,17 @@ export default async function FarmerLeadsPage({
     followUpsDue,
     paymentConfirmed,
     deviceInstalled
-  ] = await Promise.all([
-    countWith("total"),
-    countWith("open"),
-    countWith("won"),
-    countWith("lost"),
-    countWith("due"),
-    countWith("payment"),
-    countWith("installed")
-  ]);
+  ] = await timeAsync("farmer leads kpi counts", () =>
+    Promise.all([
+      countWith("total"),
+      countWith("open"),
+      countWith("won"),
+      countWith("lost"),
+      countWith("due"),
+      countWith("payment"),
+      countWith("installed")
+    ])
+  );
 
   return (
     <section>
