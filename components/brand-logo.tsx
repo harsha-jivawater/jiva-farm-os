@@ -9,10 +9,10 @@ export function BrandLogo({ className = "", priority = false }: BrandLogoProps) 
   return (
     <Image
       alt="Jiva Water"
-      className={["h-auto object-contain", className].join(" ")}
+      className={["mx-auto block h-auto max-w-full object-contain", className].join(" ")}
       height={300}
       priority={priority}
-      src="/jiva-water-logo.jpeg"
+      src="/jiva-water-logo.svg"
       width={1200}
     />
   );

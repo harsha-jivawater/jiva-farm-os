@@ -60,17 +60,17 @@ export function AppShell({
           isOpen ? "translate-x-0" : "-translate-x-full"
         ].join(" ")}
       >
-        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4">
+        <div className="relative flex h-16 items-center justify-center border-b border-slate-200 px-4">
           <Link
-            className="flex min-w-0 items-center"
+            className="flex min-w-0 flex-1 items-center justify-center px-8"
             href={mustChangePassword ? "/account/password" : "/dashboard"}
             onClick={() => setIsOpen(false)}
           >
-            <BrandLogo className="max-h-14 w-[190px]" priority />
+            <BrandLogo className="max-h-14 w-[200px]" priority />
           </Link>
           <button
             aria-label="Close navigation"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 lg:hidden"
+            className="absolute right-4 inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 lg:hidden"
             onClick={() => setIsOpen(false)}
             type="button"
           >
@@ -201,7 +201,7 @@ export function AppShell({
       </aside>
 
       <div className="min-w-0">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-30 grid h-16 grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center gap-2 border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:hidden">
           <button
             aria-label="Open navigation"
             className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-700 shadow-sm"
@@ -210,7 +210,10 @@ export function AppShell({
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
-          <BrandLogo className="max-h-12 w-[170px]" priority />
+          <div className="flex min-w-0 justify-center">
+            <BrandLogo className="max-h-12 w-[180px]" priority />
+          </div>
+          <div aria-hidden="true" />
         </header>
 
         <main className="min-h-screen min-w-0">
