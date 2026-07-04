@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requestPasswordResetAction, signInAction } from "@/app/auth-actions";
 import { BrandLogo } from "@/components/brand-logo";
+import { LoginSubmitButton } from "@/components/auth/login-submit-button";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -121,13 +122,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               />
             </div>
 
-            <button
-              className="min-h-11 w-full rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={!configured}
-              type="submit"
-            >
-              Sign in
-            </button>
+            <LoginSubmitButton isConfigured={configured} />
           </form>
 
           <details className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
