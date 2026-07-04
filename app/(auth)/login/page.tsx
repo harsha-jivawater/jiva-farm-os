@@ -161,9 +161,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </form>
           </details>
 
-          <p className="mt-4 text-sm leading-6 text-slate-500">
-            Accounts are managed internally through Supabase authentication.
-          </p>
         </div>
       </section>
     </main>
