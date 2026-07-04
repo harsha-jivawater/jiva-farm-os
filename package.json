@@ -1,10 +1,10 @@
 {
-  "name": "jiva-farm-devices-os",
+  "name": "jiva-farm-os",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "WATCHPACK_POLLING=true CHOKIDAR_USEPOLLING=true next dev -H 127.0.0.1",
-    "build": "NEXT_DIST_DIR=.next-build next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint app components lib src next.config.ts tailwind.config.ts --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.typecheck.json"
