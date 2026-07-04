@@ -29,7 +29,7 @@ import {
   type DispatchFilters
 } from "@/lib/dispatches/types";
 import { productModelOptions } from "@/lib/devices/options";
-import { timeAsync } from "@/lib/perf";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canWriteModule } from "@/lib/users/permissions";
@@ -173,12 +173,18 @@ function KpiCard({
 export default async function DispatchesPage({
   searchParams
 }: DispatchesPageProps) {
+  const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
-  const canWrite = canWriteModule(currentUser, "dispatches");
-  const scope = await dispatchScope(supabase, currentUser);
+  const { canWrite, scope } = await timeAsync(
+    "dispatches role/permission resolution",
+    async () => ({
+      canWrite: canWriteModule(currentUser, "dispatches"),
+      scope: await dispatchScope(supabase, currentUser)
+    })
+  );
   const cleanedSearch = searchValue(filters.q);
   let loadError: string | null = null;
   let dispatches: Dispatch[] = [];
@@ -263,6 +269,8 @@ export default async function DispatchesPage({
     logLoadError(error);
     loadError = loadErrorMessage;
   }
+
+  logPerf("dispatches page total server render", startedAt);
 
   return (
     <section>

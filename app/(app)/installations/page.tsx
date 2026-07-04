@@ -25,7 +25,7 @@ import {
   type Installation,
   type InstallationFilters
 } from "@/lib/installations/types";
-import { timeAsync } from "@/lib/perf";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
@@ -198,27 +198,37 @@ function KpiCard({
 export default async function InstallationsPage({
   searchParams
 }: InstallationsPageProps) {
+  const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/installations");
-  const canWrite = canWriteModule(currentUser, "installations");
-  const scope = await installationScope(supabase, currentUser);
+  const { canWrite, scope } = await timeAsync(
+    "installations role/permission resolution",
+    async () => ({
+      canWrite: canWriteModule(currentUser, "installations"),
+      scope: await installationScope(supabase, currentUser)
+    })
+  );
   const cleanedSearch = searchValue(filters.q);
 
   const [{ data: users }, { data: regions }] = await timeAsync(
     "installations filter option queries",
     () =>
       Promise.all([
-        supabase
-          .from("users")
-          .select("id, full_name, role, secondary_role")
-          .eq("is_active", true)
-          .order("full_name", { ascending: true }),
-        supabase
-          .from("regions")
-          .select("id, region_name")
-          .order("region_name", { ascending: true })
+        timeAsync("installations users query", () =>
+          supabase
+            .from("users")
+            .select("id, full_name, role, secondary_role")
+            .eq("is_active", true)
+            .order("full_name", { ascending: true })
+        ),
+        timeAsync("installations regions query", () =>
+          supabase
+            .from("regions")
+            .select("id, region_name")
+            .order("region_name", { ascending: true })
+        )
       ])
   );
 
@@ -284,6 +294,8 @@ export default async function InstallationsPage({
 
   const userOptions = (users ?? []) as UserOption[];
   const regionOptions = (regions ?? []) as RegionOption[];
+
+  logPerf("installations page total server render", startedAt);
 
   return (
     <section>

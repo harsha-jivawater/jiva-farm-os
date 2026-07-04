@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { signOutAction } from "@/app/auth-actions";
-import { timeAsync } from "@/lib/perf";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -13,6 +13,8 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const startedAt = perfStart();
+
   if (!isSupabaseConfigured()) {
     redirect("/login?error=missing-supabase-config");
   }
@@ -26,6 +28,9 @@ export default async function ProtectedLayout({
       return { currentUser: profile };
     }
   );
+
+  logPerf("app layout sidebar/nav preparation", startedAt);
+  logPerf("app layout total server render", startedAt);
 
   return (
     <AppShell currentUser={currentUser} signOutAction={signOutAction}>

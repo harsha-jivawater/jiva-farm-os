@@ -33,6 +33,7 @@ import {
   type Installation,
   type UserOption
 } from "@/lib/follow-ups/types";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
@@ -195,59 +196,71 @@ function ActionButtons({
 export default async function FollowupsPage({
   searchParams
 }: FollowupsPageProps) {
+  const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/follow-ups");
-  const canWrite = canWriteModule(currentUser, "follow-ups");
-  const scope = await followupScope(supabase, currentUser);
-  const [{ data: users }, followupsResult] = await Promise.all([
-    supabase
-      .from("users")
-      .select("id, full_name, role, secondary_role")
-      .eq("is_active", true)
-      .order("full_name", { ascending: true }),
-    (async () => {
-      let query = supabase
-        .from("followups")
-        .select(listSelectColumns)
-        .is("deleted_at", null)
-        .order("followup_due_date", { ascending: true })
-        .limit(50);
+  const { canWrite, scope } = await timeAsync(
+    "follow-ups role/permission resolution",
+    async () => ({
+      canWrite: canWriteModule(currentUser, "follow-ups"),
+      scope: await followupScope(supabase, currentUser)
+    })
+  );
+  const [{ data: users }, followupsResult] = await timeAsync(
+    "follow-ups users and list queries",
+    () =>
+      Promise.all([
+        timeAsync("follow-ups users query", () =>
+          supabase
+            .from("users")
+            .select("id, full_name, role, secondary_role")
+            .eq("is_active", true)
+            .order("full_name", { ascending: true })
+        ),
+        timeAsync("follow-ups list query", () => {
+          let query = supabase
+            .from("followups")
+            .select(listSelectColumns)
+            .is("deleted_at", null)
+            .order("followup_due_date", { ascending: true })
+            .limit(50);
 
-      if (scope.noRecords) {
-        query = query.is("id", null);
-      }
+          if (scope.noRecords) {
+            query = query.is("id", null);
+          }
 
-      if (scope.orFilter) {
-        query = query.or(scope.orFilter);
-      }
+          if (scope.orFilter) {
+            query = query.or(scope.orFilter);
+          }
 
-      for (const column of filterColumns) {
-        if (filters[column]) {
-          query = query.eq(column, filters[column]);
-        }
-      }
+          for (const column of filterColumns) {
+            if (filters[column]) {
+              query = query.eq(column, filters[column]);
+            }
+          }
 
-      if (filters.due_from) {
-        query = query.gte("followup_due_date", filters.due_from);
-      }
+          if (filters.due_from) {
+            query = query.gte("followup_due_date", filters.due_from);
+          }
 
-      if (filters.due_to) {
-        query = query.lte("followup_due_date", filters.due_to);
-      }
+          if (filters.due_to) {
+            query = query.lte("followup_due_date", filters.due_to);
+          }
 
-      if (filters.escalation_required === "true") {
-        query = query.eq("escalation_required", true);
-      }
+          if (filters.escalation_required === "true") {
+            query = query.eq("escalation_required", true);
+          }
 
-      if (filters.escalation_required === "false") {
-        query = query.eq("escalation_required", false);
-      }
+          if (filters.escalation_required === "false") {
+            query = query.eq("escalation_required", false);
+          }
 
-      return query;
-    })()
-  ]);
+          return query;
+        })
+      ])
+  );
 
   const followups = (followupsResult.data ?? []) as unknown as Followup[];
   const farmerLeadIds = Array.from(
@@ -257,20 +270,28 @@ export default async function FollowupsPage({
     new Set(followups.map((followup) => followup.installation_id).filter(Boolean))
   ) as string[];
 
-  const [{ data: farmerLeads }, { data: installations }] = await Promise.all([
-    farmerLeadIds.length
-      ? supabase
-          .from("farmer_leads")
-          .select("id, farmer_name, mobile_number")
-          .in("id", farmerLeadIds)
-      : Promise.resolve({ data: [] }),
-    installationIds.length
-      ? supabase
-          .from("installations")
-          .select("id, farmer_name_snapshot, farmer_mobile_snapshot")
-          .in("id", installationIds)
-      : Promise.resolve({ data: [] })
-  ]);
+  const [{ data: farmerLeads }, { data: installations }] = await timeAsync(
+    "follow-ups context queries",
+    () =>
+      Promise.all([
+        timeAsync("follow-ups farmer lead context query", async () =>
+          farmerLeadIds.length
+            ? await supabase
+                .from("farmer_leads")
+                .select("id, farmer_name, mobile_number")
+                .in("id", farmerLeadIds)
+            : { data: [] }
+        ),
+        timeAsync("follow-ups installation context query", async () =>
+          installationIds.length
+            ? await supabase
+                .from("installations")
+                .select("id, farmer_name_snapshot, farmer_mobile_snapshot")
+                .in("id", installationIds)
+            : { data: [] }
+        )
+      ])
+  );
 
   const farmerLeadMap = new Map(
     ((farmerLeads ?? []) as Pick<
@@ -337,6 +358,8 @@ export default async function FollowupsPage({
       interestValues.includes(followup.referral_interest ?? "")
     ).length
   };
+
+  logPerf("follow-ups page total server render", startedAt);
 
   return (
     <section>

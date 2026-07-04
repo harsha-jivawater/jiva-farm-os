@@ -26,7 +26,7 @@ import {
   leadStatusOptions,
   primaryCropOptions
 } from "@/lib/farmer-leads/options";
-import { timeAsync } from "@/lib/perf";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canWriteModule } from "@/lib/users/permissions";
@@ -184,12 +184,18 @@ function KpiCard({
 export default async function FarmerLeadsPage({
   searchParams
 }: FarmerLeadsPageProps) {
+  const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/farmer-leads");
-  const canWrite = canWriteModule(currentUser, "farmer-leads");
-  const scope = await farmerLeadScope(supabase, currentUser);
+  const { canWrite, scope } = await timeAsync(
+    "farmer leads role/permission resolution",
+    async () => ({
+      canWrite: canWriteModule(currentUser, "farmer-leads"),
+      scope: await farmerLeadScope(supabase, currentUser)
+    })
+  );
   const cleanedSearch = searchValue(filters.q);
 
   let query = supabase
@@ -247,6 +253,8 @@ export default async function FarmerLeadsPage({
   }
 
   const kpis = readKpis(kpiResult.data);
+
+  logPerf("farmer leads page total server render", startedAt);
 
   return (
     <section>

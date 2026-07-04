@@ -30,7 +30,7 @@ import {
   type Device,
   type DeviceFilters
 } from "@/lib/devices/types";
-import { timeAsync } from "@/lib/perf";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canWriteModule } from "@/lib/users/permissions";
@@ -153,12 +153,18 @@ function KpiCard({
 }
 
 export default async function DevicesPage({ searchParams }: DevicesPageProps) {
+  const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/devices");
-  const canWrite = canWriteModule(currentUser, "devices");
-  const scope = await deviceScope(supabase, currentUser);
+  const { canWrite, scope } = await timeAsync(
+    "devices role/permission resolution",
+    async () => ({
+      canWrite: canWriteModule(currentUser, "devices"),
+      scope: await deviceScope(supabase, currentUser)
+    })
+  );
   const cleanedSearch = searchValue(filters.q);
   let loadError: string | null = null;
   let devices: Device[] = [];
@@ -236,6 +242,8 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
     logLoadError(error);
     loadError = loadErrorMessage;
   }
+
+  logPerf("devices page total server render", startedAt);
 
   return (
     <section>

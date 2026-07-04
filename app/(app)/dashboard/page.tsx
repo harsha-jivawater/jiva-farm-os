@@ -11,7 +11,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { timeAsync } from "@/lib/perf";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
@@ -93,7 +93,10 @@ function applyScope<T extends { is: (column: string, value: null) => T; or: (fil
 
 async function countSafely(label: string, query: PromiseLike<{ count: number | null; error: { message: string } | null }>) {
   try {
-    const { count, error } = await withQueryTimeout(query, label);
+    const { count, error } = await timeAsync(
+      `dashboard ${label} count query`,
+      () => withQueryTimeout(query, label)
+    );
 
     if (error) {
       throw new Error(error.message);
@@ -131,13 +134,25 @@ function DailyActionCard({ card }: { card: CountCard }) {
 }
 
 export default async function DashboardPage() {
+  const startedAt = perfStart();
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dashboard");
   const today = todayString();
+  const moduleAccess = await timeAsync(
+    "dashboard role/permission resolution",
+    async () => ({
+      farmerLeads: canViewModule(currentUser, "farmer-leads"),
+      dispatches: canViewModule(currentUser, "dispatches"),
+      installations: canViewModule(currentUser, "installations"),
+      devices: canViewModule(currentUser, "devices"),
+      followUps: canViewModule(currentUser, "follow-ups"),
+      pilots: canViewModule(currentUser, "pilots")
+    })
+  );
 
   const cardTasks: Array<Promise<CountCard | CountCard[]>> = [];
 
-  if (canViewModule(currentUser, "farmer-leads")) {
+  if (moduleAccess.farmerLeads) {
     cardTasks.push(
       timeAsync("dashboard farmer leads card", async () => {
         const scope = await farmerLeadScope(supabase, currentUser);
@@ -164,7 +179,7 @@ export default async function DashboardPage() {
     );
   }
 
-  if (canViewModule(currentUser, "dispatches")) {
+  if (moduleAccess.dispatches) {
     cardTasks.push(
       timeAsync("dashboard dispatch cards", async () => {
         const scope = await dispatchScope(supabase, currentUser);
@@ -213,7 +228,7 @@ export default async function DashboardPage() {
     );
   }
 
-  if (canViewModule(currentUser, "installations")) {
+  if (moduleAccess.installations) {
     cardTasks.push(
       timeAsync("dashboard installations card", async () => {
         const scope = await installationScope(supabase, currentUser);
@@ -239,7 +254,7 @@ export default async function DashboardPage() {
     );
   }
 
-  if (canViewModule(currentUser, "devices")) {
+  if (moduleAccess.devices) {
     cardTasks.push(
       timeAsync("dashboard devices card", async () => {
         const scope = await deviceScope(supabase, currentUser);
@@ -265,7 +280,7 @@ export default async function DashboardPage() {
     );
   }
 
-  if (canViewModule(currentUser, "follow-ups")) {
+  if (moduleAccess.followUps) {
     cardTasks.push(
       timeAsync("dashboard followups card", async () => {
         const scope = await followupScope(supabase, currentUser);
@@ -292,7 +307,7 @@ export default async function DashboardPage() {
     );
   }
 
-  if (canViewModule(currentUser, "pilots")) {
+  if (moduleAccess.pilots) {
     cardTasks.push(
       timeAsync("dashboard pilots card", async () => {
         const scope = await pilotScope(supabase, currentUser);
@@ -344,6 +359,8 @@ export default async function DashboardPage() {
     },
     ...visibleCards
   ];
+
+  logPerf("dashboard page total server render", startedAt);
 
   return (
     <section>

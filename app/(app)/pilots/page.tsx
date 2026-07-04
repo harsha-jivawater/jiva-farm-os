@@ -32,7 +32,7 @@ import {
   type PilotInstitutionOption,
   type UserOption
 } from "@/lib/pilots/types";
-import { timeAsync } from "@/lib/perf";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
@@ -238,13 +238,19 @@ function ActionButtons({
 }
 
 export default async function PilotsPage({ searchParams }: PilotsPageProps) {
+  const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
   const cleanedSearch = searchValue(filters.q);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/pilots");
-  const canWrite = canWriteModule(currentUser, "pilots");
-  const scope = await pilotScope(supabase, currentUser);
+  const { canWrite, scope } = await timeAsync(
+    "pilots role/permission resolution",
+    async () => ({
+      canWrite: canWriteModule(currentUser, "pilots"),
+      scope: await pilotScope(supabase, currentUser)
+    })
+  );
   const districtOptions =
     filters.state in DISTRICTS_BY_STATE
       ? DISTRICTS_BY_STATE[filters.state as keyof typeof DISTRICTS_BY_STATE]
@@ -257,42 +263,50 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
     kpiResult
   ] = await timeAsync("pilots option and kpi queries", () =>
     Promise.all([
-      supabase
-        .from("users")
-        .select("id, full_name, role, secondary_role")
-        .eq("is_active", true)
-        .order("full_name", { ascending: true }),
-      supabase
-        .from("institutions")
-        .select("id, institution_code, organization_name")
-        .is("deleted_at", null)
-        .order("organization_name", { ascending: true })
-        .limit(200),
-      supabase
-        .from("dealers")
-        .select("id, dealer_code, dealer_name, firm_name")
-        .is("deleted_at", null)
-        .order("dealer_name", { ascending: true })
-        .limit(200),
-      supabase.rpc("get_pilots_page_kpis", {
-        p_q: cleanedSearch || null,
-        p_pilot_type: filters.pilot_type || null,
-        p_pilot_status: filters.pilot_status || null,
-        p_pilot_result_status: filters.pilot_result_status || null,
-        p_crop: filters.crop || null,
-        p_state: filters.state || null,
-        p_district: filters.district || null,
-        p_pilot_owner_user_id: filters.pilot_owner_user_id || null,
-        p_research_assistant_user_id:
-          filters.research_assistant_user_id || null,
-        p_agronomist_user_id: filters.agronomist_user_id || null,
-        p_rd_head_user_id: filters.rd_head_user_id || null,
-        p_institution_id: filters.institution_id || null,
-        p_dealer_id: filters.dealer_id || null,
-        p_scale_up_recommended: scaleUpFilterValue(
-          filters.scale_up_recommended
-        )
-      })
+      timeAsync("pilots users query", () =>
+        supabase
+          .from("users")
+          .select("id, full_name, role, secondary_role")
+          .eq("is_active", true)
+          .order("full_name", { ascending: true })
+      ),
+      timeAsync("pilots institutions option query", () =>
+        supabase
+          .from("institutions")
+          .select("id, institution_code, organization_name")
+          .is("deleted_at", null)
+          .order("organization_name", { ascending: true })
+          .limit(200)
+      ),
+      timeAsync("pilots dealers option query", () =>
+        supabase
+          .from("dealers")
+          .select("id, dealer_code, dealer_name, firm_name")
+          .is("deleted_at", null)
+          .order("dealer_name", { ascending: true })
+          .limit(200)
+      ),
+      timeAsync("pilots kpi summary rpc", () =>
+        supabase.rpc("get_pilots_page_kpis", {
+          p_q: cleanedSearch || null,
+          p_pilot_type: filters.pilot_type || null,
+          p_pilot_status: filters.pilot_status || null,
+          p_pilot_result_status: filters.pilot_result_status || null,
+          p_crop: filters.crop || null,
+          p_state: filters.state || null,
+          p_district: filters.district || null,
+          p_pilot_owner_user_id: filters.pilot_owner_user_id || null,
+          p_research_assistant_user_id:
+            filters.research_assistant_user_id || null,
+          p_agronomist_user_id: filters.agronomist_user_id || null,
+          p_rd_head_user_id: filters.rd_head_user_id || null,
+          p_institution_id: filters.institution_id || null,
+          p_dealer_id: filters.dealer_id || null,
+          p_scale_up_recommended: scaleUpFilterValue(
+            filters.scale_up_recommended
+          )
+        })
+      )
     ])
   );
 
@@ -355,6 +369,8 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   }
 
   const kpis = readKpis(kpiResult.data);
+
+  logPerf("pilots page total server render", startedAt);
 
   return (
     <section>

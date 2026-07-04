@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { timeAsync } from "@/lib/perf";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import type { InternalUser } from "@/lib/users/types";
 import {
@@ -73,46 +73,52 @@ export async function getCurrentInternalUser(
   errorPath: string,
   options: CurrentUserOptions = {}
 ) {
-  const {
-    data: { user }
-  } = await getAuthenticatedUser();
-  const missingProfileMessage =
-    options.missingProfileMessage ?? inactiveOrMissingProfileMessage;
-  const inactiveProfileMessage =
-    options.inactiveProfileMessage ?? inactiveOrMissingProfileMessage;
+  const startedAt = perfStart();
 
-  if (!user) {
-    redirectWithError(errorPath, "Please log in before continuing.");
+  try {
+    const {
+      data: { user }
+    } = await getAuthenticatedUser();
+    const missingProfileMessage =
+      options.missingProfileMessage ?? inactiveOrMissingProfileMessage;
+    const inactiveProfileMessage =
+      options.inactiveProfileMessage ?? inactiveOrMissingProfileMessage;
+
+    if (!user) {
+      redirectWithError(errorPath, "Please log in before continuing.");
+    }
+
+    const normalizedEmail = user.email?.trim().toLowerCase() ?? "";
+
+    if (!isJivawaterEmail(normalizedEmail)) {
+      redirectWithError(errorPath, INTERNAL_EMAIL_DOMAIN_MESSAGE);
+    }
+
+    const { data: profileByEmail, error: emailError } = await timeAsync(
+      "current user profile load",
+      () => getProfileByEmail(normalizedEmail)
+    );
+
+    if (emailError) {
+      redirectWithError(errorPath, emailError.message);
+    }
+
+    const profile = profileByEmail as InternalUser | null;
+
+    if (!profile) {
+      redirectWithError(errorPath, missingProfileMessage);
+    }
+
+    if (!isJivawaterEmail(profile.email)) {
+      redirectWithError(errorPath, INTERNAL_EMAIL_DOMAIN_MESSAGE);
+    }
+
+    if ((options.requireActive ?? true) && !profile.is_active) {
+      redirectWithError(errorPath, inactiveProfileMessage);
+    }
+
+    return profile;
+  } finally {
+    logPerf("current user total auth/profile resolution", startedAt);
   }
-
-  const normalizedEmail = user.email?.trim().toLowerCase() ?? "";
-
-  if (!isJivawaterEmail(normalizedEmail)) {
-    redirectWithError(errorPath, INTERNAL_EMAIL_DOMAIN_MESSAGE);
-  }
-
-  const { data: profileByEmail, error: emailError } = await timeAsync(
-    "current user profile load",
-    () => getProfileByEmail(normalizedEmail)
-  );
-
-  if (emailError) {
-    redirectWithError(errorPath, emailError.message);
-  }
-
-  const profile = profileByEmail as InternalUser | null;
-
-  if (!profile) {
-    redirectWithError(errorPath, missingProfileMessage);
-  }
-
-  if (!isJivawaterEmail(profile.email)) {
-    redirectWithError(errorPath, INTERNAL_EMAIL_DOMAIN_MESSAGE);
-  }
-
-  if ((options.requireActive ?? true) && !profile.is_active) {
-    redirectWithError(errorPath, inactiveProfileMessage);
-  }
-
-  return profile;
 }

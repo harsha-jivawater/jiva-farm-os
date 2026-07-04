@@ -25,7 +25,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { deviceStatusOptions, productModelOptions } from "@/lib/devices/options";
 import { primaryCropOptions } from "@/lib/farmer-leads/options";
-import { timeAsync } from "@/lib/perf";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -1234,17 +1234,23 @@ function KpiDashboardUnavailable() {
 export default async function KpiDashboardPage({
   searchParams
 }: KpiDashboardPageProps) {
+  const startedAt = perfStart();
   const params = await searchParams;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/kpi-dashboard");
-  const parsedFilters = parseFilters(params);
-  const filters =
-    hasRole(currentUser, "RSM")
-      ? {
-          ...parsedFilters,
-          rsmUserId: currentUser.id
-        }
-      : parsedFilters;
+  const filters = await timeAsync(
+    "kpi dashboard role/permission resolution",
+    async () => {
+      const parsedFilters = parseFilters(params);
+
+      return hasRole(currentUser, "RSM")
+        ? {
+            ...parsedFilters,
+            rsmUserId: currentUser.id
+          }
+        : parsedFilters;
+    }
+  );
   const { data: summaryData, error: summaryError } = await timeAsync(
     "kpi dashboard summary rpc",
     () =>
@@ -1262,6 +1268,8 @@ export default async function KpiDashboardPage({
   if (summaryError) {
     console.error("[KPI Dashboard] Summary RPC unavailable", summaryError);
   } else if (summaryData) {
+    logPerf("kpi dashboard page total server render", startedAt);
+
     return (
       <KpiDashboardSummaryView
         currentUser={currentUser}
@@ -1270,6 +1278,8 @@ export default async function KpiDashboardPage({
       />
     );
   }
+
+  logPerf("kpi dashboard page total server render", startedAt);
 
   return <KpiDashboardUnavailable />;
 }

@@ -32,7 +32,7 @@ import {
   type InstitutionFilters,
   type UserOption
 } from "@/lib/institutions/types";
-import { timeAsync } from "@/lib/perf";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
@@ -224,6 +224,7 @@ function ActionButtons({
 export default async function InstitutionalPartnersPage({
   searchParams
 }: InstitutionsPageProps) {
+  const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
   const cleanedSearch = searchValue(filters.q);
@@ -232,30 +233,39 @@ export default async function InstitutionalPartnersPage({
     supabase,
     "/institutional-partners"
   );
-  const canWrite = canWriteModule(currentUser, "institutional-partners");
-  const scope = await institutionScope(supabase, currentUser);
+  const { canWrite, scope } = await timeAsync(
+    "institutional partners role/permission resolution",
+    async () => ({
+      canWrite: canWriteModule(currentUser, "institutional-partners"),
+      scope: await institutionScope(supabase, currentUser)
+    })
+  );
 
   const [{ data: users }, kpiResult] = await timeAsync(
     "institution option and kpi queries",
     () =>
       Promise.all([
-        supabase
-          .from("users")
-          .select("id, full_name, role, secondary_role")
-          .eq("is_active", true)
-          .order("full_name", { ascending: true }),
-        supabase.rpc("get_institutions_page_kpis", {
-          p_q: cleanedSearch || null,
-          p_organization_type: filters.organization_type || null,
-          p_institution_status: filters.institution_status || null,
-          p_primary_state: filters.primary_state || null,
-          p_priority: filters.priority || null,
-          p_account_owner_user_id: filters.account_owner_user_id || null,
-          p_rsm_user_id: filters.rsm_user_id || null,
-          p_rd_head_user_id: filters.rd_head_user_id || null,
-          p_scale_up_status: filters.scale_up_status || null,
-          p_opportunity_type: filters.opportunity_type || null
-        })
+        timeAsync("institutional partners users query", () =>
+          supabase
+            .from("users")
+            .select("id, full_name, role, secondary_role")
+            .eq("is_active", true)
+            .order("full_name", { ascending: true })
+        ),
+        timeAsync("institutional partners kpi summary rpc", () =>
+          supabase.rpc("get_institutions_page_kpis", {
+            p_q: cleanedSearch || null,
+            p_organization_type: filters.organization_type || null,
+            p_institution_status: filters.institution_status || null,
+            p_primary_state: filters.primary_state || null,
+            p_priority: filters.priority || null,
+            p_account_owner_user_id: filters.account_owner_user_id || null,
+            p_rsm_user_id: filters.rsm_user_id || null,
+            p_rd_head_user_id: filters.rd_head_user_id || null,
+            p_scale_up_status: filters.scale_up_status || null,
+            p_opportunity_type: filters.opportunity_type || null
+          })
+        )
       ])
   );
 
@@ -294,7 +304,10 @@ export default async function InstitutionalPartnersPage({
     }
   }
 
-  const { data, error, count } = await query;
+  const { data, error, count } = await timeAsync(
+    "institutional partners list query",
+    () => query
+  );
   const institutions = (data ?? []) as unknown as Institution[];
   const usersList = (users ?? []) as UserOption[];
   const userMap = new Map(usersList.map((user) => [user.id, user]));
@@ -307,6 +320,8 @@ export default async function InstitutionalPartnersPage({
   }
 
   const kpis = readKpis(kpiResult.data);
+
+  logPerf("institutional partners page total server render", startedAt);
 
   return (
     <section>
