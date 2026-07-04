@@ -57,6 +57,11 @@ const getProfileByEmail = cache(async (normalizedEmail: string) => {
     .maybeSingle();
 });
 
+const getAuthenticatedUser = cache(async () => {
+  const supabase = await createClient();
+  return supabase.auth.getUser();
+});
+
 export async function getCurrentInternalUser(
   supabase: SupabaseClient,
   errorPath: string,
@@ -64,7 +69,7 @@ export async function getCurrentInternalUser(
 ) {
   const {
     data: { user }
-  } = await supabase.auth.getUser();
+  } = await getAuthenticatedUser();
   const missingProfileMessage =
     options.missingProfileMessage ?? inactiveOrMissingProfileMessage;
   const inactiveProfileMessage =

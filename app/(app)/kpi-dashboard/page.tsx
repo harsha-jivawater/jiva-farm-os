@@ -78,6 +78,32 @@ const FY_END = "2027-03-31";
 const FY_DEVICE_TARGET = 20000;
 const STATE_RSM_TARGET = 10000;
 const PAGE_SIZE = 1000;
+const deviceSelectColumns =
+  "id,current_holder_type,current_state,device_status,linked_dealer_id,linked_farmer_lead_id,linked_institution_id,linked_pilot_id,product_model";
+const dispatchSelectColumns =
+  "id,created_at,destination_dealer_id,destination_farmer_lead_id,destination_institution_id,destination_pilot_id,destination_state,dispatch_date,dispatch_status,linked_dealer_id,linked_farmer_lead_id,linked_institution_id,linked_pilot_id,product_model";
+const farmerLeadSelectColumns =
+  "id,created_by_user_id,followup_completed,funnel_stage,installation_completed,lead_date,lead_status,payment_confirmed,primary_crop,product_recommended,region_id,rsm_user_id,sales_completed,state";
+const followupSelectColumns =
+  "id,dealer_id,farmer_lead_id,followup_completed_date,followup_due_date,followup_owner_user_id,followup_status,institution_id,pilot_id";
+const installationSelectColumns =
+  "id,dealer_id,farmer_lead_id,installation_date,installation_status,installation_type,pilot_id,product_model,region_id,rsm_user_id,state";
+const dealerSelectColumns =
+  "id,dealer_status,key_crops,monthly_installation_target,region_id,rsm_user_id,state,training_status";
+const institutionSelectColumns =
+  "id,crop_focus,institution_status,primary_region_id,primary_state,proposal_shared,rd_head_user_id,regions_covered,rsm_user_id,scale_up_status,technical_owner_user_id,total_scale_up_potential_devices";
+const institutionMeetingSelectColumns =
+  "id,agronomist_user_id,institution_id,meeting_date,rd_head_user_id,rsm_user_id";
+const pilotSelectColumns =
+  "id,agronomist_user_id,created_at,created_by_user_id,crop,institution_id,pilot_owner_user_id,pilot_status,product_model,region_id,research_assistant_user_id,rsm_user_id,scale_up_recommended,state";
+const pilotVisitSelectColumns =
+  "id,pilot_id,visit_date,visit_status,visited_by_user_id";
+const visitReportSelectColumns =
+  "id,crop,farmer_lead_id,institution_id,pilot_id,report_date,report_status,report_type,submitted_by_user_id";
+const regionSelectColumns =
+  "id,annual_device_target,is_active,region_name,rsm_user_id,state";
+const userSelectColumns =
+  "id,full_name,is_active,region_id,reports_to_user_id,role,secondary_role,state";
 
 const installedStatuses = new Set([
   "Installed",
@@ -609,71 +635,94 @@ export default async function KpiDashboardPage({
     users
   ] = await Promise.all([
     fetchAll<Device>((from, to) =>
-      supabase.from("devices").select("*").is("deleted_at", null).range(from, to)
+      supabase
+        .from("devices")
+        .select(deviceSelectColumns)
+        .is("deleted_at", null)
+        .range(from, to) as unknown as PromiseLike<QueryResult<Device>>
     ),
     fetchAll<Dispatch>((from, to) =>
       supabase
         .from("dispatches")
-        .select("*")
+        .select(dispatchSelectColumns)
         .is("deleted_at", null)
-        .range(from, to)
+        .range(from, to) as unknown as PromiseLike<QueryResult<Dispatch>>
     ),
     fetchAll<FarmerLead>((from, to) =>
       supabase
         .from("farmer_leads")
-        .select("*")
+        .select(farmerLeadSelectColumns)
         .is("deleted_at", null)
-        .range(from, to)
+        .range(from, to) as unknown as PromiseLike<QueryResult<FarmerLead>>
     ),
     fetchAll<Followup>((from, to) =>
       supabase
         .from("followups")
-        .select("*")
+        .select(followupSelectColumns)
         .is("deleted_at", null)
-        .range(from, to)
+        .range(from, to) as unknown as PromiseLike<QueryResult<Followup>>
     ),
     fetchAll<Installation>((from, to) =>
       supabase
         .from("installations")
-        .select("*")
+        .select(installationSelectColumns)
         .is("deleted_at", null)
-        .range(from, to)
+        .range(from, to) as unknown as PromiseLike<QueryResult<Installation>>
     ),
     fetchAll<Dealer>((from, to) =>
-      supabase.from("dealers").select("*").is("deleted_at", null).range(from, to)
+      supabase
+        .from("dealers")
+        .select(dealerSelectColumns)
+        .is("deleted_at", null)
+        .range(from, to) as unknown as PromiseLike<QueryResult<Dealer>>
     ),
     fetchAll<Institution>((from, to) =>
       supabase
         .from("institutions")
-        .select("*")
+        .select(institutionSelectColumns)
         .is("deleted_at", null)
-        .range(from, to)
+        .range(from, to) as unknown as PromiseLike<QueryResult<Institution>>
     ),
     fetchAll<InstitutionMeeting>((from, to) =>
-      supabase.from("institution_meetings").select("*").range(from, to)
+      supabase
+        .from("institution_meetings")
+        .select(institutionMeetingSelectColumns)
+        .range(from, to) as unknown as PromiseLike<QueryResult<InstitutionMeeting>>
     ),
     fetchAll<Pilot>((from, to) =>
-      supabase.from("pilots").select("*").is("deleted_at", null).range(from, to)
+      supabase
+        .from("pilots")
+        .select(pilotSelectColumns)
+        .is("deleted_at", null)
+        .range(from, to) as unknown as PromiseLike<QueryResult<Pilot>>
     ),
     fetchAll<PilotVisit>((from, to) =>
       supabase
         .from("pilot_visits")
-        .select("*")
+        .select(pilotVisitSelectColumns)
         .is("deleted_at", null)
-        .range(from, to)
+        .range(from, to) as unknown as PromiseLike<QueryResult<PilotVisit>>
     ),
     fetchAll<VisitReport>((from, to) =>
       supabase
         .from("visit_reports")
-        .select("*")
+        .select(visitReportSelectColumns)
         .is("deleted_at", null)
-        .range(from, to)
+        .range(from, to) as unknown as PromiseLike<QueryResult<VisitReport>>
     ),
     fetchAll<Region>((from, to) =>
-      supabase.from("regions").select("*").order("region_name").range(from, to)
+      supabase
+        .from("regions")
+        .select(regionSelectColumns)
+        .order("region_name")
+        .range(from, to) as unknown as PromiseLike<QueryResult<Region>>
     ),
     fetchAll<User>((from, to) =>
-      supabase.from("users").select("*").order("full_name").range(from, to)
+      supabase
+        .from("users")
+        .select(userSelectColumns)
+        .order("full_name")
+        .range(from, to) as unknown as PromiseLike<QueryResult<User>>
     )
   ]);
 

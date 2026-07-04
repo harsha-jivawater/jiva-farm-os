@@ -134,161 +134,198 @@ export default async function DashboardPage() {
   const currentUser = await getCurrentInternalUser(supabase, "/dashboard");
   const today = todayString();
 
-  const visibleCards: CountCard[] = [];
+  const cardTasks: Array<Promise<CountCard | CountCard[]>> = [];
 
   if (canViewModule(currentUser, "farmer-leads")) {
-    const scope = await farmerLeadScope(supabase, currentUser);
-    const query = applyScope(
-      supabase
-        .from("farmer_leads")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .eq("lead_status", "Open")
-        .or(`next_action_date.lte.${today},followup_due_date.lte.${today}`),
-      scope
-    );
+    cardTasks.push(
+      (async () => {
+        const scope = await farmerLeadScope(supabase, currentUser);
+        const query = applyScope(
+          supabase
+            .from("farmer_leads")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("lead_status", "Open")
+            .or(`next_action_date.lte.${today},followup_due_date.lte.${today}`),
+          scope
+        );
 
-    visibleCards.push({
-      href: "/farmer-leads",
-      helper: "Open leads with action or follow-up due today.",
-      icon: Tractor,
-      includeInToday: true,
-      label: "Leads Needing Follow-up",
-      module: "farmer-leads",
-      value: await countSafely("leads needing follow-up", query)
-    });
+        return {
+          href: "/farmer-leads",
+          helper: "Open leads with action or follow-up due today.",
+          icon: Tractor,
+          includeInToday: true,
+          label: "Leads Needing Follow-up",
+          module: "farmer-leads",
+          value: await countSafely("leads needing follow-up", query)
+        };
+      })()
+    );
   }
 
   if (canViewModule(currentUser, "dispatches")) {
-    const scope = await dispatchScope(supabase, currentUser);
-    const paymentQuery = applyScope(
-      supabase
-        .from("dispatches")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .eq("payment_confirmed", false),
-      scope
-    );
-    const approvedQuery = applyScope(
-      supabase
-        .from("dispatches")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .eq("dispatch_status", "Approved for Dispatch"),
-      scope
-    );
+    cardTasks.push(
+      (async () => {
+        const scope = await dispatchScope(supabase, currentUser);
+        const paymentQuery = applyScope(
+          supabase
+            .from("dispatches")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("payment_confirmed", false),
+          scope
+        );
+        const approvedQuery = applyScope(
+          supabase
+            .from("dispatches")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("dispatch_status", "Approved for Dispatch"),
+          scope
+        );
+        const [pendingPayment, approvedDispatches] = await Promise.all([
+          countSafely("pending payment confirmation", paymentQuery),
+          countSafely("approved dispatches waiting", approvedQuery)
+        ]);
 
-    visibleCards.push(
-      {
-        href: "/dispatches",
-        helper: "Dispatches still waiting for payment confirmation.",
-        icon: CircleDollarSign,
-        includeInToday: true,
-        label: "Pending Payment Confirmation",
-        module: "dispatches",
-        value: await countSafely("pending payment confirmation", paymentQuery)
-      },
-      {
-        href: "/dispatches",
-        helper: "Approved dispatches ready for the next logistics step.",
-        icon: Send,
-        includeInToday: true,
-        label: "Approved Dispatches Waiting",
-        module: "dispatches",
-        value: await countSafely("approved dispatches waiting", approvedQuery)
-      }
+        return [
+          {
+            href: "/dispatches",
+            helper: "Dispatches still waiting for payment confirmation.",
+            icon: CircleDollarSign,
+            includeInToday: true,
+            label: "Pending Payment Confirmation",
+            module: "dispatches",
+            value: pendingPayment
+          },
+          {
+            href: "/dispatches",
+            helper: "Approved dispatches ready for the next logistics step.",
+            icon: Send,
+            includeInToday: true,
+            label: "Approved Dispatches Waiting",
+            module: "dispatches",
+            value: approvedDispatches
+          }
+        ];
+      })()
     );
   }
 
   if (canViewModule(currentUser, "installations")) {
-    const scope = await installationScope(supabase, currentUser);
-    const query = applyScope(
-      supabase
-        .from("installations")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .eq("installation_status", "Planned"),
-      scope
-    );
+    cardTasks.push(
+      (async () => {
+        const scope = await installationScope(supabase, currentUser);
+        const query = applyScope(
+          supabase
+            .from("installations")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("installation_status", "Planned"),
+          scope
+        );
 
-    visibleCards.push({
-      href: "/installations",
-      helper: "Planned installations waiting to be completed.",
-      icon: ClipboardCheck,
-      includeInToday: true,
-      label: "Installations Planned",
-      module: "installations",
-      value: await countSafely("installations planned", query)
-    });
+        return {
+          href: "/installations",
+          helper: "Planned installations waiting to be completed.",
+          icon: ClipboardCheck,
+          includeInToday: true,
+          label: "Installations Planned",
+          module: "installations",
+          value: await countSafely("installations planned", query)
+        };
+      })()
+    );
   }
 
   if (canViewModule(currentUser, "devices")) {
-    const scope = await deviceScope(supabase, currentUser);
-    const query = applyScope(
-      supabase
-        .from("devices")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .eq("device_status", "In Warehouse"),
-      scope
-    );
+    cardTasks.push(
+      (async () => {
+        const scope = await deviceScope(supabase, currentUser);
+        const query = applyScope(
+          supabase
+            .from("devices")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("device_status", "In Warehouse"),
+          scope
+        );
 
-    visibleCards.push({
-      href: "/devices",
-      helper: "Available warehouse stock for future dispatches.",
-      icon: Warehouse,
-      includeInToday: false,
-      label: "Devices in Warehouse",
-      module: "devices",
-      value: await countSafely("devices in warehouse", query)
-    });
+        return {
+          href: "/devices",
+          helper: "Available warehouse stock for future dispatches.",
+          icon: Warehouse,
+          includeInToday: false,
+          label: "Devices in Warehouse",
+          module: "devices",
+          value: await countSafely("devices in warehouse", query)
+        };
+      })()
+    );
   }
 
   if (canViewModule(currentUser, "follow-ups")) {
-    const scope = await followupScope(supabase, currentUser);
-    const query = applyScope(
-      supabase
-        .from("followups")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .in("followup_status", ["Due", "Rescheduled", "Escalated"])
-        .lt("followup_due_date", today),
-      scope
-    );
+    cardTasks.push(
+      (async () => {
+        const scope = await followupScope(supabase, currentUser);
+        const query = applyScope(
+          supabase
+            .from("followups")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .in("followup_status", ["Due", "Rescheduled", "Escalated"])
+            .lt("followup_due_date", today),
+          scope
+        );
 
-    visibleCards.push({
-      href: "/follow-ups",
-      helper: "Post installation follow-ups past their due date.",
-      icon: CalendarClock,
-      includeInToday: true,
-      label: "Overdue Post Installation Follow-ups",
-      module: "follow-ups",
-      value: await countSafely("overdue post installation follow-ups", query)
-    });
+        return {
+          href: "/follow-ups",
+          helper: "Post installation follow-ups past their due date.",
+          icon: CalendarClock,
+          includeInToday: true,
+          label: "Overdue Post Installation Follow-ups",
+          module: "follow-ups",
+          value: await countSafely("overdue post installation follow-ups", query)
+        };
+      })()
+    );
   }
 
   if (canViewModule(currentUser, "pilots")) {
-    const scope = await pilotScope(supabase, currentUser);
-    const query = applyScope(
-      supabase
-        .from("pilots")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .in("pilot_status", activePilotStatuses),
-      scope
-    );
+    cardTasks.push(
+      (async () => {
+        const scope = await pilotScope(supabase, currentUser);
+        const query = applyScope(
+          supabase
+            .from("pilots")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .in("pilot_status", activePilotStatuses),
+          scope
+        );
 
-    visibleCards.push({
-      href: "/pilots",
-      helper: "Pilots currently active or waiting for reports.",
-      icon: Activity,
-      includeInToday: true,
-      label: "Active Pilots",
-      module: "pilots",
-      value: await countSafely("active pilots", query)
-    });
+        return {
+          href: "/pilots",
+          helper: "Pilots currently active or waiting for reports.",
+          icon: Activity,
+          includeInToday: true,
+          label: "Active Pilots",
+          module: "pilots",
+          value: await countSafely("active pilots", query)
+        };
+      })()
+    );
   }
 
+  const cardResults = await Promise.allSettled(cardTasks);
+  const visibleCards = cardResults.flatMap((result) => {
+    if (result.status === "rejected") {
+      console.error("[Home] Card group unavailable", result.reason);
+      return [];
+    }
+
+    return Array.isArray(result.value) ? result.value : [result.value];
+  });
   const todayActionItems = visibleCards
     .filter((card) => card.includeInToday)
     .reduce((sum, card) => sum + (card.value ?? 0), 0);
