@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
-import { KeyRound, Leaf, LogOut, Menu, X } from "lucide-react";
+import { HelpCircle, KeyRound, Leaf, LogOut, Menu, X } from "lucide-react";
 import { navigationItems, teamItems } from "@/lib/navigation";
 import { CurrentUserProvider, type CurrentInternalUser } from "@/components/auth/current-user-context";
 import { canViewModule } from "@/lib/users/permissions";
@@ -151,6 +151,17 @@ export function AppShell({
                 : ""}
             </p>
           </div>
+          <Link
+            className={[
+              "mb-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold shadow-sm hover:bg-slate-50",
+              pathname === "/help" ? "text-brand-700" : "text-slate-700"
+            ].join(" ")}
+            href="/help"
+            onClick={() => setIsOpen(false)}
+          >
+            <HelpCircle className="h-4 w-4" aria-hidden="true" />
+            Help
+          </Link>
           <Link
             className={[
               "mb-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold shadow-sm hover:bg-slate-50",
