@@ -119,7 +119,15 @@ export default async function DashboardPage() {
   );
   const { data: countData, error: countError } = await timeAsync(
     "dashboard home counts rpc",
-    () => supabase.rpc("get_dashboard_home_counts")
+    () =>
+      supabase.rpc("get_dashboard_home_counts", {
+        p_include_farmer_leads: moduleAccess.farmerLeads,
+        p_include_dispatches: moduleAccess.dispatches,
+        p_include_installations: moduleAccess.installations,
+        p_include_devices: moduleAccess.devices,
+        p_include_followups: moduleAccess.followUps,
+        p_include_pilots: moduleAccess.pilots
+      })
   );
 
   if (countError) {

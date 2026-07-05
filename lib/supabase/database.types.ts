@@ -2015,7 +2015,14 @@ export type Database = {
         Returns: undefined;
       };
       get_dashboard_home_counts: {
-        Args: Record<PropertyKey, never>;
+        Args: {
+          p_include_farmer_leads?: boolean | null;
+          p_include_dispatches?: boolean | null;
+          p_include_installations?: boolean | null;
+          p_include_devices?: boolean | null;
+          p_include_followups?: boolean | null;
+          p_include_pilots?: boolean | null;
+        };
         Returns: Json;
       };
       get_kpi_dashboard_summary: {
