@@ -21,7 +21,9 @@ import {
   XCircle,
   type LucideIcon
 } from "lucide-react";
+import { revalidatePath } from "next/cache";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { deviceStatusOptions, productModelOptions } from "@/lib/devices/options";
 import { primaryCropOptions } from "@/lib/farmer-leads/options";
@@ -192,6 +194,19 @@ type KpiDashboardSummary = {
   };
 };
 
+type KpiCacheMeta = {
+  lastRefreshedAt: string | null;
+  isDirty: boolean;
+  dirtySections: string[];
+  refreshId: string | null;
+  message: string | null;
+};
+
+type CachedKpiDashboardResult = KpiCacheMeta & {
+  isReady: boolean;
+  summary: KpiDashboardSummary | null;
+};
+
 type CurrentUser = Database["public"]["Tables"]["users"]["Row"];
 
 const FY_START = "2026-04-01";
@@ -234,6 +249,93 @@ function formatNumber(value: number) {
 
 function formatPercent(value: number) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "Not refreshed yet";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Kolkata"
+  }).format(new Date(value));
+}
+
+function formValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
+}
+
+function filtersToSearchParams(
+  filters: DashboardFilters,
+  extra?: Record<string, string>
+) {
+  const params = new URLSearchParams();
+  const entries: [string, string][] = [
+    ["start_date", filters.startDate],
+    ["end_date", filters.endDate],
+    ["state", filters.state],
+    ["region_id", filters.regionId],
+    ["rsm_user_id", filters.rsmUserId],
+    ["product_model", filters.productModel],
+    ["crop", filters.crop]
+  ];
+
+  for (const [key, value] of entries) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) {
+      if (value) {
+        params.set(key, value);
+      }
+    }
+  }
+
+  return params;
+}
+
+function readStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function readCachedKpiDashboardResult(
+  value: unknown
+): CachedKpiDashboardResult {
+  if (!value || typeof value !== "object") {
+    return {
+      isReady: false,
+      summary: null,
+      lastRefreshedAt: null,
+      isDirty: false,
+      dirtySections: [],
+      refreshId: null,
+      message: "KPI Dashboard is preparing. Ask an admin to refresh it."
+    };
+  }
+
+  const row = value as Record<string, unknown>;
+
+  return {
+    isReady: row.isReady === true,
+    summary:
+      row.summary && typeof row.summary === "object"
+        ? (row.summary as unknown as KpiDashboardSummary)
+        : null,
+    lastRefreshedAt:
+      typeof row.lastRefreshedAt === "string" ? row.lastRefreshedAt : null,
+    isDirty: row.isDirty === true,
+    dirtySections: readStringArray(row.dirtySections),
+    refreshId: typeof row.refreshId === "string" ? row.refreshId : null,
+    message: typeof row.message === "string" ? row.message : null
+  };
 }
 
 function KpiCard({
@@ -485,13 +587,80 @@ function FiltersForm({
   );
 }
 
+function RefreshKpiDashboardForm({ filters }: { filters: DashboardFilters }) {
+  return (
+    <form action={refreshKpiDashboardCacheAction}>
+      <input name="start_date" type="hidden" value={filters.startDate} />
+      <input name="end_date" type="hidden" value={filters.endDate} />
+      <input name="state" type="hidden" value={filters.state} />
+      <input name="region_id" type="hidden" value={filters.regionId} />
+      <input name="rsm_user_id" type="hidden" value={filters.rsmUserId} />
+      <input name="product_model" type="hidden" value={filters.productModel} />
+      <input name="crop" type="hidden" value={filters.crop} />
+      <button
+        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+        type="submit"
+      >
+        <RotateCcw className="h-4 w-4" aria-hidden="true" />
+        Refresh KPI Dashboard
+      </button>
+    </form>
+  );
+}
+
+function KpiCacheStatus({
+  canRefresh,
+  cacheMeta,
+  filters,
+  refreshStatus
+}: {
+  canRefresh: boolean;
+  cacheMeta: KpiCacheMeta;
+  filters: DashboardFilters;
+  refreshStatus: string;
+}) {
+  return (
+    <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-950">
+            Last refreshed at {formatDateTime(cacheMeta.lastRefreshedAt)}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            {cacheMeta.isDirty
+              ? `Some KPI sections are marked stale: ${cacheMeta.dirtySections.join(", ")}.`
+              : "Showing saved KPI values from the dashboard cache."}
+          </p>
+          {refreshStatus === "success" ? (
+            <p className="mt-2 text-sm font-medium text-emerald-700">
+              KPI Dashboard refreshed successfully.
+            </p>
+          ) : null}
+          {refreshStatus === "failed" ? (
+            <p className="mt-2 text-sm font-medium text-red-700">
+              KPI Dashboard refresh failed. Please try again or contact Admin.
+            </p>
+          ) : null}
+        </div>
+        {canRefresh ? <RefreshKpiDashboardForm filters={filters} /> : null}
+      </div>
+    </div>
+  );
+}
+
 function KpiDashboardSummaryView({
+  cacheMeta,
+  canRefresh,
   currentUser,
   filters,
+  refreshStatus,
   summary
 }: {
+  cacheMeta: KpiCacheMeta;
+  canRefresh: boolean;
   currentUser: CurrentUser;
   filters: DashboardFilters;
+  refreshStatus: string;
   summary: KpiDashboardSummary;
 }) {
   const canSeeManagementSections = hasAnyRole(currentUser, [
@@ -580,6 +749,13 @@ function KpiDashboardSummaryView({
       <p className="mt-2 text-sm leading-6 text-slate-500">
         {dashboardScopeText(currentUser)}
       </p>
+
+      <KpiCacheStatus
+        cacheMeta={cacheMeta}
+        canRefresh={canRefresh}
+        filters={filters}
+        refreshStatus={refreshStatus}
+      />
 
       <FiltersForm
         filters={filters}
@@ -1231,6 +1407,85 @@ function KpiDashboardUnavailable() {
   );
 }
 
+function KpiDashboardPreparing({
+  cacheMeta,
+  canRefresh,
+  filters,
+  refreshStatus
+}: {
+  cacheMeta: KpiCacheMeta;
+  canRefresh: boolean;
+  filters: DashboardFilters;
+  refreshStatus: string;
+}) {
+  return (
+    <section>
+      <PageHeader
+        eyebrow="Management dashboard"
+        title="KPI Dashboard"
+        description="Track sales, stock, installations, follow-ups, and pilot performance."
+      />
+      <KpiCacheStatus
+        cacheMeta={cacheMeta}
+        canRefresh={canRefresh}
+        filters={filters}
+        refreshStatus={refreshStatus}
+      />
+      <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+        {cacheMeta.message ??
+          "KPI Dashboard is preparing. Ask an admin to refresh it."}
+      </div>
+    </section>
+  );
+}
+
+async function refreshKpiDashboardCacheAction(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+  const currentUser = await getCurrentInternalUser(supabase, "/kpi-dashboard");
+  const filters = parseFilters({
+    start_date: formValue(formData, "start_date"),
+    end_date: formValue(formData, "end_date"),
+    state: formValue(formData, "state"),
+    region_id: formValue(formData, "region_id"),
+    rsm_user_id: formValue(formData, "rsm_user_id"),
+    product_model: formValue(formData, "product_model"),
+    crop: formValue(formData, "crop")
+  });
+  const canRefresh = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "Sales Head"
+  ]);
+  const params = filtersToSearchParams(filters);
+
+  if (!canRefresh) {
+    params.set("refresh_status", "failed");
+    redirect(`/kpi-dashboard?${params.toString()}`);
+  }
+
+  const { error } = await supabase.rpc("refresh_kpi_dashboard_cache_full", {
+    p_start_date: filters.startDate,
+    p_end_date: filters.endDate,
+    p_state: filters.state || null,
+    p_region_id: filters.regionId || null,
+    p_rsm_user_id: filters.rsmUserId || null,
+    p_product_model: filters.productModel || null,
+    p_crop: filters.crop || null
+  });
+
+  if (error) {
+    console.error("[KPI Dashboard] Cache refresh failed", error);
+    params.set("refresh_status", "failed");
+  } else {
+    params.set("refresh_status", "success");
+  }
+
+  revalidatePath("/kpi-dashboard");
+  redirect(`/kpi-dashboard?${params.toString()}`);
+}
+
 export default async function KpiDashboardPage({
   searchParams
 }: KpiDashboardPageProps) {
@@ -1251,10 +1506,16 @@ export default async function KpiDashboardPage({
         : parsedFilters;
     }
   );
+  const canRefreshKpiDashboard = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "Sales Head"
+  ]);
+  const refreshStatus = paramValue(params.refresh_status);
   const { data: summaryData, error: summaryError } = await timeAsync(
-    "kpi dashboard summary rpc",
+    "kpi dashboard cached summary rpc",
     () =>
-      supabase.rpc("get_kpi_dashboard_summary", {
+      supabase.rpc("get_cached_kpi_dashboard_summary", {
         p_start_date: filters.startDate,
         p_end_date: filters.endDate,
         p_state: filters.state || null,
@@ -1266,15 +1527,33 @@ export default async function KpiDashboardPage({
   );
 
   if (summaryError) {
-    console.error("[KPI Dashboard] Summary RPC unavailable", summaryError);
+    console.error("[KPI Dashboard] Cached summary RPC unavailable", summaryError);
   } else if (summaryData) {
+    const cachedResult = readCachedKpiDashboardResult(summaryData);
+
+    if (cachedResult.isReady && cachedResult.summary) {
+      logPerf("kpi dashboard page total server render", startedAt);
+
+      return (
+        <KpiDashboardSummaryView
+          cacheMeta={cachedResult}
+          canRefresh={canRefreshKpiDashboard}
+          currentUser={currentUser}
+          filters={filters}
+          refreshStatus={refreshStatus}
+          summary={cachedResult.summary}
+        />
+      );
+    }
+
     logPerf("kpi dashboard page total server render", startedAt);
 
     return (
-      <KpiDashboardSummaryView
-        currentUser={currentUser}
+      <KpiDashboardPreparing
+        cacheMeta={cachedResult}
+        canRefresh={canRefreshKpiDashboard}
         filters={filters}
-        summary={summaryData as unknown as KpiDashboardSummary}
+        refreshStatus={refreshStatus}
       />
     );
   }

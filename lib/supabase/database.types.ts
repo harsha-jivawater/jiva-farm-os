@@ -2025,6 +2025,18 @@ export type Database = {
         };
         Returns: Json;
       };
+      get_cached_kpi_dashboard_summary: {
+        Args: {
+          p_start_date?: string | null;
+          p_end_date?: string | null;
+          p_state?: string | null;
+          p_region_id?: string | null;
+          p_rsm_user_id?: string | null;
+          p_product_model?: string | null;
+          p_crop?: string | null;
+        };
+        Returns: Json;
+      };
       get_kpi_dashboard_summary: {
         Args: {
           p_start_date?: string | null;
@@ -2034,6 +2046,25 @@ export type Database = {
           p_rsm_user_id?: string | null;
           p_product_model?: string | null;
           p_crop?: string | null;
+        };
+        Returns: Json;
+      };
+      refresh_kpi_dashboard_cache_full: {
+        Args: {
+          p_start_date?: string | null;
+          p_end_date?: string | null;
+          p_state?: string | null;
+          p_region_id?: string | null;
+          p_rsm_user_id?: string | null;
+          p_product_model?: string | null;
+          p_crop?: string | null;
+        };
+        Returns: Json;
+      };
+      mark_kpi_dashboard_sections_dirty: {
+        Args: {
+          section_names: string[];
+          reason?: string | null;
         };
         Returns: Json;
       };
