@@ -221,6 +221,7 @@ function ActionButtons({
         aria-label={`View ${pilot.pilot_name}`}
         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
         href={`/pilots/${pilot.id}`}
+        prefetch={false}
       >
         <Eye className="h-4 w-4" aria-hidden="true" />
       </Link>
@@ -229,6 +230,7 @@ function ActionButtons({
           aria-label={`Edit ${pilot.pilot_name}`}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
           href={`/pilots/${pilot.id}/edit`}
+          prefetch={false}
         >
           <Pencil className="h-4 w-4" aria-hidden="true" />
         </Link>
@@ -556,6 +558,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
                     <Link
                       className="font-semibold text-slate-950 hover:text-brand-700"
                       href={`/pilots/${pilot.id}`}
+                      prefetch={false}
                     >
                       {pilot.pilot_code}
                     </Link>

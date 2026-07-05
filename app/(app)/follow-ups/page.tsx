@@ -167,6 +167,7 @@ function ActionButtons({
       <Link
         className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
         href={`/follow-ups/${followup.id}`}
+        prefetch={false}
       >
         <Eye className="h-4 w-4" aria-hidden="true" />
         View
@@ -175,6 +176,7 @@ function ActionButtons({
         <Link
           className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
           href={`/follow-ups/${followup.id}/edit`}
+          prefetch={false}
         >
           <Pencil className="h-4 w-4" aria-hidden="true" />
           Edit
@@ -184,6 +186,7 @@ function ActionButtons({
         <Link
           className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
           href={`/follow-ups/${followup.id}/complete`}
+          prefetch={false}
         >
           <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
           Complete

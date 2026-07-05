@@ -646,6 +646,7 @@ export default async function InstallationsPage({
                             aria-label={`View ${installation.installation_code}`}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
                             href={`/installations/${installation.id}`}
+                            prefetch={false}
                           >
                             <Eye className="h-4 w-4" aria-hidden="true" />
                           </Link>
@@ -654,6 +655,7 @@ export default async function InstallationsPage({
                               aria-label={`Edit ${installation.installation_code}`}
                               className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
                               href={`/installations/${installation.id}/edit`}
+                              prefetch={false}
                             >
                               <Pencil className="h-4 w-4" aria-hidden="true" />
                             </Link>
@@ -706,6 +708,7 @@ export default async function InstallationsPage({
                     <Link
                       className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                       href={`/installations/${installation.id}`}
+                      prefetch={false}
                     >
                       <Eye className="h-4 w-4" aria-hidden="true" />
                       View
@@ -714,6 +717,7 @@ export default async function InstallationsPage({
                       <Link
                         className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                         href={`/installations/${installation.id}/edit`}
+                        prefetch={false}
                       >
                         <Pencil className="h-4 w-4" aria-hidden="true" />
                         Edit

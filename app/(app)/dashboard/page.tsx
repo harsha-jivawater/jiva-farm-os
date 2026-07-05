@@ -18,15 +18,6 @@ import {
   canViewModule,
   type ModuleKey
 } from "@/lib/users/permissions";
-import {
-  deviceScope,
-  dispatchScope,
-  farmerLeadScope,
-  followupScope,
-  installationScope,
-  pilotScope,
-  type RecordScope
-} from "@/lib/users/record-scope";
 
 type CountCard = {
   href: string;
@@ -38,75 +29,52 @@ type CountCard = {
   value: number | null;
 };
 
-const queryTimeoutMs = 8_000;
+type DashboardCounts = {
+  leadsNeedingFollowup: number | null;
+  pendingPaymentConfirmation: number | null;
+  approvedDispatchesWaiting: number | null;
+  installationsPlanned: number | null;
+  devicesInWarehouse: number | null;
+  overduePostInstallationFollowups: number | null;
+  activePilots: number | null;
+};
 
-const activePilotStatuses = [
-  "Approved",
-  "Device Assigned",
-  "Device Dispatched",
-  "Device Installed",
-  "Monitoring Active",
-  "Visit Report Pending",
-  "Final Report Pending",
-  "Final Report Submitted",
-  "Final Report Reviewed",
-  "Scale-up Recommended"
-];
+const unavailableCounts: DashboardCounts = {
+  leadsNeedingFollowup: null,
+  pendingPaymentConfirmation: null,
+  approvedDispatchesWaiting: null,
+  installationsPlanned: null,
+  devicesInWarehouse: null,
+  overduePostInstallationFollowups: null,
+  activePilots: null
+};
 
-function todayString() {
-  return new Date().toISOString().slice(0, 10);
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function readDashboardCounts(value: unknown): DashboardCounts {
+  if (!value || typeof value !== "object") {
+    return unavailableCounts;
+  }
+
+  const row = value as Record<string, unknown>;
+
+  return {
+    leadsNeedingFollowup: numberValue(row.leadsNeedingFollowup),
+    pendingPaymentConfirmation: numberValue(row.pendingPaymentConfirmation),
+    approvedDispatchesWaiting: numberValue(row.approvedDispatchesWaiting),
+    installationsPlanned: numberValue(row.installationsPlanned),
+    devicesInWarehouse: numberValue(row.devicesInWarehouse),
+    overduePostInstallationFollowups: numberValue(
+      row.overduePostInstallationFollowups
+    ),
+    activePilots: numberValue(row.activePilots)
+  };
 }
 
 function formatCount(value: number | null) {
   return value === null ? "Unavailable" : value.toLocaleString("en-IN");
-}
-
-function withQueryTimeout<T>(
-  query: PromiseLike<T>,
-  label: string
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${queryTimeoutMs}ms`));
-    }, queryTimeoutMs);
-
-    Promise.resolve(query)
-      .then(resolve, reject)
-      .finally(() => clearTimeout(timeout));
-  });
-}
-
-function applyScope<T extends { is: (column: string, value: null) => T; or: (filters: string) => T }>(
-  query: T,
-  scope: RecordScope
-) {
-  if (scope.noRecords) {
-    return query.is("id", null);
-  }
-
-  if (scope.orFilter) {
-    return query.or(scope.orFilter);
-  }
-
-  return query;
-}
-
-async function countSafely(label: string, query: PromiseLike<{ count: number | null; error: { message: string } | null }>) {
-  try {
-    const { count, error } = await timeAsync(
-      `dashboard ${label} count query`,
-      () => withQueryTimeout(query, label)
-    );
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return count ?? 0;
-  } catch (error) {
-    console.error(`[Home] ${label} count unavailable`, error);
-    return null;
-  }
 }
 
 function DailyActionCard({ card }: { card: CountCard }) {
@@ -116,6 +84,7 @@ function DailyActionCard({ card }: { card: CountCard }) {
     <Link
       className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand-200 hover:bg-brand-50/40"
       href={card.href}
+      prefetch={false}
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-slate-500">{card.label}</p>
@@ -137,7 +106,6 @@ export default async function DashboardPage() {
   const startedAt = perfStart();
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dashboard");
-  const today = todayString();
   const moduleAccess = await timeAsync(
     "dashboard role/permission resolution",
     async () => ({
@@ -149,201 +117,101 @@ export default async function DashboardPage() {
       pilots: canViewModule(currentUser, "pilots")
     })
   );
+  const { data: countData, error: countError } = await timeAsync(
+    "dashboard home counts rpc",
+    () => supabase.rpc("get_dashboard_home_counts")
+  );
 
-  const cardTasks: Array<Promise<CountCard | CountCard[]>> = [];
+  if (countError) {
+    console.error("[Home] Dashboard counts RPC unavailable", countError);
+  }
+
+  const counts = countError ? unavailableCounts : readDashboardCounts(countData);
+  const visibleCards: CountCard[] = [];
 
   if (moduleAccess.farmerLeads) {
-    cardTasks.push(
-      timeAsync("dashboard farmer leads card", async () => {
-        const scope = await farmerLeadScope(supabase, currentUser);
-        const query = applyScope(
-          supabase
-            .from("farmer_leads")
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null)
-            .eq("lead_status", "Open")
-            .or(`next_action_date.lte.${today},followup_due_date.lte.${today}`),
-          scope
-        );
-
-        return {
-          href: "/farmer-leads",
-          helper: "Open leads with action or follow-up due today.",
-          icon: Tractor,
-          includeInToday: true,
-          label: "Leads Needing Follow-up",
-          module: "farmer-leads",
-          value: await countSafely("leads needing follow-up", query)
-        };
-      })
-    );
+    visibleCards.push({
+      href: "/farmer-leads",
+      helper: "Open leads with action or follow-up due today.",
+      icon: Tractor,
+      includeInToday: true,
+      label: "Leads Needing Follow-up",
+      module: "farmer-leads",
+      value: counts.leadsNeedingFollowup
+    });
   }
 
   if (moduleAccess.dispatches) {
-    cardTasks.push(
-      timeAsync("dashboard dispatch cards", async () => {
-        const scope = await dispatchScope(supabase, currentUser);
-        const paymentQuery = applyScope(
-          supabase
-            .from("dispatches")
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null)
-            .eq("payment_confirmed", false),
-          scope
-        );
-        const approvedQuery = applyScope(
-          supabase
-            .from("dispatches")
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null)
-            .eq("dispatch_status", "Approved for Dispatch"),
-          scope
-        );
-        const [pendingPayment, approvedDispatches] = await Promise.all([
-          countSafely("pending payment confirmation", paymentQuery),
-          countSafely("approved dispatches waiting", approvedQuery)
-        ]);
-
-        return [
-          {
-            href: "/dispatches",
-            helper: "Dispatches still waiting for payment confirmation.",
-            icon: CircleDollarSign,
-            includeInToday: true,
-            label: "Pending Payment Confirmation",
-            module: "dispatches",
-            value: pendingPayment
-          },
-          {
-            href: "/dispatches",
-            helper: "Approved dispatches ready for the next logistics step.",
-            icon: Send,
-            includeInToday: true,
-            label: "Approved Dispatches Waiting",
-            module: "dispatches",
-            value: approvedDispatches
-          }
-        ];
-      })
+    visibleCards.push(
+      {
+        href: "/dispatches",
+        helper: "Dispatches still waiting for payment confirmation.",
+        icon: CircleDollarSign,
+        includeInToday: true,
+        label: "Pending Payment Confirmation",
+        module: "dispatches",
+        value: counts.pendingPaymentConfirmation
+      },
+      {
+        href: "/dispatches",
+        helper: "Approved dispatches ready for the next logistics step.",
+        icon: Send,
+        includeInToday: true,
+        label: "Approved Dispatches Waiting",
+        module: "dispatches",
+        value: counts.approvedDispatchesWaiting
+      }
     );
   }
 
   if (moduleAccess.installations) {
-    cardTasks.push(
-      timeAsync("dashboard installations card", async () => {
-        const scope = await installationScope(supabase, currentUser);
-        const query = applyScope(
-          supabase
-            .from("installations")
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null)
-            .eq("installation_status", "Planned"),
-          scope
-        );
-
-        return {
-          href: "/installations",
-          helper: "Planned installations waiting to be completed.",
-          icon: ClipboardCheck,
-          includeInToday: true,
-          label: "Installations Planned",
-          module: "installations",
-          value: await countSafely("installations planned", query)
-        };
-      })
-    );
+    visibleCards.push({
+      href: "/installations",
+      helper: "Planned installations waiting to be completed.",
+      icon: ClipboardCheck,
+      includeInToday: true,
+      label: "Installations Planned",
+      module: "installations",
+      value: counts.installationsPlanned
+    });
   }
 
   if (moduleAccess.devices) {
-    cardTasks.push(
-      timeAsync("dashboard devices card", async () => {
-        const scope = await deviceScope(supabase, currentUser);
-        const query = applyScope(
-          supabase
-            .from("devices")
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null)
-            .eq("device_status", "In Warehouse"),
-          scope
-        );
-
-        return {
-          href: "/devices",
-          helper: "Available warehouse stock for future dispatches.",
-          icon: Warehouse,
-          includeInToday: false,
-          label: "Devices in Warehouse",
-          module: "devices",
-          value: await countSafely("devices in warehouse", query)
-        };
-      })
-    );
+    visibleCards.push({
+      href: "/devices",
+      helper: "Available warehouse stock for future dispatches.",
+      icon: Warehouse,
+      includeInToday: false,
+      label: "Devices in Warehouse",
+      module: "devices",
+      value: counts.devicesInWarehouse
+    });
   }
 
   if (moduleAccess.followUps) {
-    cardTasks.push(
-      timeAsync("dashboard followups card", async () => {
-        const scope = await followupScope(supabase, currentUser);
-        const query = applyScope(
-          supabase
-            .from("followups")
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null)
-            .in("followup_status", ["Due", "Rescheduled", "Escalated"])
-            .lt("followup_due_date", today),
-          scope
-        );
-
-        return {
-          href: "/follow-ups",
-          helper: "Post installation follow-ups past their due date.",
-          icon: CalendarClock,
-          includeInToday: true,
-          label: "Overdue Post Installation Follow-ups",
-          module: "follow-ups",
-          value: await countSafely("overdue post installation follow-ups", query)
-        };
-      })
-    );
+    visibleCards.push({
+      href: "/follow-ups",
+      helper: "Post installation follow-ups past their due date.",
+      icon: CalendarClock,
+      includeInToday: true,
+      label: "Overdue Post Installation Follow-ups",
+      module: "follow-ups",
+      value: counts.overduePostInstallationFollowups
+    });
   }
 
   if (moduleAccess.pilots) {
-    cardTasks.push(
-      timeAsync("dashboard pilots card", async () => {
-        const scope = await pilotScope(supabase, currentUser);
-        const query = applyScope(
-          supabase
-            .from("pilots")
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null)
-            .in("pilot_status", activePilotStatuses),
-          scope
-        );
-
-        return {
-          href: "/pilots",
-          helper: "Pilots currently active or waiting for reports.",
-          icon: Activity,
-          includeInToday: true,
-          label: "Active Pilots",
-          module: "pilots",
-          value: await countSafely("active pilots", query)
-        };
-      })
-    );
+    visibleCards.push({
+      href: "/pilots",
+      helper: "Pilots currently active or waiting for reports.",
+      icon: Activity,
+      includeInToday: true,
+      label: "Active Pilots",
+      module: "pilots",
+      value: counts.activePilots
+    });
   }
 
-  const cardResults = await timeAsync("dashboard cards", () =>
-    Promise.allSettled(cardTasks)
-  );
-  const visibleCards = cardResults.flatMap((result) => {
-    if (result.status === "rejected") {
-      console.error("[Home] Card group unavailable", result.reason);
-      return [];
-    }
-
-    return Array.isArray(result.value) ? result.value : [result.value];
-  });
   const todayActionItems = visibleCards
     .filter((card) => card.includeInToday)
     .reduce((sum, card) => sum + (card.value ?? 0), 0);

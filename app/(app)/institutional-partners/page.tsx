@@ -205,6 +205,7 @@ function ActionButtons({
         aria-label={`View ${institution.organization_name}`}
         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
         href={`/institutional-partners/${institution.id}`}
+        prefetch={false}
       >
         <Eye className="h-4 w-4" aria-hidden="true" />
       </Link>
@@ -213,6 +214,7 @@ function ActionButtons({
           aria-label={`Edit ${institution.organization_name}`}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
           href={`/institutional-partners/${institution.id}/edit`}
+          prefetch={false}
         >
           <Pencil className="h-4 w-4" aria-hidden="true" />
         </Link>
@@ -567,6 +569,7 @@ export default async function InstitutionalPartnersPage({
                       <Link
                         className="font-semibold text-slate-950 hover:text-brand-700"
                         href={`/institutional-partners/${institution.id}`}
+                        prefetch={false}
                       >
                         {institution.organization_name}
                       </Link>

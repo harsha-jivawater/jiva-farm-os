@@ -595,6 +595,7 @@ export default async function DispatchesPage({
                             aria-label={`View ${dispatch.dispatch_code}`}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
                             href={`/dispatches/${dispatch.id}`}
+                            prefetch={false}
                           >
                             <Eye className="h-4 w-4" aria-hidden="true" />
                           </Link>
@@ -603,6 +604,7 @@ export default async function DispatchesPage({
                               aria-label={`Edit ${dispatch.dispatch_code}`}
                               className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
                               href={`/dispatches/${dispatch.id}/edit`}
+                              prefetch={false}
                             >
                               <Pencil className="h-4 w-4" aria-hidden="true" />
                             </Link>
@@ -659,6 +661,7 @@ export default async function DispatchesPage({
                     <Link
                       className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                       href={`/dispatches/${dispatch.id}`}
+                      prefetch={false}
                     >
                       <Eye className="h-4 w-4" aria-hidden="true" />
                       View
@@ -667,6 +670,7 @@ export default async function DispatchesPage({
                       <Link
                         className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                         href={`/dispatches/${dispatch.id}/edit`}
+                        prefetch={false}
                       >
                         <Pencil className="h-4 w-4" aria-hidden="true" />
                         Edit

@@ -2014,6 +2014,10 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: undefined;
       };
+      get_dashboard_home_counts: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
       get_kpi_dashboard_summary: {
         Args: {
           p_start_date?: string | null;
