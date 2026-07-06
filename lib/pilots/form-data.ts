@@ -160,6 +160,11 @@ export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
       formData,
       "device_installation_date"
     ),
+    device_removal_reason: getText(formData, "device_removal_reason"),
+    device_removed_date: getText(formData, "device_removed_date"),
+    device_removal_device_id: getText(formData, "device_removal_device_id"),
+    device_removal_status:
+      getText(formData, "device_removal_status") ?? undefined,
     installation_completed: getBoolean(
       formData,
       "installation_completed"

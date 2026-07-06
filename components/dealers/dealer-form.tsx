@@ -31,6 +31,7 @@ import { StateDistrictSelect } from "@/src/components/location/StateDistrictSele
 type DealerFormProps = {
   action: (formData: FormData) => void | Promise<void>;
   approvalOnly?: boolean;
+  canApproveLegalDocuments?: boolean;
   cancelHref: string;
   dealer?: Dealer;
   error?: string | null;
@@ -43,6 +44,11 @@ function inputClassName() {
 }
 
 const dealerOwnerRoles = new Set(["Sales Head", "RSM", "Salesperson", "Admin"]);
+const legalApprovalStatusOptions = [
+  { value: "Pending", label: "Pending" },
+  { value: "Approved", label: "Approved" },
+  { value: "Rejected", label: "Rejected" }
+] as const;
 
 function SubmitButton({ disabled = false }: { disabled?: boolean }) {
   const { pending } = useFormStatus();
@@ -137,6 +143,7 @@ function SelectField({
 export function DealerForm({
   action,
   approvalOnly = false,
+  canApproveLegalDocuments = false,
   cancelHref,
   dealer,
   error,
@@ -263,11 +270,11 @@ export function DealerForm({
         <>
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <h2 className="text-base font-semibold text-slate-950">
-              Sales Head approval
+              Approval review
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              Update approval, onboarding status, priority, targets, and next
-              action. Dealer profile fields remain with Admin/RSM ownership.
+              Update the approval fields allowed for your role. Dealer profile
+              fields remain with Admin/RSM ownership.
             </p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <SelectField
@@ -338,6 +345,35 @@ export function DealerForm({
                 required
                 type="date"
               />
+              {canApproveLegalDocuments ? (
+                <>
+                  <SelectField
+                    defaultValue={
+                      dealer.dealer_agreement_approval_status ?? "Pending"
+                    }
+                    label="Dealer Agreement legal approval"
+                    name="dealer_agreement_approval_status"
+                    options={legalApprovalStatusOptions}
+                    required
+                  />
+                  <div className="md:col-span-2">
+                    <label
+                      className="mb-1.5 block text-sm font-medium text-slate-700"
+                      htmlFor="dealer_agreement_hr_legal_comments"
+                    >
+                      HR & Legal comments
+                    </label>
+                    <textarea
+                      className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                      defaultValue={
+                        dealer.dealer_agreement_hr_legal_comments ?? ""
+                      }
+                      id="dealer_agreement_hr_legal_comments"
+                      name="dealer_agreement_hr_legal_comments"
+                    />
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
 

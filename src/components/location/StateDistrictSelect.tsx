@@ -16,6 +16,7 @@ type StateDistrictSelectProps = {
   stateLabel?: string;
   districtLabel?: string;
   required?: boolean;
+  disabled?: boolean;
 };
 
 function selectClassName() {
@@ -31,7 +32,8 @@ export function StateDistrictSelect({
   districtName = "district",
   stateLabel = "State",
   districtLabel = "District",
-  required = false
+  required = false,
+  disabled = false
 }: StateDistrictSelectProps) {
   const stateId = useId();
   const districtId = useId();
@@ -55,6 +57,7 @@ export function StateDistrictSelect({
         </label>
         <select
           className={selectClassName()}
+          disabled={disabled}
           id={stateId}
           name={stateName}
           onChange={(event) => {
@@ -82,7 +85,7 @@ export function StateDistrictSelect({
         </label>
         <select
           className={selectClassName()}
-          disabled={!stateValue}
+          disabled={disabled || !stateValue}
           id={districtId}
           name={districtName}
           onChange={(event) => onDistrictChange(event.target.value)}

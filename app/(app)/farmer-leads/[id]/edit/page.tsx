@@ -9,6 +9,7 @@ import {
 import type { FarmerLead } from "@/lib/farmer-leads/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
+import { canConfirmPayment } from "@/lib/users/permissions";
 import { farmerLeadScope } from "@/lib/users/record-scope";
 
 type EditFarmerLeadPageProps = {
@@ -62,6 +63,7 @@ export default async function EditFarmerLeadPage({
       <FarmerLeadForm
         action={updateAction}
         cancelHref={`/farmer-leads/${lead.id}`}
+        canConfirmPayment={canConfirmPayment(currentUser)}
         error={query.error}
         includeOwnerFields
         lead={lead}

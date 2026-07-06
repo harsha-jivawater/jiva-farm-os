@@ -50,11 +50,19 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "R&D Head",
     "Viewer"
   ],
-  dealers: ["Admin", "Management", "Sales Head", "R&D Head", "Viewer"],
+  dealers: [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "R&D Head",
+    "HR & Legal",
+    "Viewer"
+  ],
   "institutional-partners": [
     "Admin",
     "Management",
     "Sales Head",
+    "HR & Legal",
     "Viewer"
   ],
   pilots: ["Admin", "Management", "Sales Head", "R&D Head", "Viewer"],

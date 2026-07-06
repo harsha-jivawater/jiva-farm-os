@@ -402,6 +402,10 @@ export default async function InstitutionDetailPage({
             value={labelFor(institution.mou_agreement_status, agreementStatusOptions)}
           />
           <DetailItem
+            label="MOU legal approval"
+            value={display(institution.mou_approval_status)}
+          />
+          <DetailItem
             label="Corporate PO reference"
             value={display(institution.corporate_po_reference)}
           />

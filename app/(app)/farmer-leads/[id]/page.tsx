@@ -152,6 +152,10 @@ export default async function FarmerLeadDetailPage({
           label="Payment confirmed"
         />
         <BooleanBadge
+          active={Boolean(lead.device_dispatched)}
+          label="Device dispatched"
+        />
+        <BooleanBadge
           active={Boolean(lead.installation_completed)}
           label="Device installed"
         />

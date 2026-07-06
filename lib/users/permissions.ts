@@ -9,6 +9,7 @@ export type UserRole =
   | "Agronomist"
   | "Research Assistant"
   | "R&D Head"
+  | "HR & Legal"
   | "Stock / Dispatch"
   | "Accounts"
   | "Viewer";
@@ -83,6 +84,7 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Management",
     "Agronomist",
     "R&D Head",
+    "HR & Legal",
     "Viewer"
   ],
   "institutional-partners": [
@@ -92,6 +94,7 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "RSM",
     "R&D Head",
     "Agronomist",
+    "HR & Legal",
     "Viewer"
   ],
   pilots: [
@@ -118,6 +121,8 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
   ],
   "follow-ups": [
     "Admin",
+    "Management",
+    "R&D Head",
     "Sales Head",
     "RSM",
     "Salesperson",
@@ -164,8 +169,14 @@ const moduleWriteRoles: Record<ModuleKey, readonly UserRole[]> = {
   ],
   devices: ["Admin", "Accounts", "Stock / Dispatch"],
   dispatches: ["Admin", "Accounts", "Stock / Dispatch"],
-  dealers: ["Admin", "Sales Head", "RSM"],
-  "institutional-partners": ["Admin", "Sales Head", "RSM", "Agronomist"],
+  dealers: ["Admin", "Sales Head", "RSM", "HR & Legal"],
+  "institutional-partners": [
+    "Admin",
+    "Sales Head",
+    "RSM",
+    "Agronomist",
+    "HR & Legal"
+  ],
   pilots: ["Admin", "R&D Head", "Agronomist", "Research Assistant"],
   installations: [
     "Admin",
@@ -259,7 +270,7 @@ export function canConfirmPayment(
     | null
     | undefined
 ) {
-  return Boolean(user?.can_confirm_payment) || hasRole(user, "Accounts") || isAdmin(user);
+  return hasRole(user, "Accounts") || isAdmin(user);
 }
 
 export function canManageDispatch(
@@ -287,6 +298,36 @@ export function canApproveDealer(
   user: RoleCapableUser | null | undefined
 ) {
   return hasAnyRole(user, ["Admin", "Sales Head"]);
+}
+
+export function canApproveLegalDocuments(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, ["Admin", "HR & Legal"]);
+}
+
+export function canApproveDeviceReturn(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, ["Admin", "Sales Head"]);
+}
+
+export function canApproveManualDeviceAdjustment(
+  user: RoleCapableUser | null | undefined
+) {
+  return isAdmin(user);
+}
+
+export function canCreateTechnicalReport(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, [
+    "Admin",
+    "Management",
+    "R&D Head",
+    "Agronomist",
+    "Research Assistant"
+  ]);
 }
 
 export function canSeeAllRecords(user: RoleCapableUser) {

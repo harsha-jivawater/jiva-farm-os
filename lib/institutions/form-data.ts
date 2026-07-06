@@ -202,6 +202,8 @@ export function institutionPayloadFromForm(
     mou_agreement_status:
       getText(formData, "mou_agreement_status") ?? defaultAgreementStatus,
     mou_agreement_link: getText(formData, "mou_agreement_link"),
+    mou_approval_status: getText(formData, "mou_approval_status") ?? undefined,
+    mou_hr_legal_comments: getText(formData, "mou_hr_legal_comments"),
     corporate_po_reference: getText(formData, "corporate_po_reference"),
     overall_pilot_status:
       getText(formData, "overall_pilot_status") ??

@@ -5,6 +5,7 @@ import {
   deviceStatusOptions,
   holderTypeOptions,
   productModelOptions,
+  returnDecisionOptions,
   stockEntrySourceOptions
 } from "@/lib/devices/options";
 import type { DeviceFormPayload } from "@/lib/devices/types";
@@ -50,7 +51,19 @@ export function devicePayloadFromForm(formData: FormData): DeviceFormPayload {
     current_location_text: getText(formData, "current_location_text"),
     current_state: getText(formData, "current_state"),
     current_district: getText(formData, "current_district"),
-    remarks: getText(formData, "remarks")
+    remarks: getText(formData, "remarks"),
+    return_decision: getText(formData, "return_decision"),
+    return_reason: getText(formData, "return_reason"),
+    return_photo_link: getText(formData, "return_photo_link"),
+    return_approval_status: getText(formData, "return_approval_status") ?? undefined,
+    return_approval_comments: getText(formData, "return_approval_comments"),
+    manual_adjustment_reason: getText(formData, "manual_adjustment_reason"),
+    manual_adjustment_approval_status:
+      getText(formData, "manual_adjustment_approval_status") ?? undefined,
+    manual_adjustment_approval_comments: getText(
+      formData,
+      "manual_adjustment_approval_comments"
+    )
   };
 }
 
@@ -81,6 +94,31 @@ export function validateDevicePayload(payload: DeviceFormPayload) {
 
   if (!isOptionValue(payload.stock_entry_source, stockEntrySourceOptions)) {
     return "Stock entry source is not valid.";
+  }
+
+  if (payload.return_decision && !isOptionValue(payload.return_decision, returnDecisionOptions)) {
+    return "Return decision is not valid.";
+  }
+
+  if (payload.stock_entry_source === "Return") {
+    if (!payload.return_decision) {
+      return "Select whether this return should be replaced or rejected.";
+    }
+
+    if (!payload.return_reason) {
+      return "Return reason is required.";
+    }
+
+    if (!payload.return_photo_link) {
+      return "Photo link is required for returned devices.";
+    }
+  }
+
+  if (
+    payload.stock_entry_source === "Manual Adjustment" &&
+    !payload.manual_adjustment_reason
+  ) {
+    return "Manual adjustment reason is required.";
   }
 
   return null;

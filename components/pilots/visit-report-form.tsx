@@ -206,7 +206,13 @@ export function VisitReportForm({
       report?.report_status === "Approved"
   );
   const submittedByUsers = users.filter((user) =>
-    hasAnyRole(user, ["Agronomist", "Research Assistant", "R&D Head", "Admin"])
+    hasAnyRole(user, [
+      "Management",
+      "Agronomist",
+      "Research Assistant",
+      "R&D Head",
+      "Admin"
+    ])
   );
 
   return (

@@ -17,6 +17,7 @@ import {
   pilotResultStatusOptions
 } from "@/lib/pilots/options";
 import type {
+  DeviceStatusUpdateTaskInsert,
   Pilot,
   PilotInsert,
   PilotUpdate,
@@ -38,6 +39,7 @@ const reportSubmitterRoles = [
   "Agronomist",
   "Research Assistant",
   "R&D Head",
+  "Management",
   "Admin"
 ];
 const finalPilotReportApproverRoles = ["R&D Head", "Admin"];
@@ -353,7 +355,15 @@ export async function createPilotAction(formData: FormData) {
 export async function updatePilotAction(id: string, formData: FormData) {
   const supabase = await createClient();
   const errorPath = `/pilots/${id}/edit`;
-  await getCurrentProfile(supabase, errorPath);
+  const profile = await getCurrentProfile(supabase, errorPath);
+  const { data: existingPilot } = await supabase
+    .from("pilots")
+    .select(
+      "id, device_removal_status, device_removal_reason, device_id, device_serial_number_snapshot"
+    )
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
   const payload = pilotPayloadFromForm(formData);
   const validationError = validatePilotPayload(payload);
   const farmerLeadId = payload.farmer_lead_id;
@@ -387,7 +397,12 @@ export async function updatePilotAction(id: string, formData: FormData) {
 
   const { error } = await supabase
     .from("pilots")
-    .update(payload as PilotUpdate)
+    .update({
+      ...(payload as PilotUpdate),
+      device_removed_by_user_id: payload.device_removal_reason
+        ? profile.id
+        : undefined
+    })
     .eq("id", id);
 
   if (error) {
@@ -398,6 +413,31 @@ export async function updatePilotAction(id: string, formData: FormData) {
     .from("farmer_leads")
     .update({ linked_pilot_id: id })
     .eq("id", farmerLeadId);
+
+  const removalJustRecorded =
+    payload.device_removal_reason &&
+    existingPilot?.device_removal_status !==
+      "Pending Customer Service Update" &&
+    existingPilot?.device_removal_status !== "Resolved";
+
+  if (removalJustRecorded && payload.device_removal_reason) {
+    const taskPayload: DeviceStatusUpdateTaskInsert = {
+      pilot_id: id,
+      device_id:
+        payload.device_removal_device_id ??
+        existingPilot?.device_id ??
+        null,
+      serial_number_snapshot:
+        payload.device_serial_number_snapshot ??
+        existingPilot?.device_serial_number_snapshot ??
+        null,
+      reason: payload.device_removal_reason,
+      removal_date: payload.device_removed_date ?? todayDate(),
+      requested_by_user_id: profile.id
+    };
+
+    await supabase.from("device_status_update_tasks").insert(taskPayload);
+  }
 
   revalidatePilot(id);
   redirect(`/pilots/${id}`);
@@ -648,7 +688,7 @@ async function validateReportUsers(
   ) {
     redirectWithError(
       errorPath,
-      "Submitted by must be Agronomist, Research Assistant, R&D Head, or Admin."
+      "Submitted by must be Management, Agronomist, Research Assistant, R&D Head, or Admin."
     );
   }
 

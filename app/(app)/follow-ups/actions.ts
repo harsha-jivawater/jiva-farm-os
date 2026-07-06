@@ -15,6 +15,7 @@ import type {
   VisitReportInsert
 } from "@/lib/follow-ups/types";
 import { createClient } from "@/lib/supabase/server";
+import { canCreateTechnicalReport } from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -164,6 +165,13 @@ async function saveFollowup({
 
     if (existing.followup_type === farmerSaleFollowupType) {
       if (!existing.visit_report_id) {
+        if (!canCreateTechnicalReport(profile)) {
+          redirectWithError(
+            errorPath,
+            "Only Admin, Management, R&D Head, Agronomist, or Research Assistant can create technical follow-up reports."
+          );
+        }
+
         try {
           updatePayload.visit_report_id = await createFarmerSaleVisitReport({
             existing,

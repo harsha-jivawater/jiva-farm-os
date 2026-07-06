@@ -38,8 +38,19 @@ export const stockEntrySourceOptions = [
   { value: "Production", label: "Production" },
   { value: "Return", label: "Return" },
   { value: "Replacement Stock", label: "Replacement Stock" },
-  { value: "Manual Adjustment", label: "Manual Adjustment" },
-  { value: "Other", label: "Other" }
+  { value: "Manual Adjustment", label: "Manual Adjustment" }
+] as const;
+
+export const returnDecisionOptions = [
+  { value: "Replace", label: "Replace" },
+  { value: "Reject", label: "Reject" }
+] as const;
+
+export const approvalStatusOptions = [
+  { value: "Not Required", label: "Not Required" },
+  { value: "Pending", label: "Pending" },
+  { value: "Approved", label: "Approved" },
+  { value: "Rejected", label: "Rejected" }
 ] as const;
 
 export const defaultDeviceStatus = "In Warehouse";

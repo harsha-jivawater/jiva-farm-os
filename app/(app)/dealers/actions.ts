@@ -9,7 +9,11 @@ import {
 import type { Dealer, DealerInsert, DealerUpdate } from "@/lib/dealers/types";
 import { createClient } from "@/lib/supabase/server";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
-import { roleOf } from "@/lib/users/permissions";
+import {
+  canApproveLegalDocuments,
+  canEditDealerProfile,
+  hasRole
+} from "@/lib/users/permissions";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -26,10 +30,10 @@ export async function createDealerAction(formData: FormData) {
   const errorPath = "/dealers/new";
   const profile = await getCurrentProfile(supabase, errorPath);
 
-  if (roleOf(profile) === "Sales Head") {
+  if (hasRole(profile, "Sales Head") || hasRole(profile, "HR & Legal")) {
     redirectWithError(
       errorPath,
-      "Sales Head can approve dealers but cannot create dealer profiles."
+      "Your role can review dealers but cannot create dealer profiles."
     );
   }
 
@@ -83,8 +87,19 @@ export async function updateDealerAction(id: string, formData: FormData) {
     redirectWithError(errorPath, validationError);
   }
 
-  const salesHeadApprovalOnly = roleOf(profile) === "Sales Head";
-  const updatePayload: DealerUpdate = salesHeadApprovalOnly
+  const dealerProfileEditor = canEditDealerProfile(profile);
+  const salesHeadApprovalOnly = hasRole(profile, "Sales Head") && !dealerProfileEditor;
+  const legalApprovalOnly =
+    canApproveLegalDocuments(profile) && !dealerProfileEditor && !hasRole(profile, "Sales Head");
+  const updatePayload: DealerUpdate = legalApprovalOnly
+    ? {
+        dealer_agreement_approval_status:
+          String(formData.get("dealer_agreement_approval_status") ?? "Pending"),
+        dealer_agreement_hr_legal_comments:
+          String(formData.get("dealer_agreement_hr_legal_comments") ?? "").trim() ||
+          null
+      }
+    : salesHeadApprovalOnly
     ? {
         dealer_status: payload.dealer_status,
         commercial_terms_shared: payload.commercial_terms_shared,
@@ -100,6 +115,14 @@ export async function updateDealerAction(id: string, formData: FormData) {
     : {
         ...payload
       };
+
+  if (
+    updatePayload.dealer_agreement_approval_status === "Approved" ||
+    updatePayload.dealer_agreement_approval_status === "Rejected"
+  ) {
+    updatePayload.dealer_agreement_approved_by_user_id = profile.id;
+    updatePayload.dealer_agreement_approved_at = new Date().toISOString();
+  }
 
   const { error } = await supabase
     .from("dealers")

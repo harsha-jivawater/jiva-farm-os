@@ -5,12 +5,12 @@ import {
   defaultFunnelStage,
   defaultIrrigationType,
   defaultLeadSource,
-  defaultLeadStatus,
   defaultLeadType,
   defaultPrimaryCrop
 } from "@/lib/farmer-leads/options";
 import { validateFarmerLeadPayload } from "@/lib/farmer-leads/form-data";
 import type { FarmerLeadInsert } from "@/lib/farmer-leads/types";
+import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 import type { ImportActionState } from "@/lib/csv/import-types";
 import {
   MAX_IMPORT_ROWS,
@@ -79,6 +79,7 @@ function rowToPayload(row: CsvRecord): FarmerLeadInsert {
   const primaryCrop = clean(row.primary_crop) ?? defaultPrimaryCrop;
   const nextActionDate = clean(row.next_action_date) ?? todayDate();
   const paymentConfirmed = parseBoolean(row.payment_confirmed);
+  const funnelStage = clean(row.funnel_stage) ?? defaultFunnelStage;
 
   return {
     lead_code: clean(row.lead_code) ?? generateImportCode("JFD"),
@@ -90,8 +91,8 @@ function rowToPayload(row: CsvRecord): FarmerLeadInsert {
     taluk: clean(row.taluk),
     full_address: clean(row.full_address),
     lead_type: clean(row.lead_type) ?? defaultLeadType,
-    lead_status: clean(row.lead_status) ?? defaultLeadStatus,
-    funnel_stage: clean(row.funnel_stage) ?? defaultFunnelStage,
+    lead_status: deriveLeadStatus({ funnelStage, paymentConfirmed }),
+    funnel_stage: funnelStage,
     lead_source: clean(row.lead_source) ?? defaultLeadSource,
     primary_crop: primaryCrop,
     other_primary_crop:
@@ -102,7 +103,8 @@ function rowToPayload(row: CsvRecord): FarmerLeadInsert {
     next_action_date: nextActionDate,
     followup_due_date: clean(row.followup_due_date) ?? nextActionDate,
     payment_confirmed: paymentConfirmed,
-    installation_completed: parseBoolean(row.installation_completed),
+    device_dispatched: false,
+    installation_completed: false,
     remarks: clean(row.remarks),
     created_by_user_id: "",
     owner_user_id: "",

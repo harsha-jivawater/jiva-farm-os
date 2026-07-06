@@ -2,7 +2,10 @@ import { DispatchForm } from "@/components/dispatches/dispatch-form";
 import { PageHeader } from "@/components/page-header";
 import { createDispatchAction } from "@/app/(app)/dispatches/actions";
 import { preferredDispatchDeviceStatuses } from "@/lib/dispatches/options";
-import type { DispatchDeviceOption } from "@/lib/dispatches/types";
+import type {
+  DispatchDeviceOption,
+  DispatchFarmerLeadOption
+} from "@/lib/dispatches/types";
 import { createClient } from "@/lib/supabase/server";
 
 type NewDispatchPageProps = {
@@ -37,6 +40,30 @@ export default async function NewDispatchPage({
     .in("device_status", [...preferredDispatchDeviceStatuses])
     .order("serial_number", { ascending: true })
     .limit(200);
+  const { data: eligibleLeads } = await supabase
+    .from("farmer_leads")
+    .select(
+      [
+        "id",
+        "lead_code",
+        "farmer_name",
+        "mobile_number",
+        "village",
+        "district",
+        "state",
+        "product_recommended",
+        "payment_confirmed",
+        "device_dispatched",
+        "owner_user_id",
+        "rsm_user_id",
+        "region_id"
+      ].join(",")
+    )
+    .is("deleted_at", null)
+    .eq("payment_confirmed", true)
+    .eq("device_dispatched", false)
+    .order("created_at", { ascending: false })
+    .limit(200);
 
   return (
     <section>
@@ -50,6 +77,9 @@ export default async function NewDispatchPage({
         cancelHref="/dispatches"
         devices={(data ?? []) as unknown as DispatchDeviceOption[]}
         error={params.error}
+        farmerLeads={
+          (eligibleLeads ?? []) as unknown as DispatchFarmerLeadOption[]
+        }
         mode="create"
       />
     </section>

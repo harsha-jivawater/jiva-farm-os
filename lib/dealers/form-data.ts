@@ -100,6 +100,12 @@ export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
       getText(formData, "commercial_terms_shared") ?? "",
     dealer_agreement_status:
       getText(formData, "dealer_agreement_status") ?? "",
+    dealer_agreement_approval_status:
+      getText(formData, "dealer_agreement_approval_status") ?? undefined,
+    dealer_agreement_hr_legal_comments: getText(
+      formData,
+      "dealer_agreement_hr_legal_comments"
+    ),
     training_status: getText(formData, "training_status") ?? "",
     credit_terms: getText(formData, "credit_terms") ?? "",
     agreement_required: getBoolean(formData, "agreement_required", true),

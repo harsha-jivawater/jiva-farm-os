@@ -7,6 +7,7 @@ export const userRoleOptions = [
   { value: "Research Assistant", label: "Research Assistant" },
   { value: "Agronomist", label: "Agronomist" },
   { value: "R&D Head", label: "R&D Head" },
+  { value: "HR & Legal", label: "HR & Legal" },
   { value: "Accounts", label: "Accounts" },
   // DB role value remains "Stock / Dispatch"; UI display label is "Customer Service Team".
   { value: "Stock / Dispatch", label: "Customer Service Team" },

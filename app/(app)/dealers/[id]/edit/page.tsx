@@ -5,7 +5,10 @@ import { PageHeader } from "@/components/page-header";
 import type { Dealer, RegionOption, UserOption } from "@/lib/dealers/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { canEditDealerProfile } from "@/lib/users/permissions";
+import {
+  canApproveLegalDocuments,
+  canEditDealerProfile
+} from "@/lib/users/permissions";
 import { dealerScope } from "@/lib/users/record-scope";
 
 type EditDealerPageProps = {
@@ -61,6 +64,7 @@ export default async function EditDealerPage({
   const dealer = data as Dealer;
   const updateAction = updateDealerAction.bind(null, dealer.id);
   const approvalOnly = !canEditDealerProfile(currentUser);
+  const canApproveLegal = canApproveLegalDocuments(currentUser);
 
   return (
     <section>
@@ -75,6 +79,7 @@ export default async function EditDealerPage({
         dealer={dealer}
         error={query.error}
         approvalOnly={approvalOnly}
+        canApproveLegalDocuments={canApproveLegal}
         regions={(regions ?? []) as RegionOption[]}
         users={(users ?? []) as UserOption[]}
       />

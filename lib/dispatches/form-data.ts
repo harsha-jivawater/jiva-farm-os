@@ -48,6 +48,7 @@ export function dispatchPayloadFromForm(
     product_model: getRequiredText(formData, "product_model"),
     quantity: 1,
     destination_type: getRequiredText(formData, "destination_type"),
+    destination_farmer_lead_id: getText(formData, "destination_farmer_lead_id"),
     destination_name_snapshot: getRequiredText(
       formData,
       "destination_name_snapshot"
@@ -76,7 +77,8 @@ export function dispatchPayloadFromForm(
     expected_delivery_date: getText(formData, "expected_delivery_date"),
     delivered_date: getText(formData, "delivered_date"),
     delivery_confirmed: getCheckbox(formData, "delivery_confirmed"),
-    delivery_remarks: getText(formData, "delivery_remarks")
+    delivery_remarks: getText(formData, "delivery_remarks"),
+    linked_farmer_lead_id: getText(formData, "destination_farmer_lead_id")
   };
 }
 
@@ -105,6 +107,13 @@ export function validateDispatchPayload(payload: DispatchFormPayload) {
 
   if (!payload.dispatch_type) {
     return "Dispatch type is required.";
+  }
+
+  if (
+    payload.dispatch_type === "Farmer Sale Dispatch" &&
+    !payload.destination_farmer_lead_id
+  ) {
+    return "Select a paid farmer lead before creating a Farmer Sale Dispatch.";
   }
 
   if (!payload.destination_type) {

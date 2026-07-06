@@ -6,7 +6,6 @@ import {
   defaultFunnelStage,
   defaultIrrigationType,
   defaultLeadSource,
-  defaultLeadStatus,
   defaultLeadType,
   defaultPrimaryCrop,
   funnelStageOptions,
@@ -16,6 +15,7 @@ import {
   leadTypeOptions,
   primaryCropOptions
 } from "@/lib/farmer-leads/options";
+import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 
 function getText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -66,6 +66,8 @@ export function farmerLeadPayloadFromForm(
   const nextActionDate = getText(formData, "next_action_date") ?? todayDate();
   const leadCode = getText(formData, "lead_code");
 
+  const funnelStage = getText(formData, "funnel_stage") ?? defaultFunnelStage;
+  const paymentConfirmed = getCheckbox(formData, "payment_confirmed");
   const payload: FarmerLeadInsert | FarmerLeadUpdate = {
     lead_code: leadCode ?? generateLeadCode(),
     farmer_name: getRequiredText(formData, "farmer_name"),
@@ -74,8 +76,8 @@ export function farmerLeadPayloadFromForm(
     state: getRequiredText(formData, "state"),
     district: getRequiredText(formData, "district"),
     lead_type: getText(formData, "lead_type") ?? defaultLeadType,
-    lead_status: getText(formData, "lead_status") ?? defaultLeadStatus,
-    funnel_stage: getText(formData, "funnel_stage") ?? defaultFunnelStage,
+    lead_status: deriveLeadStatus({ funnelStage, paymentConfirmed }),
+    funnel_stage: funnelStage,
     lead_source: getText(formData, "lead_source") ?? defaultLeadSource,
     primary_crop: primaryCrop,
     other_primary_crop: otherPrimaryCrop,
@@ -83,8 +85,7 @@ export function farmerLeadPayloadFromForm(
       getText(formData, "irrigation_type") ?? defaultIrrigationType,
     next_action_date: nextActionDate,
     followup_due_date: getText(formData, "followup_due_date") ?? nextActionDate,
-    payment_confirmed: getCheckbox(formData, "payment_confirmed"),
-    installation_completed: getCheckbox(formData, "installation_completed"),
+    payment_confirmed: paymentConfirmed,
     remarks: getText(formData, "remarks")
   };
 

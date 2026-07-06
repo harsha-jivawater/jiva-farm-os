@@ -1005,6 +1005,55 @@ export function PilotForm({
         </div>
       </div>
 
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-slate-950">
+          Pilot device removal
+        </h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">
+          Record field removal here. Customer Service Team will update final
+          device stock status and location separately.
+        </p>
+        <input
+          name="device_removal_status"
+          type="hidden"
+          value={
+            pilot?.device_removal_status === "Resolved"
+              ? "Resolved"
+              : pilot?.device_removal_reason
+                ? "Pending Customer Service Update"
+                : "Not Removed"
+          }
+        />
+        <input
+          name="device_removal_device_id"
+          type="hidden"
+          value={pilot?.device_removal_device_id ?? pilot?.device_id ?? ""}
+        />
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Field
+            defaultValue={pilot?.device_removed_date}
+            label="Removal date"
+            name="device_removed_date"
+            type="date"
+          />
+          <Field
+            defaultValue={pilot?.device_serial_number_snapshot}
+            label="Device serial number"
+            name="device_removal_serial_snapshot"
+          />
+          <div className="md:col-span-2">
+            <TextareaField
+              defaultValue={pilot?.device_removal_reason}
+              label="Removal reason"
+              name="device_removal_reason"
+            />
+          </div>
+          <div className="rounded-md border border-amber-200 bg-white/70 px-3 py-2 text-sm leading-6 text-amber-900 md:col-span-2">
+            Current removal status: {pilot?.device_removal_status ?? "Not Removed"}
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"

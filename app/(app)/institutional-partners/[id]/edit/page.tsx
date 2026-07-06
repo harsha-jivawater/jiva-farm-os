@@ -9,6 +9,7 @@ import type {
 } from "@/lib/institutions/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
+import { canApproveLegalDocuments } from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
 
 type EditInstitutionPageProps = {
@@ -76,6 +77,7 @@ export default async function EditInstitutionPage({
       />
       <InstitutionForm
         action={updateAction}
+        canApproveLegalDocuments={canApproveLegalDocuments(currentUser)}
         cancelHref={`/institutional-partners/${institution.id}`}
         error={query.error}
         institution={institution}

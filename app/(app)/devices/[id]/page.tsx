@@ -18,7 +18,11 @@ import {
 } from "@/lib/devices/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { canWriteModule } from "@/lib/users/permissions";
+import {
+  canApproveDeviceReturn,
+  canApproveManualDeviceAdjustment,
+  canWriteModule
+} from "@/lib/users/permissions";
 import { deviceScope } from "@/lib/users/record-scope";
 
 type DeviceDetailPageProps = {
@@ -51,6 +55,9 @@ export default async function DeviceDetailPage({
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/devices");
   const canWrite = canWriteModule(currentUser, "devices");
+  const canReview =
+    canApproveDeviceReturn(currentUser) ||
+    canApproveManualDeviceAdjustment(currentUser);
   const scope = await deviceScope(supabase, currentUser);
   let deviceQuery = supabase
     .from("devices")
@@ -93,13 +100,13 @@ export default async function DeviceDetailPage({
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Back
           </Link>
-          {canWrite ? (
+          {canWrite || canReview ? (
             <Link
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
               href={`/devices/${device.id}/edit`}
             >
               <Pencil className="h-4 w-4" aria-hidden="true" />
-              Edit
+              {canWrite ? "Edit" : "Review"}
             </Link>
           ) : null}
         </div>
@@ -146,7 +153,23 @@ export default async function DeviceDetailPage({
           label="Last movement"
           value={formatDate(device.last_movement_date)}
         />
+        <DetailItem
+          label="Return approval"
+          value={display(device.return_approval_status)}
+        />
+        <DetailItem
+          label="Manual adjustment approval"
+          value={display(device.manual_adjustment_approval_status)}
+        />
       </div>
+
+      {device.return_approval_status === "Pending" ||
+      device.manual_adjustment_approval_status === "Pending" ? (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          This device has a pending stock workflow approval. Final inventory
+          status should be updated only after approval.
+        </div>
+      ) : null}
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <p className="text-sm font-medium text-slate-500">Remarks</p>

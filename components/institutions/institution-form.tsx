@@ -40,6 +40,7 @@ import { StateDistrictSelect } from "@/src/components/location/StateDistrictSele
 
 type InstitutionFormProps = {
   action: (formData: FormData) => void | Promise<void>;
+  canApproveLegalDocuments?: boolean;
   cancelHref: string;
   error?: string | null;
   institution?: Institution;
@@ -54,6 +55,11 @@ const technicalOwnerRoles = new Set([
   "Research Assistant",
   "R&D Head"
 ]);
+const legalApprovalStatusOptions = [
+  { value: "Pending", label: "Pending" },
+  { value: "Approved", label: "Approved" },
+  { value: "Rejected", label: "Rejected" }
+] as const;
 
 function inputClassName() {
   return "h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500";
@@ -222,6 +228,7 @@ function UserSelectField({
 
 export function InstitutionForm({
   action,
+  canApproveLegalDocuments = false,
   cancelHref,
   error,
   institution,
@@ -723,6 +730,30 @@ export function InstitutionForm({
             name="mou_agreement_link"
             type="url"
           />
+          {canApproveLegalDocuments ? (
+            <>
+              <SelectField
+                defaultValue={institution?.mou_approval_status ?? "Pending"}
+                label="MOU legal approval"
+                name="mou_approval_status"
+                options={legalApprovalStatusOptions}
+              />
+              <div className="md:col-span-2">
+                <label
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  htmlFor="mou_hr_legal_comments"
+                >
+                  HR & Legal comments
+                </label>
+                <textarea
+                  className={textareaClassName()}
+                  defaultValue={institution?.mou_hr_legal_comments ?? ""}
+                  id="mou_hr_legal_comments"
+                  name="mou_hr_legal_comments"
+                />
+              </div>
+            </>
+          ) : null}
           <Field
             defaultValue={institution?.corporate_po_reference}
             label="Corporate PO reference"

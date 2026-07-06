@@ -18,6 +18,8 @@ export type VisitReportUpdate =
 export type FarmerLead =
   Database["public"]["Tables"]["farmer_leads"]["Row"];
 export type Device = Database["public"]["Tables"]["devices"]["Row"];
+export type DeviceStatusUpdateTaskInsert =
+  Database["public"]["Tables"]["device_status_update_tasks"]["Insert"];
 export type Dealer = Database["public"]["Tables"]["dealers"]["Row"];
 export type Institution =
   Database["public"]["Tables"]["institutions"]["Row"];

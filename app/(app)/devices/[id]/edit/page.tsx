@@ -5,6 +5,11 @@ import { updateDeviceAction } from "@/app/(app)/devices/actions";
 import type { Device } from "@/lib/devices/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
+import {
+  canApproveDeviceReturn,
+  canApproveManualDeviceAdjustment,
+  canWriteModule
+} from "@/lib/users/permissions";
 import { deviceScope } from "@/lib/users/record-scope";
 
 type EditDevicePageProps = {
@@ -24,6 +29,14 @@ export default async function EditDevicePage({
   const query = await searchParams;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/devices");
+  const canEditDevice = canWriteModule(currentUser, "devices");
+  const canReviewReturn = canApproveDeviceReturn(currentUser);
+  const canReviewManual = canApproveManualDeviceAdjustment(currentUser);
+
+  if (!canEditDevice && !canReviewReturn && !canReviewManual) {
+    notFound();
+  }
+
   const scope = await deviceScope(supabase, currentUser);
   let deviceQuery = supabase
     .from("devices")
@@ -58,9 +71,12 @@ export default async function EditDevicePage({
       <DeviceForm
         action={updateAction}
         cancelHref={`/devices/${device.id}`}
+        canApproveManualAdjustment={canReviewManual}
+        canApproveReturn={canReviewReturn}
         device={device}
         error={query.error}
         mode="edit"
+        readOnlyDetails={!canEditDevice}
       />
     </section>
   );

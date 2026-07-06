@@ -279,6 +279,10 @@ export default async function DealerDetailPage({
             )}
           />
           <DetailItem
+            label="Dealer Agreement legal approval"
+            value={display(dealer.dealer_agreement_approval_status)}
+          />
+          <DetailItem
             label="Commercial terms shared"
             value={labelFor(
               dealer.commercial_terms_shared,

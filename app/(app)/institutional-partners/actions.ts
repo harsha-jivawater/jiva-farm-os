@@ -21,6 +21,10 @@ import type {
   InstitutionUpdate,
 } from "@/lib/institutions/types";
 import { createClient } from "@/lib/supabase/server";
+import {
+  canApproveLegalDocuments,
+  hasRole
+} from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -87,6 +91,14 @@ export async function createInstitutionAction(formData: FormData) {
   const supabase = await createClient();
   const errorPath = "/institutional-partners/new";
   const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (hasRole(profile, "HR & Legal")) {
+    redirectWithError(
+      errorPath,
+      "HR & Legal can approve institutional documents but cannot create institutions."
+    );
+  }
+
   const payload = institutionPayloadFromForm(formData);
   const validationError = validateInstitutionPayload(payload);
 
@@ -119,7 +131,7 @@ export async function createInstitutionAction(formData: FormData) {
 export async function updateInstitutionAction(id: string, formData: FormData) {
   const supabase = await createClient();
   const errorPath = `/institutional-partners/${id}/edit`;
-  await getCurrentProfile(supabase, errorPath);
+  const profile = await getCurrentProfile(supabase, errorPath);
 
   const { data: existing, error: existingError } = await supabase
     .from("institutions")
@@ -132,6 +144,42 @@ export async function updateInstitutionAction(id: string, formData: FormData) {
     redirectWithError(errorPath, "Institution was not found.");
   }
 
+  const legalApprovalOnly =
+    canApproveLegalDocuments(profile) &&
+    !hasRole(profile, "Admin") &&
+    !hasRole(profile, "Sales Head") &&
+    !hasRole(profile, "RSM") &&
+    !hasRole(profile, "Agronomist") &&
+    !hasRole(profile, "R&D Head");
+
+  if (legalApprovalOnly) {
+    const updatePayload: InstitutionUpdate = {
+      mou_approval_status: String(formData.get("mou_approval_status") ?? "Pending"),
+      mou_hr_legal_comments:
+        String(formData.get("mou_hr_legal_comments") ?? "").trim() || null
+    };
+
+    if (
+      updatePayload.mou_approval_status === "Approved" ||
+      updatePayload.mou_approval_status === "Rejected"
+    ) {
+      updatePayload.mou_approved_by_user_id = profile.id;
+      updatePayload.mou_approved_at = new Date().toISOString();
+    }
+
+    const { error } = await supabase
+      .from("institutions")
+      .update(updatePayload)
+      .eq("id", id);
+
+    if (error) {
+      redirectWithError(errorPath, error.message);
+    }
+
+    await revalidateInstitution(id);
+    redirect(`/institutional-partners/${id}`);
+  }
+
   const payload = institutionPayloadFromForm(formData);
   const validationError = validateInstitutionPayload(payload);
 
@@ -139,9 +187,20 @@ export async function updateInstitutionAction(id: string, formData: FormData) {
     redirectWithError(errorPath, validationError);
   }
 
+  const updatePayload = payload as InstitutionUpdate;
+
+  if (
+    canApproveLegalDocuments(profile) &&
+    (updatePayload.mou_approval_status === "Approved" ||
+      updatePayload.mou_approval_status === "Rejected")
+  ) {
+    updatePayload.mou_approved_by_user_id = profile.id;
+    updatePayload.mou_approved_at = new Date().toISOString();
+  }
+
   const { error } = await supabase
     .from("institutions")
-    .update(payload as InstitutionUpdate)
+    .update(updatePayload)
     .eq("id", id);
 
   if (error) {
