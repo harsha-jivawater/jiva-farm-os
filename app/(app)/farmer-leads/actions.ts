@@ -11,6 +11,7 @@ import type {
   FarmerLeadInsert,
   FarmerLeadUpdate
 } from "@/lib/farmer-leads/types";
+import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
@@ -120,6 +121,13 @@ export async function createFarmerLeadAction(formData: FormData) {
     payload.payment_confirmed_date = todayDate();
   }
 
+  payload.installation_completed = false;
+  payload.device_dispatched = false;
+  payload.lead_status = deriveLeadStatus({
+    funnelStage: payload.funnel_stage,
+    paymentConfirmed: Boolean(payload.payment_confirmed)
+  });
+
   const ownerAndRsmIds = Array.from(
     new Set([payload.owner_user_id, payload.rsm_user_id].filter(Boolean))
   ) as string[];
@@ -179,7 +187,18 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
 
   const { data: existingData, error: existingError } = await supabase
     .from("farmer_leads")
-    .select("id, payment_confirmed")
+    .select(
+      [
+        "id",
+        "payment_confirmed",
+        "payment_confirmed_by_user_id",
+        "payment_confirmed_date",
+        "device_dispatched",
+        "linked_dispatch_id",
+        "installation_completed",
+        "linked_installation_id"
+      ].join(",")
+    )
     .eq("id", id)
     .is("deleted_at", null)
     .single();
@@ -188,7 +207,23 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
     redirectWithError(`/farmer-leads/${id}/edit`, "Lead was not found.");
   }
 
-  const existing = existingData as Pick<FarmerLead, "id" | "payment_confirmed">;
+  const existing = existingData as unknown as Pick<
+    FarmerLead,
+    | "id"
+    | "payment_confirmed"
+    | "payment_confirmed_by_user_id"
+    | "payment_confirmed_date"
+    | "device_dispatched"
+    | "linked_dispatch_id"
+    | "installation_completed"
+    | "linked_installation_id"
+  >;
+
+  if (!canConfirmPayment(profile)) {
+    payload.payment_confirmed = existing.payment_confirmed;
+    payload.payment_confirmed_by_user_id = existing.payment_confirmed_by_user_id;
+    payload.payment_confirmed_date = existing.payment_confirmed_date;
+  }
 
   if (
     payload.payment_confirmed !== existing.payment_confirmed &&
@@ -212,6 +247,15 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
     payload.payment_confirmed_by_user_id = null;
     payload.payment_confirmed_date = null;
   }
+
+  payload.device_dispatched = existing.device_dispatched;
+  payload.linked_dispatch_id = existing.linked_dispatch_id;
+  payload.installation_completed = existing.installation_completed;
+  payload.linked_installation_id = existing.linked_installation_id;
+  payload.lead_status = deriveLeadStatus({
+    funnelStage: payload.funnel_stage,
+    paymentConfirmed: Boolean(payload.payment_confirmed)
+  });
 
   const ownerAndRsmIds = Array.from(
     new Set([payload.owner_user_id, payload.rsm_user_id].filter(Boolean))
@@ -285,12 +329,27 @@ export async function confirmFarmerLeadPaymentAction(id: string) {
     );
   }
 
+  const { data: lead, error: leadError } = await supabase
+    .from("farmer_leads")
+    .select("id, funnel_stage")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .single();
+
+  if (leadError || !lead) {
+    redirectWithError(`/farmer-leads/${id}`, "Lead was not found.");
+  }
+
   const { error } = await supabase
     .from("farmer_leads")
     .update({
       payment_confirmed: true,
       payment_confirmed_by_user_id: profile.id,
-      payment_confirmed_date: todayDate()
+      payment_confirmed_date: todayDate(),
+      lead_status: deriveLeadStatus({
+        funnelStage: lead.funnel_stage,
+        paymentConfirmed: true
+      })
     })
     .eq("id", id)
     .is("deleted_at", null);

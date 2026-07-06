@@ -15,7 +15,8 @@ import {
 } from "@/lib/dispatches/options";
 import type {
   Dispatch,
-  DispatchDeviceOption
+  DispatchDeviceOption,
+  DispatchFarmerLeadOption
 } from "@/lib/dispatches/types";
 
 type DispatchFormProps = {
@@ -24,6 +25,7 @@ type DispatchFormProps = {
   dispatch?: Dispatch;
   devices: DispatchDeviceOption[];
   error?: string | null;
+  farmerLeads?: DispatchFarmerLeadOption[];
   mode: "create" | "edit";
 };
 
@@ -42,6 +44,10 @@ function dateValue(value?: string | null) {
 function deviceLabel(device: DispatchDeviceOption) {
   const code = device.device_code ? ` · ${device.device_code}` : "";
   return `${device.serial_number}${code} · ${device.product_model} · ${device.device_status}`;
+}
+
+function leadLabel(lead: DispatchFarmerLeadOption) {
+  return `${lead.lead_code} · ${lead.farmer_name} · ${lead.village}, ${lead.district}`;
 }
 
 function SubmitButton({ label }: { label: string }) {
@@ -65,6 +71,7 @@ export function DispatchForm({
   dispatch,
   devices,
   error,
+  farmerLeads = [],
   mode
 }: DispatchFormProps) {
   const initialDevice = useMemo(
@@ -84,12 +91,51 @@ export function DispatchForm({
   const [productModel, setProductModel] = useState(
     dispatch?.product_model ?? initialDevice?.product_model ?? ""
   );
+  const [dispatchType, setDispatchType] = useState(
+    dispatch?.dispatch_type ?? ""
+  );
+  const [destinationType, setDestinationType] = useState(
+    dispatch?.destination_type ?? ""
+  );
+  const [selectedLeadId, setSelectedLeadId] = useState(
+    dispatch?.destination_farmer_lead_id ?? dispatch?.linked_farmer_lead_id ?? ""
+  );
+  const [destinationName, setDestinationName] = useState(
+    dispatch?.destination_name_snapshot ?? ""
+  );
+  const [destinationContact, setDestinationContact] = useState(
+    dispatch?.destination_contact_snapshot ?? ""
+  );
+  const [destinationAddress, setDestinationAddress] = useState(
+    dispatch?.destination_address ?? ""
+  );
+  const [paymentConfirmed, setPaymentConfirmed] = useState(
+    dispatch?.payment_confirmed ?? false
+  );
   const [stateValue, setStateValue] = useState(
     dispatch?.destination_state ?? ""
   );
   const [districtValue, setDistrictValue] = useState(
     dispatch?.destination_district ?? ""
   );
+  const isFarmerSaleDispatch = dispatchType === "Farmer Sale Dispatch";
+
+  function applyLead(leadId: string) {
+    setSelectedLeadId(leadId);
+    const lead = farmerLeads.find((option) => option.id === leadId);
+
+    if (!lead) {
+      return;
+    }
+
+    setDestinationType("Farmer");
+    setDestinationName(lead.farmer_name);
+    setDestinationContact(lead.mobile_number);
+    setStateValue(lead.state);
+    setDistrictValue(lead.district);
+    setDestinationAddress(lead.village);
+    setPaymentConfirmed(lead.payment_confirmed);
+  }
 
   return (
     <form action={action} className="space-y-6">
@@ -168,10 +214,18 @@ export function DispatchForm({
             </label>
             <select
               className={inputClassName()}
-              defaultValue={dispatch?.dispatch_type ?? ""}
               id="dispatch_type"
               name="dispatch_type"
+              onChange={(event) => {
+                const nextDispatchType = event.target.value;
+                setDispatchType(nextDispatchType);
+
+                if (nextDispatchType !== "Farmer Sale Dispatch") {
+                  setSelectedLeadId("");
+                }
+              }}
               required
+              value={dispatchType}
             >
               <option value="">Select dispatch type</option>
               {dispatchTypeOptions.map((option) => (
@@ -263,6 +317,38 @@ export function DispatchForm({
           Destination
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {isFarmerSaleDispatch ? (
+            <div className="md:col-span-2">
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="destination_farmer_lead_id"
+              >
+                Paid farmer lead ready for dispatch
+              </label>
+              <select
+                className={inputClassName()}
+                id="destination_farmer_lead_id"
+                name="destination_farmer_lead_id"
+                onChange={(event) => applyLead(event.target.value)}
+                required
+                value={selectedLeadId}
+              >
+                <option value="">Select paid, not-yet-dispatched lead</option>
+                {farmerLeads.map((lead) => (
+                  <option key={lead.id} value={lead.id}>
+                    {leadLabel(lead)}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Farmer Sale Dispatches can be created only for paid farmer
+                leads that have not yet been dispatched.
+              </p>
+            </div>
+          ) : (
+            <input name="destination_farmer_lead_id" type="hidden" value="" />
+          )}
+
           <div>
             <label
               className="mb-1.5 block text-sm font-medium text-slate-700"
@@ -272,10 +358,11 @@ export function DispatchForm({
             </label>
             <select
               className={inputClassName()}
-              defaultValue={dispatch?.destination_type ?? ""}
               id="destination_type"
               name="destination_type"
+              onChange={(event) => setDestinationType(event.target.value)}
               required
+              value={destinationType}
             >
               <option value="">Select destination type</option>
               {destinationTypeOptions.map((option) => (
@@ -295,11 +382,12 @@ export function DispatchForm({
             </label>
             <input
               className={inputClassName()}
-              defaultValue={dispatch?.destination_name_snapshot ?? ""}
               id="destination_name_snapshot"
               name="destination_name_snapshot"
+              onChange={(event) => setDestinationName(event.target.value)}
               required
               type="text"
+              value={destinationName}
             />
           </div>
 
@@ -312,10 +400,11 @@ export function DispatchForm({
             </label>
             <input
               className={inputClassName()}
-              defaultValue={dispatch?.destination_contact_snapshot ?? ""}
               id="destination_contact_snapshot"
               name="destination_contact_snapshot"
+              onChange={(event) => setDestinationContact(event.target.value)}
               type="text"
+              value={destinationContact}
             />
           </div>
 
@@ -337,9 +426,10 @@ export function DispatchForm({
             </label>
             <textarea
               className={textAreaClassName()}
-              defaultValue={dispatch?.destination_address ?? ""}
               id="destination_address"
               name="destination_address"
+              onChange={(event) => setDestinationAddress(event.target.value)}
+              value={destinationAddress}
             />
           </div>
         </div>
@@ -378,12 +468,17 @@ export function DispatchForm({
           <label className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700">
             <input
               className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-              defaultChecked={dispatch?.payment_confirmed ?? false}
+              checked={paymentConfirmed}
+              disabled={isFarmerSaleDispatch}
               name="payment_confirmed"
+              onChange={(event) => setPaymentConfirmed(event.target.checked)}
               type="checkbox"
             />
             Payment confirmed
           </label>
+          {isFarmerSaleDispatch ? (
+            <input name="payment_confirmed" type="hidden" value="on" />
+          ) : null}
 
           <div>
             <label

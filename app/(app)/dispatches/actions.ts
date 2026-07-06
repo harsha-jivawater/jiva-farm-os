@@ -15,6 +15,7 @@ import type {
   DispatchInsert,
   DispatchUpdate
 } from "@/lib/dispatches/types";
+import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 import { createClient } from "@/lib/supabase/server";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import {
@@ -23,6 +24,23 @@ import {
 } from "@/lib/users/permissions";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+type FarmerSaleDispatchLead = {
+  id: string;
+  lead_code: string;
+  farmer_name: string;
+  mobile_number: string;
+  village: string;
+  district: string;
+  state: string;
+  funnel_stage: string;
+  lead_status: string;
+  payment_confirmed: boolean;
+  payment_confirmed_by_user_id: string | null;
+  payment_confirmed_date: string | null;
+  device_dispatched: boolean;
+  linked_dispatch_id: string | null;
+};
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -115,6 +133,119 @@ async function getDeviceForDispatch(
   return data as unknown as DispatchDeviceOption;
 }
 
+async function getFarmerSaleLeadForDispatch(
+  supabase: SupabaseClient,
+  leadId: string | null | undefined,
+  errorPath: string,
+  existingDispatchId?: string
+) {
+  if (!leadId) {
+    redirectWithError(
+      errorPath,
+      "Select a paid farmer lead before creating a Farmer Sale Dispatch."
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("farmer_leads")
+    .select(
+      [
+        "id",
+        "lead_code",
+        "farmer_name",
+        "mobile_number",
+        "village",
+        "district",
+        "state",
+        "funnel_stage",
+        "lead_status",
+        "payment_confirmed",
+        "payment_confirmed_by_user_id",
+        "payment_confirmed_date",
+        "device_dispatched",
+        "linked_dispatch_id"
+      ].join(",")
+    )
+    .eq("id", leadId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !data) {
+    redirectWithError(errorPath, "Selected farmer lead was not found.");
+  }
+
+  const lead = data as unknown as FarmerSaleDispatchLead;
+
+  if (!lead.payment_confirmed) {
+    redirectWithError(
+      errorPath,
+      "Farmer Sale Dispatch can be created only after payment is confirmed."
+    );
+  }
+
+  if (
+    lead.device_dispatched &&
+    (!existingDispatchId || lead.linked_dispatch_id !== existingDispatchId)
+  ) {
+    redirectWithError(
+      errorPath,
+      "This farmer lead is already marked as dispatched."
+    );
+  }
+
+  return lead;
+}
+
+function applyFarmerSaleLeadSnapshot(
+  payload: DispatchInsert | DispatchUpdate,
+  lead: FarmerSaleDispatchLead
+) {
+  payload.destination_type = "Farmer";
+  payload.destination_farmer_lead_id = lead.id;
+  payload.linked_farmer_lead_id = lead.id;
+  payload.destination_name_snapshot = lead.farmer_name;
+  payload.destination_contact_snapshot = lead.mobile_number;
+  payload.destination_address = lead.village;
+  payload.destination_state = lead.state;
+  payload.destination_district = lead.district;
+  payload.payment_confirmed = true;
+  payload.payment_confirmed_by_user_id = lead.payment_confirmed_by_user_id;
+  payload.payment_confirmed_date = lead.payment_confirmed_date;
+}
+
+async function markFarmerSaleLeadDispatched({
+  supabase,
+  dispatchId,
+  lead,
+  errorPath
+}: {
+  supabase: SupabaseClient;
+  dispatchId: string;
+  lead: FarmerSaleDispatchLead;
+  errorPath: string;
+}) {
+  const nextFunnelStage =
+    lead.lead_status === "Lost" || lead.lead_status === "Parked"
+      ? lead.funnel_stage
+      : "Device Dispatched";
+  const { error } = await supabase
+    .from("farmer_leads")
+    .update({
+      device_dispatched: true,
+      linked_dispatch_id: dispatchId,
+      funnel_stage: nextFunnelStage,
+      lead_status: deriveLeadStatus({
+        funnelStage: nextFunnelStage,
+        paymentConfirmed: true
+      })
+    })
+    .eq("id", lead.id);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+}
+
 async function applyDispatchedSideEffects({
   supabase,
   profileId,
@@ -199,6 +330,19 @@ export async function createDispatchAction(formData: FormData) {
   }
 
   const profile = await getCurrentProfile(supabase, "/dispatches/new");
+  const farmerSaleLead =
+    payload.dispatch_type === "Farmer Sale Dispatch"
+      ? await getFarmerSaleLeadForDispatch(
+          supabase,
+          payload.destination_farmer_lead_id,
+          "/dispatches/new"
+        )
+      : null;
+
+  if (farmerSaleLead) {
+    applyFarmerSaleLeadSnapshot(payload, farmerSaleLead);
+  }
+
   const device = await getDeviceForDispatch(
     supabase,
     payload.device_id ?? "",
@@ -207,7 +351,11 @@ export async function createDispatchAction(formData: FormData) {
   const now = todayDate();
   const shouldMarkApproved = advancedStatus(payload.dispatch_status);
 
-  if (payload.payment_confirmed && !canConfirmPayment(profile)) {
+  if (
+    payload.payment_confirmed &&
+    !canConfirmPayment(profile) &&
+    payload.dispatch_type !== "Farmer Sale Dispatch"
+  ) {
     redirectWithError(
       "/dispatches/new",
       "Only Accounts or Admin can confirm payment."
@@ -232,9 +380,11 @@ export async function createDispatchAction(formData: FormData) {
     dispatched_by_user_id:
       payload.dispatch_status === "Dispatched" ? profile.id : null,
     payment_confirmed_by_user_id: payload.payment_confirmed
-      ? profile.id
+      ? (payload.payment_confirmed_by_user_id ?? profile.id)
       : null,
-    payment_confirmed_date: payload.payment_confirmed ? now : null
+    payment_confirmed_date: payload.payment_confirmed
+      ? (payload.payment_confirmed_date ?? now)
+      : null
   } as DispatchInsert;
 
   if (!canMoveToApprovedOrBeyond(insertPayload)) {
@@ -267,10 +417,23 @@ export async function createDispatchAction(formData: FormData) {
       createMovement: true,
       errorPath: `/dispatches/${data.id}/edit`
     });
+
+    if (farmerSaleLead) {
+      await markFarmerSaleLeadDispatched({
+        supabase,
+        dispatchId: data.id,
+        lead: farmerSaleLead,
+        errorPath: `/dispatches/${data.id}/edit`
+      });
+    }
   }
 
   revalidatePath("/dispatches");
   revalidatePath("/devices");
+  if (farmerSaleLead) {
+    revalidatePath("/farmer-leads");
+    revalidatePath(`/farmer-leads/${farmerSaleLead.id}`);
+  }
   redirect(`/dispatches/${data.id}`);
 }
 
@@ -304,6 +467,20 @@ export async function updateDispatchAction(id: string, formData: FormData) {
     );
   }
 
+  const farmerSaleLead =
+    payload.dispatch_type === "Farmer Sale Dispatch"
+      ? await getFarmerSaleLeadForDispatch(
+          supabase,
+          payload.destination_farmer_lead_id,
+          `/dispatches/${id}/edit`,
+          id
+        )
+      : null;
+
+  if (farmerSaleLead) {
+    applyFarmerSaleLeadSnapshot(payload, farmerSaleLead);
+  }
+
   const device = await getDeviceForDispatch(
     supabase,
     payload.device_id ?? "",
@@ -317,7 +494,8 @@ export async function updateDispatchAction(id: string, formData: FormData) {
 
   if (
     payload.payment_confirmed !== existing.payment_confirmed &&
-    !canConfirmPayment(profile)
+    !canConfirmPayment(profile) &&
+    payload.dispatch_type !== "Farmer Sale Dispatch"
   ) {
     redirectWithError(
       `/dispatches/${id}/edit`,
@@ -349,10 +527,12 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       ? profile.id
       : existing.dispatched_by_user_id,
     payment_confirmed_by_user_id: payload.payment_confirmed
-      ? (existing.payment_confirmed_by_user_id ?? profile.id)
+      ? (payload.payment_confirmed_by_user_id ??
+        existing.payment_confirmed_by_user_id ??
+        profile.id)
       : null,
     payment_confirmed_date: payload.payment_confirmed
-      ? (existing.payment_confirmed_date ?? now)
+      ? (payload.payment_confirmed_date ?? existing.payment_confirmed_date ?? now)
       : null
   } as DispatchUpdate;
 
@@ -385,6 +565,15 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       createMovement: true,
       errorPath: `/dispatches/${id}/edit`
     });
+
+    if (farmerSaleLead) {
+      await markFarmerSaleLeadDispatched({
+        supabase,
+        dispatchId: id,
+        lead: farmerSaleLead,
+        errorPath: `/dispatches/${id}/edit`
+      });
+    }
   } else if (updatePayload.dispatch_status === "Dispatched") {
     await applyDispatchedSideEffects({
       supabase,
@@ -395,10 +584,23 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       createMovement: false,
       errorPath: `/dispatches/${id}/edit`
     });
+
+    if (farmerSaleLead) {
+      await markFarmerSaleLeadDispatched({
+        supabase,
+        dispatchId: id,
+        lead: farmerSaleLead,
+        errorPath: `/dispatches/${id}/edit`
+      });
+    }
   }
 
   revalidatePath("/dispatches");
   revalidatePath(`/dispatches/${id}`);
   revalidatePath("/devices");
+  if (farmerSaleLead) {
+    revalidatePath("/farmer-leads");
+    revalidatePath(`/farmer-leads/${farmerSaleLead.id}`);
+  }
   redirect(`/dispatches/${id}`);
 }

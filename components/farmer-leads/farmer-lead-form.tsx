@@ -9,20 +9,20 @@ import {
   defaultFunnelStage,
   defaultIrrigationType,
   defaultLeadSource,
-  defaultLeadStatus,
   defaultLeadType,
   defaultPrimaryCrop,
   funnelStageOptions,
   irrigationTypeOptions,
   leadSourceOptions,
-  leadStatusOptions,
   primaryCropOptions
 } from "@/lib/farmer-leads/options";
 import type { FarmerLead } from "@/lib/farmer-leads/types";
+import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 
 type FarmerLeadFormProps = {
   action: (formData: FormData) => void | Promise<void>;
   cancelHref: string;
+  canConfirmPayment?: boolean;
   error?: string | null;
   includeOwnerFields?: boolean;
   lead?: FarmerLead;
@@ -63,6 +63,7 @@ function defaultDateValue(value?: string | null) {
 export function FarmerLeadForm({
   action,
   cancelHref,
+  canConfirmPayment = false,
   error,
   includeOwnerFields = false,
   lead,
@@ -73,6 +74,16 @@ export function FarmerLeadForm({
   );
   const [stateValue, setStateValue] = useState(lead?.state ?? "");
   const [districtValue, setDistrictValue] = useState(lead?.district ?? "");
+  const [funnelStage, setFunnelStage] = useState(
+    lead?.funnel_stage ?? defaultFunnelStage
+  );
+  const [paymentConfirmed, setPaymentConfirmed] = useState(
+    Boolean(lead?.payment_confirmed)
+  );
+  const calculatedLeadStatus = deriveLeadStatus({
+    funnelStage,
+    paymentConfirmed
+  });
 
   return (
     <form action={action} className="space-y-6">
@@ -178,24 +189,15 @@ export function FarmerLeadForm({
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="lead_status"
-            >
+            <p className="mb-1.5 block text-sm font-medium text-slate-700">
               Lead status
-            </label>
-            <select
-              className={inputClassName()}
-              defaultValue={lead?.lead_status ?? defaultLeadStatus}
-              id="lead_status"
-              name="lead_status"
-            >
-              {leadStatusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            </p>
+            <div className="flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+              {calculatedLeadStatus}
+            </div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Calculated from funnel stage and payment confirmation.
+            </p>
           </div>
 
           <div>
@@ -207,9 +209,10 @@ export function FarmerLeadForm({
             </label>
             <select
               className={inputClassName()}
-              defaultValue={lead?.funnel_stage ?? defaultFunnelStage}
               id="funnel_stage"
               name="funnel_stage"
+              onChange={(event) => setFunnelStage(event.target.value)}
+              value={funnelStage}
             >
               {funnelStageOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -331,12 +334,14 @@ export function FarmerLeadForm({
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3 md:col-span-2">
             <label className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
               <input
                 className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
-                defaultChecked={Boolean(lead?.payment_confirmed)}
+                checked={paymentConfirmed}
+                disabled={!canConfirmPayment}
                 name="payment_confirmed"
+                onChange={(event) => setPaymentConfirmed(event.target.checked)}
                 type="checkbox"
               />
               Payment confirmed
@@ -344,12 +349,27 @@ export function FarmerLeadForm({
             <label className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
               <input
                 className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
-                defaultChecked={Boolean(lead?.installation_completed)}
-                name="installation_completed"
+                checked={Boolean(lead?.device_dispatched)}
+                readOnly
+                type="checkbox"
+              />
+              Device dispatched
+            </label>
+            <label className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
+              <input
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600"
+                checked={Boolean(lead?.installation_completed)}
+                readOnly
                 type="checkbox"
               />
               Device installed
             </label>
+            {!canConfirmPayment ? (
+              <p className="text-xs leading-5 text-slate-500 sm:col-span-3">
+                Payment can be confirmed only by Accounts or Admin. Dispatch and
+                installation progress is updated from those workflows.
+              </p>
+            ) : null}
           </div>
         </div>
       </div>

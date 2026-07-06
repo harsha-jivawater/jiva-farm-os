@@ -578,6 +578,7 @@ export type Database = {
           payment_confirmed_date: string | null;
           zoho_invoice_reference: string | null;
           dispatch_required: boolean | null;
+          device_dispatched: boolean;
           linked_dispatch_id: string | null;
           linked_installation_id: string | null;
           installation_completed: boolean;
@@ -648,6 +649,7 @@ export type Database = {
           payment_confirmed_date?: string | null;
           zoho_invoice_reference?: string | null;
           dispatch_required?: boolean | null;
+          device_dispatched?: boolean;
           linked_dispatch_id?: string | null;
           linked_installation_id?: string | null;
           installation_completed?: boolean;
@@ -718,6 +720,7 @@ export type Database = {
           payment_confirmed_date?: string | null;
           zoho_invoice_reference?: string | null;
           dispatch_required?: boolean | null;
+          device_dispatched?: boolean;
           linked_dispatch_id?: string | null;
           linked_installation_id?: string | null;
           installation_completed?: boolean;
