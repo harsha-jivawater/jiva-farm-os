@@ -27,6 +27,22 @@ export type DispatchDeviceOption = Pick<
   | "current_district"
 >;
 
+export type DispatchFarmerLeadOption = {
+  id: string;
+  lead_code: string;
+  farmer_name: string;
+  mobile_number: string;
+  village: string;
+  district: string;
+  state: string;
+  product_recommended: string;
+  payment_confirmed: boolean;
+  device_dispatched: boolean;
+  owner_user_id: string;
+  rsm_user_id: string;
+  region_id: string;
+};
+
 export type DispatchFilters = {
   q: string;
   dispatch_status: string;
