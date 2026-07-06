@@ -28,6 +28,7 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Admin",
     "Management",
     "Sales Head",
+    "Agronomist",
     "Accounts",
     "Stock / Dispatch",
     "R&D Head",
@@ -39,6 +40,7 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Sales Head",
     "Accounts",
     "Stock / Dispatch",
+    "Agronomist",
     "R&D Head",
     "Viewer"
   ],
@@ -65,16 +67,31 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "HR & Legal",
     "Viewer"
   ],
-  pilots: ["Admin", "Management", "Sales Head", "R&D Head", "Viewer"],
+  pilots: [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "R&D Head",
+    "Agronomist",
+    "Viewer"
+  ],
   installations: [
     "Admin",
     "Management",
     "Sales Head",
     "Stock / Dispatch",
+    "Agronomist",
     "R&D Head",
     "Viewer"
   ],
-  "follow-ups": ["Admin", "Management", "Sales Head", "R&D Head", "Viewer"],
+  "follow-ups": [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "R&D Head",
+    "Agronomist",
+    "Viewer"
+  ],
   "monitoring-devices": [
     "Admin",
     "Management",

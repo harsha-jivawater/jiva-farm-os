@@ -674,6 +674,7 @@ function KpiDashboardSummaryView({
     "Management",
     "Sales Head",
     "RSM",
+    "Agronomist",
     "Viewer"
   ]);
   const canSeeDealerSections = hasAnyRole(currentUser, [
@@ -704,6 +705,7 @@ function KpiDashboardSummaryView({
     "Admin",
     "Management",
     "Sales Head",
+    "Agronomist",
     "Viewer"
   ]);
   const fyAchievement =
