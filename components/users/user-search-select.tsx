@@ -62,6 +62,9 @@ export function UserSearchSelect({
     }
 
     hiddenInputRef.current?.dispatchEvent(
+      new Event("input", { bubbles: true })
+    );
+    hiddenInputRef.current?.dispatchEvent(
       new Event("change", { bubbles: true })
     );
   }, [notifyFilterChange, selectedValue]);

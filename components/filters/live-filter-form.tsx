@@ -1,8 +1,8 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 type LiveFilterFormProps = {
   action?: string;
@@ -29,6 +29,14 @@ function isNamedFormControl(element: EventTarget | null) {
   ) && Boolean(element.name);
 }
 
+function isNamedHiddenInput(element: EventTarget | null) {
+  return (
+    element instanceof HTMLInputElement &&
+    element.type === "hidden" &&
+    Boolean(element.name)
+  );
+}
+
 function formSearchParams(form: HTMLFormElement) {
   const params = new URLSearchParams();
   const formData = new FormData(form);
@@ -47,6 +55,32 @@ function formSearchParams(form: HTMLFormElement) {
   return params;
 }
 
+function clearDependentFields(element: EventTarget | null, form: HTMLFormElement) {
+  if (!(element instanceof HTMLElement)) {
+    return;
+  }
+
+  const fieldNames = element.dataset.clearFields
+    ?.split(",")
+    .map((fieldName) => fieldName.trim())
+    .filter(Boolean);
+
+  if (!fieldNames?.length) {
+    return;
+  }
+
+  for (const fieldName of fieldNames) {
+    const field = form.elements.namedItem(fieldName);
+    if (
+      field instanceof HTMLInputElement ||
+      field instanceof HTMLSelectElement ||
+      field instanceof HTMLTextAreaElement
+    ) {
+      field.value = "";
+    }
+  }
+}
+
 export function LiveFilterForm({
   action,
   children,
@@ -55,7 +89,9 @@ export function LiveFilterForm({
 }: LiveFilterFormProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formKey = searchParams.toString();
 
   const updateUrl = useCallback(
     (form: HTMLFormElement) => {
@@ -86,17 +122,38 @@ export function LiveFilterForm({
     [debounceMs, updateUrl]
   );
 
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <form
       action={action}
       className={className}
+      key={formKey}
       method="get"
       onChange={(event) => {
+        if (isNamedHiddenInput(event.target)) {
+          return;
+        }
+
         if (!isNamedFormControl(event.target)) {
           return;
         }
 
+        clearDependentFields(event.target, event.currentTarget);
         scheduleUpdate(event.currentTarget, shouldDebounce(event.target));
+      }}
+      onInput={(event) => {
+        if (!isNamedHiddenInput(event.target)) {
+          return;
+        }
+
+        scheduleUpdate(event.currentTarget, false);
       }}
       onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();

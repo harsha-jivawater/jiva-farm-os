@@ -581,7 +581,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
             {pilotResultStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
           <CropFilterSelect defaultValue={filters.crop} />
-          <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" defaultValue={filters.state} name="state">
+          <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" data-clear-fields="district" defaultValue={filters.state} name="state">
             <option value="">All states</option>
             {INDIAN_STATES_AND_UTS.map((state) => <option key={state} value={state}>{state}</option>)}
           </select>

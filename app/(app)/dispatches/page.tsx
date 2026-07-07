@@ -463,6 +463,7 @@ export default async function DispatchesPage({
             </span>
             <select
               className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+              data-clear-fields="destination_district"
               defaultValue={filters.destination_state}
               name="destination_state"
             >

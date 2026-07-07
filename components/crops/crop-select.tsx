@@ -1,6 +1,6 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cropContext, cropLibrary } from "@/lib/crops/crop-library";
 
@@ -70,6 +70,9 @@ export function CropSelect({
     }
 
     hiddenInputRef.current?.dispatchEvent(
+      new Event("input", { bubbles: true })
+    );
+    hiddenInputRef.current?.dispatchEvent(
       new Event("change", { bubbles: true })
     );
   }, [notifyFilterChange, value]);
@@ -105,7 +108,7 @@ export function CropSelect({
           className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400"
         />
         <input
-          className={`${inputClassName()} pl-9`}
+          className={`${inputClassName()} pl-9 ${showSelectedInInput && value ? "pr-10" : ""}`}
           id={`${name}_search`}
           onChange={(event) => setQuery(event.target.value)}
           onFocus={(event) => {
@@ -117,6 +120,19 @@ export function CropSelect({
           type="search"
           value={inputValue}
         />
+        {showSelectedInInput && value ? (
+          <button
+            aria-label={`Clear ${label}`}
+            className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            onClick={() => {
+              setQuery("");
+              onChange("");
+            }}
+            type="button"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
       {query.trim() || visibleCrops.length ? (
         <div className="mt-2 max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-white">

@@ -390,6 +390,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
             </span>
             <select
               className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+              data-clear-fields="current_district"
               defaultValue={filters.current_state}
               name="current_state"
             >
