@@ -12,7 +12,9 @@ type CropSelectProps = {
   required?: boolean;
   showMissingSelectionMessage?: boolean;
   showOptionsOnEmptySearch?: boolean;
+  showSelectedInInput?: boolean;
   showSelectedContext?: boolean;
+  showSelectedSummary?: boolean;
 };
 
 function inputClassName() {
@@ -41,7 +43,9 @@ export function CropSelect({
   required = false,
   showMissingSelectionMessage = true,
   showOptionsOnEmptySearch = true,
-  showSelectedContext = true
+  showSelectedInInput = false,
+  showSelectedContext = true,
+  showSelectedSummary = true
 }: CropSelectProps) {
   const [query, setQuery] = useState("");
 
@@ -61,6 +65,9 @@ export function CropSelect({
   }, [query, showOptionsOnEmptySearch]);
 
   const selectedCrop = cropLibrary.find((crop) => crop.value === value);
+  const selectedLabel = selectedCrop?.label ?? value;
+  const inputValue =
+    showSelectedInInput && !query && value ? selectedLabel : query;
 
   return (
     <div>
@@ -82,9 +89,14 @@ export function CropSelect({
           className={`${inputClassName()} pl-9`}
           id={`${name}_search`}
           onChange={(event) => setQuery(event.target.value)}
+          onFocus={(event) => {
+            if (showSelectedInInput && value && !query) {
+              event.currentTarget.select();
+            }
+          }}
           placeholder="Search crop name or category"
           type="search"
-          value={query}
+          value={inputValue}
         />
       </div>
       {query.trim() || visibleCrops.length ? (
@@ -123,10 +135,12 @@ export function CropSelect({
         )}
         </div>
       ) : null}
-      {selectedCrop ? (
+      {showSelectedSummary && selectedLabel ? (
         <p className="mt-1.5 text-xs leading-5 text-slate-500">
-          Selected: {selectedCrop.label}
-          {showSelectedContext ? ` · ${cropContext(selectedCrop.value)}` : null}
+          Selected: {selectedLabel}
+          {showSelectedContext && selectedCrop
+            ? ` · ${cropContext(selectedCrop.value)}`
+            : null}
         </p>
       ) : showMissingSelectionMessage ? (
         <p className="mt-1.5 text-xs leading-5 text-red-600">
