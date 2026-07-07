@@ -53,15 +53,35 @@ export function CropSelect({
 }: CropSelectProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [localValue, setLocalValue] = useState(value);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
   const hasMountedRef = useRef(false);
 
   useEffect(() => {
+    setLocalValue(value);
     if (!value) {
       setQuery("");
       setIsOpen(false);
     }
   }, [value]);
+
+  function commitValue(nextValue: string) {
+    setLocalValue(nextValue);
+    setQuery("");
+    setIsOpen(false);
+
+    if (hiddenInputRef.current) {
+      hiddenInputRef.current.value = nextValue;
+      hiddenInputRef.current.dispatchEvent(
+        new Event("input", { bubbles: true })
+      );
+      hiddenInputRef.current.dispatchEvent(
+        new Event("change", { bubbles: true })
+      );
+    }
+
+    onChange(nextValue);
+  }
 
   useEffect(() => {
     if (!notifyFilterChange) {
@@ -88,23 +108,23 @@ export function CropSelect({
     }
 
     if (!trimmed) {
-      return showOptionsOnEmptySearch && !value ? cropLibrary : [];
+      return showOptionsOnEmptySearch && !localValue ? cropLibrary : [];
     }
 
     return cropLibrary.filter((crop) => matchesCrop(trimmed, crop));
-  }, [isOpen, query, showOptionsOnEmptySearch, value]);
+  }, [isOpen, localValue, query, showOptionsOnEmptySearch]);
 
-  const selectedCrop = cropLibrary.find((crop) => crop.value === value);
-  const selectedLabel = selectedCrop?.label ?? value;
+  const selectedCrop = cropLibrary.find((crop) => crop.value === localValue);
+  const selectedLabel = selectedCrop?.label ?? localValue;
   const inputValue =
-    showSelectedInInput && !query && value ? selectedLabel : query;
+    showSelectedInInput && !query && localValue ? selectedLabel : query;
 
   return (
     <div
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) {
           setIsOpen(false);
-          if (value) {
+          if (localValue) {
             setQuery("");
           }
         }
@@ -118,14 +138,14 @@ export function CropSelect({
           <span className="text-xs font-medium text-slate-500">Required</span>
         ) : null}
       </div>
-      <input name={name} ref={hiddenInputRef} type="hidden" value={value} />
+      <input name={name} ref={hiddenInputRef} type="hidden" value={localValue} />
       <div className="relative mt-1.5">
         <Search
           aria-hidden="true"
           className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400"
         />
         <input
-          className={`${inputClassName()} pl-9 ${showSelectedInInput && value ? "pr-10" : ""}`}
+          className={`${inputClassName()} pl-9 ${showSelectedInInput && localValue ? "pr-10" : ""}`}
           id={`${name}_search`}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -133,7 +153,7 @@ export function CropSelect({
           }}
           onFocus={(event) => {
             setIsOpen(true);
-            if (showSelectedInInput && value && !query) {
+            if (showSelectedInInput && localValue && !query) {
               event.currentTarget.select();
             }
           }}
@@ -141,15 +161,11 @@ export function CropSelect({
           type="search"
           value={inputValue}
         />
-        {showSelectedInInput && value ? (
+        {showSelectedInInput && localValue ? (
           <button
             aria-label={`Clear ${label}`}
             className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-            onClick={() => {
-              setQuery("");
-              setIsOpen(false);
-              onChange("");
-            }}
+            onClick={() => commitValue("")}
             type="button"
           >
             <X className="h-4 w-4" aria-hidden="true" />
@@ -164,7 +180,7 @@ export function CropSelect({
           </p>
         ) : (
           visibleCrops.map((crop) => {
-            const isSelected = crop.value === value;
+            const isSelected = crop.value === localValue;
             return (
               <button
                 className={[
@@ -174,11 +190,7 @@ export function CropSelect({
                     : "text-slate-700 hover:bg-slate-50"
                 ].join(" ")}
                 key={`${crop.value}-${crop.mainCategory}-${crop.subcategory}`}
-                onClick={() => {
-                  onChange(crop.value);
-                  setQuery("");
-                  setIsOpen(false);
-                }}
+                onClick={() => commitValue(crop.value)}
                 type="button"
               >
                 <span className="block font-semibold">{crop.label}</span>
