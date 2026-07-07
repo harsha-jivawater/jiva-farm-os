@@ -46,18 +46,20 @@ export function CropSelect({
   showMissingSelectionMessage = true,
   showOptionsOnEmptySearch = true,
   showOptionContext = false,
-  showSelectedInInput = false,
+  showSelectedInInput = true,
   showSelectedContext = false,
-  showSelectedSummary = true,
+  showSelectedSummary = false,
   notifyFilterChange = false
 }: CropSelectProps) {
   const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
   const hasMountedRef = useRef(false);
 
   useEffect(() => {
     if (!value) {
       setQuery("");
+      setIsOpen(false);
     }
   }, [value]);
 
@@ -81,12 +83,16 @@ export function CropSelect({
 
   const visibleCrops = useMemo(() => {
     const trimmed = query.trim();
+    if (!isOpen) {
+      return [];
+    }
+
     if (!trimmed) {
-      return showOptionsOnEmptySearch ? cropLibrary : [];
+      return showOptionsOnEmptySearch && !value ? cropLibrary : [];
     }
 
     return cropLibrary.filter((crop) => matchesCrop(trimmed, crop));
-  }, [query, showOptionsOnEmptySearch]);
+  }, [isOpen, query, showOptionsOnEmptySearch, value]);
 
   const selectedCrop = cropLibrary.find((crop) => crop.value === value);
   const selectedLabel = selectedCrop?.label ?? value;
@@ -94,7 +100,16 @@ export function CropSelect({
     showSelectedInInput && !query && value ? selectedLabel : query;
 
   return (
-    <div>
+    <div
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setIsOpen(false);
+          if (value) {
+            setQuery("");
+          }
+        }
+      }}
+    >
       <div className="flex items-center justify-between gap-3">
         <label className="text-sm font-medium text-slate-700" htmlFor={`${name}_search`}>
           {label}
@@ -112,8 +127,12 @@ export function CropSelect({
         <input
           className={`${inputClassName()} pl-9 ${showSelectedInInput && value ? "pr-10" : ""}`}
           id={`${name}_search`}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setIsOpen(true);
+          }}
           onFocus={(event) => {
+            setIsOpen(true);
             if (showSelectedInInput && value && !query) {
               event.currentTarget.select();
             }
@@ -128,6 +147,7 @@ export function CropSelect({
             className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
             onClick={() => {
               setQuery("");
+              setIsOpen(false);
               onChange("");
             }}
             type="button"
@@ -156,9 +176,8 @@ export function CropSelect({
                 key={`${crop.value}-${crop.mainCategory}-${crop.subcategory}`}
                 onClick={() => {
                   onChange(crop.value);
-                  if (!showOptionsOnEmptySearch) {
-                    setQuery("");
-                  }
+                  setQuery("");
+                  setIsOpen(false);
                 }}
                 type="button"
               >
@@ -174,14 +193,14 @@ export function CropSelect({
         )}
         </div>
       ) : null}
-      {showSelectedSummary && selectedLabel ? (
+      {selectedLabel && showSelectedSummary ? (
         <p className="mt-1.5 text-xs leading-5 text-slate-500">
           Selected: {selectedLabel}
           {showSelectedContext && selectedCrop
             ? ` · ${cropContext(selectedCrop.value)}`
             : null}
         </p>
-      ) : showMissingSelectionMessage ? (
+      ) : !selectedLabel && showMissingSelectionMessage ? (
         <p className="mt-1.5 text-xs leading-5 text-red-600">
           Select a crop before saving.
         </p>
