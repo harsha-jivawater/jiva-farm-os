@@ -18,7 +18,6 @@ import {
   defaultIrrigationType,
   defaultLeadSource,
   defaultLeadType,
-  defaultPrimaryCrop,
   funnelStageOptions,
   irrigationTypeOptions,
   leadSourceOptions
@@ -72,6 +71,7 @@ function defaultDateValue(value?: string | null) {
 const manualFunnelStageOptions = funnelStageOptions.filter(
   (option) => option.value !== "Device Installed"
 );
+const cropRequiredMessage = "Select a crop before saving.";
 
 export function FarmerLeadForm({
   action,
@@ -91,9 +91,8 @@ export function FarmerLeadForm({
     : hasInconsistentDeviceInstalledStage
       ? ""
       : (lead?.funnel_stage ?? defaultFunnelStage);
-  const [primaryCrop, setPrimaryCrop] = useState(
-    lead?.primary_crop ?? defaultPrimaryCrop
-  );
+  const [primaryCrop, setPrimaryCrop] = useState(lead?.primary_crop ?? "");
+  const [visibleError, setVisibleError] = useState(error);
   const [stateValue, setStateValue] = useState(lead?.state ?? "");
   const [districtValue, setDistrictValue] = useState(lead?.district ?? "");
   const [funnelStage, setFunnelStage] = useState(initialFunnelStage);
@@ -111,6 +110,13 @@ export function FarmerLeadForm({
     hasAnyRole(user, ["RSM", "Sales Head", "Admin"])
   );
 
+  function handlePrimaryCropChange(value: string) {
+    setPrimaryCrop(value);
+    if (value && visibleError === cropRequiredMessage) {
+      setVisibleError(null);
+    }
+  }
+
   return (
     <form action={action} className="space-y-6">
       <input
@@ -119,9 +125,9 @@ export function FarmerLeadForm({
         value={defaultLeadType}
       />
 
-      {error ? (
+      {visibleError ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
-          {error}
+          {visibleError}
         </div>
       ) : null}
 
@@ -301,7 +307,7 @@ export function FarmerLeadForm({
             <CropSelect
               label="Primary crop"
               name="primary_crop"
-              onChange={setPrimaryCrop}
+              onChange={handlePrimaryCropChange}
               required
               value={primaryCrop}
             />

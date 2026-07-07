@@ -7,7 +7,6 @@ import {
   defaultIrrigationType,
   defaultLeadSource,
   defaultLeadType,
-  defaultPrimaryCrop,
   cropStageOptions,
   funnelStageOptions,
   irrigationTypeOptions,
@@ -75,7 +74,7 @@ export function farmerLeadPayloadFromForm(
     requireLeadCode?: boolean;
   }
 ) {
-  const primaryCrop = getText(formData, "primary_crop") ?? defaultPrimaryCrop;
+  const primaryCrop = getText(formData, "primary_crop") ?? "";
   const otherPrimaryCrop =
     primaryCrop === "Other" ? getText(formData, "other_primary_crop") : null;
   const nextActionDate = getText(formData, "next_action_date") ?? todayDate();
@@ -131,6 +130,10 @@ export function validateFarmerLeadPayload(payload: FarmerLeadInsert | FarmerLead
 
   if (!payload.next_action_date) {
     return "Next action date is required.";
+  }
+
+  if (!payload.primary_crop) {
+    return "Select a crop before saving.";
   }
 
   if (payload.primary_crop === "Other" && !payload.other_primary_crop) {

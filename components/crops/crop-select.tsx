@@ -158,7 +158,7 @@ export function CropSelect({
             }
           }}
           placeholder="Search crop name"
-          type="search"
+          type="text"
           value={inputValue}
         />
         {showSelectedInInput && localValue ? (
@@ -166,6 +166,7 @@ export function CropSelect({
             aria-label={`Clear ${label}`}
             className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
             onClick={() => commitValue("")}
+            onPointerDown={(event) => event.preventDefault()}
             type="button"
           >
             <X className="h-4 w-4" aria-hidden="true" />
@@ -191,6 +192,7 @@ export function CropSelect({
                 ].join(" ")}
                 key={`${crop.value}-${crop.mainCategory}-${crop.subcategory}`}
                 onClick={() => commitValue(crop.value)}
+                onPointerDown={(event) => event.preventDefault()}
                 type="button"
               >
                 <span className="block font-semibold">{crop.label}</span>
