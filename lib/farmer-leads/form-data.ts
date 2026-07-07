@@ -27,14 +27,18 @@ function getRequiredText(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
-function getNumber(formData: FormData, key: string) {
+function getAcresNumber(formData: FormData, key: string) {
   const value = getText(formData, key);
   if (!value) {
     return null;
   }
 
+  if (!/^\d+(\.\d{1,2})?$/.test(value)) {
+    return undefined;
+  }
+
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function getCheckbox(formData: FormData, key: string) {
@@ -93,7 +97,7 @@ export function farmerLeadPayloadFromForm(
     primary_crop: primaryCrop,
     other_primary_crop: otherPrimaryCrop,
     crop_stage: getText(formData, "crop_stage"),
-    crop_area_acres: getNumber(formData, "crop_area_acres"),
+    crop_area_acres: getAcresNumber(formData, "crop_area_acres"),
     irrigation_type:
       getText(formData, "irrigation_type") ?? defaultIrrigationType,
     next_action_date: nextActionDate,
@@ -131,6 +135,10 @@ export function validateFarmerLeadPayload(payload: FarmerLeadInsert | FarmerLead
 
   if (payload.primary_crop === "Other" && !payload.other_primary_crop) {
     return "Enter the crop name when primary crop is Other.";
+  }
+
+  if (payload.crop_area_acres === undefined) {
+    return "Crop area acres must be a non-negative number with up to 2 decimal places.";
   }
 
   if (!isOptionValue(payload.lead_type, leadTypeOptions)) {

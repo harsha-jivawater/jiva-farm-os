@@ -482,14 +482,16 @@ export function FarmerLeadForm({
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <FileUploadField
             currentValue={lead?.lead_photo_folder_link}
+            helperText="Upload a ZIP of photos, up to 50 MB. Optional."
             kind="zip"
-            label="Lead photos ZIP"
+            label="Field / crop photos"
             name="lead_photo_folder_link"
           />
           <FileUploadField
             currentValue={lead?.farmer_document_link}
+            helperText="Upload consent, ID, field note, or other supporting document. Optional."
             kind="document"
-            label="Farmer document file"
+            label="Supporting farmer document"
             name="farmer_document_link"
           />
         </div>

@@ -12,6 +12,7 @@ type CropSelectProps = {
   required?: boolean;
   showMissingSelectionMessage?: boolean;
   showOptionsOnEmptySearch?: boolean;
+  showOptionContext?: boolean;
   showSelectedInInput?: boolean;
   showSelectedContext?: boolean;
   showSelectedSummary?: boolean;
@@ -44,8 +45,9 @@ export function CropSelect({
   required = false,
   showMissingSelectionMessage = true,
   showOptionsOnEmptySearch = true,
+  showOptionContext = false,
   showSelectedInInput = false,
-  showSelectedContext = true,
+  showSelectedContext = false,
   showSelectedSummary = true,
   notifyFilterChange = false
 }: CropSelectProps) {
@@ -116,7 +118,7 @@ export function CropSelect({
               event.currentTarget.select();
             }
           }}
-          placeholder="Search crop name or category"
+          placeholder="Search crop name"
           type="search"
           value={inputValue}
         />
@@ -161,9 +163,11 @@ export function CropSelect({
                 type="button"
               >
                 <span className="block font-semibold">{crop.label}</span>
-                <span className="mt-0.5 block text-xs text-slate-500">
-                  {crop.mainCategory} &gt; {crop.subcategory}
-                </span>
+                {showOptionContext ? (
+                  <span className="mt-0.5 block text-xs text-slate-500">
+                    {crop.mainCategory} &gt; {crop.subcategory}
+                  </span>
+                ) : null}
               </button>
             );
           })

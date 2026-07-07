@@ -44,6 +44,12 @@ type RsmOption = {
   state: string | null;
 };
 
+type SalesHeadOption = {
+  id: string;
+  role: string;
+  secondary_role?: string | null;
+};
+
 function result(state: Partial<ImportActionState>): ImportActionState {
   return {
     status: state.status ?? "error",
@@ -71,7 +77,7 @@ function clean(value: string | null | undefined) {
   return trimmed || null;
 }
 
-function canOwnLead(user: { role: string; secondary_role?: string | null }) {
+function canSelfAssignNewLead(user: { role: string; secondary_role?: string | null }) {
   return hasAnyRole(user, ["Salesperson", "RSM"]);
 }
 
@@ -118,16 +124,18 @@ function assignLeadOwnership({
   payload,
   profile,
   regionsByState,
-  rsmsByState
+  rsmsByState,
+  salesHeadId
 }: {
   payload: FarmerLeadInsert;
   profile: ImportProfile;
   regionsByState: Map<string, RegionOption>;
   rsmsByState: Map<string, RsmOption>;
+  salesHeadId: string | null;
 }) {
   payload.created_by_user_id = profile.id;
 
-  if (canOwnLead(profile)) {
+  if (canSelfAssignNewLead(profile)) {
     if (!profile.region_id) {
       return "Your user profile needs a region before importing leads.";
     }
@@ -142,10 +150,11 @@ function assignLeadOwnership({
 
   const stateKey = payload.state.toLowerCase();
   const region = regionsByState.get(stateKey);
-  const rsmId = region?.rsm_user_id ?? rsmsByState.get(stateKey)?.id ?? null;
+  const rsmId =
+    region?.rsm_user_id ?? rsmsByState.get(stateKey)?.id ?? salesHeadId;
 
   if (!region?.id || !rsmId) {
-    return `No active region and RSM were found for state ${payload.state}.`;
+    return `No active region or Sales Head fallback was found for state ${payload.state}.`;
   }
 
   payload.region_id = region.id;
@@ -189,7 +198,12 @@ export async function importFarmerLeadsAction(
       mobileCounts.set(mobile, (mobileCounts.get(mobile) ?? 0) + 1);
     });
 
-    const [{ data: regions }, { data: rsms }, { data: existingLeads }] =
+    const [
+      { data: regions },
+      { data: rsms },
+      { data: salesHeads },
+      { data: existingLeads }
+    ] =
       await Promise.all([
         states.length
           ? supabase
@@ -206,6 +220,12 @@ export async function importFarmerLeadsAction(
               .eq("is_active", true)
               .in("state", states)
           : Promise.resolve({ data: [] }),
+        supabase
+          .from("users")
+          .select("id, role, secondary_role")
+          .eq("is_active", true)
+          .order("full_name", { ascending: true })
+          .limit(50),
         mobiles.length
           ? supabase
               .from("farmer_leads")
@@ -228,6 +248,10 @@ export async function importFarmerLeadsAction(
         rsmsByState.set(rsm.state.toLowerCase(), rsm);
       }
     });
+    const salesHeadId =
+      ((salesHeads ?? []) as SalesHeadOption[]).find((user) =>
+        hasRole(user, "Sales Head")
+      )?.id ?? null;
 
     const existingMobileSet = new Set(
       (existingLeads ?? []).map((lead) => String(lead.mobile_number ?? ""))
@@ -243,7 +267,8 @@ export async function importFarmerLeadsAction(
         payload,
         profile,
         regionsByState,
-        rsmsByState
+        rsmsByState,
+        salesHeadId
       });
 
       if (assignmentError) {

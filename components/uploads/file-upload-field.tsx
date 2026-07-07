@@ -9,6 +9,7 @@ type FileUploadFieldProps = {
   disabled?: boolean;
   kind: UploadKind;
   label: string;
+  helperText?: string;
   name: string;
   required?: boolean;
 };
@@ -18,6 +19,7 @@ export function FileUploadField({
   disabled = false,
   kind,
   label,
+  helperText,
   name,
   required = false
 }: FileUploadFieldProps) {
@@ -32,6 +34,9 @@ export function FileUploadField({
       >
         {label}
       </label>
+      {helperText ? (
+        <p className="mb-2 text-xs leading-5 text-slate-500">{helperText}</p>
+      ) : null}
       <input name={name} type="hidden" value={currentValue ?? ""} />
       {currentValue ? (
         <p className="mb-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">

@@ -27,7 +27,19 @@ function todayDate() {
 }
 
 function canOwnLead(user: { role: string; secondary_role?: string | null } | null | undefined) {
+  return hasAnyRole(user, ["Salesperson", "RSM", "Sales Head"]);
+}
+
+function canSelfAssignNewLead(
+  user: { role: string; secondary_role?: string | null } | null | undefined
+) {
   return hasAnyRole(user, ["Salesperson", "RSM"]);
+}
+
+function canFillRegionalLeadAssignment(
+  user: { role: string; secondary_role?: string | null } | null | undefined
+) {
+  return hasAnyRole(user, ["RSM", "Sales Head"]);
 }
 
 const deviceInstalledWorkflowMessage =
@@ -79,7 +91,7 @@ export async function createFarmerLeadAction(formData: FormData) {
 
   payload.created_by_user_id = profile.id;
 
-  if (canOwnLead(profile)) {
+  if (canSelfAssignNewLead(profile)) {
     if (!profile.region_id) {
       redirectWithError(
         "/farmer-leads/new",
@@ -127,10 +139,26 @@ export async function createFarmerLeadAction(formData: FormData) {
       assignedRsmId = stateRsm?.id ?? null;
     }
 
+    if (!assignedRsmId) {
+      const { data: salesHeads, error: salesHeadError } = await supabase
+        .from("users")
+        .select("id, role, secondary_role")
+        .eq("is_active", true)
+        .order("full_name", { ascending: true })
+        .limit(50);
+
+      if (salesHeadError) {
+        redirectWithError("/farmer-leads/new", salesHeadError.message);
+      }
+
+      assignedRsmId =
+        salesHeads?.find((user) => hasRole(user, "Sales Head"))?.id ?? null;
+    }
+
     if (!region?.id || !assignedRsmId) {
       redirectWithError(
         "/farmer-leads/new",
-        "Assign an active region and RSM to the selected state before creating leads from this role."
+        "Assign an active region and Sales Head before creating leads for this state."
       );
     }
 
@@ -171,12 +199,15 @@ export async function createFarmerLeadAction(formData: FormData) {
   if (!ownerUser?.is_active || !canOwnLead(ownerUser)) {
     redirectWithError(
       "/farmer-leads/new",
-      "Lead owner must be an active Salesperson or RSM."
+      "Lead owner must be an active Salesperson, RSM, or Sales Head."
     );
   }
 
-  if (!rsmUser?.is_active || !hasRole(rsmUser, "RSM")) {
-    redirectWithError("/farmer-leads/new", "RSM must be an active RSM.");
+  if (!rsmUser?.is_active || !canFillRegionalLeadAssignment(rsmUser)) {
+    redirectWithError(
+      "/farmer-leads/new",
+      "RSM must be an active RSM, or an active Sales Head when no RSM is assigned."
+    );
   }
 
   const { data, error } = await supabase
@@ -329,12 +360,15 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
   if (!ownerUser?.is_active || !canOwnLead(ownerUser)) {
     redirectWithError(
       `/farmer-leads/${id}/edit`,
-      "Lead owner must be an active Salesperson or RSM."
+      "Lead owner must be an active Salesperson, RSM, or Sales Head."
     );
   }
 
-  if (!rsmUser?.is_active || !hasRole(rsmUser, "RSM")) {
-    redirectWithError(`/farmer-leads/${id}/edit`, "RSM must be an active RSM.");
+  if (!rsmUser?.is_active || !canFillRegionalLeadAssignment(rsmUser)) {
+    redirectWithError(
+      `/farmer-leads/${id}/edit`,
+      "RSM must be an active RSM, or an active Sales Head when no RSM is assigned."
+    );
   }
 
   const { error } = await supabase
