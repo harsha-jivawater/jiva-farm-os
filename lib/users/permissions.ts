@@ -285,7 +285,7 @@ export function canManageDispatch(
 export function canCreateDealer(
   user: RoleCapableUser | null | undefined
 ) {
-  return hasAnyRole(user, ["Admin", "RSM"]);
+  return hasAnyRole(user, ["Admin", "Sales Head", "RSM"]);
 }
 
 export function canEditDealerProfile(

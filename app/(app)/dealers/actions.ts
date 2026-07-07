@@ -32,10 +32,10 @@ export async function createDealerAction(formData: FormData) {
   const profile = await getCurrentProfile(supabase, errorPath);
   const dealerId = crypto.randomUUID();
 
-  if (hasRole(profile, "Sales Head") || hasRole(profile, "HR & Legal")) {
+  if (hasRole(profile, "HR & Legal")) {
     redirectWithError(
       errorPath,
-      "Your role can review dealers but cannot create dealer profiles."
+      "Your role can review dealer legal documents but cannot create dealer profiles."
     );
   }
 
@@ -44,8 +44,7 @@ export async function createDealerAction(formData: FormData) {
     await applyUploadedFilesToPayload({
       fields: [
         { fieldName: "agreement_link", kind: "document" },
-        { fieldName: "dealer_documents_folder_link", kind: "zip" },
-        { fieldName: "training_material_shared_link", kind: "document" }
+        { fieldName: "dealer_documents_folder_link", kind: "zip" }
       ],
       folder: "dealers",
       formData,
@@ -107,8 +106,7 @@ export async function updateDealerAction(id: string, formData: FormData) {
     await applyUploadedFilesToPayload({
       fields: [
         { fieldName: "agreement_link", kind: "document" },
-        { fieldName: "dealer_documents_folder_link", kind: "zip" },
-        { fieldName: "training_material_shared_link", kind: "document" }
+        { fieldName: "dealer_documents_folder_link", kind: "zip" }
       ],
       folder: "dealers",
       formData,
@@ -165,7 +163,8 @@ export async function updateDealerAction(id: string, formData: FormData) {
         remarks: payload.remarks
       }
     : {
-        ...payload
+        ...payload,
+        training_material_shared_link: existing.training_material_shared_link
       };
 
   if (

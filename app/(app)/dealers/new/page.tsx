@@ -22,7 +22,7 @@ export default async function NewDealerPage({
 
   if (!canCreateDealer(currentUser)) {
     return (
-      <AccessDenied message="Access denied. Sales Head can approve dealer records but cannot create dealer profiles." />
+      <AccessDenied message="Access denied. You cannot create dealer profiles." />
     );
   }
 

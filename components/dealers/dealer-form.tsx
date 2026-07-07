@@ -422,12 +422,6 @@ export function DealerForm({
                 label="Dealer documents ZIP"
                 name="dealer_documents_folder_link"
               />
-              <FileUploadField
-                currentValue={dealer.training_material_shared_link}
-                kind="document"
-                label="Training material file"
-                name="training_material_shared_link"
-              />
               {canApproveLegalDocuments ? (
                 <>
                   <SelectField
@@ -783,12 +777,6 @@ export function DealerForm({
             kind="zip"
             label="Dealer documents ZIP"
             name="dealer_documents_folder_link"
-          />
-          <FileUploadField
-            currentValue={dealer?.training_material_shared_link}
-            kind="document"
-            label="Training material file"
-            name="training_material_shared_link"
           />
         </div>
       </div>
