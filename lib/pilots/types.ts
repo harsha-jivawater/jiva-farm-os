@@ -24,8 +24,13 @@ export type VisitReportUpdate =
 export type FarmerLead =
   Database["public"]["Tables"]["farmer_leads"]["Row"];
 export type Device = Database["public"]["Tables"]["devices"]["Row"];
+export type DeviceUpdate = Database["public"]["Tables"]["devices"]["Update"];
+export type DeviceMovementInsert =
+  Database["public"]["Tables"]["device_movements"]["Insert"];
 export type DeviceStatusUpdateTaskInsert =
   Database["public"]["Tables"]["device_status_update_tasks"]["Insert"];
+export type FarmerLeadUpdate =
+  Database["public"]["Tables"]["farmer_leads"]["Update"];
 export type Dealer = Database["public"]["Tables"]["dealers"]["Row"];
 export type Institution =
   Database["public"]["Tables"]["institutions"]["Row"];

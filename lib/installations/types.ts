@@ -33,6 +33,7 @@ export type InstallationFarmerLeadOption = Pick<
   | "rsm_user_id"
   | "region_id"
   | "owner_user_id"
+  | "payment_confirmed"
   | "linked_dealer_id"
   | "linked_institution_id"
   | "linked_pilot_id"

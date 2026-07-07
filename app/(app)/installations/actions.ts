@@ -103,6 +103,7 @@ async function getFarmerLeadForInstallation(
         "rsm_user_id",
         "region_id",
         "owner_user_id",
+        "payment_confirmed",
         "linked_dealer_id",
         "linked_institution_id",
         "linked_pilot_id"
@@ -374,14 +375,25 @@ async function applyInstalledSideEffects({
     }
   }
 
-  const leadPayload: FarmerLeadUpdate = {
-    funnel_stage: "Device Installed",
-    installation_completed: true,
-    linked_installation_id: installationId,
-    followup_required: true,
-    followup_due_date: payload.followup_due_date ?? null,
-    followup_owner_user_id: payload.followup_owner_user_id ?? null
-  };
+  const isFarmerSaleInstallation = isFarmerSaleFollowupType(
+    payload.installation_type
+  );
+  const leadPayload: FarmerLeadUpdate = isFarmerSaleInstallation
+    ? {
+        funnel_stage: "Device Installed",
+        installation_completed: true,
+        linked_installation_id: installationId,
+        followup_required: createFollowup,
+        followup_due_date: createFollowup
+          ? (payload.followup_due_date ?? null)
+          : null,
+        followup_owner_user_id: createFollowup
+          ? (payload.followup_owner_user_id ?? null)
+          : null
+      }
+    : {
+        linked_installation_id: installationId
+      };
 
   if (payload.dispatch_id) {
     leadPayload.linked_dispatch_id = payload.dispatch_id;
@@ -396,7 +408,7 @@ async function applyInstalledSideEffects({
     redirectWithError(errorPath, leadError.message);
   }
 
-  if (createFollowup && isFarmerSaleFollowupType(payload.installation_type)) {
+  if (createFollowup && isFarmerSaleInstallation) {
     try {
       const followup = await createFarmerSaleFollowup({
         supabase,
@@ -507,7 +519,7 @@ export async function createInstallationAction(formData: FormData) {
       installationId: data.id,
       payload: insertPayload,
       createMovement: true,
-      createFollowup: true,
+      createFollowup: farmerLead.payment_confirmed,
       errorPath: `/installations/${data.id}/edit`
     });
   }
@@ -623,7 +635,7 @@ export async function updateInstallationAction(id: string, formData: FormData) {
       installationId: id,
       payload: updatePayload,
       createMovement: !wasInstalled,
-      createFollowup: !existing.linked_followup_id,
+      createFollowup: !existing.linked_followup_id && farmerLead.payment_confirmed,
       errorPath
     });
   }

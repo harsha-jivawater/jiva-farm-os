@@ -21,6 +21,10 @@ import {
 import { plannedVisitTypeToActualVisitType } from "@/lib/pilots/visit-planning";
 import type {
   DeviceStatusUpdateTaskInsert,
+  Device,
+  DeviceMovementInsert,
+  DeviceUpdate,
+  FarmerLeadUpdate,
   Pilot,
   PilotInsert,
   PilotUpdate,
@@ -51,8 +55,24 @@ const reportSubmitterRoles = [
 ];
 const finalPilotReportApproverRoles = ["R&D Head", "Admin"];
 const visitPlanManagerRoles = ["Agronomist", "R&D Head", "Admin"];
+const pilotCompletionRoles = ["Admin", "Management", "R&D Head", "Agronomist"];
+const pilotCompletionStatuses = [
+  "Closed - Successful",
+  "Closed - Failed",
+  "Closed - Inconclusive"
+];
 const finalPilotReportApprovalError =
   "Only the R&D Head can approve final pilot reports.";
+
+type PilotCompletionDevice = Pick<
+  Device,
+  | "id"
+  | "serial_number"
+  | "current_holder_type"
+  | "current_holder_id"
+  | "current_holder_name_snapshot"
+  | "current_location_text"
+>;
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -138,6 +158,37 @@ function canManageVisitPlans(
   return hasAnyRole(profile, visitPlanManagerRoles);
 }
 
+function isPilotCompletionStatus(status: string | null | undefined) {
+  return pilotCompletionStatuses.includes(status ?? "");
+}
+
+function canCompletePilot(
+  profile: Pick<InternalUser, "id" | "role" | "secondary_role">,
+  pilot: Pick<
+    Pilot,
+    "pilot_owner_user_id" | "research_assistant_user_id" | "agronomist_user_id" | "rd_head_user_id"
+  >,
+  payload: Pick<
+    PilotUpdate,
+    "pilot_owner_user_id" | "research_assistant_user_id" | "agronomist_user_id" | "rd_head_user_id"
+  >
+) {
+  if (hasAnyRole(profile, pilotCompletionRoles)) {
+    return true;
+  }
+
+  if (!hasAnyRole(profile, ["Research Assistant"])) {
+    return false;
+  }
+
+  return [
+    pilot.research_assistant_user_id,
+    pilot.pilot_owner_user_id,
+    payload.research_assistant_user_id,
+    payload.pilot_owner_user_id
+  ].includes(profile.id);
+}
+
 function requireVisitPlanManager(
   profile: Pick<InternalUser, "role" | "secondary_role">,
   errorPath: string
@@ -147,6 +198,185 @@ function requireVisitPlanManager(
       errorPath,
       "Only Agronomist, R&D Head, or Admin can manage pilot visit plans."
     );
+  }
+}
+
+async function applyPilotCompletionSideEffects({
+  supabase,
+  profile,
+  pilot,
+  payload,
+  errorPath
+}: {
+  supabase: SupabaseClient;
+  profile: Pick<InternalUser, "id" | "role" | "secondary_role">;
+  pilot: Pilot;
+  payload: PilotUpdate;
+  errorPath: string;
+}) {
+  const completionDate = todayDate();
+  const deviceId = payload.device_id ?? pilot.device_id;
+  const farmerLeadId = payload.farmer_lead_id ?? pilot.farmer_lead_id;
+
+  if (deviceId) {
+    const { data: deviceData, error: deviceLoadError } = await supabase
+      .from("devices")
+      .select(
+        [
+          "id",
+          "serial_number",
+          "current_holder_type",
+          "current_holder_id",
+          "current_holder_name_snapshot",
+          "current_location_text"
+        ].join(",")
+      )
+      .eq("id", deviceId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (deviceLoadError) {
+      redirectWithError(errorPath, deviceLoadError.message);
+    }
+
+    if (deviceData) {
+      const device = deviceData as unknown as PilotCompletionDevice;
+      const devicePayload: DeviceUpdate = {
+        device_status: "In Warehouse",
+        current_holder_type: "Warehouse",
+        current_holder_id: null,
+        current_holder_name_snapshot: "Jiva Warehouse",
+        current_location_text: "Jiva Warehouse",
+        current_state: null,
+        current_district: null,
+        linked_farmer_lead_id: null,
+        linked_pilot_id: null,
+        linked_installation_id: null,
+        return_date: completionDate,
+        last_movement_date: completionDate,
+        return_reason: "Pilot completed; device returned to Jiva inventory."
+      };
+
+      const { error: deviceUpdateError } = await supabase
+        .from("devices")
+        .update(devicePayload)
+        .eq("id", deviceId);
+
+      if (deviceUpdateError) {
+        redirectWithError(errorPath, deviceUpdateError.message);
+      }
+
+      const movementPayload: DeviceMovementInsert = {
+        device_id: deviceId,
+        serial_number_snapshot:
+          device.serial_number ??
+          payload.device_serial_number_snapshot ??
+          pilot.device_serial_number_snapshot ??
+          "Not set",
+        movement_date: completionDate,
+        movement_type: "Returned",
+        movement_status: "Completed",
+        created_by_user_id: profile.id,
+        from_holder_type: device.current_holder_type ?? "Pilot",
+        from_holder_id: device.current_holder_id ?? pilot.id,
+        from_holder_name_snapshot:
+          device.current_holder_name_snapshot ??
+          pilot.pilot_name ??
+          "Pilot",
+        from_location_text: device.current_location_text,
+        to_holder_type: "Warehouse",
+        to_holder_id: null,
+        to_holder_name_snapshot: "Jiva Warehouse",
+        to_location_text: "Jiva Warehouse",
+        farmer_lead_id: farmerLeadId ?? null,
+        installation_id: payload.installation_id ?? pilot.installation_id,
+        pilot_id: pilot.id,
+        remarks: "Pilot completed; device returned to Jiva inventory."
+      };
+
+      const { error: movementError } = await supabase
+        .from("device_movements")
+        .insert(movementPayload);
+
+      if (movementError) {
+        redirectWithError(errorPath, movementError.message);
+      }
+
+      const taskPayload: DeviceStatusUpdateTaskInsert = {
+        pilot_id: pilot.id,
+        device_id: deviceId,
+        serial_number_snapshot: device.serial_number,
+        reason: "Pilot completed; verify returned device in warehouse.",
+        removal_date: completionDate,
+        requested_by_user_id: profile.id
+      };
+
+      const { error: taskError } = await supabase
+        .from("device_status_update_tasks")
+        .insert(taskPayload);
+
+      if (taskError) {
+        redirectWithError(errorPath, taskError.message);
+      }
+    }
+  }
+
+  if (farmerLeadId) {
+    const { data: leadData, error: leadLoadError } = await supabase
+      .from("farmer_leads")
+      .select("id, payment_confirmed, lead_status, owner_user_id, followup_owner_user_id")
+      .eq("id", farmerLeadId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (leadLoadError) {
+      redirectWithError(errorPath, leadLoadError.message);
+    }
+
+    if (leadData) {
+      const leadPayload: FarmerLeadUpdate = {
+        funnel_stage: leadData.payment_confirmed
+          ? "Payment Confirmed"
+          : "Follow-up Active",
+        lead_status: leadData.payment_confirmed ? leadData.lead_status : "Open",
+        next_action_date: completionDate,
+        followup_required: true,
+        followup_due_date: completionDate,
+        followup_owner_user_id:
+          leadData.followup_owner_user_id ?? leadData.owner_user_id,
+        last_interaction_date: completionDate,
+        last_interaction_note: "Pilot completed; follow up for purchase.",
+        linked_pilot_id: pilot.id
+      };
+
+      const { error: leadUpdateError } = await supabase
+        .from("farmer_leads")
+        .update(leadPayload)
+        .eq("id", farmerLeadId);
+
+      if (leadUpdateError) {
+        redirectWithError(errorPath, leadUpdateError.message);
+      }
+    }
+  }
+
+  const pilotCompletionPayload: PilotUpdate = {
+    device_removed_date: payload.device_removed_date ?? completionDate,
+    device_removed_by_user_id: profile.id,
+    device_removal_device_id: deviceId ?? null,
+    device_removal_reason:
+      payload.device_removal_reason ??
+      "Pilot completed; device return initiated.",
+    device_removal_status: "Pending Customer Service Update"
+  };
+
+  const { error: pilotUpdateError } = await supabase
+    .from("pilots")
+    .update(pilotCompletionPayload)
+    .eq("id", pilot.id);
+
+  if (pilotUpdateError) {
+    redirectWithError(errorPath, pilotUpdateError.message);
   }
 }
 
@@ -411,12 +641,13 @@ export async function updatePilotAction(id: string, formData: FormData) {
   const profile = await getCurrentProfile(supabase, errorPath);
   const { data: existingPilot } = await supabase
     .from("pilots")
-    .select(
-      "id, device_removal_status, device_removal_reason, device_id, device_serial_number_snapshot"
-    )
+    .select("*")
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
+  if (!existingPilot) {
+    redirectWithError(errorPath, "Pilot was not found.");
+  }
   const payload = pilotPayloadFromForm(formData);
   try {
     await applyUploadedFilesToPayload({
@@ -470,6 +701,21 @@ export async function updatePilotAction(id: string, formData: FormData) {
     );
   }
 
+  const pilotBeforeUpdate = existingPilot as Pilot;
+  const completionJustRecorded =
+    isPilotCompletionStatus(payload.pilot_status) &&
+    !isPilotCompletionStatus(pilotBeforeUpdate.pilot_status);
+
+  if (
+    completionJustRecorded &&
+    !canCompletePilot(profile, pilotBeforeUpdate, payload as PilotUpdate)
+  ) {
+    redirectWithError(
+      errorPath,
+      "Only Admin, Management, R&D Head, Agronomist, or the assigned Research Assistant can complete a pilot."
+    );
+  }
+
   const { error } = await supabase
     .from("pilots")
     .update({
@@ -495,7 +741,11 @@ export async function updatePilotAction(id: string, formData: FormData) {
       "Pending Customer Service Update" &&
     existingPilot?.device_removal_status !== "Resolved";
 
-  if (removalJustRecorded && payload.device_removal_reason) {
+  if (
+    removalJustRecorded &&
+    payload.device_removal_reason &&
+    !completionJustRecorded
+  ) {
     const taskPayload: DeviceStatusUpdateTaskInsert = {
       pilot_id: id,
       device_id:
@@ -512,6 +762,16 @@ export async function updatePilotAction(id: string, formData: FormData) {
     };
 
     await supabase.from("device_status_update_tasks").insert(taskPayload);
+  }
+
+  if (completionJustRecorded) {
+    await applyPilotCompletionSideEffects({
+      supabase,
+      profile,
+      pilot: pilotBeforeUpdate,
+      payload: payload as PilotUpdate,
+      errorPath
+    });
   }
 
   revalidatePilot(id);
