@@ -22,30 +22,22 @@ export function CustomCropFields({
   required = false
 }: CustomCropFieldsProps) {
   const [cropName, setCropName] = useState(defaultValue ?? "");
-  const [mainCategory, setMainCategory] = useState("");
-  const [subcategory, setSubcategory] = useState("");
   const [notes, setNotes] = useState("");
   const storedValue = useMemo(() => {
     const parts = [cropName.trim()];
-    if (mainCategory.trim()) {
-      parts.push(`Main category: ${mainCategory.trim()}`);
-    }
-    if (subcategory.trim()) {
-      parts.push(`Subcategory: ${subcategory.trim()}`);
-    }
     if (notes.trim()) {
       parts.push(`Notes: ${notes.trim()}`);
     }
 
     return parts.filter(Boolean).join(" | ");
-  }, [cropName, mainCategory, notes, subcategory]);
+  }, [cropName, notes]);
 
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 md:col-span-2">
       <input name={name} type="hidden" value={storedValue} />
       <p className="text-sm font-semibold text-slate-900">Add crop not in list</p>
       <p className="mt-1 text-xs leading-5 text-slate-500">
-        These details are saved in the existing Other crop field for now.
+        Enter the crop name as users should see it in records and reports.
       </p>
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div>
@@ -58,30 +50,6 @@ export function CustomCropFields({
             required={required}
             type="text"
             value={cropName}
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-slate-700">
-            Main category
-          </label>
-          <input
-            className={inputClassName()}
-            onChange={(event) => setMainCategory(event.target.value)}
-            placeholder="Agriculture, Horticulture, Other"
-            type="text"
-            value={mainCategory}
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-slate-700">
-            Subcategory
-          </label>
-          <input
-            className={inputClassName()}
-            onChange={(event) => setSubcategory(event.target.value)}
-            placeholder="Fruit, vegetable, pulse, etc."
-            type="text"
-            value={subcategory}
           />
         </div>
         <div>

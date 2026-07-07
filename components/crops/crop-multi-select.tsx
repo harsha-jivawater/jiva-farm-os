@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { cropContext, cropLibrary } from "@/lib/crops/crop-library";
+import { cropLibrary } from "@/lib/crops/crop-library";
 
 type CropMultiSelectProps = {
   label: string;
@@ -37,6 +37,17 @@ export function CropMultiSelect({
 }: CropMultiSelectProps) {
   const [query, setQuery] = useState("");
   const valueSet = useMemo(() => new Set(values), [values]);
+  const selectedCrops = useMemo(
+    () =>
+      values.map((value) => {
+        const crop = cropLibrary.find((item) => item.value === value);
+        return {
+          label: crop?.label ?? value,
+          value
+        };
+      }),
+    [values]
+  );
   const visibleCrops = useMemo(() => {
     const trimmed = query.trim();
     return trimmed
@@ -66,11 +77,29 @@ export function CropMultiSelect({
         <input
           className={`${inputClassName()} pl-9`}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search crop name or category"
+          placeholder="Search crop name"
           type="search"
           value={query}
         />
       </div>
+      {selectedCrops.length ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {selectedCrops.map((crop) => (
+            <button
+              className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-800 transition hover:bg-brand-100"
+              key={crop.value}
+              onClick={() => toggleCrop(crop.value)}
+              type="button"
+            >
+              {crop.label}
+              <span aria-hidden="true" className="text-brand-500">
+                ×
+              </span>
+              <span className="sr-only">Remove {crop.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-2 max-h-72 overflow-y-auto rounded-md border border-slate-200 bg-white">
         {visibleCrops.length === 0 ? (
           <p className="px-3 py-4 text-sm text-slate-500">
@@ -95,20 +124,12 @@ export function CropMultiSelect({
                 />
                 <span>
                   <span className="block font-semibold">{crop.label}</span>
-                  <span className="mt-0.5 block text-xs text-slate-500">
-                    {cropContext(crop.value)}
-                  </span>
                 </span>
               </label>
             );
           })
         )}
       </div>
-      {values.length ? (
-        <p className="mt-1.5 text-xs leading-5 text-slate-500">
-          Selected {values.length} crop{values.length === 1 ? "" : "s"}.
-        </p>
-      ) : null}
     </div>
   );
 }

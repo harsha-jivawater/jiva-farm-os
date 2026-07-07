@@ -2,7 +2,7 @@
 
 import { Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cropContext, cropLibrary } from "@/lib/crops/crop-library";
+import { cropLibrary } from "@/lib/crops/crop-library";
 
 type CropSelectProps = {
   label: string;
@@ -12,10 +12,7 @@ type CropSelectProps = {
   required?: boolean;
   showMissingSelectionMessage?: boolean;
   showOptionsOnEmptySearch?: boolean;
-  showOptionContext?: boolean;
   showSelectedInInput?: boolean;
-  showSelectedContext?: boolean;
-  showSelectedSummary?: boolean;
   notifyFilterChange?: boolean;
 };
 
@@ -45,10 +42,7 @@ export function CropSelect({
   required = false,
   showMissingSelectionMessage = true,
   showOptionsOnEmptySearch = true,
-  showOptionContext = false,
   showSelectedInInput = true,
-  showSelectedContext = false,
-  showSelectedSummary = false,
   notifyFilterChange = false
 }: CropSelectProps) {
   const [query, setQuery] = useState("");
@@ -196,25 +190,13 @@ export function CropSelect({
                 type="button"
               >
                 <span className="block font-semibold">{crop.label}</span>
-                {showOptionContext ? (
-                  <span className="mt-0.5 block text-xs text-slate-500">
-                    {crop.mainCategory} &gt; {crop.subcategory}
-                  </span>
-                ) : null}
               </button>
             );
           })
         )}
         </div>
       ) : null}
-      {selectedLabel && showSelectedSummary ? (
-        <p className="mt-1.5 text-xs leading-5 text-slate-500">
-          Selected: {selectedLabel}
-          {showSelectedContext && selectedCrop
-            ? ` · ${cropContext(selectedCrop.value)}`
-            : null}
-        </p>
-      ) : !selectedLabel && showMissingSelectionMessage ? (
+      {!selectedLabel && showMissingSelectionMessage ? (
         <p className="mt-1.5 text-xs leading-5 text-red-600">
           Select a crop before saving.
         </p>

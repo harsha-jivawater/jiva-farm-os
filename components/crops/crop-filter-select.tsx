@@ -48,9 +48,7 @@ export function CropFilterSelect({
         onChange={updateFilterValue}
         showMissingSelectionMessage={false}
         showOptionsOnEmptySearch={false}
-        showSelectedContext={false}
         showSelectedInInput
-        showSelectedSummary={false}
         value={value}
       />
     </div>
