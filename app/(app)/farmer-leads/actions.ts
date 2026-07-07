@@ -140,25 +140,35 @@ export async function createFarmerLeadAction(formData: FormData) {
     }
 
     if (!assignedRsmId) {
-      const { data: salesHeads, error: salesHeadError } = await supabase
+      const { data: defaultSalesHead, error: salesHeadError } = await supabase
         .from("users")
-        .select("id, role, secondary_role")
+        .select("id")
         .eq("is_active", true)
+        .or("role.eq.Sales Head,secondary_role.eq.Sales Head")
+        .order("created_at", { ascending: true })
         .order("full_name", { ascending: true })
-        .limit(50);
+        .order("id", { ascending: true })
+        .limit(1)
+        .maybeSingle();
 
       if (salesHeadError) {
         redirectWithError("/farmer-leads/new", salesHeadError.message);
       }
 
-      assignedRsmId =
-        salesHeads?.find((user) => hasRole(user, "Sales Head"))?.id ?? null;
+      assignedRsmId = defaultSalesHead?.id ?? null;
     }
 
-    if (!region?.id || !assignedRsmId) {
+    if (!assignedRsmId) {
       redirectWithError(
         "/farmer-leads/new",
-        "Assign an active region and Sales Head before creating leads for this state."
+        "No active Sales Head found for unassigned region routing. Please add or activate a Sales Head."
+      );
+    }
+
+    if (!region?.id) {
+      redirectWithError(
+        "/farmer-leads/new",
+        "Assign an active region before creating leads for this state."
       );
     }
 

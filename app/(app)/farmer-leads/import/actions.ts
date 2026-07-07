@@ -44,12 +44,6 @@ type RsmOption = {
   state: string | null;
 };
 
-type SalesHeadOption = {
-  id: string;
-  role: string;
-  secondary_role?: string | null;
-};
-
 function result(state: Partial<ImportActionState>): ImportActionState {
   return {
     status: state.status ?? "error",
@@ -153,8 +147,12 @@ function assignLeadOwnership({
   const rsmId =
     region?.rsm_user_id ?? rsmsByState.get(stateKey)?.id ?? salesHeadId;
 
-  if (!region?.id || !rsmId) {
-    return `No active region or Sales Head fallback was found for state ${payload.state}.`;
+  if (!rsmId) {
+    return "No active Sales Head found for unassigned region routing. Please add or activate a Sales Head.";
+  }
+
+  if (!region?.id) {
+    return `No active region was found for state ${payload.state}.`;
   }
 
   payload.region_id = region.id;
@@ -201,7 +199,7 @@ export async function importFarmerLeadsAction(
     const [
       { data: regions },
       { data: rsms },
-      { data: salesHeads },
+      { data: defaultSalesHead },
       { data: existingLeads }
     ] =
       await Promise.all([
@@ -222,10 +220,14 @@ export async function importFarmerLeadsAction(
           : Promise.resolve({ data: [] }),
         supabase
           .from("users")
-          .select("id, role, secondary_role")
+          .select("id")
           .eq("is_active", true)
+          .or("role.eq.Sales Head,secondary_role.eq.Sales Head")
+          .order("created_at", { ascending: true })
           .order("full_name", { ascending: true })
-          .limit(50),
+          .order("id", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
         mobiles.length
           ? supabase
               .from("farmer_leads")
@@ -249,9 +251,7 @@ export async function importFarmerLeadsAction(
       }
     });
     const salesHeadId =
-      ((salesHeads ?? []) as SalesHeadOption[]).find((user) =>
-        hasRole(user, "Sales Head")
-      )?.id ?? null;
+      (defaultSalesHead as { id: string } | null | undefined)?.id ?? null;
 
     const existingMobileSet = new Set(
       (existingLeads ?? []).map((lead) => String(lead.mobile_number ?? ""))
