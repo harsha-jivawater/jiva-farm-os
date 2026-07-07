@@ -6,7 +6,12 @@ import {
   dealerPayloadFromForm,
   validateDealerPayload
 } from "@/lib/dealers/form-data";
-import type { Dealer, DealerInsert, DealerUpdate } from "@/lib/dealers/types";
+import type {
+  Dealer,
+  DealerInsert,
+  DealerReviewInsert,
+  DealerUpdate
+} from "@/lib/dealers/types";
 import type { DealerInstitutionLinkInsert } from "@/lib/dealers/types";
 import { createClient } from "@/lib/supabase/server";
 import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
@@ -41,6 +46,10 @@ function numberValue(formData: FormData, key: string) {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function localDateValue() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 async function getCurrentProfile(supabase: SupabaseClient, errorPath: string) {
@@ -252,6 +261,44 @@ export async function updateDealerReviewAction(id: string, formData: FormData) {
 
   if (error) {
     redirectWithReviewError(id, error.message);
+  }
+
+  const submittedReviewDate = textValue(formData, "last_dealer_review_date");
+  const submittedPriority = textValue(formData, "priority");
+  const submittedConcern = textValue(formData, "support_required");
+  const submittedNextAction = textValue(formData, "next_action");
+  const submittedNextActionDate = textValue(formData, "next_action_date");
+  const submittedNextReviewDate = textValue(formData, "next_dealer_review_date");
+  const submittedRemarks = textValue(formData, "remarks");
+  const reviewSnapshot: DealerReviewInsert = {
+    dealer_id: id,
+    reviewed_by_user_id: profile.id,
+    review_date: submittedReviewDate ?? localDateValue(),
+    priority: submittedPriority,
+    concern_or_blocker: submittedConcern,
+    next_action: submittedNextAction,
+    next_action_date: submittedNextActionDate,
+    next_review_date: submittedNextReviewDate,
+    remarks: submittedRemarks
+  };
+  const hasMeaningfulReview = Boolean(
+    submittedReviewDate ||
+      submittedPriority ||
+      submittedConcern ||
+      submittedNextAction ||
+      submittedNextActionDate ||
+      submittedNextReviewDate ||
+      submittedRemarks
+  );
+
+  if (hasMeaningfulReview) {
+    const { error: reviewError } = await supabase
+      .from("dealer_reviews")
+      .insert(reviewSnapshot);
+
+    if (reviewError) {
+      redirectWithReviewError(id, reviewError.message);
+    }
   }
 
   revalidatePath("/dealers");

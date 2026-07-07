@@ -23,6 +23,7 @@ import {
   formatDate,
   type Dealer,
   type DealerInstitutionLink,
+  type DealerReview,
   type Device,
   type Dispatch,
   type FarmerLead,
@@ -282,6 +283,31 @@ function dateInputValue(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "";
 }
 
+function formatDateTime(value: string | null | undefined) {
+  if (!value) {
+    return "Not set";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).format(new Date(value));
+}
+
+function reviewerDisplay(
+  user: UserOption | null | undefined,
+  fallback?: string | null
+) {
+  if (!user) {
+    return fallback ?? "Not set";
+  }
+
+  return user.email ? `${user.full_name} · ${user.email}` : user.full_name;
+}
+
 function formFieldClassName() {
   return "h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100";
 }
@@ -343,11 +369,12 @@ export default async function DealerDetailPage({
     { data: installations },
     { data: relatedPilots },
     { data: institutionLinks },
-    { data: institutions }
+    { data: institutions },
+    { data: dealerReviews, count: dealerReviewsCount }
   ] = await Promise.all([
     supabase
       .from("users")
-      .select("id, full_name, role, secondary_role")
+      .select("id, full_name, email, role, secondary_role")
       .eq("is_active", true)
       .order("full_name", { ascending: true }),
     supabase
@@ -414,7 +441,18 @@ export default async function DealerDetailPage({
       .from("institutions")
       .select("id, institution_code, organization_name")
       .is("deleted_at", null)
-      .order("organization_name", { ascending: true })
+      .order("organization_name", { ascending: true }),
+    supabase
+      .from("dealer_reviews")
+      .select(
+        "id, dealer_id, reviewed_by_user_id, review_date, priority, concern_or_blocker, next_action, next_action_date, next_review_date, remarks, created_at",
+        { count: "exact" }
+      )
+      .eq("dealer_id", dealer.id)
+      .is("deleted_at", null)
+      .order("review_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(10)
   ]);
 
   const usersList = (users ?? []) as UserOption[];
@@ -479,6 +517,24 @@ export default async function DealerDetailPage({
     | "rsm_user_id"
   >[];
   const institutionsList = (institutions ?? []) as InstitutionOption[];
+  const dealerReviewsList = (dealerReviews ?? []) as Pick<
+    DealerReview,
+    | "id"
+    | "dealer_id"
+    | "reviewed_by_user_id"
+    | "review_date"
+    | "priority"
+    | "concern_or_blocker"
+    | "next_action"
+    | "next_action_date"
+    | "next_review_date"
+    | "remarks"
+    | "created_at"
+  >[];
+  const latestDealerReview = dealerReviewsList[0];
+  const latestDealerReviewer = latestDealerReview?.reviewed_by_user_id
+    ? userMap.get(latestDealerReview.reviewed_by_user_id)
+    : null;
   const institutionMap = new Map(
     institutionsList.map((institution) => [institution.id, institution])
   );
@@ -658,6 +714,48 @@ export default async function DealerDetailPage({
 
       <div className="mt-6">
         <SectionPanel
+          title="Dealer performance"
+          description="Dealer sales, stock, and operational gaps."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <MetricCard
+              label="Monthly target vs actual"
+              value={`${numberDisplay(currentMonthActualSales)} / ${numberDisplay(monthlyTarget)}`}
+              tone={monthlyGap > 0 ? "warning" : "success"}
+            />
+            <MetricCard
+              label="Monthly gap"
+              value={numberDisplay(monthlyGap)}
+              tone={monthlyGap > 0 ? "warning" : "success"}
+            />
+            <MetricCard
+              label="Quarter actual vs target"
+              value={`${numberDisplay(quarterActualSales)} / ${numberDisplay(quarterlyTarget)}`}
+            />
+            <MetricCard
+              label="FY actual vs annual target"
+              value={`${numberDisplay(fyActualSales)} / ${numberDisplay(annualTarget)}`}
+            />
+            <MetricCard
+              label="Dealer stock available"
+              value={numberDisplay(dealerDevices.length)}
+            />
+            <MetricCard
+              label="Dispatches pending installation"
+              value={numberDisplay(pendingInstallationDispatchCount)}
+              tone={pendingInstallationDispatchCount > 0 ? "warning" : "neutral"}
+            />
+            <MetricCard
+              label="Issue reported installations"
+              value={numberDisplay(issueReportedInstallations)}
+              tone={issueReportedInstallations > 0 ? "danger" : "neutral"}
+            />
+          </div>
+        </SectionPanel>
+      </div>
+
+      <div className="mt-6">
+        <SectionPanel
           title="Dealer review and next action"
           description="Update the dealer review rhythm, next action, and current blocker without changing the stable dealer profile."
         >
@@ -788,6 +886,127 @@ export default async function DealerDetailPage({
           )}
         </SectionPanel>
       </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <details>
+          <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">
+                Past reviews
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {dealerReviewsCount ?? dealerReviewsList.length} past reviews
+                {latestDealerReview
+                  ? ` · Latest ${formatDate(latestDealerReview.review_date)} by ${reviewerDisplay(
+                      latestDealerReviewer,
+                      latestDealerReview.reviewed_by_user_id
+                    )}`
+                  : ""}
+              </p>
+            </div>
+            <span className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm">
+              Show past reviews
+            </span>
+          </summary>
+          <div className="border-t border-slate-200 px-4 py-4">
+            {dealerReviewsList.length ? (
+              <div className="space-y-3">
+                {dealerReviewsList.map((review) => {
+                  const reviewer = review.reviewed_by_user_id
+                    ? userMap.get(review.reviewed_by_user_id)
+                    : null;
+
+                  return (
+                    <article
+                      className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                      key={review.id}
+                    >
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-950">
+                            {formatDate(review.review_date)}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Reviewed by{" "}
+                            {reviewerDisplay(
+                              reviewer,
+                              review.reviewed_by_user_id
+                            )}
+                          </p>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          Saved {formatDateTime(review.created_at)}
+                        </p>
+                      </div>
+                      <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-3">
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Priority
+                          </dt>
+                          <dd className="mt-1 font-medium text-slate-700">
+                            {labelFor(review.priority, priorityOptions)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Next action agreed
+                          </dt>
+                          <dd className="mt-1 font-medium text-slate-700">
+                            {display(review.next_action)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Next action date
+                          </dt>
+                          <dd className="mt-1 font-medium text-slate-700">
+                            {formatDate(review.next_action_date)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Next review date
+                          </dt>
+                          <dd className="mt-1 font-medium text-slate-700">
+                            {formatDate(review.next_review_date)}
+                          </dd>
+                        </div>
+                        <div className="md:col-span-2">
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Concern / blocker
+                          </dt>
+                          <dd className="mt-1 font-medium text-slate-700">
+                            {display(review.concern_or_blocker)}
+                          </dd>
+                        </div>
+                        <div className="md:col-span-2 xl:col-span-3">
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Notes / remarks
+                          </dt>
+                          <dd className="mt-1 whitespace-pre-wrap font-medium text-slate-700">
+                            {display(review.remarks)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </article>
+                  );
+                })}
+                {(dealerReviewsCount ?? 0) > dealerReviewsList.length ? (
+                  <p className="text-sm text-slate-500">
+                    Showing latest {dealerReviewsList.length} reviews.
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">
+                No past reviews yet. History begins when a permitted user saves
+                a dealer review.
+              </p>
+            )}
+          </div>
+        </details>
+      </div>
+
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -886,48 +1105,6 @@ export default async function DealerDetailPage({
         ) : (
           <CompactEmpty>No institution connections yet.</CompactEmpty>
         )}
-      </div>
-
-      <div className="mt-6">
-        <SectionPanel
-          title="Dealer performance"
-          description="Dealer sales, stock, and operational gaps."
-        >
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <MetricCard
-              label="Monthly target vs actual"
-              value={`${numberDisplay(currentMonthActualSales)} / ${numberDisplay(monthlyTarget)}`}
-              tone={monthlyGap > 0 ? "warning" : "success"}
-            />
-            <MetricCard
-              label="Monthly gap"
-              value={numberDisplay(monthlyGap)}
-              tone={monthlyGap > 0 ? "warning" : "success"}
-            />
-            <MetricCard
-              label="Quarter actual vs target"
-              value={`${numberDisplay(quarterActualSales)} / ${numberDisplay(quarterlyTarget)}`}
-            />
-            <MetricCard
-              label="FY actual vs annual target"
-              value={`${numberDisplay(fyActualSales)} / ${numberDisplay(annualTarget)}`}
-            />
-            <MetricCard
-              label="Dealer stock available"
-              value={numberDisplay(dealerDevices.length)}
-            />
-            <MetricCard
-              label="Dispatches pending installation"
-              value={numberDisplay(pendingInstallationDispatchCount)}
-              tone={pendingInstallationDispatchCount > 0 ? "warning" : "neutral"}
-            />
-            <MetricCard
-              label="Issue reported installations"
-              value={numberDisplay(issueReportedInstallations)}
-              tone={issueReportedInstallations > 0 ? "danger" : "neutral"}
-            />
-          </div>
-        </SectionPanel>
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">

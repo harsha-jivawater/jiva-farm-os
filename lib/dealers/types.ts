@@ -8,6 +8,9 @@ export type DealerInstitutionLink =
   Database["public"]["Tables"]["dealer_institution_links"]["Row"];
 export type DealerInstitutionLinkInsert =
   Database["public"]["Tables"]["dealer_institution_links"]["Insert"];
+export type DealerReview = Database["public"]["Tables"]["dealer_reviews"]["Row"];
+export type DealerReviewInsert =
+  Database["public"]["Tables"]["dealer_reviews"]["Insert"];
 export type Device = Database["public"]["Tables"]["devices"]["Row"];
 export type Dispatch = Database["public"]["Tables"]["dispatches"]["Row"];
 export type FarmerLead = Database["public"]["Tables"]["farmer_leads"]["Row"];
@@ -31,6 +34,7 @@ export type DealerFilters = {
 
 export type UserOption = {
   id: string;
+  email?: string | null;
   full_name: string;
   role: string;
   secondary_role: string | null;

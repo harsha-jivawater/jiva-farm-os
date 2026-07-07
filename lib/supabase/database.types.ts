@@ -543,6 +543,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      dealer_reviews: {
+        Row: {
+          id: string;
+          dealer_id: string;
+          reviewed_by_user_id: string | null;
+          review_date: string;
+          priority: string | null;
+          concern_or_blocker: string | null;
+          next_action: string | null;
+          next_action_date: string | null;
+          next_review_date: string | null;
+          remarks: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          dealer_id: string;
+          reviewed_by_user_id?: string | null;
+          review_date?: string;
+          priority?: string | null;
+          concern_or_blocker?: string | null;
+          next_action?: string | null;
+          next_action_date?: string | null;
+          next_review_date?: string | null;
+          remarks?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          dealer_id?: string;
+          reviewed_by_user_id?: string | null;
+          review_date?: string;
+          priority?: string | null;
+          concern_or_blocker?: string | null;
+          next_action?: string | null;
+          next_action_date?: string | null;
+          next_review_date?: string | null;
+          remarks?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
       dispatches: {
         Row: {
           id: string;
