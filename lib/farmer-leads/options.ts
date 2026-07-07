@@ -71,6 +71,7 @@ export const leadSourceOptions = [
   },
   { value: "Agronomist Field Visit", label: "Agronomist Field Visit" },
   { value: "Intern Field Visit", label: "Intern Field Visit" },
+  { value: "Exhibition", label: "Exhibition" },
   { value: "Exhibition / Stall", label: "Exhibition / Stall" },
   { value: "Dealer Referral", label: "Dealer Referral" },
   { value: "Corporate Referral", label: "Corporate Referral" },

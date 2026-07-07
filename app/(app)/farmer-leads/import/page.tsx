@@ -9,14 +9,12 @@ import { importFarmerLeadsAction } from "@/app/(app)/farmer-leads/import/actions
 const columns = [
   { key: "farmer_name", label: "Farmer Name", required: true },
   { key: "mobile_number", label: "Mobile Number", required: true },
+  { key: "lead_source", label: "Lead Source" },
   { key: "village", label: "Village", required: true },
   { key: "district", label: "District", required: true },
   { key: "state", label: "State", required: true },
-  { key: "primary_crop", label: "Primary Crop" },
+  { key: "primary_crop", label: "Primary Crop", required: true },
   { key: "other_primary_crop", label: "Other Primary Crop" },
-  { key: "lead_source", label: "Lead Source" },
-  { key: "lead_status", label: "Lead Status" },
-  { key: "funnel_stage", label: "Funnel Stage" },
   { key: "lead_type", label: "Lead Type" },
   { key: "irrigation_type", label: "Irrigation Type" },
   { key: "crop_stage", label: "Crop Stage" },
@@ -51,7 +49,7 @@ export default async function FarmerLeadsImportPage() {
       <CsvImporter
         action={importFarmerLeadsAction}
         columns={[...columns]}
-        instructions="Required fields are farmer_name, mobile_number, village, district, and state. Lead owner, region, and RSM are assigned from your role and the selected state."
+        instructions="Required fields are farmer_name, mobile_number, village, state, district, and primary_crop. Optional fields can include lead_source; use lead_source = Exhibition for exhibition leads. Region/RSM assignment is automatic, and unassigned regions route to the default Sales Head."
         templateHref="/templates/farmer-leads-import-template.csv"
         title="Farmer Leads CSV import"
       />

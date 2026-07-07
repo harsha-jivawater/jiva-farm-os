@@ -6,7 +6,8 @@ import {
   defaultIrrigationType,
   defaultLeadSource,
   defaultLeadType,
-  defaultPrimaryCrop
+  defaultPrimaryCrop,
+  leadSourceOptions
 } from "@/lib/farmer-leads/options";
 import { validateFarmerLeadPayload } from "@/lib/farmer-leads/form-data";
 import {
@@ -19,14 +20,13 @@ import type { ImportActionState } from "@/lib/csv/import-types";
 import {
   MAX_IMPORT_ROWS,
   generateImportCode,
-  parseBoolean,
   parseNumber,
   todayDate,
   type CsvRecord
 } from "@/lib/csv/import-utils";
 import { createClient } from "@/lib/supabase/server";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
-import { canConfirmPayment, hasAnyRole, hasRole } from "@/lib/users/permissions";
+import { hasAnyRole, hasRole } from "@/lib/users/permissions";
 
 type ImportProfile = {
   id: string;
@@ -79,11 +79,20 @@ function canSelfAssignNewLead(user: { role: string; secondary_role?: string | nu
   return hasAnyRole(user, ["Salesperson", "RSM"]);
 }
 
+function validLeadSource(value: string) {
+  return leadSourceOptions.some((option) => option.value === value);
+}
+
+function leadSourceErrorMessage() {
+  return `Invalid lead_source. Use one of: ${leadSourceOptions
+    .map((option) => option.value)
+    .join(", ")}.`;
+}
+
 function rowToPayload(row: CsvRecord): FarmerLeadInsert {
   const primaryCrop = clean(row.primary_crop) ?? defaultPrimaryCrop;
   const nextActionDate = clean(row.next_action_date) ?? todayDate();
-  const paymentConfirmed = parseBoolean(row.payment_confirmed);
-  const funnelStage = clean(row.funnel_stage) ?? defaultFunnelStage;
+  const funnelStage = defaultFunnelStage;
 
   return {
     lead_code: clean(row.lead_code) ?? generateImportCode("JFD"),
@@ -95,7 +104,7 @@ function rowToPayload(row: CsvRecord): FarmerLeadInsert {
     taluk: clean(row.taluk),
     full_address: clean(row.full_address),
     lead_type: clean(row.lead_type) ?? defaultLeadType,
-    lead_status: deriveLeadStatus({ funnelStage, paymentConfirmed }),
+    lead_status: deriveLeadStatus({ funnelStage, paymentConfirmed: false }),
     funnel_stage: funnelStage,
     lead_source: clean(row.lead_source) ?? defaultLeadSource,
     primary_crop: primaryCrop,
@@ -107,7 +116,7 @@ function rowToPayload(row: CsvRecord): FarmerLeadInsert {
     crop_area_acres: parseNumber(row.crop_area_acres),
     next_action_date: nextActionDate,
     followup_due_date: clean(row.followup_due_date) ?? nextActionDate,
-    payment_confirmed: paymentConfirmed,
+    payment_confirmed: false,
     device_dispatched: false,
     installation_completed: false,
     remarks: clean(row.remarks),
@@ -280,16 +289,9 @@ export async function importFarmerLeadsAction(
         return;
       }
 
-      if (payload.payment_confirmed && !canConfirmPayment(profile)) {
-        rowErrors.push(
-          `Row ${rowNumber}: Only Accounts or Admin can import payment-confirmed leads.`
-        );
+      if (!validLeadSource(payload.lead_source)) {
+        rowErrors.push(`Row ${rowNumber}: ${leadSourceErrorMessage()}`);
         return;
-      }
-
-      if (payload.payment_confirmed) {
-        payload.payment_confirmed_by_user_id = profile.id;
-        payload.payment_confirmed_date = todayDate();
       }
 
       if (isLegacyCropValue(payload.primary_crop)) {
