@@ -30,7 +30,6 @@ import {
 } from "@/lib/dealers/options";
 import {
   compactDealerDistricts,
-  display,
   type Dealer,
   type DealerFilters,
   type DealerListItem,
@@ -79,6 +78,7 @@ const listSelectColumns = [
   "dealer_code",
   "firm_name",
   "contact_number",
+  "email",
   "dealer_type",
   "dealer_status",
   "state",
@@ -180,6 +180,10 @@ function KpiCard({
   );
 }
 
+function dealerPrimaryName(dealer: Pick<Dealer, "dealer_name" | "firm_name">) {
+  return dealer.firm_name || dealer.dealer_name;
+}
+
 function ActionButtons({
   canWrite,
   dealer
@@ -190,7 +194,7 @@ function ActionButtons({
   return (
     <div className="flex items-center gap-2">
       <Link
-        aria-label={`View ${dealer.dealer_name}`}
+        aria-label={`View ${dealerPrimaryName(dealer)}`}
         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
         href={`/dealers/${dealer.id}`}
         prefetch={false}
@@ -199,7 +203,7 @@ function ActionButtons({
       </Link>
       {canWrite ? (
         <Link
-          aria-label={`Edit ${dealer.dealer_name}`}
+          aria-label={`Edit ${dealerPrimaryName(dealer)}`}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
           href={`/dealers/${dealer.id}/edit`}
           prefetch={false}
@@ -475,7 +479,7 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
                 className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
                 defaultValue={filters.q}
                 name="q"
-                placeholder="Code, dealer, firm, contact, district, territory"
+                placeholder="Code, firm, contact person, phone, district, territory"
                 type="search"
               />
             </span>
@@ -700,10 +704,10 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
                     <tr key={dealer.id} className="align-top">
                       <td className="px-4 py-3">
                         <p className="font-semibold text-slate-950">
-                          {dealer.dealer_name}
+                          {dealerPrimaryName(dealer)}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {dealer.dealer_code} · {display(dealer.firm_name)}
+                          {dealer.dealer_code} · Contact: {dealer.dealer_name}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
                           {dealer.contact_number}
@@ -761,10 +765,10 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h3 className="truncate text-base font-semibold text-slate-950">
-                        {dealer.dealer_name}
+                        {dealerPrimaryName(dealer)}
                       </h3>
                       <p className="mt-1 text-sm text-slate-500">
-                        {display(dealer.firm_name)}
+                        {dealer.dealer_code} · Contact: {dealer.dealer_name}
                       </p>
                     </div>
                     <DealerStatusPill status={dealer.dealer_status} />

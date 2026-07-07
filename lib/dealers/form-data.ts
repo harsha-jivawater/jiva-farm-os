@@ -88,6 +88,7 @@ export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
     dealer_name: getText(formData, "dealer_name") ?? "",
     firm_name: getText(formData, "firm_name"),
     contact_number: getText(formData, "contact_number") ?? "",
+    email: getText(formData, "email"),
     dealer_type: getText(formData, "dealer_type") ?? "",
     dealer_status: getText(formData, "dealer_status") ?? "",
     dealer_owner_user_id: getText(formData, "dealer_owner_user_id") ?? "",
@@ -150,11 +151,18 @@ export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
 
 export function validateDealerPayload(payload: DealerFormPayload) {
   if (!payload.dealer_name) {
-    return "Dealer name is required.";
+    return "Contact person is required.";
   }
 
   if (!payload.contact_number) {
     return "Contact number is required.";
+  }
+
+  if (
+    payload.email &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(payload.email))
+  ) {
+    return "Enter a valid email address.";
   }
 
   if (!payload.dealer_type) {

@@ -324,6 +324,7 @@ export default async function DealerDetailPage({
   }
 
   const dealer = data as Dealer;
+  const dealerPrimaryName = dealer.firm_name || dealer.dealer_name;
   const [agreementUrl, documentsUrl, trainingUrl] = await Promise.all([
     resolveFileUrl(supabase, dealer.agreement_link),
     resolveFileUrl(supabase, dealer.dealer_documents_folder_link),
@@ -562,8 +563,10 @@ export default async function DealerDetailPage({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
           eyebrow="Dealer"
-          title={dealer.dealer_name}
-          description={`${dealer.dealer_code} · ${display(dealer.firm_name)}`}
+          title={dealerPrimaryName}
+          description={`${dealer.dealer_code} · Contact: ${
+            dealer.dealer_name
+          } · ${labelFor(dealer.dealer_type, dealerTypeOptions)}`}
         />
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link
@@ -932,9 +935,10 @@ export default async function DealerDetailPage({
           title="Dealer profile"
           description="Stable identity, ownership, and territory information."
         >
-          <InfoRow label="Dealer name" value={dealer.dealer_name} />
           <InfoRow label="Firm name" value={display(dealer.firm_name)} />
+          <InfoRow label="Contact person" value={dealer.dealer_name} />
           <InfoRow label="Contact number" value={dealer.contact_number} />
+          <InfoRow label="Email" value={display(dealer.email)} />
           <InfoRow
             label="Dealer type"
             value={labelFor(dealer.dealer_type, dealerTypeOptions)}

@@ -219,7 +219,7 @@ export function DealerForm({
 
         const formData = new FormData(event.currentTarget);
         const requiredFields = [
-          ["dealer_name", "Dealer name is required."],
+          ["dealer_name", "Contact person is required."],
           ["contact_number", "Contact number is required."],
           ["dealer_type", "Dealer type is required."],
           ["dealer_status", "Dealer status is required."],
@@ -265,6 +265,7 @@ export function DealerForm({
           <input name="dealer_name" type="hidden" value={dealer.dealer_name} />
           <input name="firm_name" type="hidden" value={dealer.firm_name ?? ""} />
           <input name="contact_number" type="hidden" value={dealer.contact_number} />
+          <input name="email" type="hidden" value={dealer.email ?? ""} />
           <input name="dealer_type" type="hidden" value={dealer.dealer_type} />
           <input
             name="dealer_owner_user_id"
@@ -503,7 +504,7 @@ export function DealerForm({
           ) : null}
           <Field
             defaultValue={dealer?.dealer_name}
-            label="Dealer name"
+            label="Contact person"
             name="dealer_name"
             required
           />
@@ -518,6 +519,12 @@ export function DealerForm({
             name="contact_number"
             required
             type="tel"
+          />
+          <Field
+            defaultValue={dealer?.email}
+            label="Email"
+            name="email"
+            type="email"
           />
           <SelectField
             defaultValue={dealer?.dealer_type ?? defaultDealerType}
