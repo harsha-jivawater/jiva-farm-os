@@ -250,6 +250,11 @@ export default async function PilotDetailPage({
       visit.visit_report_required &&
       !visit.visit_report_id
   );
+  const linkedInstitution = pilot.institution_id
+    ? institutionMap.get(pilot.institution_id)
+    : undefined;
+  const linkedDealer = pilot.dealer_id ? dealerMap.get(pilot.dealer_id) : undefined;
+  const canSeeContextWarning = hasAnyRole(currentUser, ["Admin", "Management"]);
 
   return (
     <section>
@@ -322,36 +327,46 @@ export default async function PilotDetailPage({
         />
         <DetailItem label="Crop" value={labelFor(pilot.crop, cropOptions)} />
         <DetailItem label="Other crop" value={display(pilot.other_crop)} />
-        <DetailItem
-          label={pilot.pilot_type === "Institution Pilot" ? "Through institution" : "Institution"}
-          value={
-            pilot.institution_id
-              ? (
-                  <Link
-                    className="text-brand-700 hover:text-brand-800 hover:underline"
-                    href={`/institutional-partners/${pilot.institution_id}`}
-                  >
-                    {display(institutionMap.get(pilot.institution_id)?.organization_name)}
-                  </Link>
-                )
-              : "Not set"
-          }
-        />
-        <DetailItem
-          label={pilot.pilot_type === "Dealer Pilot" ? "Through dealer" : "Dealer"}
-          value={
-            pilot.dealer_id
-              ? (
-                  <Link
-                    className="text-brand-700 hover:text-brand-800 hover:underline"
-                    href={`/dealers/${pilot.dealer_id}`}
-                  >
-                    {display(dealerMap.get(pilot.dealer_id)?.dealer_name)}
-                  </Link>
-                )
-              : "Not set"
-          }
-        />
+        {pilot.pilot_type === "Institution Pilot" && linkedInstitution ? (
+          <DetailItem
+            label="Through institution"
+            value={
+              <Link
+                className="text-brand-700 hover:text-brand-800 hover:underline"
+                href={`/institutional-partners/${linkedInstitution.id}`}
+              >
+                {linkedInstitution.organization_name}
+              </Link>
+            }
+          />
+        ) : null}
+        {pilot.pilot_type === "Dealer Pilot" && linkedDealer ? (
+          <DetailItem
+            label="Through dealer"
+            value={
+              <Link
+                className="text-brand-700 hover:text-brand-800 hover:underline"
+                href={`/dealers/${linkedDealer.id}`}
+              >
+                {linkedDealer.dealer_name}
+              </Link>
+            }
+          />
+        ) : null}
+        {canSeeContextWarning &&
+        pilot.pilot_type === "Institution Pilot" &&
+        !linkedInstitution ? (
+          <DetailItem
+            label="Pilot data warning"
+            value="Institution Pilot is missing institution."
+          />
+        ) : null}
+        {canSeeContextWarning && pilot.pilot_type === "Dealer Pilot" && !linkedDealer ? (
+          <DetailItem
+            label="Pilot data warning"
+            value="Dealer Pilot is missing dealer."
+          />
+        ) : null}
         <DetailItem
           label="Pilot owner"
           value={userLabel(userMap.get(pilot.pilot_owner_user_id), pilot.pilot_owner_user_id)}

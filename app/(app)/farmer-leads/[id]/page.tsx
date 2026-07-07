@@ -144,8 +144,6 @@ export default async function FarmerLeadDetailPage({
   const [
     { data: users },
     { data: linkedPilot },
-    { data: institutions },
-    { data: dealers },
     leadPhotosUrl,
     farmerDocumentUrl
   ] = await Promise.all([
@@ -165,32 +163,37 @@ export default async function FarmerLeadDetailPage({
           .is("deleted_at", null)
           .maybeSingle()
       : Promise.resolve({ data: null }),
-    lead.linked_institution_id
-      ? supabase
-          .from("institutions")
-          .select("id, organization_name")
-          .eq("id", lead.linked_institution_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    lead.linked_dealer_id
-      ? supabase
-          .from("dealers")
-          .select("id, dealer_name")
-          .eq("id", lead.linked_dealer_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
     resolveFileUrl(supabase, lead.lead_photo_folder_link),
     resolveFileUrl(supabase, lead.farmer_document_link)
   ]);
   const userMap = new Map((users ?? []).map((user) => [user.id, user]));
   const pilot = linkedPilot as LinkedPilot | null;
-  const institution = institutions as { id: string; organization_name: string } | null;
-  const dealer = dealers as { id: string; dealer_name: string } | null;
+  const [{ data: institution }, { data: dealer }] = await Promise.all([
+    pilot?.pilot_type === "Institution Pilot" && pilot.institution_id
+      ? supabase
+          .from("institutions")
+          .select("id, organization_name")
+          .eq("id", pilot.institution_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    pilot?.pilot_type === "Dealer Pilot" && pilot.dealer_id
+      ? supabase
+          .from("dealers")
+          .select("id, dealer_name")
+          .eq("id", pilot.dealer_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null })
+  ]);
+  const linkedInstitution = institution as
+    | { id: string; organization_name: string }
+    | null;
+  const linkedDealer = dealer as { id: string; dealer_name: string } | null;
   const confirmPaymentAction = confirmFarmerLeadPaymentAction.bind(null, lead.id);
   const canConfirmLeadPayment = canConfirmPayment(currentUser);
   const hasInconsistentDeviceInstalledStage =
     lead.funnel_stage === "Device Installed" && !lead.installation_completed;
   const canSeeWorkflowWarning = hasAnyRole(currentUser, ["Admin", "Management"]);
+  const canSeeContextWarning = hasAnyRole(currentUser, ["Admin", "Management"]);
 
   return (
     <section>
@@ -301,28 +304,46 @@ export default async function FarmerLeadDetailPage({
             )
           }
         />
-        <DetailItem
-          label="Pilot partner context"
-          value={
-            institution ? (
+        {pilot?.pilot_type === "Institution Pilot" && linkedInstitution ? (
+          <DetailItem
+            label="Through institution"
+            value={
               <Link
                 className="text-brand-700 hover:text-brand-800 hover:underline"
-                href={`/institutional-partners/${institution.id}`}
+                href={`/institutional-partners/${linkedInstitution.id}`}
               >
-                Through institution: {institution.organization_name}
+                {linkedInstitution.organization_name}
               </Link>
-            ) : dealer ? (
+            }
+          />
+        ) : null}
+        {pilot?.pilot_type === "Dealer Pilot" && linkedDealer ? (
+          <DetailItem
+            label="Through dealer"
+            value={
               <Link
                 className="text-brand-700 hover:text-brand-800 hover:underline"
-                href={`/dealers/${dealer.id}`}
+                href={`/dealers/${linkedDealer.id}`}
               >
-                Through dealer: {dealer.dealer_name}
+                {linkedDealer.dealer_name}
               </Link>
-            ) : (
-              "Not set"
-            )
-          }
-        />
+            }
+          />
+        ) : null}
+        {canSeeContextWarning &&
+        pilot?.pilot_type === "Institution Pilot" &&
+        !linkedInstitution ? (
+          <DetailItem
+            label="Pilot data warning"
+            value="Institution Pilot is missing institution."
+          />
+        ) : null}
+        {canSeeContextWarning && pilot?.pilot_type === "Dealer Pilot" && !linkedDealer ? (
+          <DetailItem
+            label="Pilot data warning"
+            value="Dealer Pilot is missing dealer."
+          />
+        ) : null}
         <DetailItem
           label="Lead photos"
           value={<FileLink href={leadPhotosUrl} label="View lead photos" />}

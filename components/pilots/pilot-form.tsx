@@ -543,7 +543,7 @@ export function PilotForm({
             </select>
             <p className="mt-1 text-xs leading-5 text-slate-500">
               Every pilot must stay linked to a Farmer Lead. The selected lead
-              supplies the farmer, crop, location, RSM, and partner context
+              supplies the farmer, crop, location, RSM, and institution or dealer
               where available.
             </p>
           </div>
