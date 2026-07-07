@@ -181,7 +181,7 @@ export function validateFarmerLeadPayload(payload: FarmerLeadInsert | FarmerLead
   }
 
   if ("owner_user_id" in payload && !payload.owner_user_id) {
-    return "Owner user is required.";
+    return "Lead owner is required.";
   }
 
   if ("rsm_user_id" in payload && !payload.rsm_user_id) {

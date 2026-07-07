@@ -461,7 +461,7 @@ export function FarmerLeadForm({
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <UserSearchSelect
               defaultValue={lead?.owner_user_id}
-              label="Owner user"
+              label="Lead owner"
               name="owner_user_id"
               placeholder="Search owner by name or email"
               users={ownerUsers}

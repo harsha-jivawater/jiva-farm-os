@@ -426,7 +426,7 @@ export default async function FarmerLeadsPage({
           )}
           <UserSearchSelect
             defaultValue={filters.owner_user_id}
-            label="Owner user"
+            label="Lead owner"
             name="owner_user_id"
             notifyFilterChange
             placeholder="Search owner by name or email"

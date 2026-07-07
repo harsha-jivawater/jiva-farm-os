@@ -282,7 +282,7 @@ export default async function FarmerLeadDetailPage({
           value={formatDate(lead.followup_due_date)}
         />
         <DetailItem
-          label="Owner user"
+          label="Lead owner"
           value={userLabel(userMap.get(lead.owner_user_id), lead.owner_user_id)}
         />
         <DetailItem
