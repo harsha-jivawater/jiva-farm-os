@@ -45,6 +45,62 @@ function canFillRegionalLeadAssignment(
 const deviceInstalledWorkflowMessage =
   "Device Installed is set automatically after a farmer-sale installation is completed.";
 
+type FarmerLeadMobileDuplicate = {
+  id: string;
+  farmer_name: string;
+  lead_code: string | null;
+};
+
+type SupabaseErrorLike = {
+  code?: string;
+  message?: string;
+  details?: string | null;
+};
+
+function formatDuplicateLeadReference(lead: FarmerLeadMobileDuplicate) {
+  const reference = [lead.farmer_name, lead.lead_code].filter(Boolean).join(" / ");
+
+  return reference ? ` Existing lead: ${reference}.` : "";
+}
+
+async function findActiveLeadByMobile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  mobileNumber: string,
+  excludeLeadId?: string
+) {
+  let query = supabase
+    .from("farmer_leads")
+    .select("id, farmer_name, lead_code")
+    .eq("mobile_number", mobileNumber)
+    .is("deleted_at", null)
+    .limit(1);
+
+  if (excludeLeadId) {
+    query = query.neq("id", excludeLeadId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error) {
+    return { duplicate: null, error };
+  }
+
+  return {
+    duplicate: (data as FarmerLeadMobileDuplicate | null) ?? null,
+    error: null
+  };
+}
+
+function isFarmerLeadMobileUniqueError(error: SupabaseErrorLike | null | undefined) {
+  const text = [error?.message, error?.details].filter(Boolean).join(" ");
+
+  return (
+    error?.code === "23505" &&
+    (text.includes("farmer_leads_active_mobile_number_unique_idx") ||
+      text.includes("mobile_number"))
+  );
+}
+
 export async function createFarmerLeadAction(formData: FormData) {
   const supabase = await createClient();
   const leadId = crypto.randomUUID();
@@ -189,6 +245,22 @@ export async function createFarmerLeadAction(formData: FormData) {
     redirectWithError("/farmer-leads/new", deviceInstalledWorkflowMessage);
   }
 
+  const { duplicate: duplicateMobileLead, error: duplicateMobileError } =
+    await findActiveLeadByMobile(supabase, payload.mobile_number);
+
+  if (duplicateMobileError) {
+    redirectWithError("/farmer-leads/new", duplicateMobileError.message);
+  }
+
+  if (duplicateMobileLead) {
+    redirectWithError(
+      "/farmer-leads/new",
+      `A Farmer Lead with this mobile number already exists.${formatDuplicateLeadReference(
+        duplicateMobileLead
+      )}`
+    );
+  }
+
   payload.lead_status = deriveLeadStatus({
     funnelStage: payload.funnel_stage,
     paymentConfirmed: Boolean(payload.payment_confirmed)
@@ -229,7 +301,9 @@ export async function createFarmerLeadAction(formData: FormData) {
   if (error || !data) {
     redirectWithError(
       "/farmer-leads/new",
-      error?.message ?? "Lead was not created."
+      isFarmerLeadMobileUniqueError(error)
+        ? "A Farmer Lead with this mobile number already exists."
+        : (error?.message ?? "Lead was not created.")
     );
   }
 
@@ -350,6 +424,22 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
     );
   }
 
+  const { duplicate: duplicateMobileLead, error: duplicateMobileError } =
+    await findActiveLeadByMobile(supabase, payload.mobile_number ?? "", id);
+
+  if (duplicateMobileError) {
+    redirectWithError(`/farmer-leads/${id}/edit`, duplicateMobileError.message);
+  }
+
+  if (duplicateMobileLead) {
+    redirectWithError(
+      `/farmer-leads/${id}/edit`,
+      `Another Farmer Lead with this mobile number already exists.${formatDuplicateLeadReference(
+        duplicateMobileLead
+      )}`
+    );
+  }
+
   payload.lead_status = deriveLeadStatus({
     funnelStage: payload.funnel_stage,
     paymentConfirmed: Boolean(payload.payment_confirmed)
@@ -387,7 +477,12 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
     .eq("id", id);
 
   if (error) {
-    redirectWithError(`/farmer-leads/${id}/edit`, error.message);
+    redirectWithError(
+      `/farmer-leads/${id}/edit`,
+      isFarmerLeadMobileUniqueError(error)
+        ? "Another Farmer Lead with this mobile number already exists."
+        : error.message
+    );
   }
 
   revalidatePath("/farmer-leads");

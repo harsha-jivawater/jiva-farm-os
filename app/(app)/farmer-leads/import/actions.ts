@@ -48,6 +48,12 @@ type RsmOption = {
   state: string | null;
 };
 
+type SupabaseErrorLike = {
+  code?: string;
+  message?: string;
+  details?: string | null;
+};
+
 function result(state: Partial<ImportActionState>): ImportActionState {
   return {
     status: state.status ?? "error",
@@ -87,6 +93,16 @@ function leadSourceErrorMessage() {
   return `Invalid lead_source. Use one of: ${leadSourceOptions
     .map((option) => option.value)
     .join(", ")}.`;
+}
+
+function isFarmerLeadMobileUniqueError(error: SupabaseErrorLike | null | undefined) {
+  const text = [error?.message, error?.details].filter(Boolean).join(" ");
+
+  return (
+    error?.code === "23505" &&
+    (text.includes("farmer_leads_active_mobile_number_unique_idx") ||
+      text.includes("mobile_number"))
+  );
 }
 
 function rowToPayload(row: CsvRecord): FarmerLeadInsert {
@@ -328,7 +344,7 @@ export async function importFarmerLeadsAction(
       }
 
       if (existingMobileSet.has(payload.mobile_number)) {
-        rowErrors.push(`Row ${rowNumber}: Farmer lead mobile number already exists.`);
+        rowErrors.push(`Row ${rowNumber}: Mobile number already exists in Farmer Leads.`);
         return;
       }
 
@@ -342,7 +358,9 @@ export async function importFarmerLeadsAction(
 
       if (error) {
         return result({
-          message: error.message,
+          message: isFarmerLeadMobileUniqueError(error)
+            ? "One or more mobile numbers already exist in Farmer Leads."
+            : error.message,
           errorCount: rows.length,
           rowErrors
         });

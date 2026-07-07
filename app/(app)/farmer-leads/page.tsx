@@ -426,7 +426,9 @@ export default async function FarmerLeadsPage({
           )}
           <UserSearchSelect
             defaultValue={filters.owner_user_id}
+            emptyLabel="All lead owners"
             label="Lead owner"
+            mode="filter"
             name="owner_user_id"
             notifyFilterChange
             placeholder="Search owner by name or email"
@@ -434,7 +436,9 @@ export default async function FarmerLeadsPage({
           />
           <UserSearchSelect
             defaultValue={filters.rsm_user_id}
+            emptyLabel="All RSMs"
             label="RSM"
+            mode="filter"
             name="rsm_user_id"
             notifyFilterChange
             placeholder="Search RSM by name or email"
