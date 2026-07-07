@@ -4,8 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
-  Pencil,
-  XCircle
+  Pencil
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
@@ -47,11 +46,35 @@ type LinkedPilot = {
   dealer_id: string | null;
 };
 
+type LinkedDispatch = {
+  id: string;
+  dispatch_code: string;
+  dispatch_status: string;
+  dispatch_date: string | null;
+  serial_number_snapshot: string;
+};
+
+type LinkedInstallation = {
+  id: string;
+  installation_code: string;
+  installation_status: string;
+  installation_date: string;
+  serial_number_snapshot: string;
+};
+
+type LinkedFollowup = {
+  id: string;
+  followup_code: string;
+  followup_status: string;
+  followup_due_date: string;
+  followup_type: string;
+};
+
 function display(value: string | null | undefined) {
   return value || "Not set";
 }
 
-function formatDate(value: string | null) {
+function formatDate(value: string | null | undefined) {
   if (!value) {
     return "Not set";
   }
@@ -63,7 +86,74 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
-function DetailItem({
+function isPastDate(value: string | null | undefined) {
+  if (!value) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+
+  return date < today;
+}
+
+function SectionPanel({
+  children,
+  description,
+  title
+}: {
+  children: React.ReactNode;
+  description?: string;
+  title: string;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div>
+        <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+        {description ? (
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        ) : null}
+      </div>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function SummaryCard({
+  helper,
+  label,
+  tone = "neutral",
+  value
+}: {
+  helper?: React.ReactNode;
+  label: string;
+  tone?: "danger" | "neutral" | "success" | "warning";
+  value: React.ReactNode;
+}) {
+  const toneClassNames = {
+    danger: "border-red-200 bg-red-50",
+    neutral: "border-slate-200 bg-slate-50",
+    success: "border-emerald-200 bg-emerald-50",
+    warning: "border-amber-200 bg-amber-50"
+  };
+
+  return (
+    <div className={`rounded-lg border p-3 ${toneClassNames[tone]}`}>
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="mt-2 break-words text-lg font-semibold leading-6 text-slate-950">
+        {value}
+      </div>
+      {helper ? <p className="mt-1 text-xs text-slate-500">{helper}</p> : null}
+    </div>
+  );
+}
+
+function InfoRow({
   label,
   value
 }: {
@@ -71,30 +161,54 @@ function DetailItem({
   value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="flex flex-col gap-1 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-start sm:justify-between">
       <p className="text-sm font-medium text-slate-500">{label}</p>
-      <div className="mt-2 break-words text-sm font-semibold leading-6 text-slate-950">
+      <div className="break-words text-sm font-semibold leading-6 text-slate-950 sm:max-w-[65%] sm:text-right">
         {value}
       </div>
     </div>
   );
 }
 
-function BooleanBadge({ active, label }: { active: boolean; label: string }) {
-  const Icon = active ? CheckCircle2 : XCircle;
+function CompactEmpty({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+      {children}
+    </div>
+  );
+}
+
+function WorkflowCard({
+  children,
+  href,
+  label,
+  value
+}: {
+  children?: React.ReactNode;
+  href?: string;
+  label: string;
+  value: React.ReactNode;
+}) {
+  const body = (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="mt-2 break-words text-sm font-semibold leading-6 text-slate-950">
+        {value}
+      </div>
+      {children ? <div className="mt-1 text-xs text-slate-500">{children}</div> : null}
+    </div>
+  );
+
+  if (!href) {
+    return body;
+  }
 
   return (
-    <span
-      className={[
-        "inline-flex min-h-8 items-center gap-2 rounded-md border px-3 py-1 text-sm font-semibold",
-        active
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : "border-slate-200 bg-slate-50 text-slate-500"
-      ].join(" ")}
-    >
-      <Icon className="h-4 w-4" aria-hidden="true" />
-      {label}
-    </span>
+    <Link className="block hover:opacity-90" href={href}>
+      {body}
+    </Link>
   );
 }
 
@@ -108,6 +222,73 @@ function userLabel(
   return user
     ? `${user.full_name} · ${user.email} · ${labelForRole(user.role)}`
     : display(fallback);
+}
+
+function deriveCurrentAction(lead: FarmerLead) {
+  const leadStatus = lead.lead_status.toLowerCase();
+  const funnelStage = lead.funnel_stage.toLowerCase();
+
+  if (leadStatus === "lost") {
+    return {
+      helper: "This lead is closed as lost.",
+      label: "No action — lost lead",
+      tone: "neutral" as const
+    };
+  }
+
+  if (leadStatus === "parked") {
+    return {
+      helper: "Review later when the farmer is ready.",
+      label: "Parked — review later",
+      tone: "warning" as const
+    };
+  }
+
+  if (funnelStage.includes("pilot active")) {
+    return {
+      helper: "Pilot workflow is driving the next step.",
+      label: "Pilot in progress",
+      tone: "warning" as const
+    };
+  }
+
+  if (funnelStage.includes("pilot completed")) {
+    return {
+      helper: "Convert pilot outcome into a sales decision.",
+      label: "Pilot completed — sales follow-up needed",
+      tone: "warning" as const
+    };
+  }
+
+  if (!lead.payment_confirmed) {
+    return {
+      helper: "Sales owner should continue conversion follow-up.",
+      label: "Follow up for payment / conversion",
+      tone: "warning" as const
+    };
+  }
+
+  if (!lead.device_dispatched) {
+    return {
+      helper: "Payment is confirmed and dispatch can be prepared.",
+      label: "Ready for farmer sale dispatch",
+      tone: "success" as const
+    };
+  }
+
+  if (!lead.installation_completed) {
+    return {
+      helper: "Device dispatch is done; installation is pending.",
+      label: "Awaiting installation",
+      tone: "warning" as const
+    };
+  }
+
+  return {
+    helper: "Installation is complete; continue post-installation workflow.",
+    label: "Installed / follow-up workflow",
+    tone: "success" as const
+  };
 }
 
 export default async function FarmerLeadDetailPage({
@@ -139,11 +320,20 @@ export default async function FarmerLeadDetailPage({
 
   const lead = data as FarmerLead;
   const userIds = Array.from(
-    new Set([lead.owner_user_id, lead.rsm_user_id].filter(Boolean))
+    new Set(
+      [
+        lead.owner_user_id,
+        lead.rsm_user_id,
+        lead.payment_confirmed_by_user_id
+      ].flatMap((userId) => (userId ? [userId] : []))
+    )
   );
   const [
     { data: users },
     { data: linkedPilot },
+    { data: linkedDispatch },
+    { data: linkedInstallation },
+    { data: linkedFollowups },
     leadPhotosUrl,
     farmerDocumentUrl
   ] = await Promise.all([
@@ -163,37 +353,76 @@ export default async function FarmerLeadDetailPage({
           .is("deleted_at", null)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    lead.linked_dispatch_id
+      ? supabase
+          .from("dispatches")
+          .select("id, dispatch_code, dispatch_status, dispatch_date, serial_number_snapshot")
+          .eq("id", lead.linked_dispatch_id)
+          .is("deleted_at", null)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    lead.linked_installation_id
+      ? supabase
+          .from("installations")
+          .select(
+            "id, installation_code, installation_status, installation_date, serial_number_snapshot"
+          )
+          .eq("id", lead.linked_installation_id)
+          .is("deleted_at", null)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("followups")
+      .select("id, followup_code, followup_status, followup_due_date, followup_type")
+      .eq("farmer_lead_id", lead.id)
+      .is("deleted_at", null)
+      .order("followup_due_date", { ascending: false })
+      .limit(5),
     resolveFileUrl(supabase, lead.lead_photo_folder_link),
     resolveFileUrl(supabase, lead.farmer_document_link)
   ]);
   const userMap = new Map((users ?? []).map((user) => [user.id, user]));
   const pilot = linkedPilot as LinkedPilot | null;
+  const dispatch = linkedDispatch as LinkedDispatch | null;
+  const installation = linkedInstallation as LinkedInstallation | null;
+  const followups = (linkedFollowups ?? []) as LinkedFollowup[];
+  const institutionId = lead.linked_institution_id ?? pilot?.institution_id ?? null;
+  const dealerId = lead.linked_dealer_id ?? pilot?.dealer_id ?? null;
   const [{ data: institution }, { data: dealer }] = await Promise.all([
-    pilot?.pilot_type === "Institution Pilot" && pilot.institution_id
+    institutionId
       ? supabase
           .from("institutions")
           .select("id, organization_name")
-          .eq("id", pilot.institution_id)
+          .eq("id", institutionId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
-    pilot?.pilot_type === "Dealer Pilot" && pilot.dealer_id
+    dealerId
       ? supabase
           .from("dealers")
-          .select("id, dealer_name")
-          .eq("id", pilot.dealer_id)
+          .select("id, dealer_name, firm_name")
+          .eq("id", dealerId)
           .maybeSingle()
       : Promise.resolve({ data: null })
   ]);
   const linkedInstitution = institution as
     | { id: string; organization_name: string }
     | null;
-  const linkedDealer = dealer as { id: string; dealer_name: string } | null;
+  const linkedDealer = dealer as
+    | { id: string; dealer_name: string; firm_name: string | null }
+    | null;
   const confirmPaymentAction = confirmFarmerLeadPaymentAction.bind(null, lead.id);
   const canConfirmLeadPayment = canConfirmPayment(currentUser);
   const hasInconsistentDeviceInstalledStage =
     lead.funnel_stage === "Device Installed" && !lead.installation_completed;
   const canSeeWorkflowWarning = hasAnyRole(currentUser, ["Admin", "Management"]);
   const canSeeContextWarning = hasAnyRole(currentUser, ["Admin", "Management"]);
+  const currentAction = deriveCurrentAction(lead);
+  const nextFollowupDate = lead.followup_due_date ?? lead.next_action_date;
+  const followupOverdue = isPastDate(nextFollowupDate);
+  const nextActionOverdue = isPastDate(lead.next_action_date);
+  const paymentConfirmedBy = lead.payment_confirmed_by_user_id
+    ? userMap.get(lead.payment_confirmed_by_user_id)
+    : null;
 
   return (
     <section>
@@ -201,7 +430,9 @@ export default async function FarmerLeadDetailPage({
         <PageHeader
           eyebrow="Farmer Lead"
           title={lead.farmer_name}
-          description={`${display(lead.lead_code)} · ${display(lead.village)}`}
+          description={`${display(lead.lead_code)} · ${display(lead.village)}, ${display(
+            lead.district
+          )}`}
         />
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link
@@ -249,118 +480,320 @@ export default async function FarmerLeadDetailPage({
 
       <div className="mb-5 flex flex-wrap gap-2">
         <StatusPill status={lead.lead_status} />
-        <BooleanBadge
-          active={Boolean(lead.payment_confirmed)}
-          label="Payment confirmed"
-        />
-        <BooleanBadge
-          active={Boolean(lead.device_dispatched)}
-          label="Device dispatched"
-        />
-        <BooleanBadge
-          active={Boolean(lead.installation_completed)}
-          label="Device installed"
-        />
+        <span className="inline-flex min-h-8 items-center rounded-md border border-brand-100 bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-700">
+          {labelFor(lead.funnel_stage, funnelStageOptions)}
+        </span>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <DetailItem label="Mobile number" value={display(lead.mobile_number)} />
-        <DetailItem label="Village" value={display(lead.village)} />
-        <DetailItem label="District" value={display(lead.district)} />
-        <DetailItem label="State" value={display(lead.state)} />
-        <DetailItem
-          label="Funnel stage"
-          value={labelFor(lead.funnel_stage, funnelStageOptions)}
-        />
-        <DetailItem
-          label="Lead source"
-          value={labelFor(lead.lead_source, leadSourceOptions)}
-        />
-        <DetailItem label="Primary crop" value={formatCrop(lead)} />
-        <DetailItem
-          label="Next follow-up"
-          value={formatDate(lead.followup_due_date)}
-        />
-        <DetailItem
-          label="Lead owner"
-          value={userLabel(userMap.get(lead.owner_user_id), lead.owner_user_id)}
-        />
-        <DetailItem
-          label="RSM"
-          value={userLabel(userMap.get(lead.rsm_user_id), lead.rsm_user_id)}
-        />
-        <DetailItem
-          label="Linked pilot"
-          value={
-            pilot ? (
-              <Link
-                className="text-brand-700 hover:text-brand-800 hover:underline"
+      <div className="mt-6">
+        <SectionPanel
+          title="Lead progress / action summary"
+          description="Current funnel state, next action, and accountability."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <SummaryCard label="Lead status" value={lead.lead_status} />
+            <SummaryCard
+              label="Funnel stage"
+              value={labelFor(lead.funnel_stage, funnelStageOptions)}
+            />
+            <SummaryCard
+              helper={currentAction.helper}
+              label="Current action needed"
+              tone={currentAction.tone}
+              value={currentAction.label}
+            />
+            <SummaryCard
+              helper={followupOverdue ? "Overdue" : "Scheduled follow-up"}
+              label="Next follow-up"
+              tone={followupOverdue ? "danger" : "neutral"}
+              value={formatDate(nextFollowupDate)}
+            />
+            <SummaryCard
+              label="Lead owner"
+              value={userLabel(userMap.get(lead.owner_user_id), lead.owner_user_id)}
+            />
+            <SummaryCard
+              label="RSM"
+              value={userLabel(userMap.get(lead.rsm_user_id), lead.rsm_user_id)}
+            />
+          </div>
+        </SectionPanel>
+      </div>
+
+      <div className="mt-6">
+        <SectionPanel
+          title="Follow-up and next action"
+          description="Near-term action dates and field notes for this lead."
+        >
+          <div className="divide-y divide-slate-100">
+            <InfoRow
+              label="Next follow-up date"
+              value={
+                <span className={followupOverdue ? "text-red-700" : undefined}>
+                  {formatDate(nextFollowupDate)}
+                </span>
+              }
+            />
+            <InfoRow
+              label="Lead next action date"
+              value={
+                <span className={nextActionOverdue ? "text-red-700" : undefined}>
+                  {formatDate(lead.next_action_date)}
+                </span>
+              }
+            />
+            <InfoRow
+              label="Last interaction"
+              value={`${formatDate(lead.last_interaction_date)} · ${display(
+                lead.last_interaction_note
+              )}`}
+            />
+            <InfoRow
+              label="Follow-up priority"
+              value={display(lead.followup_priority)}
+            />
+            <InfoRow
+              label="Accountability"
+              value={`Owner: ${userLabel(
+                userMap.get(lead.owner_user_id),
+                lead.owner_user_id
+              )} · RSM: ${userLabel(userMap.get(lead.rsm_user_id), lead.rsm_user_id)}`}
+            />
+          </div>
+        </SectionPanel>
+      </div>
+
+      <div className="mt-6">
+        <SectionPanel
+          title="Linked workflow context"
+          description="Connected workflows that explain why this lead is in its current state."
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {pilot ? (
+              <WorkflowCard
                 href={`/pilots/${pilot.id}`}
+                label="Linked pilot"
+                value={`${pilot.pilot_code} · ${pilot.pilot_name}`}
               >
-                {pilot.pilot_code} · {pilot.pilot_name} · {pilot.pilot_type}
-              </Link>
-            ) : (
-              "Not set"
-            )
-          }
-        />
-        {pilot?.pilot_type === "Institution Pilot" && linkedInstitution ? (
-          <DetailItem
-            label="Through institution"
-            value={
-              <Link
-                className="text-brand-700 hover:text-brand-800 hover:underline"
+                {pilot.pilot_type} · {pilot.pilot_status}
+              </WorkflowCard>
+            ) : null}
+            {linkedInstitution ? (
+              <WorkflowCard
                 href={`/institutional-partners/${linkedInstitution.id}`}
-              >
-                {linkedInstitution.organization_name}
-              </Link>
-            }
-          />
-        ) : null}
-        {pilot?.pilot_type === "Dealer Pilot" && linkedDealer ? (
-          <DetailItem
-            label="Through dealer"
-            value={
-              <Link
-                className="text-brand-700 hover:text-brand-800 hover:underline"
+                label="Through institution"
+                value={linkedInstitution.organization_name}
+              />
+            ) : null}
+            {linkedDealer ? (
+              <WorkflowCard
                 href={`/dealers/${linkedDealer.id}`}
+                label="Through dealer"
+                value={linkedDealer.firm_name ?? linkedDealer.dealer_name}
               >
-                {linkedDealer.dealer_name}
-              </Link>
-            }
-          />
-        ) : null}
-        {canSeeContextWarning &&
-        pilot?.pilot_type === "Institution Pilot" &&
-        !linkedInstitution ? (
-          <DetailItem
-            label="Pilot data warning"
-            value="Institution Pilot is missing institution."
-          />
-        ) : null}
-        {canSeeContextWarning && pilot?.pilot_type === "Dealer Pilot" && !linkedDealer ? (
-          <DetailItem
-            label="Pilot data warning"
-            value="Dealer Pilot is missing dealer."
-          />
-        ) : null}
-        <DetailItem
-          label="Lead photos"
-          value={<FileLink href={leadPhotosUrl} label="View lead photos" />}
-        />
-        <DetailItem
-          label="Farmer document"
-          value={
-            <FileLink href={farmerDocumentUrl} label="View farmer document" />
-          }
-        />
+                Contact: {linkedDealer.dealer_name}
+              </WorkflowCard>
+            ) : null}
+            {dispatch ? (
+              <WorkflowCard
+                href={`/dispatches/${dispatch.id}`}
+                label="Linked dispatch"
+                value={`${dispatch.dispatch_code} · ${dispatch.dispatch_status}`}
+              >
+                {dispatch.serial_number_snapshot}
+              </WorkflowCard>
+            ) : null}
+            {installation ? (
+              <WorkflowCard
+                href={`/installations/${installation.id}`}
+                label="Linked installation"
+                value={`${installation.installation_code} · ${installation.installation_status}`}
+              >
+                {installation.serial_number_snapshot}
+              </WorkflowCard>
+            ) : null}
+            {canSeeContextWarning &&
+            pilot?.pilot_type === "Institution Pilot" &&
+            !linkedInstitution ? (
+              <WorkflowCard
+                label="Pilot data warning"
+                value="Institution Pilot is missing institution."
+              />
+            ) : null}
+            {canSeeContextWarning && pilot?.pilot_type === "Dealer Pilot" && !linkedDealer ? (
+              <WorkflowCard
+                label="Pilot data warning"
+                value="Dealer Pilot is missing dealer."
+              />
+            ) : null}
+          </div>
+          {!pilot && !linkedInstitution && !linkedDealer && !dispatch && !installation ? (
+            <div className="mt-3">
+              <CompactEmpty>No linked pilot, dealer, institution, dispatch, or installation yet.</CompactEmpty>
+            </div>
+          ) : null}
+        </SectionPanel>
       </div>
 
-      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-sm font-medium text-slate-500">Notes</p>
-        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-          {display(lead.remarks)}
-        </p>
+      <div className="mt-6">
+        <SectionPanel
+          title="Farmer and farm profile"
+          description="Stable farmer, location, crop, and farm context."
+        >
+          <div className="divide-y divide-slate-100">
+            <InfoRow label="Mobile number" value={display(lead.mobile_number)} />
+            <InfoRow
+              label="Alternate mobile number"
+              value={display(lead.alternate_mobile_number)}
+            />
+            <InfoRow
+              label="Location"
+              value={`${display(lead.village)}, ${display(lead.district)}, ${display(
+                lead.state
+              )}`}
+            />
+            <InfoRow label="Taluk" value={display(lead.taluk)} />
+            <InfoRow label="Primary crop" value={formatCrop(lead)} />
+            <InfoRow label="Crop stage" value={display(lead.crop_stage)} />
+            <InfoRow
+              label="Crop area"
+              value={
+                lead.crop_area_acres === null
+                  ? "Not set"
+                  : `${lead.crop_area_acres} acres`
+              }
+            />
+            <InfoRow
+              label="Land size"
+              value={
+                lead.land_size_acres === null
+                  ? "Not set"
+                  : `${lead.land_size_acres} acres`
+              }
+            />
+            <InfoRow
+              label="Lead source"
+              value={labelFor(lead.lead_source, leadSourceOptions)}
+            />
+          </div>
+        </SectionPanel>
+      </div>
+
+      <div className="mt-6">
+        <SectionPanel
+          title="Sales, payment, dispatch, and installation status"
+          description="Workflow status from payment, dispatch, and installation records."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryCard label="Sale outcome" value={lead.lead_status} />
+            <SummaryCard
+              helper={
+                lead.payment_confirmed
+                  ? `${formatDate(lead.payment_confirmed_date)} · ${userLabel(
+                      paymentConfirmedBy,
+                      lead.payment_confirmed_by_user_id
+                    )}`
+                  : "Payment is still pending."
+              }
+              label="Payment"
+              tone={lead.payment_confirmed ? "success" : "warning"}
+              value={lead.payment_confirmed ? "Confirmed" : "Pending"}
+            />
+            <SummaryCard
+              helper={
+                dispatch
+                  ? `${dispatch.dispatch_code} · ${dispatch.dispatch_status}`
+                  : "No linked dispatch yet."
+              }
+              label="Dispatch"
+              tone={lead.device_dispatched ? "success" : "warning"}
+              value={lead.device_dispatched ? "Dispatched" : "Pending"}
+            />
+            <SummaryCard
+              helper={
+                installation
+                  ? `${installation.installation_code} · ${installation.installation_status}`
+                  : "No completed farmer-sale installation linked."
+              }
+              label="Installation"
+              tone={lead.installation_completed ? "success" : "warning"}
+              value={lead.installation_completed ? "Installed" : "Pending"}
+            />
+          </div>
+        </SectionPanel>
+      </div>
+
+      <div className="mt-6">
+        <SectionPanel
+          title="Documents and photos"
+          description="Optional farmer evidence and supporting documents."
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            <WorkflowCard label="Field / crop photos" value="Lead photos">
+              <FileLink href={leadPhotosUrl} label="View lead photos" />
+            </WorkflowCard>
+            <WorkflowCard label="Supporting farmer document" value="Farmer document">
+              <FileLink href={farmerDocumentUrl} label="View farmer document" />
+            </WorkflowCard>
+          </div>
+        </SectionPanel>
+      </div>
+
+      <div className="mt-6">
+        <SectionPanel title="Notes / remarks">
+          <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
+            {display(lead.remarks)}
+          </p>
+        </SectionPanel>
+      </div>
+
+      <div className="mt-6">
+        <SectionPanel
+          title="Related records"
+          description="Recent records connected to this farmer lead."
+        >
+          <div className="space-y-3">
+            {followups.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[42rem] text-left text-sm">
+                  <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Follow-up</th>
+                      <th className="px-3 py-2">Type</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Due date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {followups.map((followup) => (
+                      <tr key={followup.id}>
+                        <td className="px-3 py-2">
+                          <Link
+                            className="font-semibold text-brand-700 hover:text-brand-800"
+                            href={`/follow-ups/${followup.id}`}
+                          >
+                            {followup.followup_code}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {followup.followup_type}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {followup.followup_status}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {formatDate(followup.followup_due_date)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <CompactEmpty>No follow-up records linked yet.</CompactEmpty>
+            )}
+          </div>
+        </SectionPanel>
       </div>
     </section>
   );
