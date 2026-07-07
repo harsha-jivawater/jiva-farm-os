@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, Save } from "lucide-react";
+import { CustomCropFields } from "@/components/crops/custom-crop-fields";
+import { CropSelect } from "@/components/crops/crop-select";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
 import {
+  cropStageOptions,
   defaultFunnelStage,
   defaultIrrigationType,
   defaultLeadSource,
@@ -14,8 +17,7 @@ import {
   defaultPrimaryCrop,
   funnelStageOptions,
   irrigationTypeOptions,
-  leadSourceOptions,
-  primaryCropOptions
+  leadSourceOptions
 } from "@/lib/farmer-leads/options";
 import type { FarmerLead } from "@/lib/farmer-leads/types";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
@@ -245,26 +247,13 @@ export function FarmerLeadForm({
           </div>
 
           <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="primary_crop"
-            >
-              Primary crop
-            </label>
-            <select
-              className={inputClassName()}
-              id="primary_crop"
+            <CropSelect
+              label="Primary crop"
               name="primary_crop"
-              onChange={(event) => setPrimaryCrop(event.target.value)}
+              onChange={setPrimaryCrop}
               required
               value={primaryCrop}
-            >
-              {primaryCropOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div>
@@ -289,24 +278,52 @@ export function FarmerLeadForm({
             </select>
           </div>
 
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="crop_stage"
+            >
+              Crop stage
+            </label>
+            <select
+              className={inputClassName()}
+              defaultValue={lead?.crop_stage ?? ""}
+              id="crop_stage"
+              name="crop_stage"
+            >
+              <option value="">Select crop stage</option>
+              {cropStageOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="crop_area_acres"
+            >
+              Crop area acres
+            </label>
+            <input
+              className={inputClassName()}
+              defaultValue={lead?.crop_area_acres ?? ""}
+              id="crop_area_acres"
+              min={0}
+              name="crop_area_acres"
+              step="0.01"
+              type="number"
+            />
+          </div>
+
           {primaryCrop === "Other" ? (
-            <div className="md:col-span-2">
-              <label
-                className="mb-1.5 block text-sm font-medium text-slate-700"
-                htmlFor="other_primary_crop"
-              >
-                Other primary crop
-              </label>
-              <input
-                className={inputClassName()}
-                defaultValue={lead?.other_primary_crop ?? ""}
-                id="other_primary_crop"
-                name="other_primary_crop"
-                placeholder="Enter crop name"
-                required
-                type="text"
-              />
-            </div>
+            <CustomCropFields
+              defaultValue={lead?.other_primary_crop}
+              name="other_primary_crop"
+              required
+            />
           ) : null}
         </div>
       </div>

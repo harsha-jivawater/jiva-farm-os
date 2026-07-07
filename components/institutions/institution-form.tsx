@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, Save } from "lucide-react";
+import { CustomCropFields } from "@/components/crops/custom-crop-fields";
+import { CropMultiSelect } from "@/components/crops/crop-multi-select";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
 import { defaultNextActionDate } from "@/lib/institutions/form-data";
 import {
   agreementStatusOptions,
-  cropFocusOptions,
   defaultAgreementStatus,
   defaultInstitutionStatus,
   defaultOpportunityType,
@@ -525,38 +526,16 @@ export function InstitutionForm({
             type="number"
           />
           <div className="md:col-span-2">
-            <p className="mb-2 text-sm font-medium text-slate-700">
-              Crop focus
-            </p>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {cropFocusOptions.map((crop) => (
-                <label
-                  className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700"
-                  key={crop.value}
-                >
-                  <input
-                    className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                    defaultChecked={initialCropFocus.includes(crop.value)}
-                    name="crop_focus"
-                    onChange={(event) => {
-                      setSelectedCropFocus((current) =>
-                        event.target.checked
-                          ? [...current, crop.value]
-                          : current.filter((value) => value !== crop.value)
-                      );
-                    }}
-                    type="checkbox"
-                    value={crop.value}
-                  />
-                  {crop.label}
-                </label>
-              ))}
-            </div>
+            <CropMultiSelect
+              label="Crop focus"
+              name="crop_focus"
+              onChange={setSelectedCropFocus}
+              values={selectedCropFocus}
+            />
           </div>
           {showOtherCropFocus ? (
-            <Field
+            <CustomCropFields
               defaultValue={institution?.other_crop_focus}
-              label="Other crop focus"
               name="other_crop_focus"
               required
             />

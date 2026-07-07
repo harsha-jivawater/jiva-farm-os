@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, Save } from "lucide-react";
+import { CustomCropFields } from "@/components/crops/custom-crop-fields";
+import { CropMultiSelect } from "@/components/crops/crop-multi-select";
 import { defaultNextActionDate } from "@/lib/dealers/form-data";
 import {
   commercialTermsSharedOptions,
@@ -19,7 +21,6 @@ import {
   defaultPriority,
   defaultTrainingStatus,
   existingCustomerBaseTypeOptions,
-  keyCropOptions,
   priorityOptions,
   trainingStatusOptions
 } from "@/lib/dealers/options";
@@ -566,39 +567,17 @@ export function DealerForm({
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <p className="mb-2 text-sm font-medium text-slate-700">
-              Key crops
-            </p>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {keyCropOptions.map((crop) => (
-                <label
-                  className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700"
-                  key={crop.value}
-                >
-                  <input
-                    className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                    defaultChecked={initialCrops.includes(crop.value)}
-                    name="key_crops"
-                    onChange={(event) => {
-                      setSelectedCrops((current) =>
-                        event.target.checked
-                          ? [...current, crop.value]
-                          : current.filter((value) => value !== crop.value)
-                      );
-                    }}
-                    type="checkbox"
-                    value={crop.value}
-                  />
-                  {crop.label}
-                </label>
-              ))}
-            </div>
+            <CropMultiSelect
+              label="Key crops"
+              name="key_crops"
+              onChange={setSelectedCrops}
+              values={selectedCrops}
+            />
           </div>
 
           {showOtherCrops ? (
-            <Field
+            <CustomCropFields
               defaultValue={dealer?.other_key_crops}
-              label="Other key crops"
               name="other_key_crops"
               required
             />

@@ -15,6 +15,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
 import {
   cropOptions,
@@ -458,10 +459,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
             <option value="">All result statuses</option>
             {pilotResultStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
-          <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" defaultValue={filters.crop} name="crop">
-            <option value="">All crops</option>
-            {cropOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
+          <CropFilterSelect defaultValue={filters.crop} />
           <select className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm" defaultValue={filters.state} name="state">
             <option value="">All states</option>
             {INDIAN_STATES_AND_UTS.map((state) => <option key={state} value={state}>{state}</option>)}

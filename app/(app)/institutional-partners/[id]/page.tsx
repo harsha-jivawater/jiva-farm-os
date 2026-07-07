@@ -11,6 +11,7 @@ import { InstitutionStatusPill } from "@/components/institutions/institution-sta
 import { MeetingForm } from "@/components/institutions/meeting-form";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
+import { cropDisplayLabel } from "@/lib/crops/crop-library";
 import {
   agreementStatusOptions,
   decisionRoleOptions,
@@ -80,6 +81,12 @@ function userLabel(user: UserOption | undefined, fallback?: string | null) {
   }
 
   return display(fallback);
+}
+
+function displayCrops(crops: string[] | null | undefined) {
+  return crops?.length
+    ? crops.map((crop) => cropDisplayLabel(crop)).join(", ")
+    : "Not set";
 }
 
 export default async function InstitutionDetailPage({
@@ -347,7 +354,7 @@ export default async function InstitutionDetailPage({
           />
           <DetailItem
             label="Crop focus"
-            value={displayList(institution.crop_focus)}
+            value={displayCrops(institution.crop_focus)}
           />
           <DetailItem
             label="Other crop focus"

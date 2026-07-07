@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/database.types";
+import { cropDisplayLabel } from "@/lib/crops/crop-library";
 
 export type Dealer = Database["public"]["Tables"]["dealers"]["Row"];
 export type DealerInsert = Database["public"]["Tables"]["dealers"]["Insert"];
@@ -67,5 +68,5 @@ export function formatCrops(crops: string[] | null | undefined) {
     return "Not set";
   }
 
-  return crops.join(", ");
+  return crops.map((crop) => cropDisplayLabel(crop)).join(", ");
 }

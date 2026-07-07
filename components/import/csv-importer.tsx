@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { ChangeEvent } from "react";
 import { useMemo, useState, useTransition } from "react";
 import { AlertCircle, CheckCircle2, FileDown, Upload } from "lucide-react";
@@ -104,13 +103,14 @@ export function CsvImporter({
               {instructions}
             </p>
           </div>
-          <Link
+          <a
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            download
             href={templateHref}
           >
             <FileDown className="h-4 w-4" aria-hidden="true" />
             Download template
-          </Link>
+          </a>
         </div>
 
         <div className="mt-5">

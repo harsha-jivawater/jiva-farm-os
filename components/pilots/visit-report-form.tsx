@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Save } from "lucide-react";
+import { CustomCropFields } from "@/components/crops/custom-crop-fields";
+import { CropSelect } from "@/components/crops/crop-select";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
 import { todayDate } from "@/lib/pilots/form-data";
 import {
-  cropOptions,
   defaultReportStatus,
   defaultReportType,
   fitmentInspectionStatusOptions,
@@ -193,6 +195,7 @@ export function VisitReportForm({
   users,
   visits
 }: VisitReportFormProps) {
+  const [crop, setCrop] = useState(report?.crop ?? pilot.crop ?? "");
   const canApproveFinalPilotReport = hasAnyRole(currentUser, [
     "R&D Head",
     "Admin"
@@ -321,32 +324,20 @@ export function VisitReportForm({
             ))}
           </select>
         </div>
-        <div>
-          <label
-            className="mb-1.5 block text-sm font-medium text-slate-700"
-            htmlFor="crop"
-          >
-            Crop
-          </label>
-          <select
-            className={inputClassName()}
-            defaultValue={report?.crop ?? pilot.crop}
-            id="crop"
-            name="crop"
-          >
-            <option value="">Select crop</option>
-            {cropOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <Field
-          defaultValue={report?.other_crop ?? pilot.other_crop}
-          label="Other crop"
-          name="other_crop"
-        />
+        <CropSelect label="Crop" name="crop" onChange={setCrop} value={crop} />
+        {crop === "Other" ? (
+          <CustomCropFields
+            defaultValue={report?.other_crop ?? pilot.other_crop}
+            name="other_crop"
+            required
+          />
+        ) : (
+          <input
+            name="other_crop"
+            type="hidden"
+            value={report?.other_crop ?? pilot.other_crop ?? ""}
+          />
+        )}
         <Field
           defaultValue={report?.report_title}
           label="Report title"

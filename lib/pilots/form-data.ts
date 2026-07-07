@@ -63,6 +63,60 @@ function getBoolean(formData: FormData, key: string, defaultValue = false) {
   return value === "true" || value === "on";
 }
 
+function comparisonControlValues(method: string | null | undefined) {
+  switch (method) {
+    case "Same Farmer - Adjacent Plot":
+      return {
+        control_available: true,
+        control_farmer_same: true,
+        control_crop_same: true,
+        control_irrigation_same: true
+      };
+    case "Same Farmer - Different Plot":
+      return {
+        control_available: true,
+        control_farmer_same: true,
+        control_crop_same: true,
+        control_irrigation_same: false
+      };
+    case "Nearby Farmer - Similar Crop":
+      return {
+        control_available: true,
+        control_farmer_same: false,
+        control_crop_same: true,
+        control_irrigation_same: false
+      };
+    case "Historical Baseline":
+      return {
+        control_available: true,
+        control_farmer_same: true,
+        control_crop_same: true,
+        control_irrigation_same: false
+      };
+    case "Before / After Only":
+      return {
+        control_available: false,
+        control_farmer_same: true,
+        control_crop_same: true,
+        control_irrigation_same: false
+      };
+    case "No Control Available":
+      return {
+        control_available: false,
+        control_farmer_same: false,
+        control_crop_same: false,
+        control_irrigation_same: false
+      };
+    default:
+      return {
+        control_available: true,
+        control_farmer_same: null,
+        control_crop_same: null,
+        control_irrigation_same: null
+      };
+  }
+}
+
 function formatLocalDate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -95,6 +149,10 @@ function isOptionValue(
 }
 
 export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
+  const comparisonMethod =
+    getText(formData, "comparison_method") ?? defaultComparisonMethod;
+  const comparisonValues = comparisonControlValues(comparisonMethod);
+
   return {
     pilot_name: getText(formData, "pilot_name") ?? "",
     pilot_type: getText(formData, "pilot_type") ?? defaultPilotType,
@@ -142,15 +200,11 @@ export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
       getText(formData, "treatment_plot_description") ?? "",
     control_plot_description:
       getText(formData, "control_plot_description") ?? "",
-    control_available: getBoolean(formData, "control_available", true),
-    control_farmer_same: getBoolean(formData, "control_farmer_same"),
-    control_crop_same: getBoolean(formData, "control_crop_same"),
-    control_irrigation_same: getBoolean(
-      formData,
-      "control_irrigation_same"
-    ),
-    comparison_method:
-      getText(formData, "comparison_method") ?? defaultComparisonMethod,
+    control_available: comparisonValues.control_available,
+    control_farmer_same: comparisonValues.control_farmer_same,
+    control_crop_same: comparisonValues.control_crop_same,
+    control_irrigation_same: comparisonValues.control_irrigation_same,
+    comparison_method: comparisonMethod,
     product_model: getText(formData, "product_model") ?? defaultProductModel,
     device_serial_number_snapshot: getText(
       formData,

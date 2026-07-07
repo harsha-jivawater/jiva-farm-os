@@ -8,6 +8,7 @@ import {
   defaultLeadSource,
   defaultLeadType,
   defaultPrimaryCrop,
+  cropStageOptions,
   funnelStageOptions,
   irrigationTypeOptions,
   leadSourceOptions,
@@ -24,6 +25,16 @@ function getText(formData: FormData, key: string) {
 
 function getRequiredText(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
+}
+
+function getNumber(formData: FormData, key: string) {
+  const value = getText(formData, key);
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function getCheckbox(formData: FormData, key: string) {
@@ -81,6 +92,8 @@ export function farmerLeadPayloadFromForm(
     lead_source: getText(formData, "lead_source") ?? defaultLeadSource,
     primary_crop: primaryCrop,
     other_primary_crop: otherPrimaryCrop,
+    crop_stage: getText(formData, "crop_stage"),
+    crop_area_acres: getNumber(formData, "crop_area_acres"),
     irrigation_type:
       getText(formData, "irrigation_type") ?? defaultIrrigationType,
     next_action_date: nextActionDate,
@@ -138,6 +151,10 @@ export function validateFarmerLeadPayload(payload: FarmerLeadInsert | FarmerLead
 
   if (!isOptionValue(payload.primary_crop, primaryCropOptions)) {
     return "Primary crop is not valid.";
+  }
+
+  if (!isOptionValue(payload.crop_stage, cropStageOptions)) {
+    return "Crop stage is not valid.";
   }
 
   if (!isOptionValue(payload.irrigation_type, irrigationTypeOptions)) {

@@ -75,25 +75,7 @@ export const leadSourceOptions = [
   { value: "Other", label: "Other" }
 ] as const;
 
-export const primaryCropOptions = [
-  { value: "Sugarcane", label: "Sugarcane" },
-  { value: "Banana", label: "Banana" },
-  { value: "Coconut", label: "Coconut" },
-  { value: "Turmeric", label: "Turmeric" },
-  { value: "Vegetables", label: "Vegetables" },
-  { value: "Gherkins", label: "Gherkins" },
-  { value: "Arecanut", label: "Arecanut" },
-  { value: "Paddy", label: "Paddy" },
-  { value: "Grapes", label: "Grapes" },
-  { value: "Floriculture", label: "Floriculture" },
-  { value: "Coffee", label: "Coffee" },
-  { value: "Tea", label: "Tea" },
-  { value: "Spices", label: "Spices" },
-  { value: "Seed Production", label: "Seed Production" },
-  { value: "Mixed Crops", label: "Mixed Crops" },
-  { value: "Other", label: "Other" },
-  { value: "Unknown", label: "Unknown" }
-] as const;
+export const primaryCropOptions = cropOptions;
 
 export const cropStageOptions = [
   { value: "Pre-sowing", label: "Pre-sowing" },
@@ -163,3 +145,4 @@ export function labelFor(
 
   return options.find((option) => option.value === value)?.label ?? value;
 }
+import { cropOptions } from "@/lib/crops/crop-library";

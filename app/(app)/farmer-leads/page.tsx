@@ -13,6 +13,7 @@ import {
   XCircle
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { StatusPill } from "@/components/farmer-leads/status-pill";
 import {
   formatCrop,
@@ -381,23 +382,11 @@ export default async function FarmerLeadsPage({
             </select>
           </label>
 
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">
-              Primary crop
-            </span>
-            <select
-              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-              defaultValue={filters.primary_crop}
-              name="primary_crop"
-            >
-              <option value="">All crops</option>
-              {primaryCropOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <CropFilterSelect
+            defaultValue={filters.primary_crop}
+            label="Primary crop"
+            name="primary_crop"
+          />
 
           {(["state", "district", "owner_user_id", "rsm_user_id"] as const).map(
             (field) => (

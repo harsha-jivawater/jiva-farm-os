@@ -25,6 +25,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
+import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { deviceStatusOptions, productModelOptions } from "@/lib/devices/options";
 import { primaryCropOptions } from "@/lib/farmer-leads/options";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
@@ -551,21 +552,7 @@ function FiltersForm({
             ))}
           </select>
         </label>
-        <label className="grid gap-1 text-sm font-medium text-slate-700">
-          Crop
-          <select
-            className="min-h-10 rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-950 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-            defaultValue={filters.crop}
-            name="crop"
-          >
-            <option value="">All crops</option>
-            {primaryCropOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <CropFilterSelect defaultValue={filters.crop} />
       </div>
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">

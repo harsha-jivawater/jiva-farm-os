@@ -97,6 +97,7 @@ function rowToPayload(row: CsvRecord): FarmerLeadInsert {
     primary_crop: primaryCrop,
     other_primary_crop:
       primaryCrop === "Other" ? clean(row.other_primary_crop) : null,
+    crop_stage: clean(row.crop_stage),
     irrigation_type: clean(row.irrigation_type) ?? defaultIrrigationType,
     land_size_acres: parseNumber(row.land_size_acres),
     crop_area_acres: parseNumber(row.crop_area_acres),

@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/database.types";
+import { cropDisplayLabel } from "@/lib/crops/crop-library";
 
 export type FarmerLead = Database["public"]["Tables"]["farmer_leads"]["Row"];
 export type FarmerLeadInsert =
@@ -37,5 +38,5 @@ export function formatCrop(
     return lead.other_primary_crop;
   }
 
-  return lead.primary_crop || "Not set";
+  return cropDisplayLabel(lead.primary_crop);
 }

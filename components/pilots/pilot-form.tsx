@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Info, Save } from "lucide-react";
+import { CustomCropFields } from "@/components/crops/custom-crop-fields";
+import { CropSelect } from "@/components/crops/crop-select";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
 import {
   comparisonMethodOptions,
-  cropOptions,
   cropStageOptions,
   defaultComparisonMethod,
   defaultCrop,
@@ -269,6 +270,43 @@ function CheckboxField({
       />
       {label}
     </label>
+  );
+}
+
+function ComparisonMethodHelp() {
+  return (
+    <details className="group relative">
+      <summary
+        aria-label="Comparison method help"
+        className="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-brand-200 hover:text-brand-700"
+      >
+        <Info className="h-4 w-4" aria-hidden="true" />
+      </summary>
+      <div className="absolute right-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700 shadow-xl">
+        <p className="font-semibold text-slate-950">
+          Comparison method means: Compared to what are we judging whether Jiva
+          made a difference?
+        </p>
+        <div className="mt-3 space-y-2">
+          <p><strong>Same Farmer Split Study:</strong> Same farmer, same crop, same season. One part uses Jiva, another similar part does not. Best proof quality.</p>
+          <p><strong>Same Farmer - Different Plot:</strong> Same farmer has two different plots. Jiva is used in one plot and the other plot is comparison.</p>
+          <p><strong>Nearby Farmer - Similar Crop:</strong> A nearby farmer growing the same or similar crop is used as comparison.</p>
+          <p><strong>Historical Baseline:</strong> Compare current crop performance after Jiva against the same farmer&apos;s past crop performance.</p>
+          <p><strong>Before / After Only:</strong> Measure before and after Jiva in the same plot, without a separate control.</p>
+          <p><strong>No Control Available:</strong> No comparison plot, farmer, or historical baseline is available. Use only for demonstration or observation.</p>
+          <p><strong>Other:</strong> A comparison method not covered above. Explain it in notes.</p>
+        </div>
+        <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Proof strength
+        </p>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          Strongest: Same Farmer Split Study · Very good: Same Farmer -
+          Different Plot · Good: Nearby Farmer - Similar Crop · Moderate:
+          Historical Baseline · Weak: Before / After Only · Weakest: No Control
+          Available
+        </p>
+      </div>
+    </details>
   );
 }
 
@@ -641,21 +679,18 @@ export function PilotForm({
           Crop, plots and device
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <SelectField
+          <CropSelect
             label="Crop"
             name="crop"
             onChange={setCrop}
-            options={cropOptions}
             required
             value={crop}
           />
           {crop === "Other" ? (
-            <Field
-              label="Other crop"
+            <CustomCropFields
+              defaultValue={otherCrop}
               name="other_crop"
-              onChange={setOtherCrop}
               required
-              value={otherCrop}
             />
           ) : (
             <input name="other_crop" type="hidden" value={otherCrop} />
@@ -704,13 +739,30 @@ export function PilotForm({
             onChange={setSoilType}
             value={soilType}
           />
-          <SelectField
-            defaultValue={pilot?.comparison_method ?? defaultComparisonMethod}
-            label="Comparison method"
-            name="comparison_method"
-            options={comparisonMethodOptions}
-            required
-          />
+          <div>
+            <div className="mb-1.5 flex items-center gap-2">
+              <label
+                className="block text-sm font-medium text-slate-700"
+                htmlFor="comparison_method"
+              >
+                Comparison method
+              </label>
+              <ComparisonMethodHelp />
+            </div>
+            <select
+              className={inputClassName()}
+              defaultValue={pilot?.comparison_method ?? defaultComparisonMethod}
+              id="comparison_method"
+              name="comparison_method"
+              required
+            >
+              {comparisonMethodOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label
               className="mb-1.5 block text-sm font-medium text-slate-700"
@@ -755,26 +807,6 @@ export function PilotForm({
           />
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <CheckboxField
-            defaultChecked={pilot?.control_available ?? true}
-            label="Control available"
-            name="control_available"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.control_farmer_same}
-            label="Same control farmer"
-            name="control_farmer_same"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.control_crop_same}
-            label="Same control crop"
-            name="control_crop_same"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.control_irrigation_same}
-            label="Same control irrigation"
-            name="control_irrigation_same"
-          />
           <CheckboxField
             defaultChecked={pilot?.installation_completed}
             label="Installation completed"

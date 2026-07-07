@@ -19,6 +19,7 @@ const columns = [
   { key: "funnel_stage", label: "Funnel Stage" },
   { key: "lead_type", label: "Lead Type" },
   { key: "irrigation_type", label: "Irrigation Type" },
+  { key: "crop_stage", label: "Crop Stage" },
   { key: "land_size_acres", label: "Land Size Acres" },
   { key: "crop_area_acres", label: "Crop Area Acres" },
   { key: "next_action_date", label: "Next Action Date" },
