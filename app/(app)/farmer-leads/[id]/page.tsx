@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Pencil, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Pencil,
+  XCircle
+} from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
 import { StatusPill } from "@/components/farmer-leads/status-pill";
@@ -17,7 +23,11 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { canConfirmPayment, canWriteModule } from "@/lib/users/permissions";
+import {
+  canConfirmPayment,
+  canWriteModule,
+  hasAnyRole
+} from "@/lib/users/permissions";
 import { labelForRole } from "@/lib/users/options";
 import { farmerLeadScope } from "@/lib/users/record-scope";
 
@@ -134,6 +144,9 @@ export default async function FarmerLeadDetailPage({
   const userMap = new Map((users ?? []).map((user) => [user.id, user]));
   const confirmPaymentAction = confirmFarmerLeadPaymentAction.bind(null, lead.id);
   const canConfirmLeadPayment = canConfirmPayment(currentUser);
+  const hasInconsistentDeviceInstalledStage =
+    lead.funnel_stage === "Device Installed" && !lead.installation_completed;
+  const canSeeWorkflowWarning = hasAnyRole(currentUser, ["Admin", "Management"]);
 
   return (
     <section>
@@ -173,6 +186,19 @@ export default async function FarmerLeadDetailPage({
           ) : null}
         </div>
       </div>
+
+      {canSeeWorkflowWarning && hasInconsistentDeviceInstalledStage ? (
+        <div className="mb-5 flex gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+          <AlertTriangle
+            className="mt-0.5 h-4 w-4 shrink-0"
+            aria-hidden="true"
+          />
+          <p>
+            This lead is marked Device Installed in funnel stage, but no
+            completed farmer-sale installation is linked.
+          </p>
+        </div>
+      ) : null}
 
       <div className="mb-5 flex flex-wrap gap-2">
         <StatusPill status={lead.lead_status} />

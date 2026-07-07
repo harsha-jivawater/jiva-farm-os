@@ -69,6 +69,10 @@ function defaultDateValue(value?: string | null) {
   return dateValue(value) || new Date().toISOString().slice(0, 10);
 }
 
+const manualFunnelStageOptions = funnelStageOptions.filter(
+  (option) => option.value !== "Device Installed"
+);
+
 export function FarmerLeadForm({
   action,
   cancelHref,
@@ -79,14 +83,20 @@ export function FarmerLeadForm({
   mode,
   users = []
 }: FarmerLeadFormProps) {
+  const isWorkflowInstalledLead = Boolean(lead?.installation_completed);
+  const hasInconsistentDeviceInstalledStage =
+    lead?.funnel_stage === "Device Installed" && !lead.installation_completed;
+  const initialFunnelStage = isWorkflowInstalledLead
+    ? "Device Installed"
+    : hasInconsistentDeviceInstalledStage
+      ? ""
+      : (lead?.funnel_stage ?? defaultFunnelStage);
   const [primaryCrop, setPrimaryCrop] = useState(
     lead?.primary_crop ?? defaultPrimaryCrop
   );
   const [stateValue, setStateValue] = useState(lead?.state ?? "");
   const [districtValue, setDistrictValue] = useState(lead?.district ?? "");
-  const [funnelStage, setFunnelStage] = useState(
-    lead?.funnel_stage ?? defaultFunnelStage
-  );
+  const [funnelStage, setFunnelStage] = useState(initialFunnelStage);
   const [paymentConfirmed, setPaymentConfirmed] = useState(
     Boolean(lead?.payment_confirmed)
   );
@@ -219,23 +229,51 @@ export function FarmerLeadForm({
           <div>
             <label
               className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="funnel_stage"
+              htmlFor={
+                isWorkflowInstalledLead ? "funnel_stage_readonly" : "funnel_stage"
+              }
             >
               Funnel stage
             </label>
-            <select
-              className={inputClassName()}
-              id="funnel_stage"
-              name="funnel_stage"
-              onChange={(event) => setFunnelStage(event.target.value)}
-              value={funnelStage}
-            >
-              {funnelStageOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+            {isWorkflowInstalledLead ? (
+              <>
+                <input name="funnel_stage" type="hidden" value="Device Installed" />
+                <div
+                  className="flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700"
+                  id="funnel_stage_readonly"
+                >
+                  Device Installed
+                </div>
+              </>
+            ) : (
+              <select
+                className={inputClassName()}
+                id="funnel_stage"
+                name="funnel_stage"
+                onChange={(event) => setFunnelStage(event.target.value)}
+                required
+                value={funnelStage}
+              >
+                <option disabled value="">
+                  Select funnel stage
                 </option>
-              ))}
-            </select>
+                {manualFunnelStageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Device Installed is set automatically after a farmer-sale
+              installation is completed.
+            </p>
+            {hasInconsistentDeviceInstalledStage ? (
+              <p className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                This lead was manually marked Device Installed. Choose the
+                correct current stage before saving.
+              </p>
+            ) : null}
           </div>
 
           <div>

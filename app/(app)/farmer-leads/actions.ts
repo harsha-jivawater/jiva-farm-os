@@ -30,6 +30,9 @@ function canOwnLead(user: { role: string; secondary_role?: string | null } | nul
   return hasAnyRole(user, ["Salesperson", "RSM"]);
 }
 
+const deviceInstalledWorkflowMessage =
+  "Device Installed is set automatically after a farmer-sale installation is completed.";
+
 export async function createFarmerLeadAction(formData: FormData) {
   const supabase = await createClient();
   const leadId = crypto.randomUUID();
@@ -143,6 +146,11 @@ export async function createFarmerLeadAction(formData: FormData) {
 
   payload.installation_completed = false;
   payload.device_dispatched = false;
+
+  if (payload.funnel_stage === "Device Installed") {
+    redirectWithError("/farmer-leads/new", deviceInstalledWorkflowMessage);
+  }
+
   payload.lead_status = deriveLeadStatus({
     funnelStage: payload.funnel_stage,
     paymentConfirmed: Boolean(payload.payment_confirmed)
@@ -290,6 +298,17 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
   payload.linked_dispatch_id = existing.linked_dispatch_id;
   payload.installation_completed = existing.installation_completed;
   payload.linked_installation_id = existing.linked_installation_id;
+
+  if (
+    payload.funnel_stage === "Device Installed" &&
+    !payload.installation_completed
+  ) {
+    redirectWithError(
+      `/farmer-leads/${id}/edit`,
+      deviceInstalledWorkflowMessage
+    );
+  }
+
   payload.lead_status = deriveLeadStatus({
     funnelStage: payload.funnel_stage,
     paymentConfirmed: Boolean(payload.payment_confirmed)
