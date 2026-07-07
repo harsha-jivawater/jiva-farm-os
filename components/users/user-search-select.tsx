@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { labelForRole } from "@/lib/users/options";
 
 export type UserSearchOption = {
@@ -17,6 +17,7 @@ type UserSearchSelectProps = {
   label: string;
   name: string;
   placeholder: string;
+  notifyFilterChange?: boolean;
   required?: boolean;
   users: UserSearchOption[];
 };
@@ -33,6 +34,7 @@ export function UserSearchSelect({
   defaultValue,
   label,
   name,
+  notifyFilterChange = false,
   placeholder,
   required = false,
   users
@@ -40,6 +42,29 @@ export function UserSearchSelect({
   const selectedUser = users.find((user) => user.id === defaultValue);
   const [selectedValue, setSelectedValue] = useState(defaultValue ?? "");
   const [query, setQuery] = useState(selectedUser ? userLabel(selectedUser) : "");
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
+  const hasMountedRef = useRef(false);
+
+  useEffect(() => {
+    const nextUser = users.find((user) => user.id === defaultValue);
+    setSelectedValue(defaultValue ?? "");
+    setQuery(nextUser ? userLabel(nextUser) : "");
+  }, [defaultValue, users]);
+
+  useEffect(() => {
+    if (!notifyFilterChange) {
+      return;
+    }
+
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    hiddenInputRef.current?.dispatchEvent(
+      new Event("change", { bubbles: true })
+    );
+  }, [notifyFilterChange, selectedValue]);
   const trimmedQuery = query.trim().toLowerCase();
   const matchingUsers = useMemo(() => {
     if (!trimmedQuery || selectedValue) {
@@ -70,7 +95,12 @@ export function UserSearchSelect({
       >
         {label}
       </label>
-      <input name={name} type="hidden" value={selectedValue} />
+      <input
+        name={name}
+        ref={hiddenInputRef}
+        type="hidden"
+        value={selectedValue}
+      />
       <div className="relative">
         <Search
           aria-hidden="true"

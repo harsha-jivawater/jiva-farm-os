@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { CropFilterSelect } from "@/components/crops/crop-filter-select";
+import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { StatusPill } from "@/components/farmer-leads/status-pill";
 import {
   UserSearchSelect,
@@ -317,9 +318,8 @@ export default async function FarmerLeadsPage({
         <KpiCard icon={Wrench} label="Device Installed" value={kpis.deviceInstalled} />
       </div>
 
-      <form
+      <LiveFilterForm
         className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-        method="get"
       >
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
@@ -426,6 +426,7 @@ export default async function FarmerLeadsPage({
             defaultValue={filters.owner_user_id}
             label="Owner user"
             name="owner_user_id"
+            notifyFilterChange
             placeholder="Search owner by name or email"
             users={ownerUsers}
           />
@@ -433,6 +434,7 @@ export default async function FarmerLeadsPage({
             defaultValue={filters.rsm_user_id}
             label="RSM"
             name="rsm_user_id"
+            notifyFilterChange
             placeholder="Search RSM by name or email"
             users={rsmUsers}
           />
@@ -445,15 +447,8 @@ export default async function FarmerLeadsPage({
           >
             Reset
           </Link>
-          <button
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
-            type="submit"
-          >
-            <Search className="h-4 w-4" aria-hidden="true" />
-            Apply filters
-          </button>
         </div>
-      </form>
+      </LiveFilterForm>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">

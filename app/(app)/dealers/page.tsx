@@ -16,6 +16,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { DealerStatusPill } from "@/components/dealers/dealer-status-pill";
+import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PageHeader } from "@/components/page-header";
 import {
   dealerAgreementStatusOptions,
@@ -401,9 +402,8 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
         />
       </div>
 
-      <form
+      <LiveFilterForm
         className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-        method="get"
       >
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
@@ -605,15 +605,8 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
           >
             Reset
           </Link>
-          <button
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
-            type="submit"
-          >
-            <Search className="h-4 w-4" aria-hidden="true" />
-            Apply filters
-          </button>
         </div>
-      </form>
+      </LiveFilterForm>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">

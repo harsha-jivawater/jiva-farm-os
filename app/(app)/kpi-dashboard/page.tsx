@@ -9,7 +9,6 @@ import {
   Percent,
   RadioTower,
   RotateCcw,
-  Search,
   SlidersHorizontal,
   Store,
   Target,
@@ -26,6 +25,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { CropFilterSelect } from "@/components/crops/crop-filter-select";
+import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { deviceStatusOptions, productModelOptions } from "@/lib/devices/options";
 import { primaryCropOptions } from "@/lib/farmer-leads/options";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
@@ -463,10 +463,9 @@ function FiltersForm({
   rsmUsers: SummaryFilterUser[];
 }) {
   return (
-    <form
+    <LiveFilterForm
       action="/kpi-dashboard"
       className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-      method="get"
     >
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-950">
         <SlidersHorizontal className="h-4 w-4 text-slate-500" />
@@ -556,13 +555,6 @@ function FiltersForm({
       </div>
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
-          type="submit"
-        >
-          <Search className="h-4 w-4" aria-hidden="true" />
-          Apply filters
-        </button>
         <Link
           className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
           href="/kpi-dashboard"
@@ -570,7 +562,7 @@ function FiltersForm({
           Reset
         </Link>
       </div>
-    </form>
+    </LiveFilterForm>
   );
 }
 

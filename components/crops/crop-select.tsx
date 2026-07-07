@@ -1,7 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cropContext, cropLibrary } from "@/lib/crops/crop-library";
 
 type CropSelectProps = {
@@ -15,6 +15,7 @@ type CropSelectProps = {
   showSelectedInInput?: boolean;
   showSelectedContext?: boolean;
   showSelectedSummary?: boolean;
+  notifyFilterChange?: boolean;
 };
 
 function inputClassName() {
@@ -45,15 +46,33 @@ export function CropSelect({
   showOptionsOnEmptySearch = true,
   showSelectedInInput = false,
   showSelectedContext = true,
-  showSelectedSummary = true
+  showSelectedSummary = true,
+  notifyFilterChange = false
 }: CropSelectProps) {
   const [query, setQuery] = useState("");
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
+  const hasMountedRef = useRef(false);
 
   useEffect(() => {
     if (!value) {
       setQuery("");
     }
   }, [value]);
+
+  useEffect(() => {
+    if (!notifyFilterChange) {
+      return;
+    }
+
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    hiddenInputRef.current?.dispatchEvent(
+      new Event("change", { bubbles: true })
+    );
+  }, [notifyFilterChange, value]);
 
   const visibleCrops = useMemo(() => {
     const trimmed = query.trim();
@@ -79,7 +98,7 @@ export function CropSelect({
           <span className="text-xs font-medium text-slate-500">Required</span>
         ) : null}
       </div>
-      <input name={name} type="hidden" value={value} />
+      <input name={name} ref={hiddenInputRef} type="hidden" value={value} />
       <div className="relative mt-1.5">
         <Search
           aria-hidden="true"

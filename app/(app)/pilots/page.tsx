@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { CropFilterSelect } from "@/components/crops/crop-filter-select";
+import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
 import {
   cropOptions,
@@ -546,9 +547,8 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
         />
       </div>
 
-      <form
+      <LiveFilterForm
         className="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-        method="get"
       >
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
@@ -630,14 +630,8 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
           >
             Reset
           </Link>
-          <button
-            className="inline-flex min-h-10 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
-            type="submit"
-          >
-            Apply filters
-          </button>
         </div>
-      </form>
+      </LiveFilterForm>
 
       <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">

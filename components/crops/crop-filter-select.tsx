@@ -25,6 +25,7 @@ export function CropFilterSelect({
       <CropSelect
         label={label}
         name={name}
+        notifyFilterChange
         onChange={setValue}
         showMissingSelectionMessage={false}
         showOptionsOnEmptySearch={false}

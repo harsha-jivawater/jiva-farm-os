@@ -15,6 +15,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { FollowupStatusPill } from "@/components/follow-ups/followup-status-pill";
+import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PageHeader } from "@/components/page-header";
 import {
   farmerSaleFollowupType,
@@ -400,7 +401,7 @@ export default async function FollowupsPage({
         />
       </div>
 
-      <form className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <LiveFilterForm className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
           Search and filters
@@ -560,14 +561,8 @@ export default async function FollowupsPage({
           >
             Clear
           </Link>
-          <button
-            className="inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
-            type="submit"
-          >
-            Apply filters
-          </button>
         </div>
-      </form>
+      </LiveFilterForm>
 
       {followupsResult.error ? (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
