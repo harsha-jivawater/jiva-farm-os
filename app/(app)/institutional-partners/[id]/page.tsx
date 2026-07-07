@@ -10,6 +10,7 @@ import { ContactForm } from "@/components/institutions/contact-form";
 import { InstitutionStatusPill } from "@/components/institutions/institution-status-pill";
 import { MeetingForm } from "@/components/institutions/meeting-form";
 import { PageHeader } from "@/components/page-header";
+import { FileLink } from "@/components/uploads/file-link";
 import {
   agreementStatusOptions,
   decisionRoleOptions,
@@ -41,6 +42,7 @@ import {
   type UserOption
 } from "@/lib/institutions/types";
 import { createClient } from "@/lib/supabase/server";
+import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import { canWriteModule } from "@/lib/users/permissions";
@@ -147,6 +149,19 @@ export default async function InstitutionDetailPage({
   const usersList = (users ?? []) as UserOption[];
   const contactsList = (contacts ?? []) as InstitutionContact[];
   const meetingsList = (meetings ?? []) as InstitutionMeeting[];
+  const [proposalUrl, presentationUrl, mouUrl] = await Promise.all([
+    resolveFileUrl(supabase, institution.proposal_link),
+    resolveFileUrl(supabase, institution.presentation_link),
+    resolveFileUrl(supabase, institution.mou_agreement_link)
+  ]);
+  const meetingNotesUrls = new Map<string, string | null>(
+    await Promise.all(
+      meetingsList.map(async (meeting) => [
+        meeting.id,
+        await resolveFileUrl(supabase, meeting.notes_link)
+      ] as [string, string | null])
+    )
+  );
   const regionsList = (regions ?? []) as RegionOption[];
   const userMap = new Map(usersList.map((user) => [user.id, user]));
   const regionMap = new Map(regionsList.map((region) => [region.id, region]));
@@ -384,7 +399,7 @@ export default async function InstitutionDetailPage({
           />
           <DetailItem
             label="Proposal link"
-            value={display(institution.proposal_link)}
+            value={<FileLink href={proposalUrl} label="View proposal" />}
           />
           <DetailItem
             label="Presentation shared"
@@ -395,11 +410,15 @@ export default async function InstitutionDetailPage({
           />
           <DetailItem
             label="Presentation link"
-            value={display(institution.presentation_link)}
+            value={<FileLink href={presentationUrl} label="View presentation" />}
           />
           <DetailItem
             label="MoU agreement status"
             value={labelFor(institution.mou_agreement_status, agreementStatusOptions)}
+          />
+          <DetailItem
+            label="MoU agreement file"
+            value={<FileLink href={mouUrl} label="View MOU" />}
           />
           <DetailItem
             label="MOU legal approval"
@@ -617,6 +636,13 @@ export default async function InstitutionDetailPage({
                       <p>Pilot: {meeting.pilot_discussed ? "Yes" : "No"}</p>
                       <p>
                         Scale-up: {meeting.scale_up_discussed ? "Yes" : "No"}
+                      </p>
+                      <p>
+                        Notes:{" "}
+                        <FileLink
+                          href={meetingNotesUrls.get(meeting.id)}
+                          label="View notes"
+                        />
                       </p>
                     </td>
                     <td className="px-4 py-3">

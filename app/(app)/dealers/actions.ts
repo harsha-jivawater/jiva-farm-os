@@ -8,6 +8,7 @@ import {
 } from "@/lib/dealers/form-data";
 import type { Dealer, DealerInsert, DealerUpdate } from "@/lib/dealers/types";
 import { createClient } from "@/lib/supabase/server";
+import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import {
   canApproveLegalDocuments,
@@ -29,6 +30,7 @@ export async function createDealerAction(formData: FormData) {
   const supabase = await createClient();
   const errorPath = "/dealers/new";
   const profile = await getCurrentProfile(supabase, errorPath);
+  const dealerId = crypto.randomUUID();
 
   if (hasRole(profile, "Sales Head") || hasRole(profile, "HR & Legal")) {
     redirectWithError(
@@ -38,6 +40,25 @@ export async function createDealerAction(formData: FormData) {
   }
 
   const payload = dealerPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "agreement_link", kind: "document" },
+        { fieldName: "dealer_documents_folder_link", kind: "zip" },
+        { fieldName: "training_material_shared_link", kind: "document" }
+      ],
+      folder: "dealers",
+      formData,
+      payload,
+      recordId: dealerId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validateDealerPayload(payload);
 
   if (validationError) {
@@ -46,6 +67,7 @@ export async function createDealerAction(formData: FormData) {
 
   const insertPayload: DealerInsert = {
     ...payload,
+    id: dealerId,
     created_by_user_id: profile.id
   } as DealerInsert;
 
@@ -81,6 +103,25 @@ export async function updateDealerAction(id: string, formData: FormData) {
 
   const existing = existingData as Dealer;
   const payload = dealerPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "agreement_link", kind: "document" },
+        { fieldName: "dealer_documents_folder_link", kind: "zip" },
+        { fieldName: "training_material_shared_link", kind: "document" }
+      ],
+      folder: "dealers",
+      formData,
+      payload,
+      recordId: existing.id,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validateDealerPayload(payload);
 
   if (validationError) {
@@ -97,7 +138,14 @@ export async function updateDealerAction(id: string, formData: FormData) {
           String(formData.get("dealer_agreement_approval_status") ?? "Pending"),
         dealer_agreement_hr_legal_comments:
           String(formData.get("dealer_agreement_hr_legal_comments") ?? "").trim() ||
-          null
+          null,
+        agreement_link: payload.agreement_link ?? existing.agreement_link,
+        dealer_documents_folder_link:
+          payload.dealer_documents_folder_link ??
+          existing.dealer_documents_folder_link,
+        training_material_shared_link:
+          payload.training_material_shared_link ??
+          existing.training_material_shared_link
       }
     : salesHeadApprovalOnly
     ? {
@@ -120,6 +168,15 @@ export async function updateDealerAction(id: string, formData: FormData) {
     updatePayload.dealer_agreement_approval_status === "Approved" ||
     updatePayload.dealer_agreement_approval_status === "Rejected"
   ) {
+    if (
+      updatePayload.dealer_agreement_approval_status === "Approved" &&
+      !(payload.agreement_link ?? existing.agreement_link)
+    ) {
+      redirectWithError(
+        errorPath,
+        "Upload the dealer agreement file before approving it."
+      );
+    }
     updatePayload.dealer_agreement_approved_by_user_id = profile.id;
     updatePayload.dealer_agreement_approved_at = new Date().toISOString();
   }

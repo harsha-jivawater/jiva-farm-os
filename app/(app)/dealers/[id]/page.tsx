@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { DealerStatusPill } from "@/components/dealers/dealer-status-pill";
 import { PageHeader } from "@/components/page-header";
+import { FileLink } from "@/components/uploads/file-link";
 import { productModelOptions } from "@/lib/devices/options";
 import {
   commercialTermsSharedOptions,
@@ -27,6 +28,7 @@ import {
   type UserOption
 } from "@/lib/dealers/types";
 import { createClient } from "@/lib/supabase/server";
+import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import { canWriteModule } from "@/lib/users/permissions";
@@ -84,6 +86,11 @@ export default async function DealerDetailPage({
   }
 
   const dealer = data as Dealer;
+  const [agreementUrl, documentsUrl, trainingUrl] = await Promise.all([
+    resolveFileUrl(supabase, dealer.agreement_link),
+    resolveFileUrl(supabase, dealer.dealer_documents_folder_link),
+    resolveFileUrl(supabase, dealer.training_material_shared_link)
+  ]);
   const monthStart = new Date();
   monthStart.setDate(1);
   const monthStartDate = monthStart.toISOString().slice(0, 10);
@@ -281,6 +288,18 @@ export default async function DealerDetailPage({
           <DetailItem
             label="Dealer Agreement legal approval"
             value={display(dealer.dealer_agreement_approval_status)}
+          />
+          <DetailItem
+            label="Dealer agreement file"
+            value={<FileLink href={agreementUrl} label="View agreement" />}
+          />
+          <DetailItem
+            label="Dealer documents"
+            value={<FileLink href={documentsUrl} label="View documents" />}
+          />
+          <DetailItem
+            label="Training material"
+            value={<FileLink href={trainingUrl} label="View training material" />}
           />
           <DetailItem
             label="Commercial terms shared"

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { InstallationStatusPill } from "@/components/installations/installation-status-pill";
 import { PageHeader } from "@/components/page-header";
+import { FileLink } from "@/components/uploads/file-link";
 import { holderTypeOptions, productModelOptions } from "@/lib/devices/options";
 import {
   farmerConfirmationOptions,
@@ -18,6 +19,7 @@ import {
   type Installation
 } from "@/lib/installations/types";
 import { createClient } from "@/lib/supabase/server";
+import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canWriteModule } from "@/lib/users/permissions";
 import { installationScope } from "@/lib/users/record-scope";
@@ -74,6 +76,10 @@ export default async function InstallationDetailPage({
   }
 
   const installation = data as Installation;
+  const installationPhotoUrl = await resolveFileUrl(
+    supabase,
+    installation.installation_photo_link
+  );
 
   return (
     <section>
@@ -219,17 +225,7 @@ export default async function InstallationDetailPage({
         />
         <DetailItem
           label="Installation photos"
-          value={
-            <a
-              className="inline-flex items-center gap-1 text-brand-700 hover:text-brand-800"
-              href={installation.installation_photo_link}
-              rel="noreferrer"
-              target="_blank"
-            >
-              Open link
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-            </a>
-          }
+          value={<FileLink href={installationPhotoUrl} label="View photo" />}
         />
       </div>
 

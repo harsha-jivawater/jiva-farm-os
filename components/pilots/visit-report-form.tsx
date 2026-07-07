@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { Save } from "lucide-react";
+import { FileUploadField } from "@/components/uploads/file-upload-field";
 import { todayDate } from "@/lib/pilots/form-data";
 import {
   cropOptions,
@@ -352,12 +353,12 @@ export function VisitReportForm({
           name="report_title"
           required
         />
-        <Field
-          defaultValue={report?.report_link}
-          label="Report link"
+        <FileUploadField
+          currentValue={report?.report_link}
+          kind="document"
+          label="Report file"
           name="report_link"
           required
-          type="url"
         />
         <div>
           <label
@@ -386,17 +387,17 @@ export function VisitReportForm({
           name="next_visit_date"
           type="date"
         />
-        <Field
-          defaultValue={report?.photo_folder_link}
-          label="Photo folder link"
+        <FileUploadField
+          currentValue={report?.photo_folder_link}
+          kind="zip"
+          label="Report photos ZIP"
           name="photo_folder_link"
-          type="url"
         />
-        <Field
-          defaultValue={report?.data_sheet_link}
-          label="Data sheet link"
+        <FileUploadField
+          currentValue={report?.data_sheet_link}
+          kind="sheet"
+          label="Report data sheet"
           name="data_sheet_link"
-          type="url"
         />
       </div>
 

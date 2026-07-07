@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { Save } from "lucide-react";
+import { FileUploadField } from "@/components/uploads/file-upload-field";
 import { todayDate } from "@/lib/institutions/form-data";
 import {
   defaultMeetingMode,
@@ -282,11 +283,11 @@ export function MeetingForm({
           name="next_action_date"
           type="date"
         />
-        <Field
-          defaultValue={meeting?.notes_link}
-          label="Notes link"
+        <FileUploadField
+          currentValue={meeting?.notes_link}
+          kind="document"
+          label="Meeting notes file"
           name="notes_link"
-          type="url"
         />
       </div>
 

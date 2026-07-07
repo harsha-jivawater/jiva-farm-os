@@ -28,6 +28,7 @@ import type {
   VisitReportUpdate
 } from "@/lib/pilots/types";
 import { createClient } from "@/lib/supabase/server";
+import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import { hasAnyRole } from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import type { InternalUser } from "@/lib/users/types";
@@ -300,7 +301,30 @@ export async function createPilotAction(formData: FormData) {
   const supabase = await createClient();
   const errorPath = "/pilots/new";
   const profile = await getCurrentProfile(supabase, errorPath);
+  const pilotId = crypto.randomUUID();
   const payload = pilotPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "monitoring_plan_link", kind: "document" },
+        { fieldName: "pilot_folder_link", kind: "zip" },
+        { fieldName: "baseline_report_link", kind: "document" },
+        { fieldName: "final_pilot_report_link", kind: "document" },
+        { fieldName: "photo_folder_link", kind: "zip" },
+        { fieldName: "data_sheet_link", kind: "sheet" }
+      ],
+      folder: "pilots",
+      formData,
+      payload,
+      recordId: pilotId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validatePilotPayload(payload);
   const farmerLeadId = payload.farmer_lead_id;
 
@@ -330,6 +354,7 @@ export async function createPilotAction(formData: FormData) {
 
   const insertPayload: PilotInsert = {
     ...payload,
+    id: pilotId,
     created_by_user_id: profile.id
   } as PilotInsert;
 
@@ -365,6 +390,28 @@ export async function updatePilotAction(id: string, formData: FormData) {
     .is("deleted_at", null)
     .maybeSingle();
   const payload = pilotPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "monitoring_plan_link", kind: "document" },
+        { fieldName: "pilot_folder_link", kind: "zip" },
+        { fieldName: "baseline_report_link", kind: "document" },
+        { fieldName: "final_pilot_report_link", kind: "document" },
+        { fieldName: "photo_folder_link", kind: "zip" },
+        { fieldName: "data_sheet_link", kind: "sheet" }
+      ],
+      folder: "pilots",
+      formData,
+      payload,
+      recordId: id,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validatePilotPayload(payload);
   const farmerLeadId = payload.farmer_lead_id;
 
@@ -450,7 +497,26 @@ export async function createPilotVisitAction(
   const supabase = await createClient();
   const errorPath = `/pilots/${pilotId}`;
   await getCurrentProfile(supabase, errorPath);
+  const visitId = crypto.randomUUID();
   const payload = pilotVisitPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "photo_folder_link", kind: "zip" },
+        { fieldName: "raw_data_sheet_link", kind: "sheet" }
+      ],
+      folder: "pilot-visits",
+      formData,
+      payload,
+      recordId: visitId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validatePilotVisitPayload(payload);
 
   if (validationError) {
@@ -468,6 +534,7 @@ export async function createPilotVisitAction(
 
   const insertPayload: PilotVisitInsert = {
     ...payload,
+    id: visitId,
     pilot_id: pilotId
   } as PilotVisitInsert;
 
@@ -491,6 +558,24 @@ export async function updatePilotVisitAction(
   const errorPath = `/pilots/${pilotId}/visits/${visitId}/edit`;
   await getCurrentProfile(supabase, errorPath);
   const payload = pilotVisitPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "photo_folder_link", kind: "zip" },
+        { fieldName: "raw_data_sheet_link", kind: "sheet" }
+      ],
+      folder: "pilot-visits",
+      formData,
+      payload,
+      recordId: visitId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validatePilotVisitPayload(payload);
 
   if (validationError) {
@@ -552,7 +637,27 @@ export async function createVisitReportAction(
   const supabase = await createClient();
   const errorPath = `/pilots/${pilotId}`;
   const profile = await getCurrentProfile(supabase, errorPath);
+  const reportId = crypto.randomUUID();
   const payload = visitReportPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "report_link", kind: "document" },
+        { fieldName: "photo_folder_link", kind: "zip" },
+        { fieldName: "data_sheet_link", kind: "sheet" }
+      ],
+      folder: "visit-reports",
+      formData,
+      payload,
+      recordId: reportId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   stampFinalPilotReportApproval(payload, profile, errorPath);
   const validationError = validateVisitReportPayload(payload);
 
@@ -585,6 +690,7 @@ export async function createVisitReportAction(
 
   const insertPayload: VisitReportInsert = {
     ...payload,
+    id: reportId,
     pilot_id: pilotId
   } as VisitReportInsert;
 
@@ -622,6 +728,25 @@ export async function updateVisitReportAction(
   const errorPath = `/pilots/${pilotId}/reports/${reportId}/edit`;
   const profile = await getCurrentProfile(supabase, errorPath);
   const payload = visitReportPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "report_link", kind: "document" },
+        { fieldName: "photo_folder_link", kind: "zip" },
+        { fieldName: "data_sheet_link", kind: "sheet" }
+      ],
+      folder: "visit-reports",
+      formData,
+      payload,
+      recordId: reportId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   stampFinalPilotReportApproval(payload, profile, errorPath);
   const validationError = validateVisitReportPayload(payload);
 

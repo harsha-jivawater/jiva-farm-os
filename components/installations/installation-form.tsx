@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
+import { FileUploadField } from "@/components/uploads/file-upload-field";
 import { holderTypeOptions } from "@/lib/devices/options";
 import {
   defaultFarmerConfirmation,
@@ -668,23 +669,13 @@ export function InstallationForm({
             />
           </div>
 
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="installation_photo_link"
-            >
-              Installation photo link
-            </label>
-            <input
-              className={inputClassName()}
-              defaultValue={installation?.installation_photo_link ?? ""}
-              id="installation_photo_link"
-              name="installation_photo_link"
-              placeholder="Drive folder or photo URL"
-              required
-              type="url"
-            />
-          </div>
+          <FileUploadField
+            currentValue={installation?.installation_photo_link}
+            kind="image"
+            label="Installation photo"
+            name="installation_photo_link"
+            required
+          />
 
           <div>
             <label

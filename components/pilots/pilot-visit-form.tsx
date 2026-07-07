@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { Save } from "lucide-react";
+import { FileUploadField } from "@/components/uploads/file-upload-field";
 import { todayDate } from "@/lib/pilots/form-data";
 import {
   defaultVisitStatus,
@@ -285,17 +286,17 @@ export function PilotVisitForm({
           name="gps_longitude"
           type="number"
         />
-        <Field
-          defaultValue={visit?.photo_folder_link}
-          label="Photo folder link"
+        <FileUploadField
+          currentValue={visit?.photo_folder_link}
+          kind="zip"
+          label="Visit photos ZIP"
           name="photo_folder_link"
-          type="url"
         />
-        <Field
-          defaultValue={visit?.raw_data_sheet_link}
-          label="Raw data sheet link"
+        <FileUploadField
+          currentValue={visit?.raw_data_sheet_link}
+          kind="sheet"
+          label="Raw data sheet"
           name="raw_data_sheet_link"
-          type="url"
         />
         <Field
           defaultValue={visit?.next_visit_date}

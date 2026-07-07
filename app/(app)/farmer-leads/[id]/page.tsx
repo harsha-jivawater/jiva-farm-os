@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Pencil, XCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { FileLink } from "@/components/uploads/file-link";
 import { StatusPill } from "@/components/farmer-leads/status-pill";
 import { confirmFarmerLeadPaymentAction } from "@/app/(app)/farmer-leads/actions";
 import {
@@ -14,6 +15,7 @@ import {
   leadSourceOptions
 } from "@/lib/farmer-leads/options";
 import { createClient } from "@/lib/supabase/server";
+import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canConfirmPayment, canWriteModule } from "@/lib/users/permissions";
 import { farmerLeadScope } from "@/lib/users/record-scope";
@@ -103,6 +105,10 @@ export default async function FarmerLeadDetailPage({
   }
 
   const lead = data as FarmerLead;
+  const [leadPhotosUrl, farmerDocumentUrl] = await Promise.all([
+    resolveFileUrl(supabase, lead.lead_photo_folder_link),
+    resolveFileUrl(supabase, lead.farmer_document_link)
+  ]);
   const confirmPaymentAction = confirmFarmerLeadPaymentAction.bind(null, lead.id);
   const canConfirmLeadPayment = canConfirmPayment(currentUser);
 
@@ -181,6 +187,16 @@ export default async function FarmerLeadDetailPage({
         />
         <DetailItem label="Owner user ID" value={display(lead.owner_user_id)} />
         <DetailItem label="RSM user ID" value={display(lead.rsm_user_id)} />
+        <DetailItem
+          label="Lead photos"
+          value={<FileLink href={leadPhotosUrl} label="View lead photos" />}
+        />
+        <DetailItem
+          label="Farmer document"
+          value={
+            <FileLink href={farmerDocumentUrl} label="View farmer document" />
+          }
+        />
       </div>
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

@@ -124,7 +124,16 @@ export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
       "annual_installation_target"
     ),
     next_action_date:
-      getText(formData, "next_action_date") ?? defaultNextActionDate()
+      getText(formData, "next_action_date") ?? defaultNextActionDate(),
+    agreement_link: getText(formData, "agreement_link"),
+    dealer_documents_folder_link: getText(
+      formData,
+      "dealer_documents_folder_link"
+    ),
+    training_material_shared_link: getText(
+      formData,
+      "training_material_shared_link"
+    )
   };
 }
 

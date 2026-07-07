@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
+import { FileUploadField } from "@/components/uploads/file-upload-field";
 import {
   defaultFunnelStage,
   defaultIrrigationType,
@@ -424,6 +425,26 @@ export function FarmerLeadForm({
           New leads are assigned to the right RSM or Salesperson automatically.
         </div>
       )}
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-slate-950">
+          Farmer documents and photos
+        </h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <FileUploadField
+            currentValue={lead?.lead_photo_folder_link}
+            kind="zip"
+            label="Lead photos ZIP"
+            name="lead_photo_folder_link"
+          />
+          <FileUploadField
+            currentValue={lead?.farmer_document_link}
+            kind="document"
+            label="Farmer document file"
+            name="farmer_document_link"
+          />
+        </div>
+      </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <label

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { DeviceStatusPill } from "@/components/devices/device-status-pill";
 import { PageHeader } from "@/components/page-header";
+import { FileLink } from "@/components/uploads/file-link";
 import {
   deviceStatusOptions,
   holderTypeOptions,
@@ -17,6 +18,7 @@ import {
   type Device
 } from "@/lib/devices/types";
 import { createClient } from "@/lib/supabase/server";
+import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   canApproveDeviceReturn,
@@ -80,6 +82,10 @@ export default async function DeviceDetailPage({
   }
 
   const device = data as Device;
+  const returnEvidenceUrl = await resolveFileUrl(
+    supabase,
+    device.return_photo_link
+  );
 
   return (
     <section>
@@ -156,6 +162,15 @@ export default async function DeviceDetailPage({
         <DetailItem
           label="Return approval"
           value={display(device.return_approval_status)}
+        />
+        <DetailItem
+          label="Return evidence"
+          value={
+            <FileLink
+              href={returnEvidenceUrl}
+              label="View return evidence photo"
+            />
+          }
         />
         <DetailItem
           label="Manual adjustment approval"

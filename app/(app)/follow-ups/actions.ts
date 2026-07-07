@@ -15,6 +15,7 @@ import type {
   VisitReportInsert
 } from "@/lib/follow-ups/types";
 import { createClient } from "@/lib/supabase/server";
+import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import { canCreateTechnicalReport } from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 
@@ -142,6 +143,24 @@ async function saveFollowup({
   const payload = followupPayloadFromForm(formData, {
     forceCompleted: completing
   });
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "report_link", kind: "document" },
+        { fieldName: "photo_folder_link", kind: "zip" }
+      ],
+      folder: "followups",
+      formData,
+      payload,
+      recordId: id,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
 
   if (completing) {
     payload.followup_type = existing.followup_type;

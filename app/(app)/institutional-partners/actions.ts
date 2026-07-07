@@ -21,6 +21,7 @@ import type {
   InstitutionUpdate,
 } from "@/lib/institutions/types";
 import { createClient } from "@/lib/supabase/server";
+import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import {
   canApproveLegalDocuments,
   hasRole
@@ -91,6 +92,7 @@ export async function createInstitutionAction(formData: FormData) {
   const supabase = await createClient();
   const errorPath = "/institutional-partners/new";
   const profile = await getCurrentProfile(supabase, errorPath);
+  const institutionId = crypto.randomUUID();
 
   if (hasRole(profile, "HR & Legal")) {
     redirectWithError(
@@ -100,6 +102,25 @@ export async function createInstitutionAction(formData: FormData) {
   }
 
   const payload = institutionPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "proposal_link", kind: "document" },
+        { fieldName: "presentation_link", kind: "document" },
+        { fieldName: "mou_agreement_link", kind: "document" }
+      ],
+      folder: "institutions",
+      formData,
+      payload,
+      recordId: institutionId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validateInstitutionPayload(payload);
 
   if (validationError) {
@@ -108,6 +129,7 @@ export async function createInstitutionAction(formData: FormData) {
 
   const insertPayload: InstitutionInsert = {
     ...payload,
+    id: institutionId,
     created_by_user_id: profile.id
   } as InstitutionInsert;
 
@@ -158,11 +180,43 @@ export async function updateInstitutionAction(id: string, formData: FormData) {
       mou_hr_legal_comments:
         String(formData.get("mou_hr_legal_comments") ?? "").trim() || null
     };
+    try {
+      await applyUploadedFilesToPayload({
+        fields: [{ fieldName: "mou_agreement_link", kind: "document" }],
+        folder: "institutions",
+        formData,
+        payload: updatePayload,
+        recordId: id,
+        supabase
+      });
+    } catch (error) {
+      redirectWithError(
+        errorPath,
+        error instanceof Error ? error.message : "File upload failed."
+      );
+    }
 
     if (
       updatePayload.mou_approval_status === "Approved" ||
       updatePayload.mou_approval_status === "Rejected"
     ) {
+      if (
+        updatePayload.mou_approval_status === "Approved" &&
+        !updatePayload.mou_agreement_link
+      ) {
+        const { data: existingMou } = await supabase
+          .from("institutions")
+          .select("mou_agreement_link")
+          .eq("id", id)
+          .single();
+
+        if (!existingMou?.mou_agreement_link) {
+          redirectWithError(
+            errorPath,
+            "Upload the MOU agreement file before approving it."
+          );
+        }
+      }
       updatePayload.mou_approved_by_user_id = profile.id;
       updatePayload.mou_approved_at = new Date().toISOString();
     }
@@ -181,6 +235,25 @@ export async function updateInstitutionAction(id: string, formData: FormData) {
   }
 
   const payload = institutionPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "proposal_link", kind: "document" },
+        { fieldName: "presentation_link", kind: "document" },
+        { fieldName: "mou_agreement_link", kind: "document" }
+      ],
+      folder: "institutions",
+      formData,
+      payload,
+      recordId: id,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validateInstitutionPayload(payload);
 
   if (validationError) {
@@ -194,6 +267,15 @@ export async function updateInstitutionAction(id: string, formData: FormData) {
     (updatePayload.mou_approval_status === "Approved" ||
       updatePayload.mou_approval_status === "Rejected")
   ) {
+    if (
+      updatePayload.mou_approval_status === "Approved" &&
+      !updatePayload.mou_agreement_link
+    ) {
+      redirectWithError(
+        errorPath,
+        "Upload the MOU agreement file before approving it."
+      );
+    }
     updatePayload.mou_approved_by_user_id = profile.id;
     updatePayload.mou_approved_at = new Date().toISOString();
   }
@@ -346,7 +428,23 @@ export async function createInstitutionMeetingAction(
   const supabase = await createClient();
   const errorPath = `/institutional-partners/${institutionId}`;
   const profile = await getCurrentProfile(supabase, errorPath);
+  const meetingId = crypto.randomUUID();
   const payload = meetingPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [{ fieldName: "notes_link", kind: "document" }],
+      folder: "institution-meetings",
+      formData,
+      payload,
+      recordId: meetingId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validateMeetingPayload(payload);
 
   if (validationError) {
@@ -355,6 +453,7 @@ export async function createInstitutionMeetingAction(
 
   const insertPayload: InstitutionMeetingInsert = {
     ...payload,
+    id: meetingId,
     institution_id: institutionId,
     created_by_user_id: profile.id
   } as InstitutionMeetingInsert;
@@ -386,6 +485,21 @@ export async function updateInstitutionMeetingAction(
   const errorPath = `/institutional-partners/${institutionId}/meetings/${meetingId}/edit`;
   await getCurrentProfile(supabase, errorPath);
   const payload = meetingPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [{ fieldName: "notes_link", kind: "document" }],
+      folder: "institution-meetings",
+      formData,
+      payload,
+      recordId: meetingId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validateMeetingPayload(payload);
 
   if (validationError) {

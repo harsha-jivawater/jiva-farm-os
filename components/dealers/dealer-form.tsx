@@ -24,6 +24,7 @@ import {
   trainingStatusOptions
 } from "@/lib/dealers/options";
 import type { Dealer, RegionOption, UserOption } from "@/lib/dealers/types";
+import { FileUploadField } from "@/components/uploads/file-upload-field";
 import { labelForRole } from "@/lib/users/options";
 import { hasRole } from "@/lib/users/permissions";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
@@ -345,6 +346,24 @@ export function DealerForm({
                 required
                 type="date"
               />
+              <FileUploadField
+                currentValue={dealer.agreement_link}
+                kind="document"
+                label="Dealer agreement file"
+                name="agreement_link"
+              />
+              <FileUploadField
+                currentValue={dealer.dealer_documents_folder_link}
+                kind="zip"
+                label="Dealer documents ZIP"
+                name="dealer_documents_folder_link"
+              />
+              <FileUploadField
+                currentValue={dealer.training_material_shared_link}
+                kind="document"
+                label="Training material file"
+                name="training_material_shared_link"
+              />
               {canApproveLegalDocuments ? (
                 <>
                   <SelectField
@@ -638,6 +657,24 @@ export function DealerForm({
             name="next_action_date"
             required
             type="date"
+          />
+          <FileUploadField
+            currentValue={dealer?.agreement_link}
+            kind="document"
+            label="Dealer agreement file"
+            name="agreement_link"
+          />
+          <FileUploadField
+            currentValue={dealer?.dealer_documents_folder_link}
+            kind="zip"
+            label="Dealer documents ZIP"
+            name="dealer_documents_folder_link"
+          />
+          <FileUploadField
+            currentValue={dealer?.training_material_shared_link}
+            kind="document"
+            label="Training material file"
+            name="training_material_shared_link"
           />
         </div>
       </div>

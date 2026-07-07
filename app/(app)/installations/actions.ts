@@ -25,6 +25,7 @@ import type {
   Installation
 } from "@/lib/installations/types";
 import { createClient } from "@/lib/supabase/server";
+import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -425,7 +426,23 @@ export async function createInstallationAction(formData: FormData) {
   const supabase = await createClient();
   const errorPath = "/installations/new";
   const profile = await getCurrentProfile(supabase, errorPath);
+  const installationId = crypto.randomUUID();
   let payload = installationPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [{ fieldName: "installation_photo_link", kind: "image" }],
+      folder: "installations",
+      formData,
+      payload,
+      recordId: installationId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const dispatch = await getDispatchForInstallation(
     supabase,
     payload.dispatch_id,
@@ -462,6 +479,7 @@ export async function createInstallationAction(formData: FormData) {
   const now = todayDate();
   const insertPayload = {
     ...payload,
+    id: installationId,
     created_by_user_id: profile.id,
     installed_by_user_id: profile.id,
     verified_by_user_id:
@@ -517,6 +535,21 @@ export async function updateInstallationAction(id: string, formData: FormData) {
 
   const existing = existingData as Installation;
   let payload = installationPayloadFromForm(formData);
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [{ fieldName: "installation_photo_link", kind: "image" }],
+      folder: "installations",
+      formData,
+      payload,
+      recordId: id,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      errorPath,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const dispatch = await getDispatchForInstallation(
     supabase,
     payload.dispatch_id,

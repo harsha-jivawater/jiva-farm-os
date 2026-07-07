@@ -13,6 +13,7 @@ import type {
 } from "@/lib/farmer-leads/types";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 import { createClient } from "@/lib/supabase/server";
+import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import { canConfirmPayment, hasAnyRole, hasRole } from "@/lib/users/permissions";
@@ -31,10 +32,29 @@ function canOwnLead(user: { role: string; secondary_role?: string | null } | nul
 
 export async function createFarmerLeadAction(formData: FormData) {
   const supabase = await createClient();
+  const leadId = crypto.randomUUID();
   const payload = farmerLeadPayloadFromForm(formData, {
     includeOwnerFields: false,
     requireLeadCode: true
   }) as FarmerLeadInsert;
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "lead_photo_folder_link", kind: "zip" },
+        { fieldName: "farmer_document_link", kind: "document" }
+      ],
+      folder: "farmer-leads",
+      formData,
+      payload,
+      recordId: leadId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      "/farmer-leads/new",
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validateFarmerLeadPayload(payload);
 
   if (validationError) {
@@ -153,7 +173,7 @@ export async function createFarmerLeadAction(formData: FormData) {
 
   const { data, error } = await supabase
     .from("farmer_leads")
-    .insert(payload)
+    .insert({ ...payload, id: leadId })
     .select("id")
     .single();
 
@@ -179,6 +199,24 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
     includeOwnerFields: true,
     requireLeadCode: false
   }) as FarmerLeadUpdate;
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [
+        { fieldName: "lead_photo_folder_link", kind: "zip" },
+        { fieldName: "farmer_document_link", kind: "document" }
+      ],
+      folder: "farmer-leads",
+      formData,
+      payload,
+      recordId: id,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      `/farmer-leads/${id}/edit`,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validateFarmerLeadPayload(payload);
 
   if (validationError) {

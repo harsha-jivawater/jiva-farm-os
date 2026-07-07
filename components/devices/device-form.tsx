@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
+import { FileUploadField } from "@/components/uploads/file-upload-field";
 import {
   approvalStatusOptions,
   defaultDeviceStatus,
@@ -459,21 +460,14 @@ export function DeviceForm({
                 ))}
               </select>
             </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="return_photo_link">
-                Device photo link
-              </label>
-              <input
-                className={inputClassName()}
-                defaultValue={currentDevice?.return_photo_link ?? ""}
-                disabled={readOnlyDetails}
-                id="return_photo_link"
-                name="return_photo_link"
-                placeholder="Photo with visible serial number"
-                required
-                type="url"
-              />
-            </div>
+            <FileUploadField
+              currentValue={currentDevice?.return_photo_link}
+              disabled={readOnlyDetails}
+              kind="evidence"
+              label="Return evidence photo or document"
+              name="return_photo_link"
+              required
+            />
             <div className="md:col-span-2">
               <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="return_reason">
                 Return reason

@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
 import { PilotVisitForm } from "@/components/pilots/pilot-visit-form";
 import { VisitReportForm } from "@/components/pilots/visit-report-form";
+import { FileLink } from "@/components/uploads/file-link";
 import {
   cropOptions,
   labelFor,
@@ -30,6 +31,7 @@ import {
   type VisitReport
 } from "@/lib/pilots/types";
 import { createClient } from "@/lib/supabase/server";
+import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import { canWriteModule } from "@/lib/users/permissions";
@@ -139,6 +141,45 @@ export default async function PilotDetailPage({
   const dealersList = (dealers ?? []) as PilotDealerOption[];
   const visitsList = (visits ?? []) as PilotVisit[];
   const reportsList = (reports ?? []) as VisitReport[];
+  const [
+    monitoringPlanUrl,
+    pilotFolderUrl,
+    baselineReportUrl,
+    finalPilotReportUrl,
+    pilotPhotosUrl,
+    pilotDataSheetUrl
+  ] = await Promise.all([
+    resolveFileUrl(supabase, pilot.monitoring_plan_link),
+    resolveFileUrl(supabase, pilot.pilot_folder_link),
+    resolveFileUrl(supabase, pilot.baseline_report_link),
+    resolveFileUrl(supabase, pilot.final_pilot_report_link),
+    resolveFileUrl(supabase, pilot.photo_folder_link),
+    resolveFileUrl(supabase, pilot.data_sheet_link)
+  ]);
+  const reportUrls = new Map<string, string | null>(
+    await Promise.all(
+      reportsList.map(async (report) => [
+        report.id,
+        await resolveFileUrl(supabase, report.report_link)
+      ] as [string, string | null])
+    )
+  );
+  const visitPhotoUrls = new Map<string, string | null>(
+    await Promise.all(
+      visitsList.map(async (visit) => [
+        visit.id,
+        await resolveFileUrl(supabase, visit.photo_folder_link)
+      ] as [string, string | null])
+    )
+  );
+  const visitDataSheetUrls = new Map<string, string | null>(
+    await Promise.all(
+      visitsList.map(async (visit) => [
+        visit.id,
+        await resolveFileUrl(supabase, visit.raw_data_sheet_link)
+      ] as [string, string | null])
+    )
+  );
   const userMap = new Map(usersList.map((user) => [user.id, user]));
   const institutionMap = new Map(
     institutionsList.map((institution) => [institution.id, institution])
@@ -305,6 +346,33 @@ export default async function PilotDetailPage({
         />
       </div>
 
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <DetailItem
+          label="Monitoring plan"
+          value={<FileLink href={monitoringPlanUrl} label="View monitoring plan" />}
+        />
+        <DetailItem
+          label="Pilot files"
+          value={<FileLink href={pilotFolderUrl} label="View pilot files" />}
+        />
+        <DetailItem
+          label="Baseline report"
+          value={<FileLink href={baselineReportUrl} label="View baseline report" />}
+        />
+        <DetailItem
+          label="Final pilot report"
+          value={<FileLink href={finalPilotReportUrl} label="View final report" />}
+        />
+        <DetailItem
+          label="Pilot photos"
+          value={<FileLink href={pilotPhotosUrl} label="View pilot photos" />}
+        />
+        <DetailItem
+          label="Pilot data sheet"
+          value={<FileLink href={pilotDataSheetUrl} label="View data sheet" />}
+        />
+      </div>
+
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -367,6 +435,26 @@ export default async function PilotDetailPage({
                       <p className="text-xs text-slate-500">
                         {visit.visit_code}
                       </p>
+                      {visitPhotoUrls.get(visit.id) || visitDataSheetUrls.get(visit.id) ? (
+                        <div className="mt-2 space-y-1 text-xs">
+                          {visitPhotoUrls.get(visit.id) ? (
+                            <p>
+                              <FileLink
+                                href={visitPhotoUrls.get(visit.id)}
+                                label="View photos"
+                              />
+                            </p>
+                          ) : null}
+                          {visitDataSheetUrls.get(visit.id) ? (
+                            <p>
+                              <FileLink
+                                href={visitDataSheetUrls.get(visit.id)}
+                                label="View data sheet"
+                              />
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-slate-700">
                       {formatDate(visit.visit_date)}
@@ -389,14 +477,10 @@ export default async function PilotDetailPage({
                     </td>
                     <td className="px-4 py-3 text-slate-700">
                       {report?.report_link ? (
-                        <a
-                          className="font-semibold text-brand-700 hover:text-brand-800"
-                          href={report.report_link}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          Open report
-                        </a>
+                        <FileLink
+                          href={reportUrls.get(report.id)}
+                          label="Open report"
+                        />
                       ) : canWrite && visit.visit_report_required ? (
                         <Link
                           className="font-semibold text-brand-700 hover:text-brand-800"
@@ -499,6 +583,12 @@ export default async function PilotDetailPage({
                   </td>
                   <td className="px-4 py-3 text-slate-700">
                     {report.report_summary}
+                    <p className="mt-2">
+                      <FileLink
+                        href={reportUrls.get(report.id)}
+                        label="View report"
+                      />
+                    </p>
                   </td>
                   <td className="px-4 py-3">
                     {canWrite ? (

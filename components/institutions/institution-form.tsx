@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, Save } from "lucide-react";
+import { FileUploadField } from "@/components/uploads/file-upload-field";
 import { defaultNextActionDate } from "@/lib/institutions/form-data";
 import {
   agreementStatusOptions,
@@ -682,11 +683,11 @@ export function InstitutionForm({
             name="proposal_shared_date"
             type="date"
           />
-          <Field
-            defaultValue={institution?.proposal_link}
-            label="Proposal link"
+          <FileUploadField
+            currentValue={institution?.proposal_link}
+            kind="document"
+            label="Proposal file"
             name="proposal_link"
-            type="url"
           />
           <SelectField
             defaultValue={
@@ -702,11 +703,11 @@ export function InstitutionForm({
             name="presentation_shared_date"
             type="date"
           />
-          <Field
-            defaultValue={institution?.presentation_link}
-            label="Presentation link"
+          <FileUploadField
+            currentValue={institution?.presentation_link}
+            kind="document"
+            label="Presentation file"
             name="presentation_link"
-            type="url"
           />
         </div>
       </div>
@@ -724,11 +725,11 @@ export function InstitutionForm({
             name="mou_agreement_status"
             options={agreementStatusOptions}
           />
-          <Field
-            defaultValue={institution?.mou_agreement_link}
-            label="MoU agreement link"
+          <FileUploadField
+            currentValue={institution?.mou_agreement_link}
+            kind="document"
+            label="MoU agreement file"
             name="mou_agreement_link"
-            type="url"
           />
           {canApproveLegalDocuments ? (
             <>

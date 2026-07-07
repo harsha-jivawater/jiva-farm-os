@@ -8,6 +8,7 @@ import {
 } from "@/lib/devices/form-data";
 import type { DeviceInsert, DeviceUpdate } from "@/lib/devices/types";
 import { createClient } from "@/lib/supabase/server";
+import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   canApproveDeviceReturn,
@@ -30,20 +31,35 @@ function deviceErrorMessage(message: string, code?: string) {
 
 export async function createDeviceAction(formData: FormData) {
   const supabase = await createClient();
+  const profile = await requireModuleWriteAccess(
+    supabase,
+    "/devices/new",
+    "devices"
+  );
   const payload = devicePayloadFromForm(formData);
+  const existingDeviceId = String(formData.get("existing_device_id") ?? "").trim();
+  const newDeviceId = crypto.randomUUID();
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [{ fieldName: "return_photo_link", kind: "evidence" }],
+      folder: "devices",
+      formData,
+      payload,
+      recordId: existingDeviceId || newDeviceId,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      "/devices/new",
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validateDevicePayload(payload);
 
   if (validationError) {
     redirectWithError("/devices/new", validationError);
   }
 
-  const profile = await requireModuleWriteAccess(
-    supabase,
-    "/devices/new",
-    "devices"
-  );
-
-  const existingDeviceId = String(formData.get("existing_device_id") ?? "").trim();
   if (existingDeviceId) {
     const updatePayload = prepareDeviceWorkflowPayload(payload, profile.id);
     const { error } = await supabase
@@ -75,6 +91,7 @@ export async function createDeviceAction(formData: FormData) {
 
   const insertPayload = {
     ...prepareDeviceWorkflowPayload(payload, profile.id),
+    id: newDeviceId,
     created_by_user_id: profile.id,
     stock_entered_by_user_id: profile.id
   } as DeviceInsert;
@@ -111,6 +128,21 @@ export async function updateDeviceAction(id: string, formData: FormData) {
   }
 
   const payload = devicePayloadFromForm(formData) as DeviceUpdate;
+  try {
+    await applyUploadedFilesToPayload({
+      fields: [{ fieldName: "return_photo_link", kind: "evidence" }],
+      folder: "devices",
+      formData,
+      payload,
+      recordId: id,
+      supabase
+    });
+  } catch (error) {
+    redirectWithError(
+      `/devices/${id}/edit`,
+      error instanceof Error ? error.message : "File upload failed."
+    );
+  }
   const validationError = validateDevicePayload(payload);
 
   if (validationError) {

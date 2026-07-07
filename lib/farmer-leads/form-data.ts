@@ -86,6 +86,8 @@ export function farmerLeadPayloadFromForm(
     next_action_date: nextActionDate,
     followup_due_date: getText(formData, "followup_due_date") ?? nextActionDate,
     payment_confirmed: paymentConfirmed,
+    lead_photo_folder_link: getText(formData, "lead_photo_folder_link"),
+    farmer_document_link: getText(formData, "farmer_document_link"),
     remarks: getText(formData, "remarks")
   };
 

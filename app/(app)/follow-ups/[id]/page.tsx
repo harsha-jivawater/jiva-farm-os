@@ -3,11 +3,11 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
-  ExternalLink,
   Pencil
 } from "lucide-react";
 import { FollowupStatusPill } from "@/components/follow-ups/followup-status-pill";
 import { PageHeader } from "@/components/page-header";
+import { FileLink } from "@/components/uploads/file-link";
 import {
   deviceWorkingStatusOptions,
   farmerSatisfactionOptions,
@@ -26,6 +26,7 @@ import {
   type Installation
 } from "@/lib/follow-ups/types";
 import { createClient } from "@/lib/supabase/server";
+import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canWriteModule } from "@/lib/users/permissions";
 import { followupScope } from "@/lib/users/record-scope";
@@ -50,30 +51,6 @@ function DetailItem({
         {value}
       </div>
     </div>
-  );
-}
-
-function ExternalLinkValue({
-  href,
-  label
-}: {
-  href: string | null;
-  label: string;
-}) {
-  if (!href) {
-    return "Not set";
-  }
-
-  return (
-    <a
-      className="inline-flex items-center gap-1 text-brand-700 hover:text-brand-800"
-      href={href}
-      rel="noreferrer"
-      target="_blank"
-    >
-      {label}
-      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-    </a>
   );
 }
 
@@ -106,6 +83,10 @@ export default async function FollowupDetailPage({
   }
 
   const followup = data as Followup;
+  const [reportUrl, photosUrl] = await Promise.all([
+    resolveFileUrl(supabase, followup.report_link),
+    resolveFileUrl(supabase, followup.photo_folder_link)
+  ]);
   const [{ data: farmerLead }, { data: installation }] = await Promise.all([
     followup.farmer_lead_id
       ? supabase
@@ -286,16 +267,11 @@ export default async function FollowupDetailPage({
         />
         <DetailItem
           label="Report link"
-          value={<ExternalLinkValue href={followup.report_link} label="Open report" />}
+          value={<FileLink href={reportUrl} label="View report" />}
         />
         <DetailItem
           label="Photo folder"
-          value={
-            <ExternalLinkValue
-              href={followup.photo_folder_link}
-              label="Open photos"
-            />
-          }
+          value={<FileLink href={photosUrl} label="View photos" />}
         />
       </div>
 

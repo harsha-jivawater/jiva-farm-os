@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, Save } from "lucide-react";
+import { FileUploadField } from "@/components/uploads/file-upload-field";
 import {
   comparisonMethodOptions,
   cropOptions,
@@ -838,11 +839,11 @@ export function PilotForm({
             required
             type="number"
           />
-          <Field
-            defaultValue={pilot?.monitoring_plan_link}
-            label="Monitoring plan link"
+          <FileUploadField
+            currentValue={pilot?.monitoring_plan_link}
+            kind="document"
+            label="Monitoring plan file"
             name="monitoring_plan_link"
-            type="url"
           />
         </div>
         <p className="mt-3 text-sm leading-6 text-slate-500">
@@ -950,35 +951,35 @@ export function PilotForm({
             label="Scale-up next step"
             name="scale_up_next_step"
           />
-          <Field
-            defaultValue={pilot?.pilot_folder_link}
-            label="Pilot folder link"
+          <FileUploadField
+            currentValue={pilot?.pilot_folder_link}
+            kind="zip"
+            label="Pilot files ZIP"
             name="pilot_folder_link"
-            type="url"
           />
-          <Field
-            defaultValue={pilot?.baseline_report_link}
-            label="Baseline report link"
+          <FileUploadField
+            currentValue={pilot?.baseline_report_link}
+            kind="document"
+            label="Baseline report file"
             name="baseline_report_link"
-            type="url"
           />
-          <Field
-            defaultValue={pilot?.final_pilot_report_link}
-            label="Final pilot report link"
+          <FileUploadField
+            currentValue={pilot?.final_pilot_report_link}
+            kind="document"
+            label="Final pilot report file"
             name="final_pilot_report_link"
-            type="url"
           />
-          <Field
-            defaultValue={pilot?.photo_folder_link}
-            label="Photo folder link"
+          <FileUploadField
+            currentValue={pilot?.photo_folder_link}
+            kind="zip"
+            label="Pilot photos ZIP"
             name="photo_folder_link"
-            type="url"
           />
-          <Field
-            defaultValue={pilot?.data_sheet_link}
-            label="Data sheet link"
+          <FileUploadField
+            currentValue={pilot?.data_sheet_link}
+            kind="sheet"
+            label="Pilot data sheet"
             name="data_sheet_link"
-            type="url"
           />
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">

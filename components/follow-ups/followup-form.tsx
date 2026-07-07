@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, CheckCircle2, Save } from "lucide-react";
+import { FileUploadField } from "@/components/uploads/file-upload-field";
 import {
   deviceWorkingStatusOptions,
   farmerSaleFollowupType,
@@ -536,38 +537,19 @@ export function FollowupForm({
           Report links
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="report_link"
-            >
-              Visit report link
-            </label>
-            <input
-              className={inputClassName()}
-              defaultValue={followup.report_link ?? ""}
-              id="report_link"
-              name="report_link"
-              required={completingFarmerSale}
-              type="url"
-            />
-          </div>
-
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="photo_folder_link"
-            >
-              Photo folder link
-            </label>
-            <input
-              className={inputClassName()}
-              defaultValue={followup.photo_folder_link ?? ""}
-              id="photo_folder_link"
-              name="photo_folder_link"
-              type="url"
-            />
-          </div>
+          <FileUploadField
+            currentValue={followup.report_link}
+            kind="document"
+            label="Visit report file"
+            name="report_link"
+            required={completingFarmerSale}
+          />
+          <FileUploadField
+            currentValue={followup.photo_folder_link}
+            kind="zip"
+            label="Follow-up photos ZIP"
+            name="photo_folder_link"
+          />
         </div>
       </div>
 
