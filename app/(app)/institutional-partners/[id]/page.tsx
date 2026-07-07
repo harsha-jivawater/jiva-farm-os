@@ -58,6 +58,15 @@ type InstitutionDetailPageProps = {
   }>;
 };
 
+type RelatedPilot = {
+  id: string;
+  pilot_code: string;
+  pilot_name: string;
+  pilot_type: string;
+  pilot_status: string;
+  farmer_name_snapshot: string;
+};
+
 function DetailItem({
   label,
   value
@@ -127,7 +136,8 @@ export default async function InstitutionDetailPage({
     { data: users },
     { data: regions },
     { data: contacts },
-    { data: meetings }
+    { data: meetings },
+    { data: relatedPilots }
   ] = await Promise.all([
     supabase
       .from("users")
@@ -150,12 +160,22 @@ export default async function InstitutionDetailPage({
       .select("*")
       .eq("institution_id", institution.id)
       .order("meeting_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("pilots")
+      .select(
+        "id, pilot_code, pilot_name, pilot_type, pilot_status, farmer_name_snapshot"
+      )
+      .eq("institution_id", institution.id)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
+      .limit(100)
   ]);
 
   const usersList = (users ?? []) as UserOption[];
   const contactsList = (contacts ?? []) as InstitutionContact[];
   const meetingsList = (meetings ?? []) as InstitutionMeeting[];
+  const relatedPilotsList = (relatedPilots ?? []) as RelatedPilot[];
   const [proposalUrl, presentationUrl, mouUrl] = await Promise.all([
     resolveFileUrl(supabase, institution.proposal_link),
     resolveFileUrl(supabase, institution.presentation_link),
@@ -467,6 +487,58 @@ export default async function InstitutionDetailPage({
           value={display(institution.support_required)}
         />
         <DetailItem label="Remarks" value={display(institution.remarks)} />
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="text-base font-semibold text-slate-950">
+            Institution-linked pilots
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Farmer pilots conducted through this institution/company.
+          </p>
+        </div>
+        {relatedPilotsList.length ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-[760px] divide-y divide-slate-200 text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Pilot</th>
+                  <th className="px-4 py-3 font-semibold">Farmer</th>
+                  <th className="px-4 py-3 font-semibold">Type</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {relatedPilotsList.map((pilot) => (
+                  <tr key={pilot.id}>
+                    <td className="px-4 py-3">
+                      <Link
+                        className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                        href={`/pilots/${pilot.id}`}
+                      >
+                        {pilot.pilot_code} · {pilot.pilot_name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {pilot.farmer_name_snapshot}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {pilot.pilot_type}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {pilot.pilot_status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 text-sm text-slate-500">
+            No pilots are linked to this institution yet.
+          </div>
+        )}
       </div>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">

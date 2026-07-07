@@ -37,6 +37,16 @@ type FarmerLeadDetailPageProps = {
   }>;
 };
 
+type LinkedPilot = {
+  id: string;
+  pilot_code: string;
+  pilot_name: string;
+  pilot_type: string;
+  pilot_status: string;
+  institution_id: string | null;
+  dealer_id: string | null;
+};
+
 function display(value: string | null | undefined) {
   return value || "Not set";
 }
@@ -131,17 +141,51 @@ export default async function FarmerLeadDetailPage({
   const userIds = Array.from(
     new Set([lead.owner_user_id, lead.rsm_user_id].filter(Boolean))
   );
-  const [{ data: users }, leadPhotosUrl, farmerDocumentUrl] = await Promise.all([
+  const [
+    { data: users },
+    { data: linkedPilot },
+    { data: institutions },
+    { data: dealers },
+    leadPhotosUrl,
+    farmerDocumentUrl
+  ] = await Promise.all([
     userIds.length
       ? supabase
           .from("users")
           .select("id, full_name, email, role")
           .in("id", userIds)
       : Promise.resolve({ data: [] }),
+    lead.linked_pilot_id
+      ? supabase
+          .from("pilots")
+          .select(
+            "id, pilot_code, pilot_name, pilot_type, pilot_status, institution_id, dealer_id"
+          )
+          .eq("id", lead.linked_pilot_id)
+          .is("deleted_at", null)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    lead.linked_institution_id
+      ? supabase
+          .from("institutions")
+          .select("id, organization_name")
+          .eq("id", lead.linked_institution_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    lead.linked_dealer_id
+      ? supabase
+          .from("dealers")
+          .select("id, dealer_name")
+          .eq("id", lead.linked_dealer_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     resolveFileUrl(supabase, lead.lead_photo_folder_link),
     resolveFileUrl(supabase, lead.farmer_document_link)
   ]);
   const userMap = new Map((users ?? []).map((user) => [user.id, user]));
+  const pilot = linkedPilot as LinkedPilot | null;
+  const institution = institutions as { id: string; organization_name: string } | null;
+  const dealer = dealers as { id: string; dealer_name: string } | null;
   const confirmPaymentAction = confirmFarmerLeadPaymentAction.bind(null, lead.id);
   const canConfirmLeadPayment = canConfirmPayment(currentUser);
   const hasInconsistentDeviceInstalledStage =
@@ -241,6 +285,43 @@ export default async function FarmerLeadDetailPage({
         <DetailItem
           label="RSM"
           value={userLabel(userMap.get(lead.rsm_user_id), lead.rsm_user_id)}
+        />
+        <DetailItem
+          label="Linked pilot"
+          value={
+            pilot ? (
+              <Link
+                className="text-brand-700 hover:text-brand-800 hover:underline"
+                href={`/pilots/${pilot.id}`}
+              >
+                {pilot.pilot_code} · {pilot.pilot_name} · {pilot.pilot_type}
+              </Link>
+            ) : (
+              "Not set"
+            )
+          }
+        />
+        <DetailItem
+          label="Pilot partner context"
+          value={
+            institution ? (
+              <Link
+                className="text-brand-700 hover:text-brand-800 hover:underline"
+                href={`/institutional-partners/${institution.id}`}
+              >
+                Through institution: {institution.organization_name}
+              </Link>
+            ) : dealer ? (
+              <Link
+                className="text-brand-700 hover:text-brand-800 hover:underline"
+                href={`/dealers/${dealer.id}`}
+              >
+                Through dealer: {dealer.dealer_name}
+              </Link>
+            ) : (
+              "Not set"
+            )
+          }
         />
         <DetailItem
           label="Lead photos"

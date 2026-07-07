@@ -357,6 +357,9 @@ export function PilotForm({
   const [selectedDeviceId, setSelectedDeviceId] = useState(
     pilot?.device_id ?? initialDevice?.id ?? ""
   );
+  const [pilotType, setPilotType] = useState(
+    pilot?.pilot_type ?? defaultPilotType
+  );
   const [farmerName, setFarmerName] = useState(
     pilot?.farmer_name_snapshot ?? initialFarmer?.farmer_name ?? ""
   );
@@ -411,6 +414,8 @@ export function PilotForm({
   const [serialNumber, setSerialNumber] = useState(
     pilot?.device_serial_number_snapshot ?? initialDevice?.serial_number ?? ""
   );
+  const isInstitutionPilot = pilotType === "Institution Pilot";
+  const isDealerPilot = pilotType === "Dealer Pilot";
 
   function applyFarmerLead(value: string) {
     const farmerLead = farmerLeads.find((lead) => lead.id === value);
@@ -470,12 +475,20 @@ export function PilotForm({
             required
           />
           <SelectField
-            defaultValue={pilot?.pilot_type ?? defaultPilotType}
             label="Pilot type"
             name="pilot_type"
+            onChange={setPilotType}
             options={pilotTypeOptions}
             required
+            value={pilotType}
           />
+          <div className="rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm leading-6 text-sky-900 md:col-span-2">
+            {isInstitutionPilot
+              ? "Use this when the farmer pilot is conducted through an institution/company."
+              : isDealerPilot
+                ? "Use this when the farmer pilot is conducted through a dealer."
+                : "Pilot devices are temporary and return to Jiva after completion. Farmer sales follow-up starts after pilot completion."}
+          </div>
           <SelectField
             defaultValue={pilot?.pilot_status ?? defaultPilotStatus}
             label="Pilot status"
@@ -528,6 +541,11 @@ export function PilotForm({
                 </option>
               ))}
             </select>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Every pilot must stay linked to a Farmer Lead. The selected lead
+              supplies the farmer, crop, location, RSM, and partner context
+              where available.
+            </p>
           </div>
           <Field
             label="Farmer name snapshot"
@@ -630,50 +648,66 @@ export function PilotForm({
               ))}
             </select>
           </div>
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="institution_id"
-            >
-              Institution
-            </label>
-            <select
-              className={inputClassName()}
-              id="institution_id"
-              name="institution_id"
-              onChange={(event) => setInstitutionId(event.target.value)}
-              value={institutionId}
-            >
-              <option value="">No institution</option>
-              {institutions.map((institution) => (
-                <option key={institution.id} value={institution.id}>
-                  {institution.institution_code} · {institution.organization_name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="dealer_id"
-            >
-              Dealer
-            </label>
-            <select
-              className={inputClassName()}
-              id="dealer_id"
-              name="dealer_id"
-              onChange={(event) => setDealerId(event.target.value)}
-              value={dealerId}
-            >
-              <option value="">No dealer</option>
-              {dealers.map((dealer) => (
-                <option key={dealer.id} value={dealer.id}>
-                  {dealer.dealer_code} · {dealer.dealer_name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isInstitutionPilot ? (
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="institution_id"
+              >
+                Through institution
+              </label>
+              <select
+                className={inputClassName()}
+                id="institution_id"
+                name="institution_id"
+                onChange={(event) => setInstitutionId(event.target.value)}
+                required
+                value={institutionId}
+              >
+                <option value="">Select institution</option>
+                {institutions.map((institution) => (
+                  <option key={institution.id} value={institution.id}>
+                    {institution.institution_code} · {institution.organization_name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Required for Institution Pilot.
+              </p>
+            </div>
+          ) : (
+            <input name="institution_id" type="hidden" value="" />
+          )}
+          {isDealerPilot ? (
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="dealer_id"
+              >
+                Through dealer
+              </label>
+              <select
+                className={inputClassName()}
+                id="dealer_id"
+                name="dealer_id"
+                onChange={(event) => setDealerId(event.target.value)}
+                required
+                value={dealerId}
+              >
+                <option value="">Select dealer</option>
+                {dealers.map((dealer) => (
+                  <option key={dealer.id} value={dealer.id}>
+                    {dealer.dealer_code} · {dealer.dealer_name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Required for Dealer Pilot.
+              </p>
+            </div>
+          ) : (
+            <input name="dealer_id" type="hidden" value="" />
+          )}
         </div>
       </div>
 
@@ -835,6 +869,10 @@ export function PilotForm({
             required
           />
         </div>
+        <p className="mt-3 text-sm leading-6 text-slate-500">
+          Pilot Installation is a temporary trial setup. It does not mark the
+          Farmer Lead as Device Installed or count as a farmer sale.
+        </p>
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">

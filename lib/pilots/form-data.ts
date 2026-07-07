@@ -327,6 +327,12 @@ export function validatePilotPayload(payload: PilotFormPayload) {
   if (!payload.pilot_objective) return "Pilot objective is required.";
   if (!payload.pilot_status) return "Pilot status is required.";
   if (!payload.farmer_lead_id) return "Select a farmer lead.";
+  if (payload.pilot_type === "Institution Pilot" && !payload.institution_id) {
+    return "Select the institution for this Institution Pilot.";
+  }
+  if (payload.pilot_type === "Dealer Pilot" && !payload.dealer_id) {
+    return "Select the dealer for this Dealer Pilot.";
+  }
   if (!payload.pilot_owner_user_id) return "Select a pilot owner.";
   if (!payload.farmer_name_snapshot) return "Farmer name is required.";
   if (!payload.farmer_mobile_snapshot) return "Farmer mobile is required.";

@@ -40,6 +40,15 @@ type DealerDetailPageProps = {
   }>;
 };
 
+type RelatedPilot = {
+  id: string;
+  pilot_code: string;
+  pilot_name: string;
+  pilot_type: string;
+  pilot_status: string;
+  farmer_name_snapshot: string;
+};
+
 function DetailItem({
   label,
   value
@@ -101,7 +110,8 @@ export default async function DealerDetailPage({
     { data: devices },
     { data: dispatchesThisMonth },
     { data: farmerLeads },
-    { data: installations }
+    { data: installations },
+    { data: relatedPilots }
   ] = await Promise.all([
     supabase
       .from("users")
@@ -146,6 +156,15 @@ export default async function DealerDetailPage({
       .eq("dealer_id", dealer.id)
       .is("deleted_at", null)
       .order("installation_date", { ascending: false })
+      .limit(100),
+    supabase
+      .from("pilots")
+      .select(
+        "id, pilot_code, pilot_name, pilot_type, pilot_status, farmer_name_snapshot"
+      )
+      .eq("dealer_id", dealer.id)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
       .limit(100)
   ]);
 
@@ -190,6 +209,7 @@ export default async function DealerDetailPage({
     | "product_model"
     | "installation_status"
   >[];
+  const relatedPilotsList = (relatedPilots ?? []) as RelatedPilot[];
 
   return (
     <section>
@@ -440,6 +460,58 @@ export default async function DealerDetailPage({
         ) : (
           <div className="p-6 text-sm text-slate-500">
             No farmer leads are linked to this dealer yet.
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="text-base font-semibold text-slate-950">
+            Dealer-linked pilots
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Farmer pilots conducted through this dealer.
+          </p>
+        </div>
+        {relatedPilotsList.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[48rem] text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Pilot</th>
+                  <th className="px-4 py-3">Farmer</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {relatedPilotsList.map((pilot) => (
+                  <tr key={pilot.id}>
+                    <td className="px-4 py-3">
+                      <Link
+                        className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                        href={`/pilots/${pilot.id}`}
+                      >
+                        {pilot.pilot_code} · {pilot.pilot_name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {pilot.farmer_name_snapshot}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {pilot.pilot_type}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {pilot.pilot_status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 text-sm text-slate-500">
+            No pilots are linked to this dealer yet.
           </div>
         )}
       </div>

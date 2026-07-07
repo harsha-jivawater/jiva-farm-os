@@ -26,6 +26,7 @@ import type {
   DeviceUpdate,
   FarmerLeadUpdate,
   Pilot,
+  PilotFormPayload,
   PilotInsert,
   PilotUpdate,
   PilotVisitInsert,
@@ -160,6 +161,85 @@ function canManageVisitPlans(
 
 function isPilotCompletionStatus(status: string | null | undefined) {
   return pilotCompletionStatuses.includes(status ?? "");
+}
+
+function pilotLeadFunnelStage(status: string | null | undefined) {
+  if (isPilotCompletionStatus(status)) {
+    return "Pilot Completed - Sales Follow-up";
+  }
+
+  if (
+    [
+      "Device Assigned",
+      "Device Dispatched",
+      "Device Installed",
+      "Monitoring Active",
+      "Visit Report Pending",
+      "Final Report Pending",
+      "Final Report Submitted",
+      "Final Report Reviewed",
+      "Scale-up Recommended"
+    ].includes(status ?? "")
+  ) {
+    return "Pilot Active";
+  }
+
+  return "Pilot Agreed";
+}
+
+async function syncFarmerLeadPilotState({
+  supabase,
+  farmerLeadId,
+  pilotId,
+  payload,
+  errorPath
+}: {
+  supabase: SupabaseClient;
+  farmerLeadId: string;
+  pilotId: string;
+  payload: Pick<PilotFormPayload, "pilot_status" | "institution_id" | "dealer_id">;
+  errorPath: string;
+}) {
+  const { data: leadData, error: leadLoadError } = await supabase
+    .from("farmer_leads")
+    .select("id, payment_confirmed")
+    .eq("id", farmerLeadId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (leadLoadError) {
+    redirectWithError(errorPath, leadLoadError.message);
+  }
+
+  if (!leadData) {
+    redirectWithError(errorPath, "Linked farmer lead was not found.");
+  }
+
+  const leadPayload: FarmerLeadUpdate = {
+    linked_pilot_id: pilotId,
+    funnel_stage: pilotLeadFunnelStage(payload.pilot_status),
+    lead_status: leadData.payment_confirmed ? "Won" : "Open",
+    last_interaction_date: todayDate(),
+    last_interaction_note:
+      "Pilot linked. Farmer sale follow-up should continue after pilot completion."
+  };
+
+  if (payload.institution_id) {
+    leadPayload.linked_institution_id = payload.institution_id;
+  }
+
+  if (payload.dealer_id) {
+    leadPayload.linked_dealer_id = payload.dealer_id;
+  }
+
+  const { error: leadUpdateError } = await supabase
+    .from("farmer_leads")
+    .update(leadPayload)
+    .eq("id", farmerLeadId);
+
+  if (leadUpdateError) {
+    redirectWithError(errorPath, leadUpdateError.message);
+  }
 }
 
 function canCompletePilot(
@@ -335,10 +415,8 @@ async function applyPilotCompletionSideEffects({
 
     if (leadData) {
       const leadPayload: FarmerLeadUpdate = {
-        funnel_stage: leadData.payment_confirmed
-          ? "Payment Confirmed"
-          : "Follow-up Active",
-        lead_status: leadData.payment_confirmed ? leadData.lead_status : "Open",
+        funnel_stage: "Pilot Completed - Sales Follow-up",
+        lead_status: leadData.payment_confirmed ? "Won" : "Open",
         next_action_date: completionDate,
         followup_required: true,
         followup_due_date: completionDate,
@@ -626,10 +704,13 @@ export async function createPilotAction(formData: FormData) {
     redirectWithError(errorPath, error?.message ?? "Pilot was not created.");
   }
 
-  await supabase
-    .from("farmer_leads")
-    .update({ linked_pilot_id: data.id })
-    .eq("id", farmerLeadId);
+  await syncFarmerLeadPilotState({
+    supabase,
+    farmerLeadId,
+    pilotId: data.id,
+    payload,
+    errorPath
+  });
 
   revalidatePath("/pilots");
   redirect(`/pilots/${data.id}`);
@@ -730,10 +811,23 @@ export async function updatePilotAction(id: string, formData: FormData) {
     redirectWithError(errorPath, error.message);
   }
 
-  await supabase
-    .from("farmer_leads")
-    .update({ linked_pilot_id: id })
-    .eq("id", farmerLeadId);
+  if (pilotBeforeUpdate.farmer_lead_id !== farmerLeadId) {
+    await supabase
+      .from("farmer_leads")
+      .update({ linked_pilot_id: null })
+      .eq("id", pilotBeforeUpdate.farmer_lead_id)
+      .eq("linked_pilot_id", id);
+  }
+
+  if (!completionJustRecorded) {
+    await syncFarmerLeadPilotState({
+      supabase,
+      farmerLeadId,
+      pilotId: id,
+      payload,
+      errorPath
+    });
+  }
 
   const removalJustRecorded =
     payload.device_removal_reason &&

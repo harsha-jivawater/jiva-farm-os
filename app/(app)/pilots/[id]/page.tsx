@@ -55,6 +55,13 @@ type PilotDetailPageProps = {
   }>;
 };
 
+type LinkedFarmerLead = {
+  id: string;
+  lead_code: string | null;
+  farmer_name: string;
+  mobile_number: string;
+};
+
 function DetailItem({
   label,
   value
@@ -118,6 +125,7 @@ export default async function PilotDetailPage({
     { data: users },
     { data: institutions },
     { data: dealers },
+    { data: farmerLead },
     { data: plannedVisits },
     { data: visits },
     { data: reports }
@@ -135,6 +143,12 @@ export default async function PilotDetailPage({
       .from("dealers")
       .select("id, dealer_code, dealer_name, firm_name")
       .is("deleted_at", null),
+    supabase
+      .from("farmer_leads")
+      .select("id, lead_code, farmer_name, mobile_number")
+      .eq("id", pilot.farmer_lead_id)
+      .is("deleted_at", null)
+      .maybeSingle(),
     supabase
       .from("planned_pilot_visits")
       .select("*")
@@ -160,6 +174,7 @@ export default async function PilotDetailPage({
   const usersList = (users ?? []) as UserOption[];
   const institutionsList = (institutions ?? []) as PilotInstitutionOption[];
   const dealersList = (dealers ?? []) as PilotDealerOption[];
+  const linkedFarmerLead = farmerLead as LinkedFarmerLead | null;
   const plannedVisitsList = (plannedVisits ?? []) as PlannedPilotVisit[];
   const visitsList = (visits ?? []) as PilotVisit[];
   const reportsList = (reports ?? []) as VisitReport[];
@@ -286,8 +301,20 @@ export default async function PilotDetailPage({
           value={labelFor(pilot.pilot_result_status, pilotResultStatusOptions)}
         />
         <DetailItem
-          label="Farmer"
-          value={`${pilot.farmer_name_snapshot} · ${pilot.farmer_mobile_snapshot}`}
+          label="Linked farmer lead"
+          value={
+            linkedFarmerLead ? (
+              <Link
+                className="text-brand-700 hover:text-brand-800 hover:underline"
+                href={`/farmer-leads/${linkedFarmerLead.id}`}
+              >
+                {linkedFarmerLead.lead_code} · {linkedFarmerLead.farmer_name} ·{" "}
+                {linkedFarmerLead.mobile_number}
+              </Link>
+            ) : (
+              `${pilot.farmer_name_snapshot} · ${pilot.farmer_mobile_snapshot}`
+            )
+          }
         />
         <DetailItem
           label="Location"
@@ -296,18 +323,32 @@ export default async function PilotDetailPage({
         <DetailItem label="Crop" value={labelFor(pilot.crop, cropOptions)} />
         <DetailItem label="Other crop" value={display(pilot.other_crop)} />
         <DetailItem
-          label="Institution"
+          label={pilot.pilot_type === "Institution Pilot" ? "Through institution" : "Institution"}
           value={
             pilot.institution_id
-              ? display(institutionMap.get(pilot.institution_id)?.organization_name)
+              ? (
+                  <Link
+                    className="text-brand-700 hover:text-brand-800 hover:underline"
+                    href={`/institutional-partners/${pilot.institution_id}`}
+                  >
+                    {display(institutionMap.get(pilot.institution_id)?.organization_name)}
+                  </Link>
+                )
               : "Not set"
           }
         />
         <DetailItem
-          label="Dealer"
+          label={pilot.pilot_type === "Dealer Pilot" ? "Through dealer" : "Dealer"}
           value={
             pilot.dealer_id
-              ? display(dealerMap.get(pilot.dealer_id)?.dealer_name)
+              ? (
+                  <Link
+                    className="text-brand-700 hover:text-brand-800 hover:underline"
+                    href={`/dealers/${pilot.dealer_id}`}
+                  >
+                    {display(dealerMap.get(pilot.dealer_id)?.dealer_name)}
+                  </Link>
+                )
               : "Not set"
           }
         />

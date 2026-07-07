@@ -15,6 +15,12 @@ export const funnelStageOptions = [
   },
   { value: "Follow-up Active", label: "Follow-up Active" },
   { value: "Payment Confirmed", label: "Payment Confirmed" },
+  { value: "Pilot Agreed", label: "Pilot Agreed" },
+  { value: "Pilot Active", label: "Pilot Active" },
+  {
+    value: "Pilot Completed - Sales Follow-up",
+    label: "Pilot Completed - Sales Follow-up"
+  },
   { value: "Device Dispatched", label: "Device Dispatched" },
   { value: "Device Installed", label: "Device Installed" },
   {
