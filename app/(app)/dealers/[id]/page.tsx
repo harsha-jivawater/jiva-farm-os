@@ -651,73 +651,18 @@ export default async function DealerDetailPage({
         </span>
       </div>
 
-      <div className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm sm:p-5">
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_2fr]">
-          <div
-            className={`rounded-lg border p-4 ${
-              health.tone === "danger"
-                ? "border-red-200 bg-red-50"
-                : health.tone === "success"
-                  ? "border-emerald-200 bg-emerald-50"
-                  : "border-amber-200 bg-amber-50"
-            }`}
-          >
-            <p className="text-sm font-medium text-slate-600">Dealer health</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">
-              {health.label}
-            </p>
-            <p className="mt-2 text-sm text-slate-600">{health.helper}</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              label="Monthly target"
-              value={numberDisplay(monthlyTarget)}
-              helper="Dealer sales target"
-            />
-            <MetricCard
-              label="Actual this month"
-              value={numberDisplay(currentMonthActualSales)}
-              helper={`${numberDisplay(monthlyGap)} gap`}
-              tone={monthlyGap > 0 ? "warning" : "success"}
-            />
-            <MetricCard
-              label="Dealer stock"
-              value={numberDisplay(dealerDevices.length)}
-              helper="Devices currently with dealer"
-            />
-            <MetricCard
-              label="Open linked leads"
-              value={numberDisplay(openLinkedLeadCount)}
-              helper="Farmer leads still open"
-            />
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <InfoRow
-            label="Next action"
-            value={
-              <span className={nextActionOverdue ? "text-red-700" : undefined}>
-                {formatDate(dealer.next_action_date)}
-              </span>
-            }
-          />
-          <InfoRow
-            label="Concern / blocker"
-            value={display(dealer.support_required)}
-          />
-          <InfoRow
-            label="Accountable RSM"
-            value={rsm ? `${rsm.full_name} · ${labelForRole(rsm.role)}` : dealer.rsm_user_id}
-          />
-        </div>
-      </div>
-
       <div className="mt-6">
         <SectionPanel
           title="Dealer performance"
           description="Dealer sales, stock, and operational gaps."
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <MetricCard
+              label="Dealer health"
+              value={health.label}
+              helper={health.helper}
+              tone={health.tone}
+            />
             <MetricCard
               label="Monthly target vs actual"
               value={`${numberDisplay(currentMonthActualSales)} / ${numberDisplay(monthlyTarget)}`}
@@ -735,6 +680,11 @@ export default async function DealerDetailPage({
             <MetricCard
               label="FY actual vs annual target"
               value={`${numberDisplay(fyActualSales)} / ${numberDisplay(annualTarget)}`}
+            />
+            <MetricCard
+              label="Open linked leads"
+              value={numberDisplay(openLinkedLeadCount)}
+              helper="Farmer leads still open"
             />
             <MetricCard
               label="Dealer stock available"
