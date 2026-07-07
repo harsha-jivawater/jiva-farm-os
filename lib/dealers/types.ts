@@ -38,9 +38,12 @@ export type RegionOption = {
 };
 
 export type DealerListItem = Dealer & {
+  actualDealerSalesThisMonth: number;
   dealerStockCount: number;
-  dealerInstallationCount: number;
   dispatchedThisMonthCount: number;
+  issueReportedInstallations: number;
+  monthlyGap: number;
+  needsReview: boolean;
 };
 
 export function display(value: string | number | null | undefined) {

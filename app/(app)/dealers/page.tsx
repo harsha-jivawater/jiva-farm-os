@@ -20,10 +20,12 @@ import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PageHeader } from "@/components/page-header";
 import {
   dealerAgreementStatusOptions,
+  dealerStatusFilterMap,
   dealerStatusOptions,
   dealerTypeOptions,
   labelFor,
   priorityOptions,
+  simplifiedDealerStatus,
   trainingStatusOptions
 } from "@/lib/dealers/options";
 import {
@@ -33,10 +35,17 @@ import {
   type DealerListItem,
   type Device,
   type Dispatch,
-  type Installation,
   type RegionOption,
   type UserOption
 } from "@/lib/dealers/types";
+import {
+  countDealerSales,
+  countIssueReportedInstallations,
+  currentMonthRange,
+  isOverdueDate,
+  targetGap,
+  type DealerPerformanceInstallation
+} from "@/lib/dealers/performance";
 import { applyLocationFilter } from "@/lib/filters/location";
 import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
@@ -76,7 +85,11 @@ const listSelectColumns = [
   "taluk_or_territory",
   "training_status",
   "dealer_agreement_status",
-  "priority"
+  "priority",
+  "monthly_installation_target",
+  "next_action_date",
+  "next_dealer_review_date",
+  "support_required"
 ].join(",");
 
 function paramValue(value: string | string[] | undefined) {
@@ -256,6 +269,12 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
 
   for (const column of filterColumns) {
     if (filters[column]) {
+      if (column === "dealer_status") {
+        const values = dealerStatusFilterMap[filters[column]] ?? [filters[column]];
+        query = query.in(column, values);
+        continue;
+      }
+
       query = query.eq(column, filters[column]);
     }
   }
@@ -287,7 +306,9 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
         dealerIds.length
           ? supabase
               .from("installations")
-              .select("id, dealer_id")
+              .select(
+                "id, dealer_id, installation_date, installation_status, installation_type"
+              )
               .in("dealer_id", dealerIds)
               .is("deleted_at", null)
           : Promise.resolve({ data: [] }),
@@ -307,26 +328,63 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
     (stockDevices ?? []) as Pick<Device, "id" | "current_holder_id">[],
     (device) => device.current_holder_id
   );
-  const installationCounts = countById(
-    (installations ?? []) as Pick<Installation, "id" | "dealer_id">[],
-    (installation) => installation.dealer_id
-  );
   const dispatchCounts = countById(
     (dispatches ?? []) as Pick<Dispatch, "id" | "destination_dealer_id">[],
     (dispatch) => dispatch.destination_dealer_id
   );
+  const monthRange = currentMonthRange();
+  const installationsByDealer = (
+    (installations ?? []) as DealerPerformanceInstallation[]
+  ).reduce<Record<string, DealerPerformanceInstallation[]>>((acc, installation) => {
+    if (installation.dealer_id) {
+      acc[installation.dealer_id] = acc[installation.dealer_id] ?? [];
+      acc[installation.dealer_id].push(installation);
+    }
+
+    return acc;
+  }, {});
   const dealerRows: DealerListItem[] = dealers.map((dealer) => ({
     ...dealer,
+    actualDealerSalesThisMonth: countDealerSales(
+      installationsByDealer[dealer.id] ?? [],
+      monthRange
+    ),
     dealerStockCount: stockCounts[dealer.id] ?? 0,
-    dealerInstallationCount: installationCounts[dealer.id] ?? 0,
-    dispatchedThisMonthCount: dispatchCounts[dealer.id] ?? 0
+    dispatchedThisMonthCount: dispatchCounts[dealer.id] ?? 0,
+    issueReportedInstallations: countIssueReportedInstallations(
+      installationsByDealer[dealer.id] ?? [],
+      monthRange
+    ),
+    monthlyGap: targetGap(
+      dealer.monthly_installation_target,
+      countDealerSales(installationsByDealer[dealer.id] ?? [], monthRange)
+    ),
+    needsReview:
+      isOverdueDate(dealer.next_dealer_review_date) ||
+      isOverdueDate(dealer.next_action_date) ||
+      Boolean(dealer.support_required)
   }));
   const totalDealerStock = dealerRows.reduce(
     (sum, dealer) => sum + dealer.dealerStockCount,
     0
   );
-  const totalDealerInstallations = dealerRows.reduce(
-    (sum, dealer) => sum + dealer.dealerInstallationCount,
+  const totalMonthlyDealerTarget = dealerRows.reduce(
+    (sum, dealer) => sum + (dealer.monthly_installation_target ?? 0),
+    0
+  );
+  const totalActualDealerSalesThisMonth = dealerRows.reduce(
+    (sum, dealer) => sum + dealer.actualDealerSalesThisMonth,
+    0
+  );
+  const totalMonthlyGap = targetGap(
+    totalMonthlyDealerTarget,
+    totalActualDealerSalesThisMonth
+  );
+  const dealersNeedingReview = dealerRows.filter(
+    (dealer) => dealer.needsReview
+  ).length;
+  const issueReportedInstallationCount = dealerRows.reduce(
+    (sum, dealer) => sum + dealer.issueReportedInstallations,
     0
   );
 
@@ -352,55 +410,35 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard icon={Store} label="Total Dealers" value={dealerRows.length} />
         <KpiCard
-          icon={Users}
-          label="Potential Dealers"
-          value={
-            dealerRows.filter(
-              (dealer) => dealer.dealer_status === "Potential Dealer"
-            ).length
-          }
-        />
-        <KpiCard
           icon={CheckCircle2}
           label="Active Dealers"
           value={
             dealerRows.filter(
-              (dealer) => dealer.dealer_status === "Active Dealer"
+              (dealer) => simplifiedDealerStatus(dealer.dealer_status) === "Active"
             ).length
           }
         />
         <KpiCard
           icon={Target}
-          label="Dormant Dealers"
-          value={
-            dealerRows.filter(
-              (dealer) => dealer.dealer_status === "Dormant Dealer"
-            ).length
-          }
+          label="Dealer sales target this month"
+          value={totalMonthlyDealerTarget}
         />
         <KpiCard
           icon={Award}
-          label="Dealers Trained"
-          value={
-            dealerRows.filter(
-              (dealer) => dealer.training_status === "Training Completed"
-            ).length
-          }
+          label="Actual dealer sales this month"
+          value={totalActualDealerSalesThisMonth}
         />
+        <KpiCard icon={FileSignature} label="Gap" value={totalMonthlyGap} />
         <KpiCard
-          icon={FileSignature}
-          label="Agreement Signed"
-          value={
-            dealerRows.filter(
-              (dealer) => dealer.dealer_agreement_status === "Signed"
-            ).length
-          }
+          icon={Users}
+          label="Dealers needing review"
+          value={dealersNeedingReview}
         />
         <KpiCard icon={Boxes} label="Dealer Stock" value={totalDealerStock} />
         <KpiCard
           icon={UserRoundCheck}
-          label="Dealer Installations"
-          value={totalDealerInstallations}
+          label="Issue reported installations"
+          value={issueReportedInstallationCount}
         />
       </div>
 
@@ -642,7 +680,7 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
                     <th className="px-4 py-3">Training</th>
                     <th className="px-4 py-3">Agreement</th>
                     <th className="px-4 py-3">Stock</th>
-                    <th className="px-4 py-3">Installations</th>
+                    <th className="px-4 py-3">Sales this month</th>
                     <th className="px-4 py-3">Actions</th>
                   </tr>
                 </thead>
@@ -692,7 +730,12 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
                         </p>
                       </td>
                       <td className="px-4 py-3 text-slate-600">
-                        {dealer.dealerInstallationCount}
+                        <p className="font-semibold text-slate-950">
+                          {dealer.actualDealerSalesThisMonth}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {dealer.monthlyGap} gap
+                        </p>
                       </td>
                       <td className="px-4 py-3">
                         <ActionButtons canWrite={canWrite} dealer={dealer} />
@@ -731,9 +774,9 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-slate-400">Installations</dt>
+                      <dt className="text-slate-400">Sales this month</dt>
                       <dd className="mt-1 font-medium text-slate-700">
-                        {dealer.dealerInstallationCount}
+                        {dealer.actualDealerSalesThisMonth}
                       </dd>
                     </div>
                     <div>

@@ -158,7 +158,11 @@ export async function updateDealerAction(id: string, formData: FormData) {
         monthly_installation_target: payload.monthly_installation_target,
         quarterly_installation_target: payload.quarterly_installation_target,
         annual_installation_target: payload.annual_installation_target,
-        next_action_date: payload.next_action_date
+        next_action_date: payload.next_action_date,
+        last_dealer_review_date: payload.last_dealer_review_date,
+        next_dealer_review_date: payload.next_dealer_review_date,
+        support_required: payload.support_required,
+        remarks: payload.remarks
       }
     : {
         ...payload

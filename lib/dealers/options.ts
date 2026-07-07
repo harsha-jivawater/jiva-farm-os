@@ -15,23 +15,52 @@ export const dealerTypeOptions = [
 ] as const;
 
 export const dealerStatusOptions = [
-  { value: "Potential Dealer", label: "Potential Dealer" },
-  { value: "First Discussion Done", label: "First Discussion Done" },
-  { value: "Profile Collected", label: "Profile Collected" },
-  { value: "Territory Assessed", label: "Territory Assessed" },
-  { value: "Commercial Terms Shared", label: "Commercial Terms Shared" },
-  { value: "Training Completed", label: "Training Completed" },
-  { value: "First Order Expected", label: "First Order Expected" },
-  { value: "First Order Received", label: "First Order Received" },
-  { value: "Dealer Stock Dispatched", label: "Dealer Stock Dispatched" },
-  {
-    value: "First Farmer Installation Done",
-    label: "First Farmer Installation Done"
-  },
-  { value: "Active Dealer", label: "Active Dealer" },
-  { value: "Dormant Dealer", label: "Dormant Dealer" },
+  { value: "Prospect", label: "Prospect" },
+  { value: "Onboarding", label: "Onboarding" },
+  { value: "Active", label: "Active" },
+  { value: "Dormant", label: "Dormant" },
   { value: "Dropped", label: "Dropped" }
 ] as const;
+
+export const legacyDealerStatusMap: Record<string, string> = {
+  "Potential Dealer": "Prospect",
+  "First Discussion Done": "Prospect",
+  "Profile Collected": "Prospect",
+  "Territory Assessed": "Onboarding",
+  "Commercial Terms Shared": "Onboarding",
+  "Training Completed": "Onboarding",
+  "First Order Expected": "Onboarding",
+  "First Order Received": "Onboarding",
+  "Dealer Stock Dispatched": "Onboarding",
+  "First Farmer Installation Done": "Active",
+  "Active Dealer": "Active",
+  "Dormant Dealer": "Dormant",
+  Dropped: "Dropped"
+};
+
+export const dealerStatusFilterMap: Record<string, string[]> = {
+  Prospect: ["Prospect", "Potential Dealer", "First Discussion Done", "Profile Collected"],
+  Onboarding: [
+    "Onboarding",
+    "Territory Assessed",
+    "Commercial Terms Shared",
+    "Training Completed",
+    "First Order Expected",
+    "First Order Received",
+    "Dealer Stock Dispatched"
+  ],
+  Active: ["Active", "First Farmer Installation Done", "Active Dealer"],
+  Dormant: ["Dormant", "Dormant Dealer"],
+  Dropped: ["Dropped"]
+};
+
+export function simplifiedDealerStatus(value: string | null | undefined) {
+  if (!value) {
+    return "Not set";
+  }
+
+  return legacyDealerStatusMap[value] ?? value;
+}
 
 export const existingCustomerBaseTypeOptions = [
   { value: "Small Farmers", label: "Small Farmers" },
@@ -87,7 +116,7 @@ export const priorityOptions = [
 export const keyCropOptions = primaryCropOptions;
 
 export const defaultDealerType = "Agri Input Dealer";
-export const defaultDealerStatus = "Potential Dealer";
+export const defaultDealerStatus = "Prospect";
 export const defaultCommercialTermsShared = "Pending";
 export const defaultDealerAgreementStatus = "Not Started";
 export const defaultTrainingStatus = "Not Trained";

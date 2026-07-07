@@ -22,6 +22,7 @@ import {
   defaultTrainingStatus,
   existingCustomerBaseTypeOptions,
   priorityOptions,
+  simplifiedDealerStatus,
   trainingStatusOptions
 } from "@/lib/dealers/options";
 import type { Dealer, RegionOption, UserOption } from "@/lib/dealers/types";
@@ -142,6 +143,36 @@ function SelectField({
   );
 }
 
+function TextAreaField({
+  defaultValue,
+  label,
+  name,
+  placeholder
+}: {
+  defaultValue?: string | null;
+  label: string;
+  name: string;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label
+        className="mb-1.5 block text-sm font-medium text-slate-700"
+        htmlFor={name}
+      >
+        {label}
+      </label>
+      <textarea
+        className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+        defaultValue={defaultValue ?? ""}
+        id={name}
+        name={name}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
 export function DealerForm({
   action,
   approvalOnly = false,
@@ -205,12 +236,12 @@ export function DealerForm({
         }
 
         if (
-          formData.get("dealer_status") === "Active Dealer" &&
+          formData.get("dealer_status") === "Active" &&
           formData.get("dealer_agreement_status") !== "Signed"
         ) {
           event.preventDefault();
           setClientError(
-            "Dealer cannot become Active Dealer unless the dealer agreement status is Signed."
+            "Dealer cannot become Active unless the dealer agreement status is Signed."
           );
         }
       }}
@@ -280,7 +311,7 @@ export function DealerForm({
             </p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <SelectField
-                defaultValue={dealer.dealer_status}
+                defaultValue={simplifiedDealerStatus(dealer.dealer_status)}
                 label="Dealer status"
                 name="dealer_status"
                 options={dealerStatusOptions}
@@ -323,20 +354,20 @@ export function DealerForm({
               />
               <Field
                 defaultValue={dealer.monthly_installation_target ?? 0}
-                label="Monthly installation target"
+                label="Monthly dealer sales target"
                 name="monthly_installation_target"
                 required
                 type="number"
               />
               <Field
                 defaultValue={dealer.quarterly_installation_target ?? 0}
-                label="Quarterly installation target"
+                label="Quarterly dealer sales target"
                 name="quarterly_installation_target"
                 type="number"
               />
               <Field
                 defaultValue={dealer.annual_installation_target ?? 0}
-                label="Annual installation target"
+                label="Annual dealer sales target"
                 name="annual_installation_target"
                 type="number"
               />
@@ -347,6 +378,38 @@ export function DealerForm({
                 required
                 type="date"
               />
+              {!canApproveLegalDocuments ? (
+                <>
+                  <Field
+                    defaultValue={dealer.last_dealer_review_date}
+                    label="Last dealer review date"
+                    name="last_dealer_review_date"
+                    type="date"
+                  />
+                  <Field
+                    defaultValue={dealer.next_dealer_review_date}
+                    label="Next dealer review date"
+                    name="next_dealer_review_date"
+                    type="date"
+                  />
+                  <div className="md:col-span-2">
+                    <TextAreaField
+                      defaultValue={dealer.support_required}
+                      label="Concern / blocker"
+                      name="support_required"
+                      placeholder="Support needed, blocker, or risk to resolve"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <TextAreaField
+                      defaultValue={dealer.remarks}
+                      label="Remarks"
+                      name="remarks"
+                      placeholder="Review notes or Sales Head guidance"
+                    />
+                  </div>
+                </>
+              ) : null}
               <FileUploadField
                 currentValue={dealer.agreement_link}
                 kind="document"
@@ -451,7 +514,11 @@ export function DealerForm({
             required
           />
           <SelectField
-            defaultValue={dealer?.dealer_status ?? defaultDealerStatus}
+            defaultValue={
+              dealer?.dealer_status
+                ? simplifiedDealerStatus(dealer.dealer_status)
+                : defaultDealerStatus
+            }
             label="Dealer status"
             name="dealer_status"
             options={dealerStatusOptions}
@@ -630,6 +697,52 @@ export function DealerForm({
             options={creditTermsOptions}
             required
           />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-slate-950">
+          Dealer targets
+        </h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <Field
+            defaultValue={dealer?.monthly_installation_target ?? 0}
+            label="Monthly dealer sales target"
+            name="monthly_installation_target"
+            type="number"
+          />
+          <Field
+            defaultValue={dealer?.quarterly_installation_target ?? 0}
+            label="Quarterly dealer sales target"
+            name="quarterly_installation_target"
+            type="number"
+          />
+          <Field
+            defaultValue={dealer?.annual_installation_target ?? 0}
+            label="Annual dealer sales target"
+            name="annual_installation_target"
+            type="number"
+          />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-slate-950">
+          Dealer review and next action
+        </h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Field
+            defaultValue={dealer?.last_dealer_review_date}
+            label="Last dealer review date"
+            name="last_dealer_review_date"
+            type="date"
+          />
+          <Field
+            defaultValue={dealer?.next_dealer_review_date}
+            label="Next dealer review date"
+            name="next_dealer_review_date"
+            type="date"
+          />
           <Field
             defaultValue={dealer?.next_action_date ?? defaultNextActionDate()}
             label="Next action date"
@@ -637,6 +750,28 @@ export function DealerForm({
             required
             type="date"
           />
+          <div className="md:col-span-2">
+            <TextAreaField
+              defaultValue={dealer?.support_required}
+              label="Concern / blocker"
+              name="support_required"
+              placeholder="Support needed, blocker, or risk to resolve"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <TextAreaField
+              defaultValue={dealer?.remarks}
+              label="Remarks"
+              name="remarks"
+              placeholder="Review notes or internal context"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-slate-950">Documents</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <FileUploadField
             currentValue={dealer?.agreement_link}
             kind="document"
@@ -654,30 +789,6 @@ export function DealerForm({
             kind="document"
             label="Training material file"
             name="training_material_shared_link"
-          />
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <h2 className="text-base font-semibold text-slate-950">Targets</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <Field
-            defaultValue={dealer?.monthly_installation_target ?? 0}
-            label="Monthly installation target"
-            name="monthly_installation_target"
-            type="number"
-          />
-          <Field
-            defaultValue={dealer?.quarterly_installation_target ?? 0}
-            label="Quarterly installation target"
-            name="quarterly_installation_target"
-            type="number"
-          />
-          <Field
-            defaultValue={dealer?.annual_installation_target ?? 0}
-            label="Annual installation target"
-            name="annual_installation_target"
-            type="number"
           />
         </div>
       </div>

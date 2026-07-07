@@ -129,6 +129,9 @@ export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
     ),
     next_action_date:
       getText(formData, "next_action_date") ?? defaultNextActionDate(),
+    last_dealer_review_date: getText(formData, "last_dealer_review_date"),
+    next_dealer_review_date: getText(formData, "next_dealer_review_date"),
+    support_required: getText(formData, "support_required"),
     agreement_link: getText(formData, "agreement_link"),
     dealer_documents_folder_link: getText(
       formData,
@@ -137,7 +140,8 @@ export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
     training_material_shared_link: getText(
       formData,
       "training_material_shared_link"
-    )
+    ),
+    remarks: getText(formData, "remarks")
   };
 }
 
@@ -267,10 +271,10 @@ export function validateDealerPayload(payload: DealerFormPayload) {
   }
 
   if (
-    payload.dealer_status === "Active Dealer" &&
+    payload.dealer_status === "Active" &&
     payload.dealer_agreement_status !== "Signed"
   ) {
-    return "Dealer cannot become Active Dealer unless the dealer agreement status is Signed.";
+    return "Dealer cannot become Active unless the dealer agreement status is Signed.";
   }
 
   return null;

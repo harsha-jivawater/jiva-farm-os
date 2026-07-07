@@ -27,6 +27,16 @@ import {
   type RegionOption,
   type UserOption
 } from "@/lib/dealers/types";
+import {
+  countDealerSales,
+  countIssueReportedInstallations,
+  currentFinancialYearRange,
+  currentMonthRange,
+  currentQuarterRange,
+  isOverdueDate,
+  targetGap,
+  type DealerPerformanceInstallation
+} from "@/lib/dealers/performance";
 import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -64,6 +74,10 @@ function DetailItem({
       </div>
     </div>
   );
+}
+
+function numberDisplay(value: number | null | undefined) {
+  return (value ?? 0).toLocaleString("en-IN");
 }
 
 export default async function DealerDetailPage({
@@ -133,7 +147,9 @@ export default async function DealerDetailPage({
       .order("serial_number", { ascending: true }),
     supabase
       .from("dispatches")
-      .select("id, dispatch_code, dispatch_date, serial_number_snapshot")
+      .select(
+        "id, dispatch_code, dispatch_date, dispatch_status, serial_number_snapshot, linked_installation_id"
+      )
       .eq("destination_type", "Dealer")
       .eq("destination_dealer_id", dealer.id)
       .gte("dispatch_date", monthStartDate)
@@ -151,7 +167,7 @@ export default async function DealerDetailPage({
     supabase
       .from("installations")
       .select(
-        "id, installation_code, installation_date, farmer_name_snapshot, serial_number_snapshot, product_model, installation_status"
+        "id, installation_code, installation_date, farmer_name_snapshot, serial_number_snapshot, product_model, installation_status, installation_type, dealer_id"
       )
       .eq("dealer_id", dealer.id)
       .is("deleted_at", null)
@@ -186,7 +202,12 @@ export default async function DealerDetailPage({
   >[];
   const dealerDispatches = (dispatchesThisMonth ?? []) as Pick<
     Dispatch,
-    "id" | "dispatch_code" | "dispatch_date" | "serial_number_snapshot"
+    | "id"
+    | "dispatch_code"
+    | "dispatch_date"
+    | "dispatch_status"
+    | "serial_number_snapshot"
+    | "linked_installation_id"
   >[];
   const linkedLeads = (farmerLeads ?? []) as Pick<
     FarmerLead,
@@ -208,8 +229,33 @@ export default async function DealerDetailPage({
     | "serial_number_snapshot"
     | "product_model"
     | "installation_status"
+    | "installation_type"
+    | "dealer_id"
   >[];
   const relatedPilotsList = (relatedPilots ?? []) as RelatedPilot[];
+  const performanceInstallations =
+    dealerInstallations as DealerPerformanceInstallation[];
+  const monthRange = currentMonthRange();
+  const quarterRange = currentQuarterRange();
+  const fyRange = currentFinancialYearRange();
+  const currentMonthActualSales = countDealerSales(
+    performanceInstallations,
+    monthRange
+  );
+  const quarterActualSales = countDealerSales(performanceInstallations, quarterRange);
+  const fyActualSales = countDealerSales(performanceInstallations, fyRange);
+  const issueReportedInstallations =
+    countIssueReportedInstallations(performanceInstallations);
+  const openLinkedLeadCount = linkedLeads.filter(
+    (lead) => lead.lead_status === "Open"
+  ).length;
+  const pendingInstallationDispatchCount = dealerDispatches.filter(
+    (dispatch) => !dispatch.linked_installation_id
+  ).length;
+  const nextReviewDate =
+    dealer.next_dealer_review_date ?? dealer.next_action_date;
+  const firstFarmerInstallationDone =
+    fyActualSales > 0 || Boolean(dealer.last_farmer_installation_date);
 
   return (
     <section>
@@ -241,6 +287,90 @@ export default async function DealerDetailPage({
 
       <div className="mb-5">
         <DealerStatusPill status={dealer.dealer_status} />
+      </div>
+
+      <div className="mt-6">
+        <h2 className="mb-3 text-base font-semibold text-slate-950">
+          Dealer performance
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <DetailItem
+            label="Monthly dealer sales target"
+            value={numberDisplay(dealer.monthly_installation_target)}
+          />
+          <DetailItem
+            label="Current month actual dealer sales"
+            value={numberDisplay(currentMonthActualSales)}
+          />
+          <DetailItem
+            label="Monthly gap"
+            value={numberDisplay(
+              targetGap(dealer.monthly_installation_target, currentMonthActualSales)
+            )}
+          />
+          <DetailItem
+            label="Quarterly dealer sales target"
+            value={numberDisplay(dealer.quarterly_installation_target)}
+          />
+          <DetailItem
+            label="Quarter actual dealer sales"
+            value={numberDisplay(quarterActualSales)}
+          />
+          <DetailItem
+            label="Annual dealer sales target"
+            value={numberDisplay(dealer.annual_installation_target)}
+          />
+          <DetailItem
+            label="FY actual dealer sales"
+            value={numberDisplay(fyActualSales)}
+          />
+          <DetailItem
+            label="Dealer stock available"
+            value={numberDisplay(dealerDevices.length)}
+          />
+          <DetailItem
+            label="Open linked farmer leads"
+            value={numberDisplay(openLinkedLeadCount)}
+          />
+          <DetailItem
+            label="Dispatches pending installation"
+            value={numberDisplay(pendingInstallationDispatchCount)}
+          />
+          <DetailItem
+            label="Issue reported installations"
+            value={numberDisplay(issueReportedInstallations)}
+          />
+          <DetailItem
+            label="Next dealer review date"
+            value={
+              <span
+                className={
+                  isOverdueDate(nextReviewDate)
+                    ? "text-red-700"
+                    : "text-slate-950"
+                }
+              >
+                {formatDate(nextReviewDate)}
+              </span>
+            }
+          />
+          <DetailItem
+            label="Priority"
+            value={labelFor(dealer.priority, priorityOptions)}
+          />
+          <DetailItem
+            label="Concern / blocker"
+            value={display(dealer.support_required)}
+          />
+          <DetailItem
+            label="Next action date"
+            value={formatDate(dealer.next_action_date)}
+          />
+          <DetailItem
+            label="Last dealer review date"
+            value={formatDate(dealer.last_dealer_review_date)}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -336,20 +466,103 @@ export default async function DealerDetailPage({
       </div>
 
       <div className="mt-6">
+        <h2 className="mb-3 text-base font-semibold text-slate-950">
+          Onboarding progress
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <DetailItem
+            label="Commercial terms shared"
+            value={labelFor(
+              dealer.commercial_terms_shared,
+              commercialTermsSharedOptions
+            )}
+          />
+          <DetailItem
+            label="Training completed"
+            value={
+              dealer.training_status === "Training Completed"
+                ? "Yes"
+                : labelFor(dealer.training_status, trainingStatusOptions)
+            }
+          />
+          <DetailItem
+            label="Agreement status"
+            value={labelFor(
+              dealer.dealer_agreement_status,
+              dealerAgreementStatusOptions
+            )}
+          />
+          <DetailItem
+            label="Legal approval"
+            value={display(dealer.dealer_agreement_approval_status)}
+          />
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <h2 className="mb-3 text-base font-semibold text-slate-950">
+          Commercial and operations progress
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <DetailItem
+            label="First order expected"
+            value={formatDate(dealer.first_order_target_date)}
+          />
+          <DetailItem
+            label="Dealer stock dispatched"
+            value={dealerDispatches.length > 0 ? "Yes" : "No"}
+          />
+          <DetailItem
+            label="First farmer installation done"
+            value={firstFarmerInstallationDone ? "Yes" : "No"}
+          />
+          <DetailItem
+            label="Last farmer installation date"
+            value={formatDate(dealer.last_farmer_installation_date)}
+          />
+        </div>
+      </div>
+
+      <div className="mt-6">
         <h2 className="mb-3 text-base font-semibold text-slate-950">Targets</h2>
         <div className="grid gap-4 md:grid-cols-3">
           <DetailItem
-            label="Monthly installation target"
+            label="Monthly dealer sales target"
             value={dealer.monthly_installation_target}
           />
           <DetailItem
-            label="Quarterly installation target"
+            label="Quarterly dealer sales target"
             value={dealer.quarterly_installation_target}
           />
           <DetailItem
-            label="Annual installation target"
+            label="Annual dealer sales target"
             value={dealer.annual_installation_target}
           />
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <h2 className="mb-3 text-base font-semibold text-slate-950">
+          Review and next action
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <DetailItem
+            label="Last dealer review date"
+            value={formatDate(dealer.last_dealer_review_date)}
+          />
+          <DetailItem
+            label="Next dealer review date"
+            value={formatDate(dealer.next_dealer_review_date)}
+          />
+          <DetailItem
+            label="Next action date"
+            value={formatDate(dealer.next_action_date)}
+          />
+          <DetailItem
+            label="Concern / blocker"
+            value={display(dealer.support_required)}
+          />
+          <DetailItem label="Remarks" value={display(dealer.remarks)} />
         </div>
       </div>
 
