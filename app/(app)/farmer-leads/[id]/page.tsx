@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canConfirmPayment, canWriteModule } from "@/lib/users/permissions";
+import { labelForRole } from "@/lib/users/options";
 import { farmerLeadScope } from "@/lib/users/record-scope";
 
 type FarmerLeadDetailPageProps = {
@@ -77,6 +78,18 @@ function BooleanBadge({ active, label }: { active: boolean; label: string }) {
   );
 }
 
+function userLabel(
+  user:
+    | { full_name: string; email: string; role: string }
+    | null
+    | undefined,
+  fallback: string | null | undefined
+) {
+  return user
+    ? `${user.full_name} · ${user.email} · ${labelForRole(user.role)}`
+    : display(fallback);
+}
+
 export default async function FarmerLeadDetailPage({
   params
 }: FarmerLeadDetailPageProps) {
@@ -105,10 +118,20 @@ export default async function FarmerLeadDetailPage({
   }
 
   const lead = data as FarmerLead;
-  const [leadPhotosUrl, farmerDocumentUrl] = await Promise.all([
+  const userIds = Array.from(
+    new Set([lead.owner_user_id, lead.rsm_user_id].filter(Boolean))
+  );
+  const [{ data: users }, leadPhotosUrl, farmerDocumentUrl] = await Promise.all([
+    userIds.length
+      ? supabase
+          .from("users")
+          .select("id, full_name, email, role")
+          .in("id", userIds)
+      : Promise.resolve({ data: [] }),
     resolveFileUrl(supabase, lead.lead_photo_folder_link),
     resolveFileUrl(supabase, lead.farmer_document_link)
   ]);
+  const userMap = new Map((users ?? []).map((user) => [user.id, user]));
   const confirmPaymentAction = confirmFarmerLeadPaymentAction.bind(null, lead.id);
   const canConfirmLeadPayment = canConfirmPayment(currentUser);
 
@@ -185,8 +208,14 @@ export default async function FarmerLeadDetailPage({
           label="Next follow-up"
           value={formatDate(lead.followup_due_date)}
         />
-        <DetailItem label="Owner user ID" value={display(lead.owner_user_id)} />
-        <DetailItem label="RSM user ID" value={display(lead.rsm_user_id)} />
+        <DetailItem
+          label="Owner user"
+          value={userLabel(userMap.get(lead.owner_user_id), lead.owner_user_id)}
+        />
+        <DetailItem
+          label="RSM"
+          value={userLabel(userMap.get(lead.rsm_user_id), lead.rsm_user_id)}
+        />
         <DetailItem
           label="Lead photos"
           value={<FileLink href={leadPhotosUrl} label="View lead photos" />}

@@ -9,6 +9,10 @@ import { CropSelect } from "@/components/crops/crop-select";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
 import {
+  UserSearchSelect,
+  type UserSearchOption
+} from "@/components/users/user-search-select";
+import {
   cropStageOptions,
   defaultFunnelStage,
   defaultIrrigationType,
@@ -21,6 +25,7 @@ import {
 } from "@/lib/farmer-leads/options";
 import type { FarmerLead } from "@/lib/farmer-leads/types";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
+import { hasAnyRole } from "@/lib/users/permissions";
 
 type FarmerLeadFormProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -30,6 +35,7 @@ type FarmerLeadFormProps = {
   includeOwnerFields?: boolean;
   lead?: FarmerLead;
   mode: "create" | "edit";
+  users?: UserSearchOption[];
 };
 
 function inputClassName() {
@@ -70,7 +76,8 @@ export function FarmerLeadForm({
   error,
   includeOwnerFields = false,
   lead,
-  mode
+  mode,
+  users = []
 }: FarmerLeadFormProps) {
   const [primaryCrop, setPrimaryCrop] = useState(
     lead?.primary_crop ?? defaultPrimaryCrop
@@ -87,6 +94,12 @@ export function FarmerLeadForm({
     funnelStage,
     paymentConfirmed
   });
+  const ownerUsers = users.filter((user) =>
+    hasAnyRole(user, ["Sales Head", "RSM", "Salesperson", "Admin"])
+  );
+  const rsmUsers = users.filter((user) =>
+    hasAnyRole(user, ["RSM", "Sales Head", "Admin"])
+  );
 
   return (
     <form action={action} className="space-y-6">
@@ -402,39 +415,20 @@ export function FarmerLeadForm({
             active.
           </p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div>
-              <label
-                className="mb-1.5 block text-sm font-medium text-slate-700"
-                htmlFor="owner_user_id"
-              >
-                Owner user ID
-              </label>
-              <input
-                className={inputClassName()}
-                defaultValue={lead?.owner_user_id ?? ""}
-                id="owner_user_id"
-                name="owner_user_id"
-                placeholder="Salesperson or RSM user ID"
-                type="text"
-              />
-            </div>
-
-            <div>
-              <label
-                className="mb-1.5 block text-sm font-medium text-slate-700"
-                htmlFor="rsm_user_id"
-              >
-                RSM user ID
-              </label>
-              <input
-                className={inputClassName()}
-                defaultValue={lead?.rsm_user_id ?? ""}
-                id="rsm_user_id"
-                name="rsm_user_id"
-                placeholder="RSM user ID"
-                type="text"
-              />
-            </div>
+            <UserSearchSelect
+              defaultValue={lead?.owner_user_id}
+              label="Owner user"
+              name="owner_user_id"
+              placeholder="Search owner by name or email"
+              users={ownerUsers}
+            />
+            <UserSearchSelect
+              defaultValue={lead?.rsm_user_id}
+              label="RSM"
+              name="rsm_user_id"
+              placeholder="Search RSM by name or email"
+              users={rsmUsers}
+            />
           </div>
         </div>
       ) : (

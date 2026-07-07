@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { DeleteLeadButton } from "@/components/farmer-leads/delete-lead-button";
 import { FarmerLeadForm } from "@/components/farmer-leads/farmer-lead-form";
+import type { UserSearchOption } from "@/components/users/user-search-select";
 import {
   deleteFarmerLeadAction,
   updateFarmerLeadAction
@@ -43,7 +44,14 @@ export default async function EditFarmerLeadPage({
     leadQuery = leadQuery.or(scope.orFilter);
   }
 
-  const { data, error } = await leadQuery.single();
+  const [{ data, error }, { data: users }] = await Promise.all([
+    leadQuery.single(),
+    supabase
+      .from("users")
+      .select("id, full_name, email, role, secondary_role")
+      .eq("is_active", true)
+      .order("full_name", { ascending: true })
+  ]);
 
   if (error || !data) {
     notFound();
@@ -68,6 +76,7 @@ export default async function EditFarmerLeadPage({
         includeOwnerFields
         lead={lead}
         mode="edit"
+        users={(users ?? []) as UserSearchOption[]}
       />
       <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

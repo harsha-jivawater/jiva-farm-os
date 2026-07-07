@@ -10,6 +10,8 @@ type CropSelectProps = {
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
+  showMissingSelectionMessage?: boolean;
+  showOptionsOnEmptySearch?: boolean;
 };
 
 function inputClassName() {
@@ -35,15 +37,19 @@ export function CropSelect({
   name,
   value,
   onChange,
-  required = false
+  required = false,
+  showMissingSelectionMessage = true,
+  showOptionsOnEmptySearch = true
 }: CropSelectProps) {
   const [query, setQuery] = useState("");
   const visibleCrops = useMemo(() => {
     const trimmed = query.trim();
-    return trimmed
-      ? cropLibrary.filter((crop) => matchesCrop(trimmed, crop))
-      : cropLibrary;
-  }, [query]);
+    if (!trimmed) {
+      return showOptionsOnEmptySearch ? cropLibrary : [];
+    }
+
+    return cropLibrary.filter((crop) => matchesCrop(trimmed, crop));
+  }, [query, showOptionsOnEmptySearch]);
 
   const selectedCrop = cropLibrary.find((crop) => crop.value === value);
 
@@ -72,7 +78,8 @@ export function CropSelect({
           value={query}
         />
       </div>
-      <div className="mt-2 max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-white">
+      {query.trim() || visibleCrops.length ? (
+        <div className="mt-2 max-h-60 overflow-y-auto rounded-md border border-slate-200 bg-white">
         {visibleCrops.length === 0 ? (
           <p className="px-3 py-4 text-sm text-slate-500">
             No crops found. Select “Add crop not in list” below.
@@ -100,16 +107,17 @@ export function CropSelect({
             );
           })
         )}
-      </div>
+        </div>
+      ) : null}
       {selectedCrop ? (
         <p className="mt-1.5 text-xs leading-5 text-slate-500">
           Selected: {selectedCrop.label} · {cropContext(selectedCrop.value)}
         </p>
-      ) : (
+      ) : showMissingSelectionMessage ? (
         <p className="mt-1.5 text-xs leading-5 text-red-600">
           Select a crop before saving.
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

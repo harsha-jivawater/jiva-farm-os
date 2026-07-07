@@ -18,7 +18,14 @@ export function CropFilterSelect({
 
   return (
     <div>
-      <CropSelect label={label} name={name} onChange={setValue} value={value} />
+      <CropSelect
+        label={label}
+        name={name}
+        onChange={setValue}
+        showMissingSelectionMessage={false}
+        showOptionsOnEmptySearch={false}
+        value={value}
+      />
       {value ? (
         <button
           className="mt-2 text-xs font-semibold text-slate-500 hover:text-slate-800"

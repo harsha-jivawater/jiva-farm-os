@@ -16,6 +16,10 @@ import { PageHeader } from "@/components/page-header";
 import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { StatusPill } from "@/components/farmer-leads/status-pill";
 import {
+  UserSearchSelect,
+  type UserSearchOption
+} from "@/components/users/user-search-select";
+import {
   formatCrop,
   type FarmerLead,
   type FarmerLeadFilters
@@ -30,7 +34,7 @@ import {
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { canWriteModule } from "@/lib/users/permissions";
+import { canWriteModule, hasAnyRole } from "@/lib/users/permissions";
 import { farmerLeadScope } from "@/lib/users/record-scope";
 
 type FarmerLeadsPageProps = {
@@ -230,7 +234,7 @@ export default async function FarmerLeadsPage({
     }
   }
 
-  const [listResult, kpiResult] = await Promise.all([
+  const [listResult, kpiResult, usersResult] = await Promise.all([
     timeAsync("farmer leads list query", () => query),
     timeAsync("farmer leads kpi summary rpc", () =>
       supabase.rpc("get_farmer_leads_page_kpis", {
@@ -244,10 +248,24 @@ export default async function FarmerLeadsPage({
         p_lead_source: filters.lead_source || null,
         p_primary_crop: filters.primary_crop || null
       })
+    ),
+    timeAsync("farmer leads users filter query", () =>
+      supabase
+        .from("users")
+        .select("id, full_name, email, role, secondary_role")
+        .eq("is_active", true)
+        .order("full_name", { ascending: true })
     )
   ]);
   const { data, error, count } = listResult;
   const leads = (data ?? []) as unknown as FarmerLead[];
+  const users = (usersResult.data ?? []) as UserSearchOption[];
+  const ownerUsers = users.filter((user) =>
+    hasAnyRole(user, ["Sales Head", "RSM", "Salesperson", "Admin"])
+  );
+  const rsmUsers = users.filter((user) =>
+    hasAnyRole(user, ["RSM", "Sales Head", "Admin"])
+  );
 
   if (kpiResult.error) {
     console.error("[Farmer Leads] KPI summary RPC unavailable", kpiResult.error);
@@ -388,15 +406,11 @@ export default async function FarmerLeadsPage({
             name="primary_crop"
           />
 
-          {(["state", "district", "owner_user_id", "rsm_user_id"] as const).map(
+          {(["state", "district"] as const).map(
             (field) => (
               <label key={field}>
                 <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  {field === "owner_user_id"
-                    ? "Owner user ID"
-                    : field === "rsm_user_id"
-                      ? "RSM user ID"
-                      : field[0].toUpperCase() + field.slice(1)}
+                  {field[0].toUpperCase() + field.slice(1)}
                 </span>
                 <input
                   className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
@@ -408,6 +422,20 @@ export default async function FarmerLeadsPage({
               </label>
             )
           )}
+          <UserSearchSelect
+            defaultValue={filters.owner_user_id}
+            label="Owner user"
+            name="owner_user_id"
+            placeholder="Search owner by name or email"
+            users={ownerUsers}
+          />
+          <UserSearchSelect
+            defaultValue={filters.rsm_user_id}
+            label="RSM"
+            name="rsm_user_id"
+            placeholder="Search RSM by name or email"
+            users={rsmUsers}
+          />
         </div>
 
         <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
