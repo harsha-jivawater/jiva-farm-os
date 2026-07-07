@@ -383,14 +383,6 @@ export function validatePilotPayload(payload: PilotFormPayload) {
   if (!isOptionValue(payload.monitoring_frequency, monitoringFrequencyOptions)) {
     return "Monitoring frequency is not valid.";
   }
-  if (
-    payload.monitoring_start_date &&
-    payload.monitoring_frequency &&
-    !payload.total_visits_planned
-  ) {
-    return "Total visits planned is required when monitoring start date and frequency are set.";
-  }
-
   return null;
 }
 

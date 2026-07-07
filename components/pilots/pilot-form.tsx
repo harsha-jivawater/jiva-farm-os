@@ -19,7 +19,6 @@ import {
   defaultPilotType,
   defaultProductModel,
   irrigationTypeOptions,
-  monitoringFrequencyOptions,
   pilotResultStatusOptions,
   pilotStatusOptions,
   pilotTypeOptions,
@@ -69,6 +68,10 @@ function todayDate() {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function booleanValue(value: boolean | null | undefined, defaultValue = false) {
+  return (value ?? defaultValue) ? "true" : "false";
 }
 
 function SubmitButton() {
@@ -838,6 +841,81 @@ export function PilotForm({
         <h2 className="text-base font-semibold text-slate-950">
           Monitoring plan
         </h2>
+        <input
+          name="monitoring_frequency"
+          type="hidden"
+          value={pilot?.monitoring_frequency ?? defaultMonitoringFrequency}
+        />
+        <input
+          name="next_visit_due_date"
+          type="hidden"
+          value={pilot?.next_visit_due_date ?? ""}
+        />
+        <input
+          name="total_visits_planned"
+          type="hidden"
+          value={pilot?.total_visits_planned ?? ""}
+        />
+        <input
+          name="track_soil_moisture"
+          type="hidden"
+          value={booleanValue(pilot?.track_soil_moisture)}
+        />
+        <input
+          name="track_crop_growth"
+          type="hidden"
+          value={booleanValue(pilot?.track_crop_growth)}
+        />
+        <input
+          name="track_irrigation_frequency"
+          type="hidden"
+          value={booleanValue(pilot?.track_irrigation_frequency)}
+        />
+        <input
+          name="track_water_saving"
+          type="hidden"
+          value={booleanValue(pilot?.track_water_saving)}
+        />
+        <input
+          name="track_fertilizer_usage"
+          type="hidden"
+          value={booleanValue(pilot?.track_fertilizer_usage)}
+        />
+        <input
+          name="track_pest_disease"
+          type="hidden"
+          value={booleanValue(pilot?.track_pest_disease)}
+        />
+        <input
+          name="track_root_growth"
+          type="hidden"
+          value={booleanValue(pilot?.track_root_growth)}
+        />
+        <input
+          name="track_plant_height"
+          type="hidden"
+          value={booleanValue(pilot?.track_plant_height)}
+        />
+        <input
+          name="track_chlorophyll"
+          type="hidden"
+          value={booleanValue(pilot?.track_chlorophyll)}
+        />
+        <input
+          name="track_yield"
+          type="hidden"
+          value={booleanValue(pilot?.track_yield)}
+        />
+        <input
+          name="track_quality_parameters"
+          type="hidden"
+          value={booleanValue(pilot?.track_quality_parameters)}
+        />
+        <input
+          name="track_farmer_feedback"
+          type="hidden"
+          value={booleanValue(pilot?.track_farmer_feedback, true)}
+        />
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field
             defaultValue={pilot?.monitoring_start_date ?? todayDate()}
@@ -851,26 +929,6 @@ export function PilotForm({
             name="expected_monitoring_end_date"
             type="date"
           />
-          <SelectField
-            defaultValue={pilot?.monitoring_frequency ?? defaultMonitoringFrequency}
-            label="Monitoring frequency"
-            name="monitoring_frequency"
-            options={monitoringFrequencyOptions}
-            required
-          />
-          <Field
-            defaultValue={pilot?.next_visit_due_date}
-            label="Next visit due date"
-            name="next_visit_due_date"
-            type="date"
-          />
-          <Field
-            defaultValue={pilot?.total_visits_planned}
-            label="Total visits planned"
-            name="total_visits_planned"
-            required
-            type="number"
-          />
           <FileUploadField
             currentValue={pilot?.monitoring_plan_link}
             kind="document"
@@ -879,71 +937,9 @@ export function PilotForm({
           />
         </div>
         <p className="mt-3 text-sm leading-6 text-slate-500">
-          This will create planned monitoring visits. Each completed visit
-          requires a visit report.
+          Detailed visit dates, assignees, crop stages, and parameters are
+          managed in the Visit Planning section after the pilot is created.
         </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          <CheckboxField
-            defaultChecked={pilot?.track_soil_moisture}
-            label="Track soil moisture"
-            name="track_soil_moisture"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_crop_growth}
-            label="Track crop growth"
-            name="track_crop_growth"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_irrigation_frequency}
-            label="Track irrigation frequency"
-            name="track_irrigation_frequency"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_water_saving}
-            label="Track water saving"
-            name="track_water_saving"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_fertilizer_usage}
-            label="Track fertilizer usage"
-            name="track_fertilizer_usage"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_pest_disease}
-            label="Track pest disease"
-            name="track_pest_disease"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_root_growth}
-            label="Track root growth"
-            name="track_root_growth"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_plant_height}
-            label="Track plant height"
-            name="track_plant_height"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_chlorophyll}
-            label="Track chlorophyll"
-            name="track_chlorophyll"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_yield}
-            label="Track yield"
-            name="track_yield"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_quality_parameters}
-            label="Track quality parameters"
-            name="track_quality_parameters"
-          />
-          <CheckboxField
-            defaultChecked={pilot?.track_farmer_feedback ?? true}
-            label="Track farmer feedback"
-            name="track_farmer_feedback"
-          />
-        </div>
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
