@@ -1,7 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cropContext, cropLibrary } from "@/lib/crops/crop-library";
 
 type CropSelectProps = {
@@ -12,6 +12,7 @@ type CropSelectProps = {
   required?: boolean;
   showMissingSelectionMessage?: boolean;
   showOptionsOnEmptySearch?: boolean;
+  showSelectedContext?: boolean;
 };
 
 function inputClassName() {
@@ -39,9 +40,17 @@ export function CropSelect({
   onChange,
   required = false,
   showMissingSelectionMessage = true,
-  showOptionsOnEmptySearch = true
+  showOptionsOnEmptySearch = true,
+  showSelectedContext = true
 }: CropSelectProps) {
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (!value) {
+      setQuery("");
+    }
+  }, [value]);
+
   const visibleCrops = useMemo(() => {
     const trimmed = query.trim();
     if (!trimmed) {
@@ -96,7 +105,12 @@ export function CropSelect({
                     : "text-slate-700 hover:bg-slate-50"
                 ].join(" ")}
                 key={`${crop.value}-${crop.mainCategory}-${crop.subcategory}`}
-                onClick={() => onChange(crop.value)}
+                onClick={() => {
+                  onChange(crop.value);
+                  if (!showOptionsOnEmptySearch) {
+                    setQuery("");
+                  }
+                }}
                 type="button"
               >
                 <span className="block font-semibold">{crop.label}</span>
@@ -111,7 +125,8 @@ export function CropSelect({
       ) : null}
       {selectedCrop ? (
         <p className="mt-1.5 text-xs leading-5 text-slate-500">
-          Selected: {selectedCrop.label} · {cropContext(selectedCrop.value)}
+          Selected: {selectedCrop.label}
+          {showSelectedContext ? ` · ${cropContext(selectedCrop.value)}` : null}
         </p>
       ) : showMissingSelectionMessage ? (
         <p className="mt-1.5 text-xs leading-5 text-red-600">

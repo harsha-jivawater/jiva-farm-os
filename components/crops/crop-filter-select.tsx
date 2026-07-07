@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CropSelect } from "@/components/crops/crop-select";
 
 type CropFilterSelectProps = {
@@ -16,6 +16,10 @@ export function CropFilterSelect({
 }: CropFilterSelectProps) {
   const [value, setValue] = useState(defaultValue);
 
+  useEffect(() => {
+    setValue(defaultValue);
+  }, [defaultValue]);
+
   return (
     <div>
       <CropSelect
@@ -24,6 +28,7 @@ export function CropFilterSelect({
         onChange={setValue}
         showMissingSelectionMessage={false}
         showOptionsOnEmptySearch={false}
+        showSelectedContext={false}
         value={value}
       />
       {value ? (
