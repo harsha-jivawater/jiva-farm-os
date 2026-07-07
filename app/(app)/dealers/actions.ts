@@ -23,6 +23,10 @@ function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
 
+function redirectWithReviewError(dealerId: string, message: string): never {
+  redirect(`/dealers/${dealerId}?review_error=${encodeURIComponent(message)}`);
+}
+
 function textValue(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
   return value || null;
@@ -213,6 +217,46 @@ export async function updateDealerAction(id: string, formData: FormData) {
   revalidatePath("/dealers");
   revalidatePath(`/dealers/${id}`);
   redirect(`/dealers/${id}`);
+}
+
+export async function updateDealerReviewAction(id: string, formData: FormData) {
+  const supabase = await createClient();
+  const errorPath = `/dealers/${id}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (
+    !hasRole(profile, "Admin") &&
+    !hasRole(profile, "Sales Head") &&
+    !hasRole(profile, "RSM")
+  ) {
+    redirectWithReviewError(
+      id,
+      "You can view dealer review notes but cannot update them."
+    );
+  }
+
+  const payload: DealerUpdate = {
+    last_dealer_review_date: textValue(formData, "last_dealer_review_date"),
+    next_dealer_review_date: textValue(formData, "next_dealer_review_date"),
+    next_action_date: textValue(formData, "next_action_date"),
+    support_required: textValue(formData, "support_required"),
+    remarks: textValue(formData, "remarks"),
+    priority: textValue(formData, "priority")
+  } as DealerUpdate;
+
+  const { error } = await supabase
+    .from("dealers")
+    .update(payload)
+    .eq("id", id)
+    .is("deleted_at", null);
+
+  if (error) {
+    redirectWithReviewError(id, error.message);
+  }
+
+  revalidatePath("/dealers");
+  revalidatePath(`/dealers/${id}`);
+  redirect(`/dealers/${id}?review_saved=1`);
 }
 
 export async function createDealerInstitutionLinkAction(

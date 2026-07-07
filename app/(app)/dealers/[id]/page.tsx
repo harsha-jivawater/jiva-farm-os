@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
+import { updateDealerReviewAction } from "@/app/(app)/dealers/actions";
 import { DealerStatusPill } from "@/components/dealers/dealer-status-pill";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
@@ -49,6 +50,10 @@ import { dealerScope } from "@/lib/users/record-scope";
 type DealerDetailPageProps = {
   params: Promise<{
     id: string;
+  }>;
+  searchParams: Promise<{
+    review_error?: string;
+    review_saved?: string;
   }>;
 };
 
@@ -273,10 +278,25 @@ function numberDisplay(value: number | null | undefined) {
   return (value ?? 0).toLocaleString("en-IN");
 }
 
+function dateInputValue(value: string | null | undefined) {
+  return value ? value.slice(0, 10) : "";
+}
+
+function formFieldClassName() {
+  return "h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100";
+}
+
+function formTextareaClassName() {
+  return "min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100";
+}
+
 export default async function DealerDetailPage({
-  params
+  params,
+  searchParams
 }: DealerDetailPageProps) {
   const { id } = await params;
+  const { review_error: reviewError, review_saved: reviewSaved } =
+    await searchParams;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dealers");
   const canWrite = canWriteModule(currentUser, "dealers");
@@ -507,6 +527,11 @@ export default async function DealerDetailPage({
     hasRole(currentUser, "Admin") ||
     hasRole(currentUser, "Sales Head") ||
     hasRole(currentUser, "RSM");
+  const canSaveDealerReview =
+    hasRole(currentUser, "Admin") ||
+    hasRole(currentUser, "Sales Head") ||
+    hasRole(currentUser, "RSM");
+  const saveReviewAction = updateDealerReviewAction.bind(null, dealer.id);
   const editDealerAction = canWrite ? (
     <Link
       className="font-semibold text-brand-700 hover:text-brand-800"
@@ -628,41 +653,241 @@ export default async function DealerDetailPage({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_1.35fr]">
+      <div className="mt-6">
         <SectionPanel
-          title="Review and next action"
-          description="Management notes, priority, and the next decision point."
+          title="Dealer review and next action"
+          description="Update the dealer review rhythm, next action, and current blocker without changing the stable dealer profile."
         >
-          <InfoRow
-            label="Priority"
-            value={labelFor(dealer.priority, priorityOptions)}
-          />
-          <InfoRow
-            label="Last review date"
-            value={formatDate(dealer.last_dealer_review_date)}
-          />
-          <InfoRow
-            label="Next dealer review"
-            value={
-              <span className={reviewOverdue ? "text-red-700" : undefined}>
-                {formatDate(dealer.next_dealer_review_date)}
-              </span>
-            }
-          />
-          <InfoRow
-            label="Concern / blocker"
-            value={display(dealer.support_required)}
-          />
-          <InfoRow label="Remarks" value={display(dealer.remarks)} />
-          {!dealer.support_required && !dealer.remarks ? (
-            <p className="pt-3 text-sm text-slate-500">
-              No concern or review notes yet.
-            </p>
+          {reviewSaved ? (
+            <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+              Dealer review saved.
+            </div>
           ) : null}
-        </SectionPanel>
+          {reviewError ? (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+              {reviewError}
+            </div>
+          ) : null}
 
+          {canSaveDealerReview ? (
+            <form action={saveReviewAction}>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Priority
+                  </span>
+                  <select
+                    className={formFieldClassName()}
+                    defaultValue={dealer.priority ?? ""}
+                    name="priority"
+                  >
+                    <option value="">Select priority</option>
+                    {priorityOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Last dealer review date
+                  </span>
+                  <input
+                    className={formFieldClassName()}
+                    defaultValue={dateInputValue(dealer.last_dealer_review_date)}
+                    name="last_dealer_review_date"
+                    type="date"
+                  />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Next dealer review date
+                  </span>
+                  <input
+                    className={formFieldClassName()}
+                    defaultValue={dateInputValue(dealer.next_dealer_review_date)}
+                    name="next_dealer_review_date"
+                    type="date"
+                  />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Dealer next action date
+                  </span>
+                  <input
+                    className={formFieldClassName()}
+                    defaultValue={dateInputValue(dealer.next_action_date)}
+                    name="next_action_date"
+                    type="date"
+                  />
+                </label>
+                <label className="md:col-span-2">
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Dealer concern / blocker
+                  </span>
+                  <input
+                    className={formFieldClassName()}
+                    defaultValue={dealer.support_required ?? ""}
+                    name="support_required"
+                  />
+                </label>
+                <label className="md:col-span-2 xl:col-span-3">
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Dealer remarks
+                  </span>
+                  <textarea
+                    className={formTextareaClassName()}
+                    defaultValue={dealer.remarks ?? ""}
+                    name="remarks"
+                  />
+                </label>
+              </div>
+              <button
+                className="mt-4 inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                type="submit"
+              >
+                Save review
+              </button>
+            </form>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              <InfoRow
+                label="Priority"
+                value={labelFor(dealer.priority, priorityOptions)}
+              />
+              <InfoRow
+                label="Dealer next action date"
+                value={
+                  <span className={nextActionOverdue ? "text-red-700" : undefined}>
+                    {formatDate(dealer.next_action_date)}
+                  </span>
+                }
+              />
+              <InfoRow
+                label="Next dealer review date"
+                value={
+                  <span className={reviewOverdue ? "text-red-700" : undefined}>
+                    {formatDate(dealer.next_dealer_review_date)}
+                  </span>
+                }
+              />
+              <InfoRow
+                label="Last dealer review date"
+                value={formatDate(dealer.last_dealer_review_date)}
+              />
+              <InfoRow
+                label="Dealer concern / blocker"
+                value={display(dealer.support_required)}
+              />
+              <InfoRow label="Dealer remarks" value={display(dealer.remarks)} />
+            </div>
+          )}
+        </SectionPanel>
+      </div>
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">
+              Institution connections
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Institutional opportunities introduced or supported through this
+              dealer.
+            </p>
+          </div>
+          {canManageInstitutionConnections ? (
+            <Link
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+              href={`/dealers/${dealer.id}/institution-connections/new`}
+            >
+              Add institution opportunity
+            </Link>
+          ) : null}
+        </div>
+        {institutionLinksList.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[64rem] text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Institution</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Opportunity</th>
+                  <th className="px-4 py-3">Opportunity follow-up date</th>
+                  <th className="px-4 py-3">Owner / RSM</th>
+                  <th className="px-4 py-3">Concern</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {institutionLinksList.map((connection) => {
+                  const institution = institutionMap.get(
+                    connection.institution_id
+                  );
+
+                  return (
+                    <tr key={connection.id} className="align-top">
+                      <td className="px-4 py-3">
+                        {institution ? (
+                          <Link
+                            className="font-semibold text-brand-700 hover:text-brand-800"
+                            href={`/institutional-partners/${institution.id}`}
+                          >
+                            {institution.organization_name}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold text-slate-950">
+                            {connection.institution_id}
+                          </span>
+                        )}
+                        <p className="mt-1 text-xs text-slate-500">
+                          {institution?.institution_code ?? "Institution"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {labelFor(
+                          connection.relationship_status,
+                          dealerInstitutionRelationshipStatusOptions
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        <p>{display(connection.opportunity_name)}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {connection.expected_devices ?? 0} expected devices
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {formatDate(connection.next_action_date)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        <p>
+                          {connection.owner_user_id
+                            ? display(userMap.get(connection.owner_user_id)?.full_name)
+                            : "Not set"}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          RSM:{" "}
+                          {connection.rsm_user_id
+                            ? display(userMap.get(connection.rsm_user_id)?.full_name)
+                            : "Not set"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {display(connection.concern_or_blocker)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <CompactEmpty>No institution connections yet.</CompactEmpty>
+        )}
+      </div>
+
+      <div className="mt-6">
         <SectionPanel
-          title="Performance"
+          title="Dealer performance"
           description="Dealer sales, stock, and operational gaps."
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -862,106 +1087,6 @@ export default async function DealerDetailPage({
             </p>
           )}
         </SectionPanel>
-      </div>
-
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-slate-950">
-              Institution connections
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Institutional opportunities introduced or supported through this
-              dealer.
-            </p>
-          </div>
-          {canManageInstitutionConnections ? (
-            <Link
-              className="inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
-              href={`/dealers/${dealer.id}/institution-connections/new`}
-            >
-              Add institution opportunity
-            </Link>
-          ) : null}
-        </div>
-        {institutionLinksList.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[64rem] text-left text-sm">
-              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Institution</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Opportunity</th>
-                  <th className="px-4 py-3">Opportunity follow-up date</th>
-                  <th className="px-4 py-3">Owner / RSM</th>
-                  <th className="px-4 py-3">Concern</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {institutionLinksList.map((connection) => {
-                  const institution = institutionMap.get(
-                    connection.institution_id
-                  );
-
-                  return (
-                    <tr key={connection.id} className="align-top">
-                      <td className="px-4 py-3">
-                        {institution ? (
-                          <Link
-                            className="font-semibold text-brand-700 hover:text-brand-800"
-                            href={`/institutional-partners/${institution.id}`}
-                          >
-                            {institution.organization_name}
-                          </Link>
-                        ) : (
-                          <span className="font-semibold text-slate-950">
-                            {connection.institution_id}
-                          </span>
-                        )}
-                        <p className="mt-1 text-xs text-slate-500">
-                          {institution?.institution_code ?? "Institution"}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {labelFor(
-                          connection.relationship_status,
-                          dealerInstitutionRelationshipStatusOptions
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        <p>{display(connection.opportunity_name)}</p>
-                        <p className="mt-1 text-xs text-slate-400">
-                          {connection.expected_devices ?? 0} expected devices
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {formatDate(connection.next_action_date)}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        <p>
-                          {connection.owner_user_id
-                            ? display(userMap.get(connection.owner_user_id)?.full_name)
-                            : "Not set"}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-400">
-                          RSM:{" "}
-                          {connection.rsm_user_id
-                            ? display(userMap.get(connection.rsm_user_id)?.full_name)
-                            : "Not set"}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {display(connection.concern_or_blocker)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <CompactEmpty>No institution connections yet.</CompactEmpty>
-        )}
       </div>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
