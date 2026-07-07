@@ -31,15 +31,6 @@ export function CropFilterSelect({
         showSelectedContext={false}
         value={value}
       />
-      {value ? (
-        <button
-          className="mt-2 text-xs font-semibold text-slate-500 hover:text-slate-800"
-          onClick={() => setValue("")}
-          type="button"
-        >
-          Clear crop filter
-        </button>
-      ) : null}
     </div>
   );
 }
