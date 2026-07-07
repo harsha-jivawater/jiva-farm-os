@@ -1,4 +1,4 @@
-# Jiva Farm Devices OS
+# Jiva Farm OS
 
 Internal operating system for managing Jiva Water farmer leads, dealers, institutional partners, pilots, devices, dispatches, installations, follow-ups, users, regions, and KPIs.
 
@@ -16,6 +16,7 @@ Internal operating system for managing Jiva Water farmer leads, dealers, institu
 - Protected dashboard area
 - Responsive sidebar navigation
 - Production modules for sales, operations, pilots, devices, follow-ups, internal users, regions, and reporting
+- Production deployment on Vercel with Supabase Auth, Database, RLS, and Storage
 
 ## Local setup
 
@@ -53,5 +54,13 @@ Internal operating system for managing Jiva Water farmer leads, dealers, institu
 - `/dealers`
 - `/institutional-partners`
 - `/pilots`
+- `/my-visits`
+- `/devices`
+- `/dispatches`
 - `/installations`
+- `/follow-ups`
 - `/kpi-dashboard`
+- `/regions`
+- `/internal-users`
+- `/help`
+- `/account/password`

@@ -2,6 +2,12 @@
 
 Simple reverse chronological record of major Jiva Farm OS work.
 
+## 2026-07-08
+
+- Updated project status and operations documentation with the current production architecture, deployment flow, role model, workflows, crop rules, file upload workflow, KPI notes, RLS/security notes, and recent important migrations.
+- Documented legacy crop enforcement and the crop-name-only operational UI rule.
+- Documented Farmer Lead default Sales Head fallback routing and Device Installed workflow semantics.
+
 ## 2026-07-04
 
 - Added preview-first CSV import for Farmer Leads and Devices.
