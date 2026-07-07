@@ -3,6 +3,10 @@ import type {
   FarmerLeadUpdate
 } from "@/lib/farmer-leads/types";
 import {
+  isLegacyCropValue,
+  legacyCropValidationMessage
+} from "@/lib/crops/crop-library";
+import {
   defaultFunnelStage,
   defaultIrrigationType,
   defaultLeadSource,
@@ -134,6 +138,10 @@ export function validateFarmerLeadPayload(payload: FarmerLeadInsert | FarmerLead
 
   if (!payload.primary_crop) {
     return "Select a crop before saving.";
+  }
+
+  if (isLegacyCropValue(payload.primary_crop)) {
+    return legacyCropValidationMessage();
   }
 
   if (payload.primary_crop === "Other" && !payload.other_primary_crop) {

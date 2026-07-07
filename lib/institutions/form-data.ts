@@ -1,4 +1,8 @@
 import {
+  legacyCropNames,
+  legacyCropValidationMessage
+} from "@/lib/crops/crop-library";
+import {
   agreementStatusOptions,
   cropFocusOptions,
   decisionRoleOptions,
@@ -280,6 +284,10 @@ export function validateInstitutionPayload(payload: InstitutionFormPayload) {
 
   if (!hasOnlyOptionValues(payload.crop_focus, cropFocusOptions)) {
     return "One or more crop focus values are not valid.";
+  }
+
+  if (legacyCropNames(payload.crop_focus ?? []).length) {
+    return legacyCropValidationMessage();
   }
 
   if (payload.crop_focus?.includes("Other") && !payload.other_crop_focus) {

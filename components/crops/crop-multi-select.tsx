@@ -2,7 +2,12 @@
 
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { cropLibrary } from "@/lib/crops/crop-library";
+import {
+  cropDisplayLabel,
+  cropLibrary,
+  legacyCropNames,
+  selectableCropLibrary
+} from "@/lib/crops/crop-library";
 
 type CropMultiSelectProps = {
   label: string;
@@ -40,19 +45,19 @@ export function CropMultiSelect({
   const selectedCrops = useMemo(
     () =>
       values.map((value) => {
-        const crop = cropLibrary.find((item) => item.value === value);
         return {
-          label: crop?.label ?? value,
+          label: cropDisplayLabel(value),
           value
         };
       }),
     [values]
   );
+  const legacyCrops = useMemo(() => legacyCropNames(values), [values]);
   const visibleCrops = useMemo(() => {
     const trimmed = query.trim();
     return trimmed
-      ? cropLibrary.filter((crop) => matchesCrop(trimmed, crop))
-      : cropLibrary;
+      ? selectableCropLibrary.filter((crop) => matchesCrop(trimmed, crop))
+      : selectableCropLibrary;
   }, [query]);
 
   function toggleCrop(value: string) {
@@ -98,6 +103,15 @@ export function CropMultiSelect({
               <span className="sr-only">Remove {crop.label}</span>
             </button>
           ))}
+        </div>
+      ) : null}
+      {legacyCrops.length ? (
+        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+          <p>Current old crop value: {legacyCrops.join(", ")}</p>
+          <p>
+            This crop is a legacy general value. Please update it to a specific
+            crop before saving.
+          </p>
         </div>
       ) : null}
       <div className="mt-2 max-h-72 overflow-y-auto rounded-md border border-slate-200 bg-white">

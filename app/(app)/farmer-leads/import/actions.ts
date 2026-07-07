@@ -9,6 +9,10 @@ import {
   defaultPrimaryCrop
 } from "@/lib/farmer-leads/options";
 import { validateFarmerLeadPayload } from "@/lib/farmer-leads/form-data";
+import {
+  isLegacyCropValue,
+  legacyCropValidationMessage
+} from "@/lib/crops/crop-library";
 import type { FarmerLeadInsert } from "@/lib/farmer-leads/types";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 import type { ImportActionState } from "@/lib/csv/import-types";
@@ -286,6 +290,13 @@ export async function importFarmerLeadsAction(
       if (payload.payment_confirmed) {
         payload.payment_confirmed_by_user_id = profile.id;
         payload.payment_confirmed_date = todayDate();
+      }
+
+      if (isLegacyCropValue(payload.primary_crop)) {
+        rowErrors.push(
+          `Row ${rowNumber}: ${legacyCropValidationMessage(payload.primary_crop)}`
+        );
+        return;
       }
 
       const validationError = validateFarmerLeadPayload(payload);

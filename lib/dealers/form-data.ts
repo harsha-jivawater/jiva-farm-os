@@ -1,4 +1,8 @@
 import {
+  legacyCropNames,
+  legacyCropValidationMessage
+} from "@/lib/crops/crop-library";
+import {
   commercialTermsSharedOptions,
   creditTermsOptions,
   dealerAgreementStatusOptions,
@@ -252,6 +256,10 @@ export function validateDealerPayload(payload: DealerFormPayload) {
 
   if (payload.key_crops?.some((crop) => !isOptionValue(crop, keyCropOptions))) {
     return "One or more key crops are not valid.";
+  }
+
+  if (legacyCropNames(payload.key_crops ?? []).length) {
+    return legacyCropValidationMessage();
   }
 
   if (payload.key_crops?.includes("Other") && !payload.other_key_crops) {

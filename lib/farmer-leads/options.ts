@@ -1,3 +1,5 @@
+import { selectableCropOptions } from "@/lib/crops/crop-library";
+
 export const leadStatusOptions = [
   { value: "Open", label: "Open" },
   { value: "Won", label: "Won" },
@@ -81,7 +83,7 @@ export const leadSourceOptions = [
   { value: "Other", label: "Other" }
 ] as const;
 
-export const primaryCropOptions = cropOptions;
+export const primaryCropOptions = selectableCropOptions;
 
 export const cropStageOptions = [
   { value: "Pre-sowing", label: "Pre-sowing" },
@@ -151,4 +153,3 @@ export function labelFor(
 
   return options.find((option) => option.value === value)?.label ?? value;
 }
-import { cropOptions } from "@/lib/crops/crop-library";

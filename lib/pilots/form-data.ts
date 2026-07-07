@@ -1,4 +1,8 @@
 import {
+  isLegacyCropValue,
+  legacyCropValidationMessage
+} from "@/lib/crops/crop-library";
+import {
   comparisonMethodOptions,
   cropOptions,
   cropStageOptions,
@@ -340,6 +344,9 @@ export function validatePilotPayload(payload: PilotFormPayload) {
   if (!payload.district) return "District is required.";
   if (!payload.village) return "Village is required.";
   if (!payload.crop) return "Crop is required.";
+  if (isLegacyCropValue(payload.crop)) {
+    return legacyCropValidationMessage();
+  }
   if (payload.crop === "Other" && !payload.other_crop) {
     return "Enter other crop when crop is Other.";
   }
@@ -601,6 +608,9 @@ export function validateVisitReportPayload(payload: VisitReportFormPayload) {
   if (!payload.report_title) return "Report title is required.";
   if (!payload.report_summary) return "Report summary is required.";
   if (!payload.report_link) return "Report link is required.";
+  if (isLegacyCropValue(payload.crop)) {
+    return legacyCropValidationMessage();
+  }
   if (payload.crop === "Other" && !payload.other_crop) {
     return "Enter other crop when crop is Other.";
   }

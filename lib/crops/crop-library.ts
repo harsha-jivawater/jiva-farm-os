@@ -135,10 +135,23 @@ export const cropLibrary: CropLibraryItem[] = [
   { value: "Unknown", label: "Unknown", mainCategory: SPECIAL, subcategory: "Incomplete data" }
 ];
 
+export const legacyCropValues = cropLibrary
+  .filter((crop) => crop.legacy)
+  .map((crop) => crop.value);
+
+export const selectableCropLibrary = cropLibrary.filter((crop) => !crop.legacy);
+
 export const cropOptions: CropOption[] = cropLibrary.map(({ value, label }) => ({
   value,
   label
 }));
+
+export const selectableCropOptions: CropOption[] = selectableCropLibrary.map(
+  ({ value, label }) => ({
+    value,
+    label
+  })
+);
 
 export function cropContext(value: string | null | undefined) {
   const item = cropLibrary.find((crop) => crop.value === value);
@@ -150,5 +163,29 @@ export function cropDisplayLabel(value: string | null | undefined) {
     return "Not set";
   }
 
-  return cropLibrary.find((crop) => crop.value === value)?.label ?? value;
+  const item = cropLibrary.find((crop) => crop.value === value);
+
+  if (!item) {
+    return value;
+  }
+
+  return item.legacy ? item.value : item.label;
+}
+
+export function isLegacyCropValue(value: string | null | undefined) {
+  return Boolean(value && legacyCropValues.includes(value));
+}
+
+export function legacyCropNames(values: Array<string | null | undefined>) {
+  return values
+    .filter((value): value is string => Boolean(value))
+    .filter(isLegacyCropValue);
+}
+
+export function legacyCropValidationMessage(value?: string | null) {
+  if (value && isLegacyCropValue(value)) {
+    return `Please choose a specific crop instead of legacy value ‘${value}’.`;
+  }
+
+  return "Please choose a specific crop. General legacy values like Vegetables or Mixed Crops are no longer allowed.";
 }

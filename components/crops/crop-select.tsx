@@ -2,7 +2,12 @@
 
 import { Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cropLibrary } from "@/lib/crops/crop-library";
+import {
+  cropDisplayLabel,
+  cropLibrary,
+  isLegacyCropValue,
+  selectableCropLibrary
+} from "@/lib/crops/crop-library";
 
 type CropSelectProps = {
   label: string;
@@ -13,6 +18,7 @@ type CropSelectProps = {
   showMissingSelectionMessage?: boolean;
   showOptionsOnEmptySearch?: boolean;
   showSelectedInInput?: boolean;
+  showLegacyWarning?: boolean;
   notifyFilterChange?: boolean;
 };
 
@@ -43,6 +49,7 @@ export function CropSelect({
   showMissingSelectionMessage = true,
   showOptionsOnEmptySearch = true,
   showSelectedInInput = true,
+  showLegacyWarning = true,
   notifyFilterChange = false
 }: CropSelectProps) {
   const [query, setQuery] = useState("");
@@ -102,14 +109,17 @@ export function CropSelect({
     }
 
     if (!trimmed) {
-      return showOptionsOnEmptySearch && !localValue ? cropLibrary : [];
+      return showOptionsOnEmptySearch && !localValue
+        ? selectableCropLibrary
+        : [];
     }
 
-    return cropLibrary.filter((crop) => matchesCrop(trimmed, crop));
+    return selectableCropLibrary.filter((crop) => matchesCrop(trimmed, crop));
   }, [isOpen, localValue, query, showOptionsOnEmptySearch]);
 
-  const selectedCrop = cropLibrary.find((crop) => crop.value === localValue);
-  const selectedLabel = selectedCrop?.label ?? localValue;
+  const selectedLabel = cropDisplayLabel(localValue);
+  const hasSelectedCrop = Boolean(localValue);
+  const hasLegacyCrop = isLegacyCropValue(localValue);
   const inputValue =
     showSelectedInInput && !query && localValue ? selectedLabel : query;
 
@@ -196,7 +206,16 @@ export function CropSelect({
         )}
         </div>
       ) : null}
-      {!selectedLabel && showMissingSelectionMessage ? (
+      {hasLegacyCrop && showLegacyWarning ? (
+        <div className="mt-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+          <p>Current old crop value: {selectedLabel}</p>
+          <p>
+            This crop is a legacy general value. Please update it to a specific
+            crop before saving.
+          </p>
+        </div>
+      ) : null}
+      {!hasSelectedCrop && showMissingSelectionMessage ? (
         <p className="mt-1.5 text-xs leading-5 text-red-600">
           Select a crop before saving.
         </p>

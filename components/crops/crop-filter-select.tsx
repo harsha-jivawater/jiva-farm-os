@@ -46,6 +46,7 @@ export function CropFilterSelect({
         label={label}
         name={name}
         onChange={updateFilterValue}
+        showLegacyWarning={false}
         showMissingSelectionMessage={false}
         showOptionsOnEmptySearch={false}
         showSelectedInInput
