@@ -81,6 +81,8 @@ function isOptionValue(
 
 export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
   const keyCrops = getTextList(formData, "key_crops");
+  const districts = getTextList(formData, "districts");
+  const primaryDistrict = districts[0] ?? getText(formData, "district") ?? "";
 
   return {
     dealer_name: getText(formData, "dealer_name") ?? "",
@@ -92,7 +94,8 @@ export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
     rsm_user_id: getText(formData, "rsm_user_id") ?? "",
     region_id: getText(formData, "region_id") ?? "",
     state: getText(formData, "state") ?? "",
-    district: getText(formData, "district") ?? "",
+    district: primaryDistrict,
+    districts: districts.length ? districts : primaryDistrict ? [primaryDistrict] : [],
     taluk_or_territory: getText(formData, "taluk_or_territory") ?? "",
     key_crops: keyCrops.length ? keyCrops : null,
     other_key_crops: getText(formData, "other_key_crops"),
@@ -178,8 +181,8 @@ export function validateDealerPayload(payload: DealerFormPayload) {
     return "State is required.";
   }
 
-  if (!payload.district) {
-    return "District is required.";
+  if (!payload.district || !payload.districts?.length) {
+    return "Select at least one district covered.";
   }
 
   if (!payload.taluk_or_territory) {

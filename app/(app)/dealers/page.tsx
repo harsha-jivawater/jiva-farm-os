@@ -29,6 +29,7 @@ import {
   trainingStatusOptions
 } from "@/lib/dealers/options";
 import {
+  compactDealerDistricts,
   display,
   type Dealer,
   type DealerFilters,
@@ -82,6 +83,7 @@ const listSelectColumns = [
   "dealer_status",
   "state",
   "district",
+  "districts",
   "taluk_or_territory",
   "training_status",
   "dealer_agreement_status",
@@ -262,6 +264,7 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
         `firm_name.ilike.%${cleanedSearch}%`,
         `contact_number.ilike.%${cleanedSearch}%`,
         `district.ilike.%${cleanedSearch}%`,
+        `districts.cs.{${cleanedSearch}}`,
         `taluk_or_territory.ilike.%${cleanedSearch}%`
       ].join(",")
     );
@@ -280,7 +283,15 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
   }
 
   query = applyLocationFilter(query, "state", filters.state);
-  query = applyLocationFilter(query, "district", filters.district);
+
+  if (filters.district) {
+    query = query.or(
+      [
+        `district.ilike.%${filters.district}%`,
+        `districts.cs.{${filters.district}}`
+      ].join(",")
+    );
+  }
 
   const { data, error, count } = await timeAsync(
     "dealers list query",
@@ -705,9 +716,7 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
                         <DealerStatusPill status={dealer.dealer_status} />
                       </td>
                       <td className="px-4 py-3 text-slate-600">
-                        <p>
-                          {dealer.district}, {dealer.state}
-                        </p>
+                        <p>{compactDealerDistricts(dealer)}, {dealer.state}</p>
                         <p className="mt-1 text-xs text-slate-400">
                           {dealer.taluk_or_territory}
                         </p>
@@ -764,7 +773,7 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
                     <div>
                       <dt className="text-slate-400">Location</dt>
                       <dd className="mt-1 font-medium text-slate-700">
-                        {dealer.district}
+                        {compactDealerDistricts(dealer)}
                       </dd>
                     </div>
                     <div>

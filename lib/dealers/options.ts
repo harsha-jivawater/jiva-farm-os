@@ -113,6 +113,16 @@ export const priorityOptions = [
   { value: "Parked", label: "Parked" }
 ] as const;
 
+export const dealerInstitutionRelationshipStatusOptions = [
+  { value: "Introduced", label: "Introduced" },
+  { value: "Contact Established", label: "Contact Established" },
+  { value: "Discussion Active", label: "Discussion Active" },
+  { value: "Proposal Shared", label: "Proposal Shared" },
+  { value: "Converted", label: "Converted" },
+  { value: "Dormant", label: "Dormant" },
+  { value: "Dropped", label: "Dropped" }
+] as const;
+
 export const keyCropOptions = primaryCropOptions;
 
 export const defaultDealerType = "Agri Input Dealer";

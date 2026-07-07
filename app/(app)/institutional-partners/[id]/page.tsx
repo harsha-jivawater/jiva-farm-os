@@ -13,6 +13,11 @@ import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
 import { cropDisplayLabel } from "@/lib/crops/crop-library";
 import {
+  dealerInstitutionRelationshipStatusOptions,
+  labelFor as dealerLabelFor
+} from "@/lib/dealers/options";
+import type { Dealer, DealerInstitutionLink } from "@/lib/dealers/types";
+import {
   agreementStatusOptions,
   decisionRoleOptions,
   departmentOptions,
@@ -66,6 +71,11 @@ type RelatedPilot = {
   pilot_status: string;
   farmer_name_snapshot: string;
 };
+
+type LinkedDealer = Pick<
+  Dealer,
+  "dealer_code" | "dealer_name" | "id" | "rsm_user_id"
+>;
 
 function DetailItem({
   label,
@@ -137,7 +147,9 @@ export default async function InstitutionDetailPage({
     { data: regions },
     { data: contacts },
     { data: meetings },
-    { data: relatedPilots }
+    { data: relatedPilots },
+    { data: dealerConnections },
+    { data: dealers }
   ] = await Promise.all([
     supabase
       .from("users")
@@ -169,13 +181,41 @@ export default async function InstitutionDetailPage({
       .eq("institution_id", institution.id)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(100)
+      .limit(100),
+    supabase
+      .from("dealer_institution_links")
+      .select(
+        "id, dealer_id, institution_id, relationship_status, opportunity_name, expected_devices, next_action_date, concern_or_blocker, owner_user_id, rsm_user_id"
+      )
+      .eq("institution_id", institution.id)
+      .is("deleted_at", null)
+      .order("next_action_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("dealers")
+      .select("id, dealer_code, dealer_name, rsm_user_id")
+      .is("deleted_at", null)
+      .order("dealer_name", { ascending: true })
   ]);
 
   const usersList = (users ?? []) as UserOption[];
   const contactsList = (contacts ?? []) as InstitutionContact[];
   const meetingsList = (meetings ?? []) as InstitutionMeeting[];
   const relatedPilotsList = (relatedPilots ?? []) as RelatedPilot[];
+  const dealerConnectionsList = (dealerConnections ?? []) as Pick<
+    DealerInstitutionLink,
+    | "id"
+    | "dealer_id"
+    | "institution_id"
+    | "relationship_status"
+    | "opportunity_name"
+    | "expected_devices"
+    | "next_action_date"
+    | "concern_or_blocker"
+    | "owner_user_id"
+    | "rsm_user_id"
+  >[];
+  const linkedDealers = (dealers ?? []) as LinkedDealer[];
   const [proposalUrl, presentationUrl, mouUrl] = await Promise.all([
     resolveFileUrl(supabase, institution.proposal_link),
     resolveFileUrl(supabase, institution.presentation_link),
@@ -192,6 +232,7 @@ export default async function InstitutionDetailPage({
   const regionsList = (regions ?? []) as RegionOption[];
   const userMap = new Map(usersList.map((user) => [user.id, user]));
   const regionMap = new Map(regionsList.map((region) => [region.id, region]));
+  const dealerMap = new Map(linkedDealers.map((dealer) => [dealer.id, dealer]));
   const contactMap = new Map(
     contactsList.map((contact) => [contact.id, contact])
   );
@@ -537,6 +578,94 @@ export default async function InstitutionDetailPage({
         ) : (
           <div className="p-6 text-sm text-slate-500">
             No pilots are linked to this institution yet.
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="text-base font-semibold text-slate-950">
+            Dealer connections
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Dealers supporting introductions, discussions, or institutional
+            opportunities.
+          </p>
+        </div>
+        {dealerConnectionsList.length ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-[860px] divide-y divide-slate-200 text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Dealer</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Opportunity</th>
+                  <th className="px-4 py-3 font-semibold">Next action</th>
+                  <th className="px-4 py-3 font-semibold">Owner / RSM</th>
+                  <th className="px-4 py-3 font-semibold">Concern</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {dealerConnectionsList.map((connection) => {
+                  const dealer = dealerMap.get(connection.dealer_id);
+
+                  return (
+                    <tr key={connection.id} className="align-top">
+                      <td className="px-4 py-3">
+                        {dealer ? (
+                          <Link
+                            className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                            href={`/dealers/${dealer.id}`}
+                          >
+                            {dealer.dealer_code} · {dealer.dealer_name}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold text-slate-950">
+                            {connection.dealer_id}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {dealerLabelFor(
+                          connection.relationship_status,
+                          dealerInstitutionRelationshipStatusOptions
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        <p>{display(connection.opportunity_name)}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {connection.expected_devices ?? 0} expected devices
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {formatDate(connection.next_action_date)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        <p>
+                          Owner:{" "}
+                          {connection.owner_user_id
+                            ? display(userMap.get(connection.owner_user_id)?.full_name)
+                            : "Not set"}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          RSM:{" "}
+                          {connection.rsm_user_id
+                            ? display(userMap.get(connection.rsm_user_id)?.full_name)
+                            : "Not set"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {display(connection.concern_or_blocker)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 text-sm text-slate-500">
+            No dealer connections yet.
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
+import { createDealerInstitutionLinkAction } from "@/app/(app)/dealers/actions";
 import { DealerStatusPill } from "@/components/dealers/dealer-status-pill";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
@@ -8,6 +9,7 @@ import { productModelOptions } from "@/lib/devices/options";
 import {
   commercialTermsSharedOptions,
   dealerAgreementStatusOptions,
+  dealerInstitutionRelationshipStatusOptions,
   dealerTypeOptions,
   existingCustomerBaseTypeOptions,
   labelFor,
@@ -16,9 +18,11 @@ import {
 } from "@/lib/dealers/options";
 import {
   display,
+  formatDealerDistricts,
   formatCrops,
   formatDate,
   type Dealer,
+  type DealerInstitutionLink,
   type Device,
   type Dispatch,
   type FarmerLead,
@@ -40,7 +44,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canWriteModule } from "@/lib/users/permissions";
+import { canWriteModule, hasRole } from "@/lib/users/permissions";
 import { dealerScope } from "@/lib/users/record-scope";
 
 type DealerDetailPageProps = {
@@ -56,6 +60,12 @@ type RelatedPilot = {
   pilot_type: string;
   pilot_status: string;
   farmer_name_snapshot: string;
+};
+
+type InstitutionOption = {
+  id: string;
+  institution_code: string;
+  organization_name: string;
 };
 
 function SectionPanel({
@@ -299,12 +309,15 @@ export default async function DealerDetailPage({
     { data: dispatchesThisMonth },
     { data: farmerLeads },
     { data: installations },
-    { data: relatedPilots }
+    { data: relatedPilots },
+    { data: institutionLinks },
+    { data: institutions }
   ] = await Promise.all([
     supabase
       .from("users")
       .select("id, full_name, role, secondary_role")
-      .in("id", [dealer.dealer_owner_user_id, dealer.rsm_user_id]),
+      .eq("is_active", true)
+      .order("full_name", { ascending: true }),
     supabase
       .from("regions")
       .select("id, region_name")
@@ -355,13 +368,25 @@ export default async function DealerDetailPage({
       .eq("dealer_id", dealer.id)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(100)
+      .limit(100),
+    supabase
+      .from("dealer_institution_links")
+      .select(
+        "id, dealer_id, institution_id, relationship_status, opportunity_name, expected_devices, next_action_date, concern_or_blocker, notes, owner_user_id, rsm_user_id"
+      )
+      .eq("dealer_id", dealer.id)
+      .is("deleted_at", null)
+      .order("next_action_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("institutions")
+      .select("id, institution_code, organization_name")
+      .is("deleted_at", null)
+      .order("organization_name", { ascending: true })
   ]);
 
-  const userMap = new Map(((users ?? []) as UserOption[]).map((user) => [
-    user.id,
-    user
-  ]));
+  const usersList = (users ?? []) as UserOption[];
+  const userMap = new Map(usersList.map((user) => [user.id, user]));
   const dealerOwner = userMap.get(dealer.dealer_owner_user_id);
   const rsm = userMap.get(dealer.rsm_user_id);
   const region = ((regions ?? []) as RegionOption[])[0];
@@ -407,6 +432,30 @@ export default async function DealerDetailPage({
     | "dealer_id"
   >[];
   const relatedPilotsList = (relatedPilots ?? []) as RelatedPilot[];
+  const institutionLinksList = (institutionLinks ?? []) as Pick<
+    DealerInstitutionLink,
+    | "id"
+    | "dealer_id"
+    | "institution_id"
+    | "relationship_status"
+    | "opportunity_name"
+    | "expected_devices"
+    | "next_action_date"
+    | "concern_or_blocker"
+    | "notes"
+    | "owner_user_id"
+    | "rsm_user_id"
+  >[];
+  const institutionsList = (institutions ?? []) as InstitutionOption[];
+  const institutionMap = new Map(
+    institutionsList.map((institution) => [institution.id, institution])
+  );
+  const linkedInstitutionIds = new Set(
+    institutionLinksList.map((link) => link.institution_id)
+  );
+  const availableInstitutionOptions = institutionsList.filter(
+    (institution) => !linkedInstitutionIds.has(institution.id)
+  );
   const performanceInstallations =
     dealerInstallations as DealerPerformanceInstallation[];
   const monthRange = currentMonthRange();
@@ -449,6 +498,22 @@ export default async function DealerDetailPage({
     documentsUrl,
     trainingUrl
   });
+  const createInstitutionLinkAction = createDealerInstitutionLinkAction.bind(
+    null,
+    dealer.id
+  );
+  const canManageInstitutionConnections =
+    hasRole(currentUser, "Admin") ||
+    hasRole(currentUser, "Sales Head") ||
+    hasRole(currentUser, "RSM");
+  const ownerOptions = usersList.filter(
+    (user) =>
+      hasRole(user, "Admin") ||
+      hasRole(user, "Sales Head") ||
+      hasRole(user, "RSM") ||
+      hasRole(user, "Salesperson")
+  );
+  const rsmOptions = usersList.filter((user) => hasRole(user, "RSM"));
 
   return (
     <section>
@@ -651,7 +716,13 @@ export default async function DealerDetailPage({
           <InfoRow label="Region" value={region?.region_name ?? dealer.region_id} />
           <InfoRow
             label="Territory"
-            value={`${dealer.taluk_or_territory}, ${dealer.district}, ${dealer.state}`}
+            value={`${dealer.taluk_or_territory}, ${formatDealerDistricts(
+              dealer
+            )}, ${dealer.state}`}
+          />
+          <InfoRow
+            label="Districts covered"
+            value={formatDealerDistricts(dealer)}
           />
           <InfoRow label="Key crops" value={formatCrops(dealer.key_crops)} />
           {dealer.other_key_crops ? (
@@ -761,6 +832,233 @@ export default async function DealerDetailPage({
             </p>
           )}
         </SectionPanel>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="text-base font-semibold text-slate-950">
+            Institution connections
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Institutional opportunities introduced or supported through this
+            dealer.
+          </p>
+        </div>
+        {institutionLinksList.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[64rem] text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Institution</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Opportunity</th>
+                  <th className="px-4 py-3">Next action</th>
+                  <th className="px-4 py-3">Owner / RSM</th>
+                  <th className="px-4 py-3">Concern</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {institutionLinksList.map((connection) => {
+                  const institution = institutionMap.get(
+                    connection.institution_id
+                  );
+
+                  return (
+                    <tr key={connection.id} className="align-top">
+                      <td className="px-4 py-3">
+                        {institution ? (
+                          <Link
+                            className="font-semibold text-brand-700 hover:text-brand-800"
+                            href={`/institutional-partners/${institution.id}`}
+                          >
+                            {institution.organization_name}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold text-slate-950">
+                            {connection.institution_id}
+                          </span>
+                        )}
+                        <p className="mt-1 text-xs text-slate-500">
+                          {institution?.institution_code ?? "Institution"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {labelFor(
+                          connection.relationship_status,
+                          dealerInstitutionRelationshipStatusOptions
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        <p>{display(connection.opportunity_name)}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {connection.expected_devices ?? 0} expected devices
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {formatDate(connection.next_action_date)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        <p>
+                          {connection.owner_user_id
+                            ? display(userMap.get(connection.owner_user_id)?.full_name)
+                            : "Not set"}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          RSM:{" "}
+                          {connection.rsm_user_id
+                            ? display(userMap.get(connection.rsm_user_id)?.full_name)
+                            : "Not set"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {display(connection.concern_or_blocker)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <CompactEmpty>No institution connections yet.</CompactEmpty>
+        )}
+
+        {canManageInstitutionConnections ? (
+          <form
+            action={createInstitutionLinkAction}
+            className="border-t border-slate-200 p-4"
+          >
+            <h3 className="text-sm font-semibold text-slate-950">
+              Add institution connection
+            </h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <label>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Connected institution
+                </span>
+                <select
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                  name="institution_id"
+                  required
+                >
+                  <option value="">Select institution</option>
+                  {availableInstitutionOptions.map((institution) => (
+                    <option key={institution.id} value={institution.id}>
+                      {institution.organization_name} ·{" "}
+                      {institution.institution_code}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Opportunity status
+                </span>
+                <select
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                  defaultValue="Introduced"
+                  name="relationship_status"
+                  required
+                >
+                  {dealerInstitutionRelationshipStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Expected devices
+                </span>
+                <input
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                  min={0}
+                  name="expected_devices"
+                  type="number"
+                />
+              </label>
+              <label>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Next action
+                </span>
+                <input
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                  name="next_action_date"
+                  type="date"
+                />
+              </label>
+              <label>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Opportunity name
+                </span>
+                <input
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                  name="opportunity_name"
+                />
+              </label>
+              <label>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Owner
+                </span>
+                <select
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                  defaultValue={dealer.dealer_owner_user_id}
+                  name="owner_user_id"
+                >
+                  <option value="">Use dealer owner</option>
+                  {ownerOptions.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name} · {labelForRole(user.role)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  RSM
+                </span>
+                <select
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                  defaultValue={dealer.rsm_user_id}
+                  name="rsm_user_id"
+                >
+                  <option value="">Use dealer RSM</option>
+                  {rsmOptions.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name} · {labelForRole(user.role)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="md:col-span-2">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Concern / blocker
+                </span>
+                <input
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                  name="concern_or_blocker"
+                />
+              </label>
+              <label className="md:col-span-2 xl:col-span-4">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Notes
+                </span>
+                <textarea
+                  className="min-h-20 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                  name="notes"
+                />
+              </label>
+            </div>
+            <button
+              className="mt-4 inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={availableInstitutionOptions.length === 0}
+              type="submit"
+            >
+              Add connection
+            </button>
+          </form>
+        ) : null}
       </div>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">

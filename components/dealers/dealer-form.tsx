@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { CustomCropFields } from "@/components/crops/custom-crop-fields";
 import { CropMultiSelect } from "@/components/crops/crop-multi-select";
+import { DistrictMultiSelect } from "@/components/location/district-multi-select";
 import { defaultNextActionDate } from "@/lib/dealers/form-data";
 import {
   commercialTermsSharedOptions,
@@ -29,7 +30,7 @@ import type { Dealer, RegionOption, UserOption } from "@/lib/dealers/types";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
 import { labelForRole } from "@/lib/users/options";
 import { hasRole } from "@/lib/users/permissions";
-import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
+import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
 type DealerFormProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -184,8 +185,16 @@ export function DealerForm({
   users
 }: DealerFormProps) {
   const initialCrops = useMemo(() => dealer?.key_crops ?? [], [dealer]);
+  const initialDistricts = useMemo(() => {
+    if (dealer?.districts?.length) {
+      return dealer.districts;
+    }
+
+    return dealer?.district ? [dealer.district] : [];
+  }, [dealer]);
   const [stateValue, setStateValue] = useState(dealer?.state ?? "");
-  const [districtValue, setDistrictValue] = useState(dealer?.district ?? "");
+  const [selectedDistricts, setSelectedDistricts] =
+    useState<string[]>(initialDistricts);
   const [selectedCrops, setSelectedCrops] = useState<string[]>(initialCrops);
   const [clientError, setClientError] = useState<string | null>(null);
   const showOtherCrops = selectedCrops.includes("Other");
@@ -218,7 +227,7 @@ export function DealerForm({
           ["rsm_user_id", "Select an RSM for this dealer."],
           ["region_id", "Select a region for this dealer."],
           ["state", "State is required."],
-          ["district", "District is required."],
+          ["district", "Select at least one district covered."],
           ["commercial_terms_shared", "Commercial terms shared is required."],
           ["dealer_agreement_status", "Dealer agreement status is required."],
           ["training_status", "Training status is required."],
@@ -266,6 +275,16 @@ export function DealerForm({
           <input name="region_id" type="hidden" value={dealer.region_id} />
           <input name="state" type="hidden" value={dealer.state} />
           <input name="district" type="hidden" value={dealer.district} />
+          {(dealer.districts?.length ? dealer.districts : [dealer.district]).map(
+            (district) => (
+              <input
+                key={district}
+                name="districts"
+                type="hidden"
+                value={district}
+              />
+            )
+          )}
           <input
             name="taluk_or_territory"
             type="hidden"
@@ -605,12 +624,40 @@ export function DealerForm({
             </select>
           </div>
 
-          <StateDistrictSelect
-            districtValue={districtValue}
-            onDistrictChange={setDistrictValue}
-            onStateChange={setStateValue}
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="state"
+            >
+              State
+            </label>
+            <select
+              className={inputClassName()}
+              id="state"
+              name="state"
+              onChange={(event) => {
+                setStateValue(event.target.value);
+                setSelectedDistricts([]);
+              }}
+              required
+              value={stateValue}
+            >
+              <option value="">Select state or UT</option>
+              {INDIAN_STATES_AND_UTS.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <DistrictMultiSelect
+            helperText="Select all districts this dealer can cover."
+            label="Districts covered"
+            name="districts"
+            onChange={setSelectedDistricts}
             stateValue={stateValue}
-            required
+            values={selectedDistricts}
           />
 
           <Field

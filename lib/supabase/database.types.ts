@@ -311,6 +311,7 @@ export type Database = {
           region_id: string;
           state: string;
           district: string;
+          districts: string[];
           taluk_or_territory: string | null;
           primary_market_area: string | null;
           villages_covered: string | null;
@@ -374,6 +375,7 @@ export type Database = {
           region_id: string;
           state: string;
           district: string;
+          districts?: string[];
           taluk_or_territory?: string | null;
           primary_market_area?: string | null;
           villages_covered?: string | null;
@@ -437,6 +439,7 @@ export type Database = {
           region_id?: string;
           state?: string;
           district?: string;
+          districts?: string[];
           taluk_or_territory?: string | null;
           primary_market_area?: string | null;
           villages_covered?: string | null;
@@ -480,6 +483,60 @@ export type Database = {
           dealer_documents_folder_link?: string | null;
           training_material_shared_link?: string | null;
           remarks?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      dealer_institution_links: {
+        Row: {
+          id: string;
+          dealer_id: string;
+          institution_id: string;
+          relationship_status: string;
+          opportunity_name: string | null;
+          expected_devices: number | null;
+          next_action_date: string | null;
+          concern_or_blocker: string | null;
+          notes: string | null;
+          created_by_user_id: string;
+          owner_user_id: string | null;
+          rsm_user_id: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          dealer_id: string;
+          institution_id: string;
+          relationship_status?: string;
+          opportunity_name?: string | null;
+          expected_devices?: number | null;
+          next_action_date?: string | null;
+          concern_or_blocker?: string | null;
+          notes?: string | null;
+          created_by_user_id: string;
+          owner_user_id?: string | null;
+          rsm_user_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          dealer_id?: string;
+          institution_id?: string;
+          relationship_status?: string;
+          opportunity_name?: string | null;
+          expected_devices?: number | null;
+          next_action_date?: string | null;
+          concern_or_blocker?: string | null;
+          notes?: string | null;
+          created_by_user_id?: string;
+          owner_user_id?: string | null;
+          rsm_user_id?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;

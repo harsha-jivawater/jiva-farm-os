@@ -4,6 +4,10 @@ import { cropDisplayLabel } from "@/lib/crops/crop-library";
 export type Dealer = Database["public"]["Tables"]["dealers"]["Row"];
 export type DealerInsert = Database["public"]["Tables"]["dealers"]["Insert"];
 export type DealerUpdate = Database["public"]["Tables"]["dealers"]["Update"];
+export type DealerInstitutionLink =
+  Database["public"]["Tables"]["dealer_institution_links"]["Row"];
+export type DealerInstitutionLinkInsert =
+  Database["public"]["Tables"]["dealer_institution_links"]["Insert"];
 export type Device = Database["public"]["Tables"]["devices"]["Row"];
 export type Dispatch = Database["public"]["Tables"]["dispatches"]["Row"];
 export type FarmerLead = Database["public"]["Tables"]["farmer_leads"]["Row"];
@@ -72,4 +76,37 @@ export function formatCrops(crops: string[] | null | undefined) {
   }
 
   return crops.map((crop) => cropDisplayLabel(crop)).join(", ");
+}
+
+export function dealerDistricts(
+  dealer: Pick<Dealer, "district" | "districts">
+) {
+  const values = dealer.districts?.length ? dealer.districts : [dealer.district];
+
+  return Array.from(
+    new Set(values.map((district) => district?.trim()).filter(Boolean))
+  ) as string[];
+}
+
+export function formatDealerDistricts(
+  dealer: Pick<Dealer, "district" | "districts">
+) {
+  const districts = dealerDistricts(dealer);
+
+  return districts.length ? districts.join(", ") : "Not set";
+}
+
+export function compactDealerDistricts(
+  dealer: Pick<Dealer, "district" | "districts">,
+  visibleCount = 2
+) {
+  const districts = dealerDistricts(dealer);
+
+  if (districts.length <= visibleCount) {
+    return districts.join(", ") || "Not set";
+  }
+
+  return `${districts.slice(0, visibleCount).join(", ")} +${
+    districts.length - visibleCount
+  } more`;
 }

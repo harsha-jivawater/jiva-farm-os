@@ -7,6 +7,7 @@ import {
   validateDealerPayload
 } from "@/lib/dealers/form-data";
 import type { Dealer, DealerInsert, DealerUpdate } from "@/lib/dealers/types";
+import type { DealerInstitutionLinkInsert } from "@/lib/dealers/types";
 import { createClient } from "@/lib/supabase/server";
 import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
@@ -20,6 +21,22 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+function textValue(formData: FormData, key: string) {
+  const value = String(formData.get(key) ?? "").trim();
+  return value || null;
+}
+
+function numberValue(formData: FormData, key: string) {
+  const value = textValue(formData, key);
+
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 async function getCurrentProfile(supabase: SupabaseClient, errorPath: string) {
@@ -196,4 +213,75 @@ export async function updateDealerAction(id: string, formData: FormData) {
   revalidatePath("/dealers");
   revalidatePath(`/dealers/${id}`);
   redirect(`/dealers/${id}`);
+}
+
+export async function createDealerInstitutionLinkAction(
+  dealerId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const errorPath = `/dealers/${dealerId}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (
+    !hasRole(profile, "Admin") &&
+    !hasRole(profile, "Sales Head") &&
+    !hasRole(profile, "RSM")
+  ) {
+    redirectWithError(
+      errorPath,
+      "You can view dealer institution connections but cannot create them."
+    );
+  }
+
+  const institutionId = textValue(formData, "institution_id");
+
+  if (!institutionId) {
+    redirectWithError(errorPath, "Select an institution to connect.");
+  }
+
+  const { data: dealer, error: dealerError } = await supabase
+    .from("dealers")
+    .select("id, dealer_owner_user_id, rsm_user_id")
+    .eq("id", dealerId)
+    .is("deleted_at", null)
+    .single();
+
+  if (dealerError || !dealer) {
+    redirectWithError(errorPath, "Dealer was not found.");
+  }
+
+  const payload: DealerInstitutionLinkInsert = {
+    dealer_id: dealerId,
+    institution_id: institutionId,
+    relationship_status:
+      textValue(formData, "relationship_status") ?? "Introduced",
+    opportunity_name: textValue(formData, "opportunity_name"),
+    expected_devices: numberValue(formData, "expected_devices"),
+    next_action_date: textValue(formData, "next_action_date"),
+    concern_or_blocker: textValue(formData, "concern_or_blocker"),
+    notes: textValue(formData, "notes"),
+    created_by_user_id: profile.id,
+    owner_user_id:
+      textValue(formData, "owner_user_id") ?? dealer.dealer_owner_user_id,
+    rsm_user_id: textValue(formData, "rsm_user_id") ?? dealer.rsm_user_id
+  };
+
+  const { error } = await supabase
+    .from("dealer_institution_links")
+    .insert(payload);
+
+  if (error) {
+    redirectWithError(
+      errorPath,
+      error.code === "23505"
+        ? "This institution is already connected to this dealer."
+        : error.message
+    );
+  }
+
+  revalidatePath("/dealers");
+  revalidatePath(`/dealers/${dealerId}`);
+  revalidatePath(`/institutional-partners/${institutionId}`);
+  redirect(`/dealers/${dealerId}`);
 }
