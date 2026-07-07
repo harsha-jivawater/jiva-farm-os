@@ -951,6 +951,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      farmer_lead_followups: {
+        Row: {
+          id: string;
+          farmer_lead_id: string;
+          followed_up_by_user_id: string | null;
+          followup_date: string;
+          priority: string | null;
+          interaction_note: string | null;
+          concern_or_blocker: string | null;
+          next_action_date: string | null;
+          next_followup_date: string | null;
+          remarks: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          farmer_lead_id: string;
+          followed_up_by_user_id?: string | null;
+          followup_date?: string;
+          priority?: string | null;
+          interaction_note?: string | null;
+          concern_or_blocker?: string | null;
+          next_action_date?: string | null;
+          next_followup_date?: string | null;
+          remarks?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          farmer_lead_id?: string;
+          followed_up_by_user_id?: string | null;
+          followup_date?: string;
+          priority?: string | null;
+          interaction_note?: string | null;
+          concern_or_blocker?: string | null;
+          next_action_date?: string | null;
+          next_followup_date?: string | null;
+          remarks?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
       followups: {
         Row: {
           id: string;

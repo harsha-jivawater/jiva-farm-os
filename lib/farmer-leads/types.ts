@@ -6,6 +6,10 @@ export type FarmerLeadInsert =
   Database["public"]["Tables"]["farmer_leads"]["Insert"];
 export type FarmerLeadUpdate =
   Database["public"]["Tables"]["farmer_leads"]["Update"];
+export type FarmerLeadFollowup =
+  Database["public"]["Tables"]["farmer_lead_followups"]["Row"];
+export type FarmerLeadFollowupInsert =
+  Database["public"]["Tables"]["farmer_lead_followups"]["Insert"];
 
 export type FarmerLeadFilters = {
   q: string;

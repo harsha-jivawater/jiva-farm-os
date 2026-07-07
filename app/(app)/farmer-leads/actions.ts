@@ -8,6 +8,7 @@ import {
 } from "@/lib/farmer-leads/form-data";
 import type {
   FarmerLead,
+  FarmerLeadFollowupInsert,
   FarmerLeadInsert,
   FarmerLeadUpdate
 } from "@/lib/farmer-leads/types";
@@ -20,6 +21,16 @@ import { canConfirmPayment, hasAnyRole, hasRole } from "@/lib/users/permissions"
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+function redirectWithFollowupError(id: string, message: string): never {
+  redirect(`/farmer-leads/${id}?followup_error=${encodeURIComponent(message)}`);
+}
+
+function textValue(formData: FormData, key: string) {
+  const value = String(formData.get(key) ?? "").trim();
+
+  return value || null;
 }
 
 function todayDate() {
@@ -488,6 +499,83 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
   revalidatePath("/farmer-leads");
   revalidatePath(`/farmer-leads/${id}`);
   redirect(`/farmer-leads/${id}`);
+}
+
+export async function updateFarmerLeadFollowupAction(
+  id: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const profile = await requireModuleWriteAccess(
+    supabase,
+    `/farmer-leads/${id}`,
+    "farmer-leads"
+  );
+
+  const followupPriority = textValue(formData, "followup_priority");
+  const lastInteractionDate = textValue(formData, "last_interaction_date");
+  const followupDueDate = textValue(formData, "followup_due_date");
+  const nextActionDate = textValue(formData, "next_action_date");
+  const interactionNote = textValue(formData, "last_interaction_note");
+  const remarks = textValue(formData, "remarks");
+
+  if (!followupPriority || !["High", "Medium", "Low"].includes(followupPriority)) {
+    redirectWithFollowupError(id, "Select a valid follow-up priority.");
+  }
+
+  if (!nextActionDate) {
+    redirectWithFollowupError(id, "Lead next action date is required.");
+  }
+
+  const { error } = await supabase
+    .from("farmer_leads")
+    .update({
+      followup_priority: followupPriority,
+      last_interaction_date: lastInteractionDate,
+      last_interaction_note: interactionNote,
+      followup_due_date: followupDueDate,
+      next_action_date: nextActionDate,
+      remarks
+    })
+    .eq("id", id)
+    .is("deleted_at", null);
+
+  if (error) {
+    redirectWithFollowupError(id, error.message);
+  }
+
+  const hasMeaningfulFollowup = Boolean(
+    followupPriority ||
+      lastInteractionDate ||
+      followupDueDate ||
+      nextActionDate ||
+      interactionNote ||
+      remarks
+  );
+
+  if (hasMeaningfulFollowup) {
+    const followupSnapshot: FarmerLeadFollowupInsert = {
+      farmer_lead_id: id,
+      followed_up_by_user_id: profile.id,
+      followup_date: lastInteractionDate ?? todayDate(),
+      priority: followupPriority,
+      interaction_note: interactionNote,
+      next_action_date: nextActionDate,
+      next_followup_date: followupDueDate,
+      remarks
+    };
+    const { error: followupError } = await supabase
+      .from("farmer_lead_followups")
+      .insert(followupSnapshot);
+
+    if (followupError) {
+      redirectWithFollowupError(id, followupError.message);
+    }
+  }
+
+  revalidatePath("/farmer-leads");
+  revalidatePath(`/farmer-leads/${id}`);
+  redirect(`/farmer-leads/${id}?followup_saved=1`);
 }
 
 export async function deleteFarmerLeadAction(id: string) {

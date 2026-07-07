@@ -9,8 +9,12 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
 import { StatusPill } from "@/components/farmer-leads/status-pill";
-import { confirmFarmerLeadPaymentAction } from "@/app/(app)/farmer-leads/actions";
 import {
+  confirmFarmerLeadPaymentAction,
+  updateFarmerLeadFollowupAction
+} from "@/app/(app)/farmer-leads/actions";
+import {
+  type FarmerLeadFollowup,
   formatCrop,
   type FarmerLead
 } from "@/lib/farmer-leads/types";
@@ -33,6 +37,10 @@ import { farmerLeadScope } from "@/lib/users/record-scope";
 type FarmerLeadDetailPageProps = {
   params: Promise<{
     id: string;
+  }>;
+  searchParams: Promise<{
+    followup_error?: string;
+    followup_saved?: string;
   }>;
 };
 
@@ -220,8 +228,20 @@ function userLabel(
   fallback: string | null | undefined
 ) {
   return user
-    ? `${user.full_name} · ${user.email} · ${labelForRole(user.role)}`
+    ? `${user.full_name} · ${labelForRole(user.role)}`
     : display(fallback);
+}
+
+function dateInputValue(value: string | null | undefined) {
+  return value ? value.slice(0, 10) : "";
+}
+
+function formFieldClassName() {
+  return "w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
+}
+
+function formTextareaClassName() {
+  return `${formFieldClassName()} min-h-24`;
 }
 
 function deriveCurrentAction(lead: FarmerLead) {
@@ -292,9 +312,12 @@ function deriveCurrentAction(lead: FarmerLead) {
 }
 
 export default async function FarmerLeadDetailPage({
-  params
+  params,
+  searchParams
 }: FarmerLeadDetailPageProps) {
   const { id } = await params;
+  const { followup_error: followupError, followup_saved: followupSaved } =
+    await searchParams;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/farmer-leads");
   const canWrite = canWriteModule(currentUser, "farmer-leads");
@@ -334,6 +357,7 @@ export default async function FarmerLeadDetailPage({
     { data: linkedDispatch },
     { data: linkedInstallation },
     { data: linkedFollowups },
+    { data: farmerLeadFollowupRows, count: farmerLeadFollowupCount },
     leadPhotosUrl,
     farmerDocumentUrl
   ] = await Promise.all([
@@ -378,6 +402,30 @@ export default async function FarmerLeadDetailPage({
       .is("deleted_at", null)
       .order("followup_due_date", { ascending: false })
       .limit(5),
+    supabase
+      .from("farmer_lead_followups")
+      .select(
+        [
+          "id",
+          "farmer_lead_id",
+          "followed_up_by_user_id",
+          "followup_date",
+          "priority",
+          "interaction_note",
+          "concern_or_blocker",
+          "next_action_date",
+          "next_followup_date",
+          "remarks",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ].join(","),
+        { count: "exact" }
+      )
+      .eq("farmer_lead_id", lead.id)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(10),
     resolveFileUrl(supabase, lead.lead_photo_folder_link),
     resolveFileUrl(supabase, lead.farmer_document_link)
   ]);
@@ -386,6 +434,30 @@ export default async function FarmerLeadDetailPage({
   const dispatch = linkedDispatch as LinkedDispatch | null;
   const installation = linkedInstallation as LinkedInstallation | null;
   const followups = (linkedFollowups ?? []) as LinkedFollowup[];
+  const farmerLeadFollowups =
+    ((farmerLeadFollowupRows ?? []) as unknown) as FarmerLeadFollowup[];
+  const followupUserIds = Array.from(
+    new Set(
+      farmerLeadFollowups.flatMap((followup) =>
+        followup.followed_up_by_user_id &&
+        !userMap.has(followup.followed_up_by_user_id)
+          ? [followup.followed_up_by_user_id]
+          : []
+      )
+    )
+  );
+
+  if (followupUserIds.length) {
+    const { data: followupUsers } = await supabase
+      .from("users")
+      .select("id, full_name, email, role")
+      .in("id", followupUserIds);
+
+    for (const user of followupUsers ?? []) {
+      userMap.set(user.id, user);
+    }
+  }
+
   const institutionId = lead.linked_institution_id ?? pilot?.institution_id ?? null;
   const dealerId = lead.linked_dealer_id ?? pilot?.dealer_id ?? null;
   const [{ data: institution }, { data: dealer }] = await Promise.all([
@@ -423,6 +495,8 @@ export default async function FarmerLeadDetailPage({
   const paymentConfirmedBy = lead.payment_confirmed_by_user_id
     ? userMap.get(lead.payment_confirmed_by_user_id)
     : null;
+  const saveFollowupAction = updateFarmerLeadFollowupAction.bind(null, lead.id);
+  const latestFarmerLeadFollowup = farmerLeadFollowups[0];
 
   return (
     <section>
@@ -523,44 +597,264 @@ export default async function FarmerLeadDetailPage({
       <div className="mt-6">
         <SectionPanel
           title="Follow-up and next action"
-          description="Near-term action dates and field notes for this lead."
+          description="Update the current sales follow-up without changing payment, dispatch, or installation workflow fields."
         >
-          <div className="divide-y divide-slate-100">
-            <InfoRow
-              label="Next follow-up date"
-              value={
-                <span className={followupOverdue ? "text-red-700" : undefined}>
-                  {formatDate(nextFollowupDate)}
-                </span>
-              }
-            />
-            <InfoRow
-              label="Lead next action date"
-              value={
-                <span className={nextActionOverdue ? "text-red-700" : undefined}>
-                  {formatDate(lead.next_action_date)}
-                </span>
-              }
-            />
-            <InfoRow
-              label="Last interaction"
-              value={`${formatDate(lead.last_interaction_date)} · ${display(
-                lead.last_interaction_note
-              )}`}
-            />
-            <InfoRow
-              label="Follow-up priority"
-              value={display(lead.followup_priority)}
-            />
-            <InfoRow
-              label="Accountability"
-              value={`Owner: ${userLabel(
-                userMap.get(lead.owner_user_id),
-                lead.owner_user_id
-              )} · RSM: ${userLabel(userMap.get(lead.rsm_user_id), lead.rsm_user_id)}`}
-            />
-          </div>
+          {followupSaved ? (
+            <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+              Follow-up saved.
+            </div>
+          ) : null}
+          {followupError ? (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+              {followupError}
+            </div>
+          ) : null}
+
+          {canWrite ? (
+            <form action={saveFollowupAction}>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Follow-up priority
+                  </span>
+                  <select
+                    className={formFieldClassName()}
+                    defaultValue={lead.followup_priority}
+                    name="followup_priority"
+                  >
+                    {["High", "Medium", "Low"].map((priority) => (
+                      <option key={priority} value={priority}>
+                        {priority}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Last interaction date
+                  </span>
+                  <input
+                    className={formFieldClassName()}
+                    defaultValue={dateInputValue(lead.last_interaction_date)}
+                    name="last_interaction_date"
+                    type="date"
+                  />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Next follow-up date
+                  </span>
+                  <input
+                    className={formFieldClassName()}
+                    defaultValue={dateInputValue(lead.followup_due_date)}
+                    name="followup_due_date"
+                    type="date"
+                  />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Lead next action date
+                  </span>
+                  <input
+                    className={formFieldClassName()}
+                    defaultValue={dateInputValue(lead.next_action_date)}
+                    name="next_action_date"
+                    required
+                    type="date"
+                  />
+                </label>
+                <label className="md:col-span-2">
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Current concern / blocker
+                  </span>
+                  <input
+                    className={formFieldClassName()}
+                    defaultValue={lead.last_interaction_note ?? ""}
+                    name="last_interaction_note"
+                  />
+                </label>
+                <label className="md:col-span-2 xl:col-span-3">
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Lead remarks / notes
+                  </span>
+                  <textarea
+                    className={formTextareaClassName()}
+                    defaultValue={lead.remarks ?? ""}
+                    name="remarks"
+                  />
+                </label>
+              </div>
+              <button
+                className="mt-4 inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                type="submit"
+              >
+                Save follow-up
+              </button>
+            </form>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              <InfoRow
+                label="Next follow-up date"
+                value={
+                  <span className={followupOverdue ? "text-red-700" : undefined}>
+                    {formatDate(nextFollowupDate)}
+                  </span>
+                }
+              />
+              <InfoRow
+                label="Lead next action date"
+                value={
+                  <span className={nextActionOverdue ? "text-red-700" : undefined}>
+                    {formatDate(lead.next_action_date)}
+                  </span>
+                }
+              />
+              <InfoRow
+                label="Last interaction"
+                value={`${formatDate(lead.last_interaction_date)} · ${display(
+                  lead.last_interaction_note
+                )}`}
+              />
+              <InfoRow
+                label="Follow-up priority"
+                value={display(lead.followup_priority)}
+              />
+              <InfoRow
+                label="Lead remarks / notes"
+                value={display(lead.remarks)}
+              />
+              <InfoRow
+                label="Accountability"
+                value={`Owner: ${userLabel(
+                  userMap.get(lead.owner_user_id),
+                  lead.owner_user_id
+                )} · RSM: ${userLabel(
+                  userMap.get(lead.rsm_user_id),
+                  lead.rsm_user_id
+                )}`}
+              />
+            </div>
+          )}
         </SectionPanel>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <details>
+          <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">
+                Past follow-ups
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {farmerLeadFollowupCount ?? farmerLeadFollowups.length} past
+                follow-ups
+                {latestFarmerLeadFollowup
+                  ? ` · Latest ${formatDate(
+                      latestFarmerLeadFollowup.followup_date
+                    )} by ${userLabel(
+                      latestFarmerLeadFollowup.followed_up_by_user_id
+                        ? userMap.get(
+                            latestFarmerLeadFollowup.followed_up_by_user_id
+                          )
+                        : null,
+                      latestFarmerLeadFollowup.followed_up_by_user_id
+                    )}`
+                  : ""}
+              </p>
+            </div>
+            <span className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm">
+              Show past follow-ups
+            </span>
+          </summary>
+          <div className="border-t border-slate-200 px-4 py-4">
+            {farmerLeadFollowups.length ? (
+              <div className="space-y-3">
+                {farmerLeadFollowups.map((followup) => {
+                  const reviewer = followup.followed_up_by_user_id
+                    ? userMap.get(followup.followed_up_by_user_id)
+                    : null;
+
+                  return (
+                    <article
+                      className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                      key={followup.id}
+                    >
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-950">
+                            {formatDate(followup.followup_date)}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Followed up by{" "}
+                            {userLabel(reviewer, followup.followed_up_by_user_id)}
+                          </p>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          Saved {formatDate(followup.created_at)}
+                        </p>
+                      </div>
+                      <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-3">
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Priority
+                          </dt>
+                          <dd className="mt-1 font-medium text-slate-700">
+                            {display(followup.priority)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Next action date
+                          </dt>
+                          <dd className="mt-1 font-medium text-slate-700">
+                            {formatDate(followup.next_action_date)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Next follow-up date
+                          </dt>
+                          <dd className="mt-1 font-medium text-slate-700">
+                            {formatDate(followup.next_followup_date)}
+                          </dd>
+                        </div>
+                        <div className="md:col-span-2">
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Concern / interaction note
+                          </dt>
+                          <dd className="mt-1 font-medium text-slate-700">
+                            {display(
+                              followup.concern_or_blocker ??
+                                followup.interaction_note
+                            )}
+                          </dd>
+                        </div>
+                        <div className="md:col-span-2 xl:col-span-3">
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Remarks / notes
+                          </dt>
+                          <dd className="mt-1 whitespace-pre-wrap font-medium text-slate-700">
+                            {display(followup.remarks)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </article>
+                  );
+                })}
+                {(farmerLeadFollowupCount ?? 0) > farmerLeadFollowups.length ? (
+                  <p className="text-sm text-slate-500">
+                    Showing latest {farmerLeadFollowups.length} follow-ups.
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">
+                No past follow-ups yet. History begins when a permitted user
+                saves a Farmer Lead follow-up.
+              </p>
+            )}
+          </div>
+        </details>
       </div>
 
       <div className="mt-6">
@@ -736,14 +1030,6 @@ export default async function FarmerLeadDetailPage({
               <FileLink href={farmerDocumentUrl} label="View farmer document" />
             </WorkflowCard>
           </div>
-        </SectionPanel>
-      </div>
-
-      <div className="mt-6">
-        <SectionPanel title="Notes / remarks">
-          <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
-            {display(lead.remarks)}
-          </p>
         </SectionPanel>
       </div>
 
