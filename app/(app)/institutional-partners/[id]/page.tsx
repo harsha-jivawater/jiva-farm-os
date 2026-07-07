@@ -600,7 +600,9 @@ export default async function InstitutionDetailPage({
                   <th className="px-4 py-3 font-semibold">Dealer</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 font-semibold">Opportunity</th>
-                  <th className="px-4 py-3 font-semibold">Next action</th>
+                  <th className="px-4 py-3 font-semibold">
+                    Opportunity follow-up date
+                  </th>
                   <th className="px-4 py-3 font-semibold">Owner / RSM</th>
                   <th className="px-4 py-3 font-semibold">Concern</th>
                 </tr>

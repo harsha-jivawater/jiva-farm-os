@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
-import { createDealerInstitutionLinkAction } from "@/app/(app)/dealers/actions";
 import { DealerStatusPill } from "@/components/dealers/dealer-status-pill";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
@@ -44,7 +43,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canWriteModule, hasRole } from "@/lib/users/permissions";
+import { canViewModule, canWriteModule, hasRole } from "@/lib/users/permissions";
 import { dealerScope } from "@/lib/users/record-scope";
 
 type DealerDetailPageProps = {
@@ -137,11 +136,15 @@ function InfoRow({
 }
 
 function MilestoneRow({
+  action,
   detail,
+  helper,
   label,
   status
 }: {
+  action?: React.ReactNode;
   detail?: React.ReactNode;
+  helper?: React.ReactNode;
   label: string;
   status: "Done" | "Needs approval" | "Not set" | "Pending";
 }) {
@@ -157,6 +160,12 @@ function MilestoneRow({
       <div>
         <p className="text-sm font-semibold text-slate-950">{label}</p>
         {detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}
+        {helper || action ? (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+            {helper ? <span>{helper}</span> : null}
+            {action}
+          </div>
+        ) : null}
       </div>
       <span
         className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassNames[status]}`}
@@ -271,6 +280,8 @@ export default async function DealerDetailPage({
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dealers");
   const canWrite = canWriteModule(currentUser, "dealers");
+  const canViewDispatches = canViewModule(currentUser, "dispatches");
+  const canViewInstallations = canViewModule(currentUser, "installations");
   const scope = await dealerScope(supabase, currentUser);
   let dealerQuery = supabase
     .from("dealers")
@@ -450,12 +461,6 @@ export default async function DealerDetailPage({
   const institutionMap = new Map(
     institutionsList.map((institution) => [institution.id, institution])
   );
-  const linkedInstitutionIds = new Set(
-    institutionLinksList.map((link) => link.institution_id)
-  );
-  const availableInstitutionOptions = institutionsList.filter(
-    (institution) => !linkedInstitutionIds.has(institution.id)
-  );
   const performanceInstallations =
     dealerInstallations as DealerPerformanceInstallation[];
   const monthRange = currentMonthRange();
@@ -498,22 +503,34 @@ export default async function DealerDetailPage({
     documentsUrl,
     trainingUrl
   });
-  const createInstitutionLinkAction = createDealerInstitutionLinkAction.bind(
-    null,
-    dealer.id
-  );
   const canManageInstitutionConnections =
     hasRole(currentUser, "Admin") ||
     hasRole(currentUser, "Sales Head") ||
     hasRole(currentUser, "RSM");
-  const ownerOptions = usersList.filter(
-    (user) =>
-      hasRole(user, "Admin") ||
-      hasRole(user, "Sales Head") ||
-      hasRole(user, "RSM") ||
-      hasRole(user, "Salesperson")
-  );
-  const rsmOptions = usersList.filter((user) => hasRole(user, "RSM"));
+  const editDealerAction = canWrite ? (
+    <Link
+      className="font-semibold text-brand-700 hover:text-brand-800"
+      href={`/dealers/${dealer.id}/edit`}
+    >
+      Edit dealer
+    </Link>
+  ) : null;
+  const dispatchesAction = canViewDispatches ? (
+    <Link
+      className="font-semibold text-brand-700 hover:text-brand-800"
+      href="/dispatches"
+    >
+      Go to Dispatches
+    </Link>
+  ) : null;
+  const installationsAction = canViewInstallations ? (
+    <Link
+      className="font-semibold text-brand-700 hover:text-brand-800"
+      href="/installations"
+    >
+      Go to Installations
+    </Link>
+  ) : null;
 
   return (
     <section>
@@ -754,6 +771,8 @@ export default async function DealerDetailPage({
               dealer.commercial_terms_shared,
               commercialTermsSharedOptions
             )}
+            helper="Updated from Dealer edit."
+            action={editDealerAction}
           />
           <MilestoneRow
             label="Training completed"
@@ -765,6 +784,8 @@ export default async function DealerDetailPage({
                   : "Pending"
             }
             detail={labelFor(dealer.training_status, trainingStatusOptions)}
+            helper="Updated from Dealer edit."
+            action={editDealerAction}
           />
           <MilestoneRow
             label="Agreement signed"
@@ -779,6 +800,8 @@ export default async function DealerDetailPage({
               dealer.dealer_agreement_status,
               dealerAgreementStatusOptions
             )}
+            helper="Updated from Dealer edit after agreement is received."
+            action={editDealerAction}
           />
           <MilestoneRow
             label="Legal approval"
@@ -790,21 +813,28 @@ export default async function DealerDetailPage({
                   : "Needs approval"
             }
             detail={display(dealer.dealer_agreement_approval_status)}
+            helper="Updated by HR & Legal."
           />
           <MilestoneRow
             label="First order expected"
             status={dealer.first_order_target_date ? "Done" : "Not set"}
             detail={formatDate(dealer.first_order_target_date)}
+            helper="Set the expected first order date in Dealer edit."
+            action={editDealerAction}
           />
           <MilestoneRow
             label="Dealer stock dispatched"
             status={dealerDispatches.length > 0 ? "Done" : "Pending"}
             detail={`${numberDisplay(dealerDispatches.length)} dispatches this month`}
+            helper="Updated automatically from Dealer Dispatches."
+            action={dispatchesAction}
           />
           <MilestoneRow
             label="First farmer installation done"
             status={firstFarmerInstallationDone ? "Done" : "Pending"}
             detail={formatDate(dealer.last_farmer_installation_date)}
+            helper="Updated automatically from Dealer Installations."
+            action={installationsAction}
           />
         </SectionPanel>
       </div>
@@ -835,14 +865,24 @@ export default async function DealerDetailPage({
       </div>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-950">
-            Institution connections
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Institutional opportunities introduced or supported through this
-            dealer.
-          </p>
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">
+              Institution connections
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Institutional opportunities introduced or supported through this
+              dealer.
+            </p>
+          </div>
+          {canManageInstitutionConnections ? (
+            <Link
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+              href={`/dealers/${dealer.id}/institution-connections/new`}
+            >
+              Add institution opportunity
+            </Link>
+          ) : null}
         </div>
         {institutionLinksList.length ? (
           <div className="overflow-x-auto">
@@ -852,7 +892,7 @@ export default async function DealerDetailPage({
                   <th className="px-4 py-3">Institution</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Opportunity</th>
-                  <th className="px-4 py-3">Next action</th>
+                  <th className="px-4 py-3">Opportunity follow-up date</th>
                   <th className="px-4 py-3">Owner / RSM</th>
                   <th className="px-4 py-3">Concern</th>
                 </tr>
@@ -922,143 +962,6 @@ export default async function DealerDetailPage({
         ) : (
           <CompactEmpty>No institution connections yet.</CompactEmpty>
         )}
-
-        {canManageInstitutionConnections ? (
-          <form
-            action={createInstitutionLinkAction}
-            className="border-t border-slate-200 p-4"
-          >
-            <h3 className="text-sm font-semibold text-slate-950">
-              Add institution connection
-            </h3>
-            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <label>
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Connected institution
-                </span>
-                <select
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                  name="institution_id"
-                  required
-                >
-                  <option value="">Select institution</option>
-                  {availableInstitutionOptions.map((institution) => (
-                    <option key={institution.id} value={institution.id}>
-                      {institution.organization_name} ·{" "}
-                      {institution.institution_code}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Opportunity status
-                </span>
-                <select
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                  defaultValue="Introduced"
-                  name="relationship_status"
-                  required
-                >
-                  {dealerInstitutionRelationshipStatusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Expected devices
-                </span>
-                <input
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                  min={0}
-                  name="expected_devices"
-                  type="number"
-                />
-              </label>
-              <label>
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Next action
-                </span>
-                <input
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                  name="next_action_date"
-                  type="date"
-                />
-              </label>
-              <label>
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Opportunity name
-                </span>
-                <input
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                  name="opportunity_name"
-                />
-              </label>
-              <label>
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Owner
-                </span>
-                <select
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                  defaultValue={dealer.dealer_owner_user_id}
-                  name="owner_user_id"
-                >
-                  <option value="">Use dealer owner</option>
-                  {ownerOptions.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.full_name} · {labelForRole(user.role)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  RSM
-                </span>
-                <select
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                  defaultValue={dealer.rsm_user_id}
-                  name="rsm_user_id"
-                >
-                  <option value="">Use dealer RSM</option>
-                  {rsmOptions.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.full_name} · {labelForRole(user.role)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="md:col-span-2">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Concern / blocker
-                </span>
-                <input
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                  name="concern_or_blocker"
-                />
-              </label>
-              <label className="md:col-span-2 xl:col-span-4">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Notes
-                </span>
-                <textarea
-                  className="min-h-20 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                  name="notes"
-                />
-              </label>
-            </div>
-            <button
-              className="mt-4 inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={availableInstitutionOptions.length === 0}
-              type="submit"
-            >
-              Add connection
-            </button>
-          </form>
-        ) : null}
       </div>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">

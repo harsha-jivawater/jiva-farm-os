@@ -220,7 +220,7 @@ export async function createDealerInstitutionLinkAction(
   formData: FormData
 ) {
   const supabase = await createClient();
-  const errorPath = `/dealers/${dealerId}`;
+  const errorPath = `/dealers/${dealerId}/institution-connections/new`;
   const profile = await getCurrentProfile(supabase, errorPath);
 
   if (
