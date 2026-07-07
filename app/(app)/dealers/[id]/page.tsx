@@ -7,7 +7,6 @@ import { FileLink } from "@/components/uploads/file-link";
 import { productModelOptions } from "@/lib/devices/options";
 import {
   commercialTermsSharedOptions,
-  creditTermsOptions,
   dealerAgreementStatusOptions,
   dealerTypeOptions,
   existingCustomerBaseTypeOptions,
@@ -59,7 +58,58 @@ type RelatedPilot = {
   farmer_name_snapshot: string;
 };
 
-function DetailItem({
+function SectionPanel({
+  children,
+  description,
+  title
+}: {
+  children: React.ReactNode;
+  description?: string;
+  title: string;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div>
+        <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+        {description ? (
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        ) : null}
+      </div>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function MetricCard({
+  helper,
+  label,
+  tone = "neutral",
+  value
+}: {
+  helper?: React.ReactNode;
+  label: string;
+  tone?: "danger" | "neutral" | "success" | "warning";
+  value: React.ReactNode;
+}) {
+  const toneClassNames = {
+    danger: "border-red-200 bg-red-50",
+    neutral: "border-slate-200 bg-slate-50",
+    success: "border-emerald-200 bg-emerald-50",
+    warning: "border-amber-200 bg-amber-50"
+  };
+
+  return (
+    <div className={`rounded-lg border p-3 ${toneClassNames[tone]}`}>
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="mt-2 text-lg font-semibold text-slate-950">{value}</div>
+      {helper ? <p className="mt-1 text-xs text-slate-500">{helper}</p> : null}
+    </div>
+  );
+}
+
+function InfoRow({
   label,
   value
 }: {
@@ -67,13 +117,137 @@ function DetailItem({
   value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="flex flex-col gap-1 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-start sm:justify-between">
       <p className="text-sm font-medium text-slate-500">{label}</p>
-      <div className="mt-2 break-words text-sm font-semibold leading-6 text-slate-950">
+      <div className="break-words text-sm font-semibold leading-6 text-slate-950 sm:max-w-[65%] sm:text-right">
         {value}
       </div>
     </div>
   );
+}
+
+function MilestoneRow({
+  detail,
+  label,
+  status
+}: {
+  detail?: React.ReactNode;
+  label: string;
+  status: "Done" | "Needs approval" | "Not set" | "Pending";
+}) {
+  const statusClassNames = {
+    Done: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    "Needs approval": "border-amber-200 bg-amber-50 text-amber-700",
+    "Not set": "border-slate-200 bg-slate-50 text-slate-600",
+    Pending: "border-slate-200 bg-white text-slate-700"
+  };
+
+  return (
+    <div className="flex flex-col gap-2 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-semibold text-slate-950">{label}</p>
+        {detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}
+      </div>
+      <span
+        className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassNames[status]}`}
+      >
+        {status}
+      </span>
+    </div>
+  );
+}
+
+function CompactEmpty({ children }: { children: React.ReactNode }) {
+  return <div className="px-4 py-3 text-sm text-slate-500">{children}</div>;
+}
+
+function documentLinks({
+  agreementUrl,
+  documentsUrl,
+  trainingUrl
+}: {
+  agreementUrl: string | null;
+  documentsUrl: string | null;
+  trainingUrl: string | null;
+}) {
+  return [
+    agreementUrl
+      ? {
+          href: agreementUrl,
+          label: "Dealer agreement file",
+          linkLabel: "View agreement"
+        }
+      : null,
+    documentsUrl
+      ? {
+          href: documentsUrl,
+          label: "Dealer documents",
+          linkLabel: "View documents"
+        }
+      : null,
+    trainingUrl
+      ? {
+          href: trainingUrl,
+          label: "Historical training material",
+          linkLabel: "View previously uploaded training material"
+        }
+      : null
+  ].filter(Boolean) as Array<{
+    href: string;
+    label: string;
+    linkLabel: string;
+  }>;
+}
+
+function dealerHealth({
+  issueReportedInstallations,
+  monthlyTarget,
+  monthlyActual,
+  nextActionOverdue,
+  priority,
+  reviewOverdue
+}: {
+  issueReportedInstallations: number;
+  monthlyActual: number;
+  monthlyTarget: number;
+  nextActionOverdue: boolean;
+  priority: string | null;
+  reviewOverdue: boolean;
+}) {
+  if (
+    issueReportedInstallations > 0 ||
+    priority === "High" ||
+    nextActionOverdue ||
+    reviewOverdue
+  ) {
+    return {
+      helper: "Issue reported, high priority, or overdue action needs attention.",
+      label: "Needs attention",
+      tone: "danger" as const
+    };
+  }
+
+  if (monthlyTarget <= 0) {
+    return {
+      helper: "Add a monthly dealer sales target.",
+      label: "No target set",
+      tone: "warning" as const
+    };
+  }
+
+  if (monthlyActual >= monthlyTarget) {
+    return {
+      helper: "Monthly target achieved.",
+      label: "On track",
+      tone: "success" as const
+    };
+  }
+
+  return {
+    helper: `${monthlyActual} of ${monthlyTarget} monthly sales completed.`,
+    label: "Off track",
+    tone: "warning" as const
+  };
 }
 
 function numberDisplay(value: number | null | undefined) {
@@ -246,6 +420,10 @@ export default async function DealerDetailPage({
   const fyActualSales = countDealerSales(performanceInstallations, fyRange);
   const issueReportedInstallations =
     countIssueReportedInstallations(performanceInstallations);
+  const monthlyTarget = dealer.monthly_installation_target ?? 0;
+  const quarterlyTarget = dealer.quarterly_installation_target ?? 0;
+  const annualTarget = dealer.annual_installation_target ?? 0;
+  const monthlyGap = targetGap(monthlyTarget, currentMonthActualSales);
   const openLinkedLeadCount = linkedLeads.filter(
     (lead) => lead.lead_status === "Open"
   ).length;
@@ -254,8 +432,23 @@ export default async function DealerDetailPage({
   ).length;
   const nextReviewDate =
     dealer.next_dealer_review_date ?? dealer.next_action_date;
+  const nextActionOverdue = isOverdueDate(dealer.next_action_date);
+  const reviewOverdue = isOverdueDate(nextReviewDate);
   const firstFarmerInstallationDone =
     fyActualSales > 0 || Boolean(dealer.last_farmer_installation_date);
+  const health = dealerHealth({
+    issueReportedInstallations,
+    monthlyActual: currentMonthActualSales,
+    monthlyTarget,
+    nextActionOverdue,
+    priority: dealer.priority,
+    reviewOverdue
+  });
+  const documents = documentLinks({
+    agreementUrl,
+    documentsUrl,
+    trainingUrl
+  });
 
   return (
     <section>
@@ -285,285 +478,289 @@ export default async function DealerDetailPage({
         </div>
       </div>
 
-      <div className="mb-5">
+      <div className="mb-5 flex items-center gap-3">
         <DealerStatusPill status={dealer.dealer_status} />
+        <span className="text-sm text-slate-500">
+          {region?.region_name ?? dealer.state}
+        </span>
       </div>
 
-      <div className="mt-6">
-        <h2 className="mb-3 text-base font-semibold text-slate-950">
-          Dealer performance
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DetailItem
-            label="Monthly dealer sales target"
-            value={numberDisplay(dealer.monthly_installation_target)}
-          />
-          <DetailItem
-            label="Current month actual dealer sales"
-            value={numberDisplay(currentMonthActualSales)}
-          />
-          <DetailItem
-            label="Monthly gap"
-            value={numberDisplay(
-              targetGap(dealer.monthly_installation_target, currentMonthActualSales)
-            )}
-          />
-          <DetailItem
-            label="Quarterly dealer sales target"
-            value={numberDisplay(dealer.quarterly_installation_target)}
-          />
-          <DetailItem
-            label="Quarter actual dealer sales"
-            value={numberDisplay(quarterActualSales)}
-          />
-          <DetailItem
-            label="Annual dealer sales target"
-            value={numberDisplay(dealer.annual_installation_target)}
-          />
-          <DetailItem
-            label="FY actual dealer sales"
-            value={numberDisplay(fyActualSales)}
-          />
-          <DetailItem
-            label="Dealer stock available"
-            value={numberDisplay(dealerDevices.length)}
-          />
-          <DetailItem
-            label="Open linked farmer leads"
-            value={numberDisplay(openLinkedLeadCount)}
-          />
-          <DetailItem
-            label="Dispatches pending installation"
-            value={numberDisplay(pendingInstallationDispatchCount)}
-          />
-          <DetailItem
-            label="Issue reported installations"
-            value={numberDisplay(issueReportedInstallations)}
-          />
-          <DetailItem
-            label="Next dealer review date"
+      <div className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm sm:p-5">
+        <div className="grid gap-4 lg:grid-cols-[1.2fr_2fr]">
+          <div
+            className={`rounded-lg border p-4 ${
+              health.tone === "danger"
+                ? "border-red-200 bg-red-50"
+                : health.tone === "success"
+                  ? "border-emerald-200 bg-emerald-50"
+                  : "border-amber-200 bg-amber-50"
+            }`}
+          >
+            <p className="text-sm font-medium text-slate-600">Dealer health</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">
+              {health.label}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">{health.helper}</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Monthly target"
+              value={numberDisplay(monthlyTarget)}
+              helper="Dealer sales target"
+            />
+            <MetricCard
+              label="Actual this month"
+              value={numberDisplay(currentMonthActualSales)}
+              helper={`${numberDisplay(monthlyGap)} gap`}
+              tone={monthlyGap > 0 ? "warning" : "success"}
+            />
+            <MetricCard
+              label="Dealer stock"
+              value={numberDisplay(dealerDevices.length)}
+              helper="Devices currently with dealer"
+            />
+            <MetricCard
+              label="Open linked leads"
+              value={numberDisplay(openLinkedLeadCount)}
+              helper="Farmer leads still open"
+            />
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <InfoRow
+            label="Next action"
             value={
-              <span
-                className={
-                  isOverdueDate(nextReviewDate)
-                    ? "text-red-700"
-                    : "text-slate-950"
-                }
-              >
-                {formatDate(nextReviewDate)}
+              <span className={nextActionOverdue ? "text-red-700" : undefined}>
+                {formatDate(dealer.next_action_date)}
               </span>
             }
           />
-          <DetailItem
+          <InfoRow
+            label="Concern / blocker"
+            value={display(dealer.support_required)}
+          />
+          <InfoRow
+            label="Accountable RSM"
+            value={rsm ? `${rsm.full_name} · ${labelForRole(rsm.role)}` : dealer.rsm_user_id}
+          />
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_1.35fr]">
+        <SectionPanel
+          title="Review and next action"
+          description="Management notes, priority, and the next decision point."
+        >
+          <InfoRow
             label="Priority"
             value={labelFor(dealer.priority, priorityOptions)}
           />
-          <DetailItem
-            label="Concern / blocker"
-            value={display(dealer.support_required)}
-          />
-          <DetailItem
-            label="Next action date"
-            value={formatDate(dealer.next_action_date)}
-          />
-          <DetailItem
-            label="Last dealer review date"
+          <InfoRow
+            label="Last review date"
             value={formatDate(dealer.last_dealer_review_date)}
           />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <DetailItem label="Dealer name" value={dealer.dealer_name} />
-        <DetailItem label="Firm name" value={display(dealer.firm_name)} />
-        <DetailItem label="Contact number" value={dealer.contact_number} />
-        <DetailItem
-          label="Dealer type"
-          value={labelFor(dealer.dealer_type, dealerTypeOptions)}
-        />
-        <DetailItem
-          label="Dealer owner"
-          value={
-            dealerOwner
-              ? `${dealerOwner.full_name} · ${labelForRole(dealerOwner.role)}`
-              : dealer.dealer_owner_user_id
-          }
-        />
-        <DetailItem
-          label="RSM"
-          value={rsm ? `${rsm.full_name} · ${labelForRole(rsm.role)}` : dealer.rsm_user_id}
-        />
-        <DetailItem
-          label="Region"
-          value={region?.region_name ?? dealer.region_id}
-        />
-        <DetailItem
-          label="Territory"
-          value={`${dealer.taluk_or_territory}, ${dealer.district}, ${dealer.state}`}
-        />
-        <DetailItem label="Key crops" value={formatCrops(dealer.key_crops)} />
-        <DetailItem
-          label="Other key crops"
-          value={display(dealer.other_key_crops)}
-        />
-        <DetailItem
-          label="Existing customer base"
-          value={labelFor(
-            dealer.existing_customer_base_type,
-            existingCustomerBaseTypeOptions
-          )}
-        />
-        <DetailItem
-          label="Priority"
-          value={labelFor(dealer.priority, priorityOptions)}
-        />
-      </div>
-
-      <div className="mt-6">
-        <h2 className="mb-3 text-base font-semibold text-slate-950">
-          Onboarding and commercial details
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DetailItem
-            label="Training status"
-            value={labelFor(dealer.training_status, trainingStatusOptions)}
-          />
-          <DetailItem
-            label="Agreement status"
-            value={labelFor(
-              dealer.dealer_agreement_status,
-              dealerAgreementStatusOptions
-            )}
-          />
-          <DetailItem
-            label="Dealer Agreement legal approval"
-            value={display(dealer.dealer_agreement_approval_status)}
-          />
-          <DetailItem
-            label="Dealer agreement file"
-            value={<FileLink href={agreementUrl} label="View agreement" />}
-          />
-          <DetailItem
-            label="Dealer documents"
-            value={<FileLink href={documentsUrl} label="View documents" />}
-          />
-          <DetailItem
-            label="Training material"
-            value={<FileLink href={trainingUrl} label="View training material" />}
-          />
-          <DetailItem
-            label="Commercial terms shared"
-            value={labelFor(
-              dealer.commercial_terms_shared,
-              commercialTermsSharedOptions
-            )}
-          />
-          <DetailItem
-            label="Credit terms"
-            value={labelFor(dealer.credit_terms, creditTermsOptions)}
-          />
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <h2 className="mb-3 text-base font-semibold text-slate-950">
-          Onboarding progress
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DetailItem
-            label="Commercial terms shared"
-            value={labelFor(
-              dealer.commercial_terms_shared,
-              commercialTermsSharedOptions
-            )}
-          />
-          <DetailItem
-            label="Training completed"
+          <InfoRow
+            label="Next dealer review"
             value={
-              dealer.training_status === "Training Completed"
-                ? "Yes"
-                : labelFor(dealer.training_status, trainingStatusOptions)
+              <span className={reviewOverdue ? "text-red-700" : undefined}>
+                {formatDate(dealer.next_dealer_review_date)}
+              </span>
             }
           />
-          <DetailItem
-            label="Agreement status"
+          <InfoRow
+            label="Concern / blocker"
+            value={display(dealer.support_required)}
+          />
+          <InfoRow label="Remarks" value={display(dealer.remarks)} />
+          {!dealer.support_required && !dealer.remarks ? (
+            <p className="pt-3 text-sm text-slate-500">
+              No concern or review notes yet.
+            </p>
+          ) : null}
+        </SectionPanel>
+
+        <SectionPanel
+          title="Performance"
+          description="Dealer sales, stock, and operational gaps."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <MetricCard
+              label="Monthly target vs actual"
+              value={`${numberDisplay(currentMonthActualSales)} / ${numberDisplay(monthlyTarget)}`}
+              tone={monthlyGap > 0 ? "warning" : "success"}
+            />
+            <MetricCard
+              label="Monthly gap"
+              value={numberDisplay(monthlyGap)}
+              tone={monthlyGap > 0 ? "warning" : "success"}
+            />
+            <MetricCard
+              label="Quarter actual vs target"
+              value={`${numberDisplay(quarterActualSales)} / ${numberDisplay(quarterlyTarget)}`}
+            />
+            <MetricCard
+              label="FY actual vs annual target"
+              value={`${numberDisplay(fyActualSales)} / ${numberDisplay(annualTarget)}`}
+            />
+            <MetricCard
+              label="Dealer stock available"
+              value={numberDisplay(dealerDevices.length)}
+            />
+            <MetricCard
+              label="Dispatches pending installation"
+              value={numberDisplay(pendingInstallationDispatchCount)}
+              tone={pendingInstallationDispatchCount > 0 ? "warning" : "neutral"}
+            />
+            <MetricCard
+              label="Issue reported installations"
+              value={numberDisplay(issueReportedInstallations)}
+              tone={issueReportedInstallations > 0 ? "danger" : "neutral"}
+            />
+          </div>
+        </SectionPanel>
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <SectionPanel
+          title="Dealer profile"
+          description="Stable identity, ownership, and territory information."
+        >
+          <InfoRow label="Dealer name" value={dealer.dealer_name} />
+          <InfoRow label="Firm name" value={display(dealer.firm_name)} />
+          <InfoRow label="Contact number" value={dealer.contact_number} />
+          <InfoRow
+            label="Dealer type"
+            value={labelFor(dealer.dealer_type, dealerTypeOptions)}
+          />
+          <InfoRow
+            label="Dealer owner"
+            value={
+              dealerOwner
+                ? `${dealerOwner.full_name} · ${labelForRole(dealerOwner.role)}`
+                : dealer.dealer_owner_user_id
+            }
+          />
+          <InfoRow
+            label="RSM"
+            value={
+              rsm
+                ? `${rsm.full_name} · ${labelForRole(rsm.role)}`
+                : dealer.rsm_user_id
+            }
+          />
+          <InfoRow label="Region" value={region?.region_name ?? dealer.region_id} />
+          <InfoRow
+            label="Territory"
+            value={`${dealer.taluk_or_territory}, ${dealer.district}, ${dealer.state}`}
+          />
+          <InfoRow label="Key crops" value={formatCrops(dealer.key_crops)} />
+          {dealer.other_key_crops ? (
+            <InfoRow label="Other key crops" value={dealer.other_key_crops} />
+          ) : null}
+          <InfoRow
+            label="Existing customer base"
             value={labelFor(
+              dealer.existing_customer_base_type,
+              existingCustomerBaseTypeOptions
+            )}
+          />
+        </SectionPanel>
+
+        <SectionPanel
+          title="Onboarding progress"
+          description="Setup and commercial milestones tracked from existing records."
+        >
+          <MilestoneRow
+            label="Commercial terms shared"
+            status={
+              !dealer.commercial_terms_shared
+                ? "Not set"
+                : dealer.commercial_terms_shared === "Yes"
+                  ? "Done"
+                  : "Pending"
+            }
+            detail={labelFor(
+              dealer.commercial_terms_shared,
+              commercialTermsSharedOptions
+            )}
+          />
+          <MilestoneRow
+            label="Training completed"
+            status={
+              !dealer.training_status
+                ? "Not set"
+                : dealer.training_status === "Training Completed"
+                  ? "Done"
+                  : "Pending"
+            }
+            detail={labelFor(dealer.training_status, trainingStatusOptions)}
+          />
+          <MilestoneRow
+            label="Agreement signed"
+            status={
+              !dealer.dealer_agreement_status
+                ? "Not set"
+                : dealer.dealer_agreement_status === "Signed"
+                  ? "Done"
+                  : "Pending"
+            }
+            detail={labelFor(
               dealer.dealer_agreement_status,
               dealerAgreementStatusOptions
             )}
           />
-          <DetailItem
+          <MilestoneRow
             label="Legal approval"
-            value={display(dealer.dealer_agreement_approval_status)}
+            status={
+              !dealer.dealer_agreement_approval_status
+                ? "Not set"
+                : dealer.dealer_agreement_approval_status === "Approved"
+                  ? "Done"
+                  : "Needs approval"
+            }
+            detail={display(dealer.dealer_agreement_approval_status)}
           />
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <h2 className="mb-3 text-base font-semibold text-slate-950">
-          Commercial and operations progress
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DetailItem
+          <MilestoneRow
             label="First order expected"
-            value={formatDate(dealer.first_order_target_date)}
+            status={dealer.first_order_target_date ? "Done" : "Not set"}
+            detail={formatDate(dealer.first_order_target_date)}
           />
-          <DetailItem
+          <MilestoneRow
             label="Dealer stock dispatched"
-            value={dealerDispatches.length > 0 ? "Yes" : "No"}
+            status={dealerDispatches.length > 0 ? "Done" : "Pending"}
+            detail={`${numberDisplay(dealerDispatches.length)} dispatches this month`}
           />
-          <DetailItem
+          <MilestoneRow
             label="First farmer installation done"
-            value={firstFarmerInstallationDone ? "Yes" : "No"}
+            status={firstFarmerInstallationDone ? "Done" : "Pending"}
+            detail={formatDate(dealer.last_farmer_installation_date)}
           />
-          <DetailItem
-            label="Last farmer installation date"
-            value={formatDate(dealer.last_farmer_installation_date)}
-          />
-        </div>
+        </SectionPanel>
       </div>
 
       <div className="mt-6">
-        <h2 className="mb-3 text-base font-semibold text-slate-950">Targets</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          <DetailItem
-            label="Monthly dealer sales target"
-            value={dealer.monthly_installation_target}
-          />
-          <DetailItem
-            label="Quarterly dealer sales target"
-            value={dealer.quarterly_installation_target}
-          />
-          <DetailItem
-            label="Annual dealer sales target"
-            value={dealer.annual_installation_target}
-          />
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <h2 className="mb-3 text-base font-semibold text-slate-950">
-          Review and next action
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DetailItem
-            label="Last dealer review date"
-            value={formatDate(dealer.last_dealer_review_date)}
-          />
-          <DetailItem
-            label="Next dealer review date"
-            value={formatDate(dealer.next_dealer_review_date)}
-          />
-          <DetailItem
-            label="Next action date"
-            value={formatDate(dealer.next_action_date)}
-          />
-          <DetailItem
-            label="Concern / blocker"
-            value={display(dealer.support_required)}
-          />
-          <DetailItem label="Remarks" value={display(dealer.remarks)} />
-        </div>
+        <SectionPanel
+          title="Documents"
+          description="Dealer documents already uploaded for this profile."
+        >
+          {documents.length ? (
+            <div className="divide-y divide-slate-100">
+              {documents.map((document) => (
+                <InfoRow
+                  key={document.label}
+                  label={document.label}
+                  value={
+                    <FileLink href={document.href} label={document.linkLabel} />
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">
+              No dealer documents uploaded yet.
+            </p>
+          )}
+        </SectionPanel>
       </div>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -615,9 +812,9 @@ export default async function DealerDetailPage({
             </table>
           </div>
         ) : (
-          <div className="p-6 text-sm text-slate-500">
+          <CompactEmpty>
             No devices are currently held by this dealer.
-          </div>
+          </CompactEmpty>
         )}
       </div>
 
@@ -671,9 +868,9 @@ export default async function DealerDetailPage({
             </table>
           </div>
         ) : (
-          <div className="p-6 text-sm text-slate-500">
+          <CompactEmpty>
             No farmer leads are linked to this dealer yet.
-          </div>
+          </CompactEmpty>
         )}
       </div>
 
@@ -723,9 +920,9 @@ export default async function DealerDetailPage({
             </table>
           </div>
         ) : (
-          <div className="p-6 text-sm text-slate-500">
+          <CompactEmpty>
             No pilots are linked to this dealer yet.
-          </div>
+          </CompactEmpty>
         )}
       </div>
 
@@ -779,9 +976,9 @@ export default async function DealerDetailPage({
             </table>
           </div>
         ) : (
-          <div className="p-6 text-sm text-slate-500">
+          <CompactEmpty>
             No installations are linked to this dealer yet.
-          </div>
+          </CompactEmpty>
         )}
       </div>
     </section>
