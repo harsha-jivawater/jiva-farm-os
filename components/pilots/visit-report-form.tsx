@@ -16,11 +16,13 @@ import {
   reportStatusOptions,
   reportTypeOptions
 } from "@/lib/pilots/options";
+import { parameterInputName } from "@/lib/pilots/visit-planning";
 import { labelForRole } from "@/lib/users/options";
 import { hasAnyRole } from "@/lib/users/permissions";
 import type {
   Pilot,
   PilotVisit,
+  PlannedPilotVisit,
   UserOption,
   VisitReport
 } from "@/lib/pilots/types";
@@ -29,9 +31,11 @@ type VisitReportFormProps = {
   action: (formData: FormData) => void | Promise<void>;
   cancelHref?: string;
   compact?: boolean;
+  defaultPlannedVisitId?: string | null;
   defaultPilotVisitId?: string | null;
   currentUser: UserOption;
   pilot: Pilot;
+  plannedVisits?: PlannedPilotVisit[];
   report?: VisitReport;
   users: UserOption[];
   visits: PilotVisit[];
@@ -189,17 +193,31 @@ export function VisitReportForm({
   cancelHref,
   compact = false,
   currentUser,
+  defaultPlannedVisitId,
   defaultPilotVisitId,
   pilot,
+  plannedVisits = [],
   report,
   users,
   visits
 }: VisitReportFormProps) {
   const [crop, setCrop] = useState(report?.crop ?? pilot.crop ?? "");
+  const [selectedPlannedVisitId, setSelectedPlannedVisitId] = useState(
+    report?.planned_pilot_visit_id ?? defaultPlannedVisitId ?? ""
+  );
   const canApproveFinalPilotReport = hasAnyRole(currentUser, [
     "R&D Head",
     "Admin"
   ]);
+  const selectedPlannedVisit = plannedVisits.find(
+    (visit) => visit.id === selectedPlannedVisitId
+  );
+  const parameterObservations =
+    report?.parameter_observations &&
+    typeof report.parameter_observations === "object" &&
+    !Array.isArray(report.parameter_observations)
+      ? (report.parameter_observations as Record<string, string>)
+      : {};
   const reviewer = report?.reviewed_by_user_id && report.report_status === "Approved"
     ? users.find((user) => user.id === report.reviewed_by_user_id)
     : null;
@@ -266,7 +284,7 @@ export function VisitReportForm({
           </select>
         </div>
         <UserSelect
-          defaultValue={report?.submitted_by_user_id}
+          defaultValue={report?.submitted_by_user_id ?? currentUser.id}
           label="Submitted by"
           name="submitted_by_user_id"
           options={submittedByUsers}
@@ -299,6 +317,29 @@ export function VisitReportForm({
             {visibleReportStatusOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label
+            className="mb-1.5 block text-sm font-medium text-slate-700"
+            htmlFor="planned_pilot_visit_id"
+          >
+            Planned visit
+          </label>
+          <select
+            className={inputClassName()}
+            defaultValue={selectedPlannedVisitId}
+            id="planned_pilot_visit_id"
+            name="planned_pilot_visit_id"
+            onChange={(event) => setSelectedPlannedVisitId(event.target.value)}
+          >
+            <option value="">No linked planned visit</option>
+            {plannedVisits.map((visit) => (
+              <option key={visit.id} value={visit.id}>
+                Visit {visit.visit_number} · {visit.planned_visit_date} ·{" "}
+                {visit.visit_type}
               </option>
             ))}
           </select>
@@ -391,6 +432,35 @@ export function VisitReportForm({
           name="data_sheet_link"
         />
       </div>
+
+      {selectedPlannedVisit?.parameters_to_collect.length ? (
+        <div className="rounded-lg border border-brand-100 bg-brand-50/40 p-4">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-slate-950">
+              Planned visit parameters
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Enter the observations collected during this assigned visit.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {selectedPlannedVisit.parameters_to_collect.map((parameter) => (
+              <TextareaField
+                defaultValue={parameterObservations[parameter]}
+                key={parameter}
+                label={parameter}
+                name={parameterInputName(parameter)}
+              />
+            ))}
+          </div>
+          {selectedPlannedVisit.special_instructions ? (
+            <p className="mt-3 rounded-md border border-brand-100 bg-white px-3 py-2 text-sm text-slate-700">
+              <span className="font-semibold">Instructions:</span>{" "}
+              {selectedPlannedVisit.special_instructions}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <TextareaField

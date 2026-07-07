@@ -2,11 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarPlus, Pencil } from "lucide-react";
 import {
+  createPlannedPilotVisitAction,
   createPilotVisitAction,
   createVisitReportAction,
-  generatePilotVisitScheduleAction
+  generatePilotVisitScheduleAction,
+  updatePlannedPilotVisitAction
 } from "@/app/(app)/pilots/actions";
 import { PageHeader } from "@/components/page-header";
+import { PlannedVisitForm } from "@/components/pilots/planned-visit-form";
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
 import { PilotVisitForm } from "@/components/pilots/pilot-visit-form";
 import { VisitReportForm } from "@/components/pilots/visit-report-form";
@@ -27,14 +30,18 @@ import {
   type PilotDealerOption,
   type PilotInstitutionOption,
   type PilotVisit,
+  type PlannedPilotVisit,
   type UserOption,
   type VisitReport
 } from "@/lib/pilots/types";
+import {
+  displayPlannedVisitStatus
+} from "@/lib/pilots/visit-planning";
 import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canWriteModule } from "@/lib/users/permissions";
+import { canWriteModule, hasAnyRole } from "@/lib/users/permissions";
 import { pilotScope } from "@/lib/users/record-scope";
 
 type PilotDetailPageProps = {
@@ -43,6 +50,7 @@ type PilotDetailPageProps = {
   }>;
   searchParams: Promise<{
     error?: string;
+    planned_visit_id?: string;
     pilot_visit_id?: string;
   }>;
 };
@@ -79,6 +87,11 @@ export default async function PilotDetailPage({
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/pilots");
   const canWrite = canWriteModule(currentUser, "pilots");
+  const canManageVisitPlans = hasAnyRole(currentUser, [
+    "Admin",
+    "R&D Head",
+    "Agronomist"
+  ]);
   const scope = await pilotScope(supabase, currentUser);
   let pilotQuery = supabase
     .from("pilots")
@@ -105,6 +118,7 @@ export default async function PilotDetailPage({
     { data: users },
     { data: institutions },
     { data: dealers },
+    { data: plannedVisits },
     { data: visits },
     { data: reports }
   ] = await Promise.all([
@@ -121,6 +135,13 @@ export default async function PilotDetailPage({
       .from("dealers")
       .select("id, dealer_code, dealer_name, firm_name")
       .is("deleted_at", null),
+    supabase
+      .from("planned_pilot_visits")
+      .select("*")
+      .eq("pilot_id", pilot.id)
+      .is("deleted_at", null)
+      .order("visit_number", { ascending: true })
+      .order("planned_visit_date", { ascending: true }),
     supabase
       .from("pilot_visits")
       .select("*")
@@ -139,6 +160,7 @@ export default async function PilotDetailPage({
   const usersList = (users ?? []) as UserOption[];
   const institutionsList = (institutions ?? []) as PilotInstitutionOption[];
   const dealersList = (dealers ?? []) as PilotDealerOption[];
+  const plannedVisitsList = (plannedVisits ?? []) as PlannedPilotVisit[];
   const visitsList = (visits ?? []) as PilotVisit[];
   const reportsList = (reports ?? []) as VisitReport[];
   const [
@@ -186,6 +208,10 @@ export default async function PilotDetailPage({
   );
   const dealerMap = new Map(dealersList.map((dealer) => [dealer.id, dealer]));
   const createVisitAction = createPilotVisitAction.bind(null, pilot.id);
+  const createPlannedVisitAction = createPlannedPilotVisitAction.bind(
+    null,
+    pilot.id
+  );
   const createReportAction = createVisitReportAction.bind(null, pilot.id);
   const generateScheduleAction = generatePilotVisitScheduleAction.bind(
     null,
@@ -196,7 +222,13 @@ export default async function PilotDetailPage({
     visitsList.some((visit) => visit.id === query.pilot_visit_id)
       ? query.pilot_visit_id
       : null;
+  const selectedPlannedVisitId =
+    query.planned_visit_id &&
+    plannedVisitsList.some((visit) => visit.id === query.planned_visit_id)
+      ? query.planned_visit_id
+      : null;
   const reportMap = new Map(reportsList.map((report) => [report.id, report]));
+  const today = new Date().toISOString().slice(0, 10);
   const pendingVisitReports = visitsList.filter(
     (visit) =>
       visit.visit_status === "Completed" &&
@@ -371,6 +403,124 @@ export default async function PilotDetailPage({
           label="Pilot data sheet"
           value={<FileLink href={pilotDataSheetUrl} label="View data sheet" />}
         />
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-1 border-b border-slate-200 px-4 py-3">
+          <h2 className="text-base font-semibold text-slate-950">
+            Visit Planning
+          </h2>
+          <p className="text-sm text-slate-500">
+            Plan the exact visit date, assigned person, purpose, parameters, and instructions.
+          </p>
+        </div>
+        <div className="grid gap-4 p-4 lg:grid-cols-2">
+          {plannedVisitsList.map((plannedVisit) => {
+            const assignedUser = userMap.get(plannedVisit.assigned_user_id);
+            const linkedReport = plannedVisit.linked_visit_report_id
+              ? reportMap.get(plannedVisit.linked_visit_report_id)
+              : undefined;
+            const updateAction = updatePlannedPilotVisitAction.bind(
+              null,
+              pilot.id,
+              plannedVisit.id
+            );
+
+            return (
+              <div
+                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                key={plannedVisit.id}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">
+                      Visit {plannedVisit.visit_number} · {plannedVisit.visit_type}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {formatDate(plannedVisit.planned_visit_date)} ·{" "}
+                      {userLabel(assignedUser, plannedVisit.assigned_user_id)}
+                    </p>
+                  </div>
+                  <span className="w-fit rounded-full border border-brand-100 bg-white px-2.5 py-1 text-xs font-semibold text-brand-700">
+                    {displayPlannedVisitStatus(plannedVisit, today)}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-700">
+                  {plannedVisit.visit_purpose}
+                </p>
+                {plannedVisit.crop_stage_timing ? (
+                  <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    {plannedVisit.crop_stage_timing}
+                  </p>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {plannedVisit.parameters_to_collect.map((parameter) => (
+                    <span
+                      className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-600"
+                      key={parameter}
+                    >
+                      {parameter}
+                    </span>
+                  ))}
+                </div>
+                {plannedVisit.special_instructions ? (
+                  <p className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                    <span className="font-semibold">Instructions:</span>{" "}
+                    {plannedVisit.special_instructions}
+                  </p>
+                ) : null}
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {linkedReport ? (
+                    <span className="text-sm font-medium text-emerald-700">
+                      Report submitted: {linkedReport.visit_report_code}
+                    </span>
+                  ) : canWrite ? (
+                    <Link
+                      className="inline-flex min-h-9 items-center justify-center rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                      href={`/pilots/${pilot.id}?planned_visit_id=${plannedVisit.id}#add-visit-report`}
+                    >
+                      Create Visit Report
+                    </Link>
+                  ) : null}
+                  {canManageVisitPlans ? (
+                    <details className="w-full">
+                      <summary className="mt-2 cursor-pointer text-sm font-semibold text-brand-700">
+                        Edit planned visit
+                      </summary>
+                      <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+                        <PlannedVisitForm
+                          action={updateAction}
+                          compact
+                          users={usersList}
+                          visit={plannedVisit}
+                        />
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+          {plannedVisitsList.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 lg:col-span-2">
+              No planned pilot visits yet. Add the first planned visit with purpose, assignee, and parameters.
+            </div>
+          ) : null}
+        </div>
+        {canManageVisitPlans ? (
+          <div className="border-t border-slate-200 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-950">
+              Add planned visit
+            </h3>
+            <PlannedVisitForm
+              action={createPlannedVisitAction}
+              compact
+              defaultAssigneeId={pilot.research_assistant_user_id}
+              nextVisitNumber={plannedVisitsList.length + 1}
+              users={usersList}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -627,8 +777,10 @@ export default async function PilotDetailPage({
                 role: currentUser.role,
                 secondary_role: currentUser.secondary_role
               }}
+              defaultPlannedVisitId={selectedPlannedVisitId}
               defaultPilotVisitId={selectedPilotVisitId}
               pilot={pilot}
+              plannedVisits={plannedVisitsList}
               users={usersList}
               visits={visitsList}
             />

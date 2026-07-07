@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Building2,
+  CalendarCheck2,
   ClipboardCheck,
   Gauge,
   Handshake,
@@ -44,7 +45,13 @@ export const navigationItems = [
     label: "Pilots",
     href: "/pilots",
     module: "pilots" satisfies ModuleKey,
-    icon: Gauge,
+    icon: Gauge
+  },
+  {
+    label: "My Visits",
+    href: "/my-visits",
+    module: "pilots" satisfies ModuleKey,
+    icon: CalendarCheck2,
     gapAfter: true
   },
   {

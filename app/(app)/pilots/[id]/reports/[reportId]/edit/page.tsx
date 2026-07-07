@@ -5,6 +5,7 @@ import { VisitReportForm } from "@/components/pilots/visit-report-form";
 import type {
   Pilot,
   PilotVisit,
+  PlannedPilotVisit,
   UserOption,
   VisitReport
 } from "@/lib/pilots/types";
@@ -49,6 +50,7 @@ export default async function EditVisitReportPage({
     { data: pilot, error: pilotError },
     { data: report, error },
     { data: users },
+    { data: plannedVisits },
     { data: visits }
   ] = await Promise.all([
     pilotQuery.single(),
@@ -64,6 +66,12 @@ export default async function EditVisitReportPage({
       .select("id, full_name, role, secondary_role")
       .eq("is_active", true)
       .order("full_name", { ascending: true }),
+    supabase
+      .from("planned_pilot_visits")
+      .select("*")
+      .eq("pilot_id", id)
+      .is("deleted_at", null)
+      .order("planned_visit_date", { ascending: true }),
     supabase
       .from("pilot_visits")
       .select("*")
@@ -102,6 +110,7 @@ export default async function EditVisitReportPage({
             secondary_role: currentUser.secondary_role
           }}
           pilot={pilotRow}
+          plannedVisits={(plannedVisits ?? []) as PlannedPilotVisit[]}
           report={report as VisitReport}
           users={(users ?? []) as UserOption[]}
           visits={(visits ?? []) as PilotVisit[]}

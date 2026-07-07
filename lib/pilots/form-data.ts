@@ -27,9 +27,18 @@ import {
   visitTypeOptions,
   waterSourceOptions
 } from "@/lib/pilots/options";
+import {
+  defaultPlannedVisitStatus,
+  defaultPlannedVisitType,
+  parameterInputName,
+  plannedVisitStatusOptions,
+  plannedVisitTypeOptions,
+  visitParameterOptions
+} from "@/lib/pilots/visit-planning";
 import type {
   PilotFormPayload,
   PilotVisitFormPayload,
+  PlannedPilotVisitFormPayload,
   VisitReportFormPayload
 } from "@/lib/pilots/types";
 
@@ -61,6 +70,24 @@ function getBoolean(formData: FormData, key: string, defaultValue = false) {
   }
 
   return value === "true" || value === "on";
+}
+
+function getAllText(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+}
+
+function getParameterObservations(formData: FormData) {
+  return Object.fromEntries(
+    visitParameterOptions
+      .map((parameter) => [
+        parameter,
+        getText(formData, parameterInputName(parameter))
+      ] as const)
+      .filter(([, value]) => Boolean(value))
+  );
 }
 
 function comparisonControlValues(method: string | null | undefined) {
@@ -476,10 +503,49 @@ export function validatePilotVisitPayload(payload: PilotVisitFormPayload) {
   return null;
 }
 
+export function plannedPilotVisitPayloadFromForm(
+  formData: FormData
+): PlannedPilotVisitFormPayload {
+  return {
+    visit_number: getNumber(formData, "visit_number", 1) ?? 1,
+    planned_visit_date: getText(formData, "planned_visit_date") ?? todayDate(),
+    crop_stage_timing: getText(formData, "crop_stage_timing"),
+    visit_purpose: getText(formData, "visit_purpose") ?? "",
+    assigned_user_id: getText(formData, "assigned_user_id") ?? "",
+    visit_type: getText(formData, "visit_type") ?? defaultPlannedVisitType,
+    parameters_to_collect: getAllText(formData, "parameters_to_collect"),
+    special_instructions: getText(formData, "special_instructions"),
+    planned_visit_status:
+      getText(formData, "planned_visit_status") ?? defaultPlannedVisitStatus
+  };
+}
+
+export function validatePlannedPilotVisitPayload(
+  payload: PlannedPilotVisitFormPayload
+) {
+  if (!payload.visit_number) return "Visit number is required.";
+  if (!payload.planned_visit_date) return "Planned visit date is required.";
+  if (!payload.visit_purpose) return "Visit purpose is required.";
+  if (!payload.assigned_user_id) return "Assign the visit to a team member.";
+  if (!payload.visit_type) return "Visit type is required.";
+  if (!payload.parameters_to_collect?.length) {
+    return "Select at least one parameter to collect.";
+  }
+  if (!isOptionValue(payload.visit_type, plannedVisitTypeOptions)) {
+    return "Visit type is not valid.";
+  }
+  if (!isOptionValue(payload.planned_visit_status, plannedVisitStatusOptions)) {
+    return "Visit status is not valid.";
+  }
+
+  return null;
+}
+
 export function visitReportPayloadFromForm(
   formData: FormData
 ): VisitReportFormPayload {
   const reportStatus = getText(formData, "report_status") ?? defaultReportStatus;
+  const parameterObservations = getParameterObservations(formData);
 
   return {
     report_date: getText(formData, "report_date") ?? todayDate(),
@@ -488,6 +554,7 @@ export function visitReportPayloadFromForm(
     reviewed_by_user_id: getText(formData, "reviewed_by_user_id"),
     report_status: reportStatus,
     pilot_visit_id: getText(formData, "pilot_visit_id"),
+    planned_pilot_visit_id: getText(formData, "planned_pilot_visit_id"),
     institution_id: getText(formData, "institution_id"),
     farmer_lead_id: getText(formData, "farmer_lead_id"),
     installation_id: getText(formData, "installation_id"),
@@ -523,7 +590,8 @@ export function visitReportPayloadFromForm(
     approved_for_partner_sharing: getBoolean(
       formData,
       "approved_for_partner_sharing"
-    )
+    ),
+    parameter_observations: parameterObservations
   };
 }
 

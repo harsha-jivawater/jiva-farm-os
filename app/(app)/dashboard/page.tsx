@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Activity,
+  CalendarCheck2,
   CalendarClock,
   CircleDollarSign,
   ClipboardCheck,
@@ -37,6 +38,8 @@ type DashboardCounts = {
   devicesInWarehouse: number | null;
   overduePostInstallationFollowups: number | null;
   activePilots: number | null;
+  plannedPilotVisitsDue: number | null;
+  plannedPilotVisitReportsPending: number | null;
 };
 
 const unavailableCounts: DashboardCounts = {
@@ -46,7 +49,9 @@ const unavailableCounts: DashboardCounts = {
   installationsPlanned: null,
   devicesInWarehouse: null,
   overduePostInstallationFollowups: null,
-  activePilots: null
+  activePilots: null,
+  plannedPilotVisitsDue: null,
+  plannedPilotVisitReportsPending: null
 };
 
 function numberValue(value: unknown) {
@@ -69,7 +74,9 @@ function readDashboardCounts(value: unknown): DashboardCounts {
     overduePostInstallationFollowups: numberValue(
       row.overduePostInstallationFollowups
     ),
-    activePilots: numberValue(row.activePilots)
+    activePilots: numberValue(row.activePilots),
+    plannedPilotVisitsDue: null,
+    plannedPilotVisitReportsPending: null
   };
 }
 
@@ -134,7 +141,50 @@ export default async function DashboardPage() {
     console.error("[Home] Dashboard counts RPC unavailable", countError);
   }
 
-  const counts = countError ? unavailableCounts : readDashboardCounts(countData);
+  const counts: DashboardCounts = {
+    ...(countError ? unavailableCounts : readDashboardCounts(countData))
+  };
+  if (moduleAccess.pilots) {
+    const today = new Date().toISOString().slice(0, 10);
+    const [{ count: dueCount, error: dueError }, { count: pendingReportCount, error: pendingReportError }] =
+      await Promise.all([
+        supabase
+          .from("planned_pilot_visits")
+          .select("id", { count: "exact", head: true })
+          .lte("planned_visit_date", today)
+          .in("planned_visit_status", [
+            "Planned",
+            "Assigned",
+            "Due",
+            "In Progress",
+            "Rescheduled"
+          ])
+          .is("linked_visit_report_id", null)
+          .is("deleted_at", null),
+        supabase
+          .from("planned_pilot_visits")
+          .select("id", { count: "exact", head: true })
+          .in("planned_visit_status", [
+            "Planned",
+            "Assigned",
+            "Due",
+            "In Progress",
+            "Rescheduled"
+          ])
+          .is("linked_visit_report_id", null)
+          .is("deleted_at", null)
+      ]);
+
+    if (dueError || pendingReportError) {
+      console.error("[Home] Planned visit counts unavailable", {
+        dueError,
+        pendingReportError
+      });
+    } else {
+      counts.plannedPilotVisitsDue = dueCount ?? 0;
+      counts.plannedPilotVisitReportsPending = pendingReportCount ?? 0;
+    }
+  }
   const visibleCards: CountCard[] = [];
 
   if (moduleAccess.farmerLeads) {
@@ -209,15 +259,35 @@ export default async function DashboardPage() {
   }
 
   if (moduleAccess.pilots) {
-    visibleCards.push({
-      href: "/pilots",
-      helper: "Pilots currently active or waiting for reports.",
-      icon: Activity,
-      includeInToday: true,
-      label: "Active Pilots",
-      module: "pilots",
-      value: counts.activePilots
-    });
+    visibleCards.push(
+      {
+        href: "/pilots",
+        helper: "Pilots currently active or waiting for reports.",
+        icon: Activity,
+        includeInToday: true,
+        label: "Active Pilots",
+        module: "pilots",
+        value: counts.activePilots
+      },
+      {
+        href: "/my-visits",
+        helper: "Assigned pilot visits due today or overdue.",
+        icon: CalendarCheck2,
+        includeInToday: true,
+        label: "Pilot Visits Due",
+        module: "pilots",
+        value: counts.plannedPilotVisitsDue
+      },
+      {
+        href: "/my-visits",
+        helper: "Planned pilot visits still waiting for report submission.",
+        icon: CalendarClock,
+        includeInToday: true,
+        label: "Pilot Visit Reports Pending",
+        module: "pilots",
+        value: counts.plannedPilotVisitReportsPending
+      }
+    );
   }
 
   const todayActionItems = visibleCards

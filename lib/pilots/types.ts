@@ -11,6 +11,12 @@ export type PilotVisitUpdate =
   Database["public"]["Tables"]["pilot_visits"]["Update"];
 export type VisitReport =
   Database["public"]["Tables"]["visit_reports"]["Row"];
+export type PlannedPilotVisit =
+  Database["public"]["Tables"]["planned_pilot_visits"]["Row"];
+export type PlannedPilotVisitInsert =
+  Database["public"]["Tables"]["planned_pilot_visits"]["Insert"];
+export type PlannedPilotVisitUpdate =
+  Database["public"]["Tables"]["planned_pilot_visits"]["Update"];
 export type VisitReportInsert =
   Database["public"]["Tables"]["visit_reports"]["Insert"];
 export type VisitReportUpdate =
@@ -28,6 +34,9 @@ export type Installation =
 
 export type PilotFormPayload = PilotInsert | PilotUpdate;
 export type PilotVisitFormPayload = PilotVisitInsert | PilotVisitUpdate;
+export type PlannedPilotVisitFormPayload =
+  | PlannedPilotVisitInsert
+  | PlannedPilotVisitUpdate;
 export type VisitReportFormPayload = VisitReportInsert | VisitReportUpdate;
 
 export type PilotFilters = {

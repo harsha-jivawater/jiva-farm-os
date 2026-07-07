@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   pilotPayloadFromForm,
+  plannedPilotVisitPayloadFromForm,
   pilotResultUpdateFromReport,
   pilotVisitPayloadFromForm,
   scaleUpRecommendedFromReport,
   todayDate,
   validatePilotPayload,
+  validatePlannedPilotVisitPayload,
   validatePilotVisitPayload,
   validateVisitReportPayload,
   visitReportPayloadFromForm
@@ -16,6 +18,7 @@ import {
 import {
   pilotResultStatusOptions
 } from "@/lib/pilots/options";
+import { plannedVisitTypeToActualVisitType } from "@/lib/pilots/visit-planning";
 import type {
   DeviceStatusUpdateTaskInsert,
   Pilot,
@@ -23,6 +26,9 @@ import type {
   PilotUpdate,
   PilotVisitInsert,
   PilotVisitUpdate,
+  PlannedPilotVisit,
+  PlannedPilotVisitInsert,
+  PlannedPilotVisitUpdate,
   VisitReport,
   VisitReportInsert,
   VisitReportUpdate
@@ -44,6 +50,7 @@ const reportSubmitterRoles = [
   "Admin"
 ];
 const finalPilotReportApproverRoles = ["R&D Head", "Admin"];
+const visitPlanManagerRoles = ["Agronomist", "R&D Head", "Admin"];
 const finalPilotReportApprovalError =
   "Only the R&D Head can approve final pilot reports.";
 
@@ -120,6 +127,27 @@ function canApproveFinalPilotReport(
     | undefined
 ) {
   return hasAnyRole(profile, ["R&D Head", "Admin"]);
+}
+
+function canManageVisitPlans(
+  profile:
+    | Pick<InternalUser, "role" | "secondary_role">
+    | null
+    | undefined
+) {
+  return hasAnyRole(profile, visitPlanManagerRoles);
+}
+
+function requireVisitPlanManager(
+  profile: Pick<InternalUser, "role" | "secondary_role">,
+  errorPath: string
+) {
+  if (!canManageVisitPlans(profile)) {
+    redirectWithError(
+      errorPath,
+      "Only Agronomist, R&D Head, or Admin can manage pilot visit plans."
+    );
+  }
 }
 
 function stampFinalPilotReportApproval(
@@ -490,6 +518,139 @@ export async function updatePilotAction(id: string, formData: FormData) {
   redirect(`/pilots/${id}`);
 }
 
+export async function createPlannedPilotVisitAction(
+  pilotId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const errorPath = `/pilots/${pilotId}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+  requireVisitPlanManager(profile, errorPath);
+  const payload = plannedPilotVisitPayloadFromForm(formData);
+  const validationError = validatePlannedPilotVisitPayload(payload);
+
+  if (validationError) {
+    redirectWithError(errorPath, validationError);
+  }
+
+  if (
+    !(await userHasRole(supabase, payload.assigned_user_id, [
+      "Research Assistant"
+    ]))
+  ) {
+    redirectWithError(errorPath, "Assign the visit to a Research Assistant.");
+  }
+
+  const insertPayload: PlannedPilotVisitInsert = {
+    ...payload,
+    id: crypto.randomUUID(),
+    pilot_id: pilotId,
+    created_by_user_id: profile.id
+  } as PlannedPilotVisitInsert;
+
+  const { error } = await supabase
+    .from("planned_pilot_visits")
+    .insert(insertPayload);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  await supabase
+    .from("pilots")
+    .update({ next_visit_due_date: payload.planned_visit_date })
+    .eq("id", pilotId);
+
+  revalidatePilot(pilotId);
+  revalidatePath("/my-visits");
+  redirect(errorPath);
+}
+
+export async function updatePlannedPilotVisitAction(
+  pilotId: string,
+  plannedVisitId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const errorPath = `/pilots/${pilotId}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+  requireVisitPlanManager(profile, errorPath);
+  const payload = plannedPilotVisitPayloadFromForm(formData);
+  const validationError = validatePlannedPilotVisitPayload(payload);
+
+  if (validationError) {
+    redirectWithError(errorPath, validationError);
+  }
+
+  if (
+    !(await userHasRole(supabase, payload.assigned_user_id, [
+      "Research Assistant"
+    ]))
+  ) {
+    redirectWithError(errorPath, "Assign the visit to a Research Assistant.");
+  }
+
+  const { error } = await supabase
+    .from("planned_pilot_visits")
+    .update(payload as PlannedPilotVisitUpdate)
+    .eq("id", plannedVisitId)
+    .eq("pilot_id", pilotId);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  await supabase
+    .from("pilots")
+    .update({ next_visit_due_date: payload.planned_visit_date })
+    .eq("id", pilotId);
+
+  revalidatePilot(pilotId);
+  revalidatePath("/my-visits");
+  redirect(errorPath);
+}
+
+export async function updatePlannedPilotVisitStatusAction(
+  plannedVisitId: string,
+  status: string,
+  returnPath: string
+) {
+  const supabase = await createClient();
+  await getCurrentProfile(supabase, returnPath);
+
+  if (
+    !["In Progress", "Unable to Complete", "Rescheduled", "Cancelled"].includes(
+      status
+    )
+  ) {
+    redirectWithError(returnPath, "Visit status is not valid.");
+  }
+
+  const { data: plannedVisit, error: loadError } = await supabase
+    .from("planned_pilot_visits")
+    .select("id, pilot_id")
+    .eq("id", plannedVisitId)
+    .is("deleted_at", null)
+    .single();
+
+  if (loadError || !plannedVisit) {
+    redirectWithError(returnPath, "Planned visit was not found.");
+  }
+
+  const { error } = await supabase
+    .from("planned_pilot_visits")
+    .update({ planned_visit_status: status })
+    .eq("id", plannedVisitId);
+
+  if (error) {
+    redirectWithError(returnPath, error.message);
+  }
+
+  revalidatePilot(plannedVisit.pilot_id);
+  revalidatePath("/my-visits");
+  redirect(returnPath);
+}
+
 export async function createPilotVisitAction(
   pilotId: string,
   formData: FormData
@@ -667,6 +828,62 @@ export async function createVisitReportAction(
 
   await validateReportUsers(supabase, errorPath, payload);
 
+  let plannedVisit: PlannedPilotVisit | null = null;
+
+  if (payload.planned_pilot_visit_id) {
+    const { data: plannedVisitData } = await supabase
+      .from("planned_pilot_visits")
+      .select("*")
+      .eq("id", payload.planned_pilot_visit_id)
+      .eq("pilot_id", pilotId)
+      .is("deleted_at", null)
+      .single();
+
+    if (!plannedVisitData) {
+      redirectWithError(errorPath, "Selected planned visit was not found.");
+    }
+
+    plannedVisit = plannedVisitData as PlannedPilotVisit;
+
+    if (plannedVisit.linked_visit_report_id) {
+      redirectWithError(
+        errorPath,
+        "This planned visit already has a linked visit report."
+      );
+    }
+
+    if (!payload.pilot_visit_id) {
+      const actualVisitId = crypto.randomUUID();
+      const actualVisitPayload: PilotVisitInsert = {
+        id: actualVisitId,
+        pilot_id: pilotId,
+        visit_date: payload.report_date ?? todayDate(),
+        visit_number: plannedVisit.visit_number,
+        visit_type: plannedVisitTypeToActualVisitType(plannedVisit.visit_type),
+        visit_status: "Completed",
+        visited_by_user_id: payload.submitted_by_user_id!,
+        visit_summary: payload.report_summary ?? "",
+        visit_report_required: true
+      };
+
+      const { data: createdVisit, error: createVisitError } = await supabase
+        .from("pilot_visits")
+        .insert(actualVisitPayload)
+        .select("id")
+        .single();
+
+      if (createVisitError || !createdVisit) {
+        redirectWithError(
+          errorPath,
+          createVisitError?.message ?? "Actual pilot visit was not created."
+        );
+      }
+
+      payload.pilot_visit_id = createdVisit.id;
+      plannedVisit.linked_pilot_visit_id = createdVisit.id;
+    }
+  }
+
   if (payload.pilot_visit_id) {
     const { data: visit } = await supabase
       .from("pilot_visits")
@@ -714,6 +931,17 @@ export async function createVisitReportAction(
       .eq("id", payload.pilot_visit_id);
   }
 
+  if (plannedVisit) {
+    await supabase
+      .from("planned_pilot_visits")
+      .update({
+        linked_pilot_visit_id: payload.pilot_visit_id,
+        linked_visit_report_id: data.id,
+        planned_visit_status: "Completed"
+      })
+      .eq("id", plannedVisit.id);
+  }
+
   await updatePilotFromReport(supabase, pilotId, payload, formData);
   revalidatePilot(pilotId);
   redirect(errorPath);
@@ -756,6 +984,24 @@ export async function updateVisitReportAction(
 
   await validateReportUsers(supabase, errorPath, payload);
 
+  let plannedVisit: Pick<PlannedPilotVisit, "id"> | null = null;
+
+  if (payload.planned_pilot_visit_id) {
+    const { data: plannedVisitData } = await supabase
+      .from("planned_pilot_visits")
+      .select("id")
+      .eq("id", payload.planned_pilot_visit_id)
+      .eq("pilot_id", pilotId)
+      .is("deleted_at", null)
+      .single();
+
+    if (!plannedVisitData) {
+      redirectWithError(errorPath, "Selected planned visit was not found.");
+    }
+
+    plannedVisit = plannedVisitData;
+  }
+
   if (payload.pilot_visit_id) {
     const { data: visit } = await supabase
       .from("pilot_visits")
@@ -792,6 +1038,17 @@ export async function updateVisitReportAction(
       .from("pilot_visits")
       .update({ visit_report_id: reportId })
       .eq("id", payload.pilot_visit_id);
+  }
+
+  if (plannedVisit) {
+    await supabase
+      .from("planned_pilot_visits")
+      .update({
+        linked_pilot_visit_id: payload.pilot_visit_id,
+        linked_visit_report_id: reportId,
+        planned_visit_status: "Completed"
+      })
+      .eq("id", plannedVisit.id);
   }
 
   await updatePilotFromReport(supabase, pilotId, payload, formData);

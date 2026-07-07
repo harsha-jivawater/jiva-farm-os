@@ -1566,6 +1566,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      planned_pilot_visits: {
+        Row: {
+          id: string;
+          pilot_id: string;
+          visit_number: number;
+          planned_visit_date: string;
+          crop_stage_timing: string | null;
+          visit_purpose: string;
+          assigned_user_id: string;
+          visit_type: string;
+          parameters_to_collect: string[];
+          special_instructions: string | null;
+          planned_visit_status: string;
+          linked_pilot_visit_id: string | null;
+          linked_visit_report_id: string | null;
+          created_by_user_id: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          pilot_id: string;
+          visit_number: number;
+          planned_visit_date: string;
+          crop_stage_timing?: string | null;
+          visit_purpose: string;
+          assigned_user_id: string;
+          visit_type: string;
+          parameters_to_collect?: string[];
+          special_instructions?: string | null;
+          planned_visit_status?: string;
+          linked_pilot_visit_id?: string | null;
+          linked_visit_report_id?: string | null;
+          created_by_user_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          pilot_id?: string;
+          visit_number?: number;
+          planned_visit_date?: string;
+          crop_stage_timing?: string | null;
+          visit_purpose?: string;
+          assigned_user_id?: string;
+          visit_type?: string;
+          parameters_to_collect?: string[];
+          special_instructions?: string | null;
+          planned_visit_status?: string;
+          linked_pilot_visit_id?: string | null;
+          linked_visit_report_id?: string | null;
+          created_by_user_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
       visit_reports: {
         Row: {
           id: string;
@@ -1577,6 +1637,7 @@ export type Database = {
           report_status: string;
           pilot_id: string | null;
           pilot_visit_id: string | null;
+          planned_pilot_visit_id: string | null;
           institution_id: string | null;
           farmer_lead_id: string | null;
           installation_id: string | null;
@@ -1599,6 +1660,7 @@ export type Database = {
           reviewed_date: string | null;
           review_comments: string | null;
           approved_for_partner_sharing: boolean | null;
+          parameter_observations: Json;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -1613,6 +1675,7 @@ export type Database = {
           report_status?: string;
           pilot_id?: string | null;
           pilot_visit_id?: string | null;
+          planned_pilot_visit_id?: string | null;
           institution_id?: string | null;
           farmer_lead_id?: string | null;
           installation_id?: string | null;
@@ -1635,6 +1698,7 @@ export type Database = {
           reviewed_date?: string | null;
           review_comments?: string | null;
           approved_for_partner_sharing?: boolean | null;
+          parameter_observations?: Json;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1649,6 +1713,7 @@ export type Database = {
           report_status?: string;
           pilot_id?: string | null;
           pilot_visit_id?: string | null;
+          planned_pilot_visit_id?: string | null;
           institution_id?: string | null;
           farmer_lead_id?: string | null;
           installation_id?: string | null;
@@ -1671,6 +1736,7 @@ export type Database = {
           reviewed_date?: string | null;
           review_comments?: string | null;
           approved_for_partner_sharing?: boolean | null;
+          parameter_observations?: Json;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
