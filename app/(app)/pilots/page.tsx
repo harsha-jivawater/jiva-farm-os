@@ -37,6 +37,7 @@ import {
   type PilotInstitutionOption,
   type UserOption
 } from "@/lib/pilots/types";
+import { applyLocationFilter } from "@/lib/filters/location";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -68,8 +69,6 @@ const filterColumns = [
   "pilot_status",
   "pilot_result_status",
   "crop",
-  "state",
-  "district",
   "pilot_owner_user_id",
   "research_assistant_user_id",
   "agronomist_user_id",
@@ -361,6 +360,9 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
       query = query.eq(column, filters[column]);
     }
   }
+
+  query = applyLocationFilter(query, "state", filters.state);
+  query = applyLocationFilter(query, "district", filters.district);
 
   if (filters.scale_up_recommended === "true") {
     query = query.eq("scale_up_recommended", true);

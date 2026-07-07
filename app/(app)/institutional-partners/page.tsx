@@ -33,6 +33,7 @@ import {
   type InstitutionFilters,
   type UserOption
 } from "@/lib/institutions/types";
+import { applyLocationFilter } from "@/lib/filters/location";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -59,7 +60,6 @@ type InstitutionKpis = {
 const filterColumns = [
   "organization_type",
   "institution_status",
-  "primary_state",
   "priority",
   "account_owner_user_id",
   "rsm_user_id",
@@ -306,6 +306,8 @@ export default async function InstitutionalPartnersPage({
       query = query.eq(column, filters[column]);
     }
   }
+
+  query = applyLocationFilter(query, "primary_state", filters.primary_state);
 
   const { data, error, count } = await timeAsync(
     "institutional partners list query",

@@ -25,6 +25,7 @@ import {
   type FarmerLead,
   type FarmerLeadFilters
 } from "@/lib/farmer-leads/types";
+import { applyLocationFilter } from "@/lib/filters/location";
 import {
   funnelStageOptions,
   labelFor,
@@ -55,8 +56,6 @@ type FarmerLeadKpis = {
 const filterColumns = [
   "lead_status",
   "funnel_stage",
-  "state",
-  "district",
   "owner_user_id",
   "rsm_user_id",
   "lead_source",
@@ -234,6 +233,9 @@ export default async function FarmerLeadsPage({
       query = query.eq(column, filters[column]);
     }
   }
+
+  query = applyLocationFilter(query, "state", filters.state);
+  query = applyLocationFilter(query, "district", filters.district);
 
   const [listResult, kpiResult, usersResult] = await Promise.all([
     timeAsync("farmer leads list query", () => query),

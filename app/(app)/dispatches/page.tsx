@@ -29,6 +29,7 @@ import {
   type Dispatch,
   type DispatchFilters
 } from "@/lib/dispatches/types";
+import { applyLocationFilter } from "@/lib/filters/location";
 import { productModelOptions } from "@/lib/devices/options";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
@@ -46,9 +47,7 @@ const filterColumns = [
   "dispatch_type",
   "destination_type",
   "product_model",
-  "payment_requirement_type",
-  "destination_state",
-  "destination_district"
+  "payment_requirement_type"
 ] as const;
 
 const listSelectColumns = [
@@ -230,6 +229,17 @@ export default async function DispatchesPage({
       query = query.eq(column, filters[column]);
     }
   }
+
+  query = applyLocationFilter(
+    query,
+    "destination_state",
+    filters.destination_state
+  );
+  query = applyLocationFilter(
+    query,
+    "destination_district",
+    filters.destination_district
+  );
 
   if (filters.payment_confirmed) {
     query = query.eq("payment_confirmed", filters.payment_confirmed === "true");

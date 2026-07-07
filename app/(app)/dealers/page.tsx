@@ -37,6 +37,7 @@ import {
   type RegionOption,
   type UserOption
 } from "@/lib/dealers/types";
+import { applyLocationFilter } from "@/lib/filters/location";
 import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -55,8 +56,6 @@ type DealersPageProps = {
 const filterColumns = [
   "dealer_status",
   "dealer_type",
-  "state",
-  "district",
   "rsm_user_id",
   "region_id",
   "training_status",
@@ -260,6 +259,9 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
       query = query.eq(column, filters[column]);
     }
   }
+
+  query = applyLocationFilter(query, "state", filters.state);
+  query = applyLocationFilter(query, "district", filters.district);
 
   const { data, error, count } = await timeAsync(
     "dealers list query",

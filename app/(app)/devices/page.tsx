@@ -31,6 +31,7 @@ import {
   type Device,
   type DeviceFilters
 } from "@/lib/devices/types";
+import { applyLocationFilter } from "@/lib/filters/location";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -45,9 +46,7 @@ type DevicesPageProps = {
 const filterColumns = [
   "product_model",
   "device_status",
-  "current_holder_type",
-  "current_state",
-  "current_district"
+  "current_holder_type"
 ] as const;
 
 const listSelectColumns = [
@@ -208,6 +207,13 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
       query = query.eq(column, filters[column]);
     }
   }
+
+  query = applyLocationFilter(query, "current_state", filters.current_state);
+  query = applyLocationFilter(
+    query,
+    "current_district",
+    filters.current_district
+  );
 
   try {
     const { data, error } = await timeAsync("devices list query", () =>

@@ -26,6 +26,7 @@ import {
   type Installation,
   type InstallationFilters
 } from "@/lib/installations/types";
+import { applyLocationFilter } from "@/lib/filters/location";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -64,8 +65,6 @@ const filterColumns = [
   "installation_status",
   "installation_type",
   "product_model",
-  "state",
-  "district",
   "rsm_user_id",
   "region_id",
   "dealer_id",
@@ -265,6 +264,9 @@ export default async function InstallationsPage({
       query = query.eq(column, filters[column]);
     }
   }
+
+  query = applyLocationFilter(query, "state", filters.state);
+  query = applyLocationFilter(query, "district", filters.district);
 
   const [listResult, kpiResult] = await Promise.all([
     timeAsync("installations list query", () => query),
