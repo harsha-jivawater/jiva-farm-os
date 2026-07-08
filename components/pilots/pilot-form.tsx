@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import { ArrowLeft, Info, Save } from "lucide-react";
 import { CustomCropFields } from "@/components/crops/custom-crop-fields";
 import { CropSelect } from "@/components/crops/crop-select";
+import { PlannedVisitForm } from "@/components/pilots/planned-visit-form";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
 import {
   comparisonMethodOptions,
@@ -493,6 +494,12 @@ export function PilotForm({
     currentUser,
     pilotDeviceInstallRoles
   );
+  const canManageVisitPlans = hasAnyRole(currentUser, [
+    "Admin",
+    "R&D Head",
+    "Agronomist"
+  ]);
+  const [initialVisitKeys, setInitialVisitKeys] = useState<number[]>([]);
   const pilotStatusFieldOptions = canManagePilotDeviceInstall
     ? pilotStatusOptions
     : pilotStatusOptions.filter((option) => option.value !== "Device Installed");
@@ -1081,7 +1088,7 @@ export function PilotForm({
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-slate-950">
-          Monitoring plan
+          Monitoring dates and plan file
         </h2>
         <input
           name="monitoring_frequency"
@@ -1180,7 +1187,7 @@ export function PilotForm({
         </div>
         <p className="mt-3 text-sm leading-6 text-slate-500">
           Detailed visit dates, assignees, crop stages, and parameters are
-          managed in the Visit Planning section after the pilot is created.
+          managed in the Monitoring Plan section after the pilot is created.
         </p>
         <input
           name="pilot_folder_link"
@@ -1198,6 +1205,81 @@ export function PilotForm({
           value={pilot?.photo_folder_link ?? ""}
         />
       </div>
+
+      {!pilot && canManageVisitPlans ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">
+                Monitoring Plan
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                Plan the visit dates, visit type, assigned Research Assistant,
+                crop stage, parameters, and instructions for this pilot.
+              </p>
+            </div>
+            <button
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 shadow-sm hover:bg-slate-50"
+              onClick={() =>
+                setInitialVisitKeys((keys) => [
+                  ...keys,
+                  keys.length ? Math.max(...keys) + 1 : 0
+                ])
+              }
+              type="button"
+            >
+              Add Visit
+            </button>
+          </div>
+          <input
+            name="initial_planned_visit_count"
+            type="hidden"
+            value={initialVisitKeys.length}
+          />
+          <div className="mt-4 space-y-3">
+            {initialVisitKeys.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm leading-6 text-slate-500">
+                No planned visits yet. Add the first planned visit for this
+                pilot.
+              </div>
+            ) : null}
+            {initialVisitKeys.map((key, index) => (
+              <details
+                className="rounded-md border border-slate-200 bg-slate-50"
+                key={key}
+                open
+              >
+                <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-950">
+                  Visit {index + 1}
+                </summary>
+                <div className="border-t border-slate-200 p-4">
+                  <PlannedVisitForm
+                    action={action}
+                    compact
+                    fieldPrefix={`initial_planned_visit_${index}_`}
+                    nextVisitNumber={index + 1}
+                    showSubmit={false}
+                    users={users}
+                  />
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      className="text-sm font-semibold text-red-700 hover:text-red-800"
+                      onClick={() =>
+                        setInitialVisitKeys((keys) =>
+                          keys.filter((visitKey) => visitKey !== key)
+                        )
+                      }
+                      type="button"
+                    >
+                      Remove visit
+                    </button>
+                  </div>
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-slate-950">

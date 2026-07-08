@@ -35,7 +35,9 @@ import {
   type VisitReport
 } from "@/lib/pilots/types";
 import {
-  displayPlannedVisitStatus
+  displayVisitParameter,
+  displayPlannedVisitStatus,
+  plannedVisitTypeOptions
 } from "@/lib/pilots/visit-planning";
 import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrl } from "@/lib/uploads/server";
@@ -369,7 +371,7 @@ export default async function PilotDetailPage({
       : plannedVisitNeedingReport
         ? {
             label: `Visit ${plannedVisitNeedingReport.visit_number} report pending`,
-            helper: "Create the visit report from the Visit Planning section.",
+            helper: "Create the visit report from the Monitoring Plan section.",
             tone: "amber" as const
           }
         : nextPlannedVisit
@@ -389,7 +391,7 @@ export default async function PilotDetailPage({
               helper:
                 pilot.pilot_status === "Completed"
                   ? "Review final result, proof files, and closure notes."
-                  : "Use Visit Planning to add dates, assignees, crop stages, and parameters.",
+                  : "Use Monitoring Plan to add dates, assignees, crop stages, and parameters.",
               tone: pilot.pilot_status === "Completed" ? ("emerald" as const) : ("default" as const)
             };
 
@@ -625,9 +627,59 @@ export default async function PilotDetailPage({
       </SectionCard>
 
       <SectionCard
-        description="Plan exact visit dates, assigned person, purpose, crop stage, parameters, and instructions."
-        title="Visit Planning"
+        description="Planned visits for this pilot. Research Assistants complete these through My Visits and Visit Reports."
+        title="Monitoring Plan"
       >
+        {nextPlannedVisit ? (
+          <div className="mb-4 rounded-lg border border-brand-100 bg-brand-50 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+                  Next Visit
+                </p>
+                <h3 className="mt-1 text-base font-semibold text-slate-950">
+                  Visit {nextPlannedVisit.visit_number} ·{" "}
+                  {labelFor(nextPlannedVisit.visit_type, plannedVisitTypeOptions)}
+                </h3>
+                <p className="mt-1 text-sm text-slate-700">
+                  {formatDate(nextPlannedVisit.planned_visit_date)} ·{" "}
+                  {userLabel(
+                    userMap.get(nextPlannedVisit.assigned_user_id),
+                    nextPlannedVisit.assigned_user_id
+                  )}
+                </p>
+                {nextPlannedVisit.crop_stage_timing ? (
+                  <p className="mt-1 text-sm text-slate-600">
+                    {nextPlannedVisit.crop_stage_timing}
+                  </p>
+                ) : null}
+              </div>
+              <span className="w-fit rounded-full border border-brand-100 bg-white px-2.5 py-1 text-xs font-semibold text-brand-700">
+                {displayPlannedVisitStatus(nextPlannedVisit, today)}
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {nextPlannedVisit.parameters_to_collect.map((parameter) => (
+                <span
+                  className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm"
+                  key={parameter}
+                >
+                  {displayVisitParameter(parameter)}
+                </span>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {canWrite ? (
+                <Link
+                  className="inline-flex min-h-9 items-center justify-center rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                  href={`/pilots/${pilot.id}?planned_visit_id=${nextPlannedVisit.id}#add-visit-report`}
+                >
+                  Create Visit Report
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <div className="grid gap-4 lg:grid-cols-2">
           {plannedVisitsList.map((plannedVisit) => {
             const assignedUser = userMap.get(plannedVisit.assigned_user_id);
@@ -648,7 +700,8 @@ export default async function PilotDetailPage({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-slate-950">
-                      Visit {plannedVisit.visit_number} · {plannedVisit.visit_type}
+                      Visit {plannedVisit.visit_number} ·{" "}
+                      {labelFor(plannedVisit.visit_type, plannedVisitTypeOptions)}
                     </p>
                     <p className="mt-1 text-sm text-slate-600">
                       {formatDate(plannedVisit.planned_visit_date)} ·{" "}
@@ -673,7 +726,7 @@ export default async function PilotDetailPage({
                       className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-600"
                       key={parameter}
                     >
-                      {parameter}
+                      {displayVisitParameter(parameter)}
                     </span>
                   ))}
                 </div>
@@ -726,7 +779,7 @@ export default async function PilotDetailPage({
         {canManageVisitPlans ? (
           <details className="mt-4 rounded-md border border-slate-200 bg-slate-50">
             <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-brand-700">
-              Add planned visit
+              Add Visit
             </summary>
             <div className="border-t border-slate-200 p-4">
               <PlannedVisitForm
@@ -854,7 +907,7 @@ export default async function PilotDetailPage({
             Actual visit history
           </span>
           <span className="mt-1 block text-sm leading-6 text-slate-500">
-            Historical visits recorded before or outside the Visit Planning tool.
+            Historical visits recorded before or outside the Monitoring Plan tool.
           </span>
         </summary>
         <div className="p-4">

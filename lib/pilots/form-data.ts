@@ -532,20 +532,41 @@ export function validatePilotVisitPayload(payload: PilotVisitFormPayload) {
 }
 
 export function plannedPilotVisitPayloadFromForm(
-  formData: FormData
+  formData: FormData,
+  fieldPrefix = ""
 ): PlannedPilotVisitFormPayload {
+  const fieldName = (name: string) => `${fieldPrefix}${name}`;
+
   return {
-    visit_number: getNumber(formData, "visit_number", 1) ?? 1,
-    planned_visit_date: getText(formData, "planned_visit_date") ?? todayDate(),
-    crop_stage_timing: getText(formData, "crop_stage_timing"),
-    visit_purpose: getText(formData, "visit_purpose") ?? "",
-    assigned_user_id: getText(formData, "assigned_user_id") ?? "",
-    visit_type: getText(formData, "visit_type") ?? defaultPlannedVisitType,
-    parameters_to_collect: getAllText(formData, "parameters_to_collect"),
-    special_instructions: getText(formData, "special_instructions"),
+    visit_number: getNumber(formData, fieldName("visit_number"), 1) ?? 1,
+    planned_visit_date:
+      getText(formData, fieldName("planned_visit_date")) ?? todayDate(),
+    crop_stage_timing: getText(formData, fieldName("crop_stage_timing")),
+    visit_purpose: getText(formData, fieldName("visit_purpose")) ?? "",
+    assigned_user_id: getText(formData, fieldName("assigned_user_id")) ?? "",
+    visit_type: getText(formData, fieldName("visit_type")) ?? defaultPlannedVisitType,
+    parameters_to_collect: getAllText(
+      formData,
+      fieldName("parameters_to_collect")
+    ),
+    special_instructions: getText(formData, fieldName("special_instructions")),
     planned_visit_status:
-      getText(formData, "planned_visit_status") ?? defaultPlannedVisitStatus
+      getText(formData, fieldName("planned_visit_status")) ??
+      defaultPlannedVisitStatus
   };
+}
+
+export function initialPlannedPilotVisitsFromForm(formData: FormData) {
+  const count = getNumber(formData, "initial_planned_visit_count", 0) ?? 0;
+
+  return Array.from({ length: count }, (_, index) => ({
+    ...plannedPilotVisitPayloadFromForm(
+      formData,
+      `initial_planned_visit_${index}_`
+    ),
+    visit_number: index + 1,
+    planned_visit_status: defaultPlannedVisitStatus
+  }));
 }
 
 export function validatePlannedPilotVisitPayload(

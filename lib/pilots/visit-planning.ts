@@ -1,13 +1,13 @@
 import type { PlannedPilotVisit } from "@/lib/pilots/types";
 
 export const plannedVisitTypeOptions = [
-  { value: "Baseline visit", label: "Baseline visit" },
-  { value: "Installation visit", label: "Installation visit" },
-  { value: "Routine monitoring visit", label: "Routine monitoring visit" },
-  { value: "Crop-stage visit", label: "Crop-stage visit" },
-  { value: "Issue/incident visit", label: "Issue/incident visit" },
-  { value: "Final visit / harvest visit", label: "Final visit / harvest visit" },
-  { value: "Additional visit", label: "Additional visit" }
+  { value: "Baseline visit", label: "Baseline Visit" },
+  { value: "Installation visit", label: "Installation Visit" },
+  { value: "Routine monitoring visit", label: "Routine Monitoring Visit" },
+  { value: "Crop-stage visit", label: "Crop Stage Visit" },
+  { value: "Issue/incident visit", label: "Issue / Incident Visit" },
+  { value: "Final visit / harvest visit", label: "Final / Harvest Visit" },
+  { value: "Additional visit", label: "Additional Visit" }
 ] as const;
 
 export const plannedVisitStatusOptions = [
@@ -68,6 +68,36 @@ export function parameterInputName(parameter: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")}`;
+}
+
+export function displayVisitParameter(parameter: string) {
+  const displayLabels: Record<string, string> = {
+    "Plant height": "Plant Height",
+    "Number of leaves": "Number of Leaves",
+    "Number of branches/tillers": "Number of Branches / Tillers",
+    "Leaf length": "Leaf Length",
+    "Leaf width": "Leaf Width",
+    "Leaf area": "Leaf Area",
+    "Internodal length": "Internodal Length",
+    "Root length": "Root Length",
+    "Fresh biomass": "Fresh Biomass",
+    "Dry biomass": "Dry Biomass",
+    "Number of flowers": "Number of Flowers",
+    "Fruit/Pod/Grain set": "Fruit / Pod / Grain Set",
+    "Number of fruits/pods/grains": "Number of Fruits / Pods / Grains",
+    "Produce length": "Produce Length",
+    "Produce girth/diameter/circumference":
+      "Produce Girth / Diameter / Circumference",
+    "Average produce weight": "Average Produce Weight",
+    "Yield per plant": "Yield per Plant",
+    "Marketable yield": "Marketable Yield",
+    "Total yield (kg/ha or t/ha)": "Total Yield (kg/ha or t/ha)",
+    "Biomass yield": "Biomass Yield",
+    "Dry matter": "Dry Matter",
+    "Shelf life": "Shelf Life"
+  };
+
+  return displayLabels[parameter] ?? parameter;
 }
 
 export function plannedVisitTypeToActualVisitType(type: string | null | undefined) {

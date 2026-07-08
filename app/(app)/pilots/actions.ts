@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  initialPlannedPilotVisitsFromForm,
   pilotPayloadFromForm,
   plannedPilotVisitPayloadFromForm,
   pilotResultUpdateFromReport,
@@ -795,6 +796,7 @@ export async function createPilotAction(formData: FormData) {
   const profile = await getCurrentProfile(supabase, errorPath);
   const pilotId = crypto.randomUUID();
   const payload = pilotPayloadFromForm(formData);
+  const initialPlannedVisits = initialPlannedPilotVisitsFromForm(formData);
   await applyPilotNameFallback(supabase, payload);
   try {
     await applyUploadedFilesToPayload({
@@ -822,10 +824,23 @@ export async function createPilotAction(formData: FormData) {
     profile
   });
   const validationError = validatePilotPayload(payload);
+  const initialVisitValidationError =
+    initialPlannedVisits.map(validatePlannedPilotVisitPayload).find(Boolean) ??
+    null;
   const farmerLeadId = payload.farmer_lead_id;
 
-  if (validationError || !farmerLeadId) {
-    redirectWithError(errorPath, validationError ?? "Select a farmer lead.");
+  if (validationError || initialVisitValidationError || !farmerLeadId) {
+    redirectWithError(
+      errorPath,
+      validationError ?? initialVisitValidationError ?? "Select a farmer lead."
+    );
+  }
+
+  if (initialPlannedVisits.length > 0 && !canManageVisitPlans(profile)) {
+    redirectWithError(
+      errorPath,
+      "Only Admin, R&D Head, or Agronomist can create a monitoring plan."
+    );
   }
 
   if (
@@ -848,6 +863,19 @@ export async function createPilotAction(formData: FormData) {
     );
   }
 
+  for (const visit of initialPlannedVisits) {
+    if (
+      !(await userHasRole(supabase, visit.assigned_user_id, [
+        "Research Assistant"
+      ]))
+    ) {
+      redirectWithError(
+        errorPath,
+        "Assign each planned visit to a Research Assistant."
+      );
+    }
+  }
+
   const insertPayload: PilotInsert = {
     ...payload,
     id: pilotId,
@@ -862,6 +890,34 @@ export async function createPilotAction(formData: FormData) {
 
   if (error || !data) {
     redirectWithError(errorPath, error?.message ?? "Pilot was not created.");
+  }
+
+  if (initialPlannedVisits.length > 0) {
+    const visitRows = initialPlannedVisits.map(
+      (visit) =>
+        ({
+          ...visit,
+          id: crypto.randomUUID(),
+          pilot_id: data.id,
+          created_by_user_id: profile.id
+        }) as PlannedPilotVisitInsert
+    );
+    const { error: visitError } = await supabase
+      .from("planned_pilot_visits")
+      .insert(visitRows);
+
+    if (visitError) {
+      redirectWithError(`/pilots/${data.id}`, visitError.message);
+    }
+
+    await supabase
+      .from("pilots")
+      .update({
+        next_visit_due_date: initialPlannedVisits[0]?.planned_visit_date ?? null
+      })
+      .eq("id", data.id);
+
+    revalidatePath("/my-visits");
   }
 
   await syncFarmerLeadPilotState({
