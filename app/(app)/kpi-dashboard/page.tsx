@@ -210,6 +210,12 @@ type CachedKpiDashboardResult = KpiCacheMeta & {
 
 type CurrentUser = Database["public"]["Tables"]["users"]["Row"];
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+type SupabaseRpcError = {
+  code?: string;
+  message?: string;
+  details?: string | null;
+  hint?: string | null;
+};
 
 const FY_START = "2026-04-01";
 
@@ -268,6 +274,66 @@ function formatDateTime(value: string | null) {
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
+}
+
+function refreshErrorMessage(errorCode: string) {
+  switch (errorCode) {
+    case "permission":
+      return "You do not have permission to refresh the KPI Dashboard.";
+    case "missing_rpc":
+      return "KPI refresh function is missing in Supabase. Apply the KPI cache migration before refreshing.";
+    case "rls_or_write":
+      return "KPI refresh could not write the dashboard cache. Check KPI cache table RLS/write policies.";
+    case "invalid_filter":
+      return "KPI refresh received an invalid filter value. Reset filters and try again.";
+    case "kpi_rpc":
+      return "KPI refresh calculation failed inside Supabase. Check the KPI summary RPC logs.";
+    default:
+      return "KPI Dashboard refresh failed. Please try again or contact Admin.";
+  }
+}
+
+function classifyRefreshError(error: SupabaseRpcError) {
+  const message = error.message?.toLowerCase() ?? "";
+  const details = error.details?.toLowerCase() ?? "";
+  const hint = error.hint?.toLowerCase() ?? "";
+  const combined = `${message} ${details} ${hint}`;
+
+  if (error.code === "42501" || combined.includes("permission denied")) {
+    return "permission";
+  }
+
+  if (
+    error.code === "PGRST202" ||
+    combined.includes("could not find the function") ||
+    combined.includes("function public.refresh_kpi_dashboard_cache_full")
+  ) {
+    return "missing_rpc";
+  }
+
+  if (
+    combined.includes("row-level security") ||
+    combined.includes("violates row-level security") ||
+    combined.includes("kpi_dashboard_cache") ||
+    combined.includes("kpi_dashboard_refresh_log") ||
+    combined.includes("kpi_dashboard_dirty_flags")
+  ) {
+    return "rls_or_write";
+  }
+
+  if (
+    error.code === "22P02" ||
+    error.code === "22007" ||
+    combined.includes("invalid input syntax")
+  ) {
+    return "invalid_filter";
+  }
+
+  if (combined.includes("get_kpi_dashboard_summary")) {
+    return "kpi_rpc";
+  }
+
+  return "unknown";
 }
 
 function filtersToSearchParams(
@@ -338,6 +404,12 @@ function readCachedKpiDashboardResult(
     refreshId: typeof row.refreshId === "string" ? row.refreshId : null,
     message: typeof row.message === "string" ? row.message : null
   };
+}
+
+function readLiveKpiDashboardSummary(value: unknown) {
+  return value && typeof value === "object"
+    ? (value as KpiDashboardSummary)
+    : null;
 }
 
 function endOfDateFilter(date: string) {
@@ -823,24 +895,31 @@ function KpiCacheStatus({
   canRefresh,
   cacheMeta,
   filters,
-  refreshStatus
+  refreshError,
+  refreshStatus,
+  sourceDescription,
+  timestampLabel = "Last refreshed at"
 }: {
   canRefresh: boolean;
   cacheMeta: KpiCacheMeta;
   filters: DashboardFilters;
+  refreshError: string;
   refreshStatus: string;
+  sourceDescription?: string;
+  timestampLabel?: string;
 }) {
   return (
     <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-sm font-semibold text-slate-950">
-            Last refreshed at {formatDateTime(cacheMeta.lastRefreshedAt)}
+            {timestampLabel} {formatDateTime(cacheMeta.lastRefreshedAt)}
           </p>
           <p className="mt-1 text-sm leading-6 text-slate-500">
-            {cacheMeta.isDirty
+            {sourceDescription ??
+            (cacheMeta.isDirty
               ? `Some KPI sections are marked stale: ${cacheMeta.dirtySections.join(", ")}.`
-              : "Showing saved KPI values from the dashboard cache."}
+              : "Showing saved KPI values from the dashboard cache.")}
           </p>
           {refreshStatus === "success" ? (
             <p className="mt-2 text-sm font-medium text-emerald-700">
@@ -849,7 +928,7 @@ function KpiCacheStatus({
           ) : null}
           {refreshStatus === "failed" ? (
             <p className="mt-2 text-sm font-medium text-red-700">
-              KPI Dashboard refresh failed. Please try again or contact Admin.
+              {refreshErrorMessage(refreshError)}
             </p>
           ) : null}
         </div>
@@ -863,16 +942,22 @@ function KpiDashboardSummaryView({
   cacheMeta,
   canRefresh,
   currentUser,
+  dataSourceDescription,
   filters,
+  refreshError,
   refreshStatus,
-  summary
+  summary,
+  timestampLabel
 }: {
   cacheMeta: KpiCacheMeta;
   canRefresh: boolean;
   currentUser: CurrentUser;
+  dataSourceDescription?: string;
   filters: DashboardFilters;
+  refreshError: string;
   refreshStatus: string;
   summary: KpiDashboardSummary;
+  timestampLabel?: string;
 }) {
   const canSeeManagementSections = hasAnyRole(currentUser, [
     "Admin",
@@ -908,6 +993,7 @@ function KpiDashboardSummaryView({
     "Admin",
     "Management",
     "Sales Head",
+    "RSM",
     "R&D Head",
     "Agronomist",
     "Viewer"
@@ -967,7 +1053,10 @@ function KpiDashboardSummaryView({
         cacheMeta={cacheMeta}
         canRefresh={canRefresh}
         filters={filters}
+        refreshError={refreshError}
         refreshStatus={refreshStatus}
+        sourceDescription={dataSourceDescription}
+        timestampLabel={timestampLabel}
       />
 
       <FiltersForm
@@ -1627,11 +1716,13 @@ function KpiDashboardPreparing({
   cacheMeta,
   canRefresh,
   filters,
+  refreshError,
   refreshStatus
 }: {
   cacheMeta: KpiCacheMeta;
   canRefresh: boolean;
   filters: DashboardFilters;
+  refreshError: string;
   refreshStatus: string;
 }) {
   return (
@@ -1645,6 +1736,7 @@ function KpiDashboardPreparing({
         cacheMeta={cacheMeta}
         canRefresh={canRefresh}
         filters={filters}
+        refreshError={refreshError}
         refreshStatus={refreshStatus}
       />
       <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
@@ -1678,6 +1770,7 @@ async function refreshKpiDashboardCacheAction(formData: FormData) {
 
   if (!canRefresh) {
     params.set("refresh_status", "failed");
+    params.set("refresh_error", "permission");
     redirect(`/kpi-dashboard?${params.toString()}`);
   }
 
@@ -1694,6 +1787,7 @@ async function refreshKpiDashboardCacheAction(formData: FormData) {
   if (error) {
     console.error("[KPI Dashboard] Cache refresh failed", error);
     params.set("refresh_status", "failed");
+    params.set("refresh_error", classifyRefreshError(error));
   } else {
     params.set("refresh_status", "success");
   }
@@ -1728,6 +1822,65 @@ export default async function KpiDashboardPage({
     "Sales Head"
   ]);
   const refreshStatus = paramValue(params.refresh_status);
+  const refreshError = paramValue(params.refresh_error);
+  const shouldUseLiveRsmSummary =
+    hasRole(currentUser, "RSM") &&
+    !hasAnyRole(currentUser, ["Admin", "Management", "Sales Head"]);
+
+  if (shouldUseLiveRsmSummary) {
+    const { data: liveSummaryData, error: liveSummaryError } = await timeAsync(
+      "kpi dashboard rsm live summary rpc",
+      () =>
+        supabase.rpc("get_kpi_dashboard_summary", {
+          p_start_date: filters.startDate,
+          p_end_date: filters.endDate,
+          p_state: filters.state || null,
+          p_region_id: filters.regionId || null,
+          p_rsm_user_id: filters.rsmUserId || null,
+          p_product_model: filters.productModel || null,
+          p_crop: filters.crop || null
+        })
+    );
+
+    if (liveSummaryError) {
+      console.error("[KPI Dashboard] RSM live summary RPC unavailable", liveSummaryError);
+      logPerf("kpi dashboard page total server render", startedAt);
+
+      return <KpiDashboardUnavailable />;
+    }
+
+    const liveSummary = readLiveKpiDashboardSummary(liveSummaryData);
+
+    if (!liveSummary) {
+      console.error("[KPI Dashboard] RSM live summary RPC returned empty data");
+      logPerf("kpi dashboard page total server render", startedAt);
+
+      return <KpiDashboardUnavailable />;
+    }
+
+    logPerf("kpi dashboard page total server render", startedAt);
+
+    return (
+      <KpiDashboardSummaryView
+        cacheMeta={{
+          lastRefreshedAt: new Date().toISOString(),
+          isDirty: false,
+          dirtySections: [],
+          refreshId: null,
+          message: null
+        }}
+        canRefresh={canRefreshKpiDashboard}
+        currentUser={currentUser}
+        dataSourceDescription="RSM KPIs are calculated live for your assigned scope."
+        filters={filters}
+        refreshError={refreshError}
+        refreshStatus={refreshStatus}
+        summary={liveSummary}
+        timestampLabel="Calculated at"
+      />
+    );
+  }
+
   const { data: summaryData, error: summaryError } = await timeAsync(
     "kpi dashboard cached summary rpc",
     () =>
@@ -1766,6 +1919,7 @@ export default async function KpiDashboardPage({
           canRefresh={canRefreshKpiDashboard}
           currentUser={currentUser}
           filters={filters}
+          refreshError={refreshError}
           refreshStatus={refreshStatus}
           summary={summary}
         />
@@ -1779,6 +1933,7 @@ export default async function KpiDashboardPage({
         cacheMeta={cachedResult}
         canRefresh={canRefreshKpiDashboard}
         filters={filters}
+        refreshError={refreshError}
         refreshStatus={refreshStatus}
       />
     );
