@@ -630,58 +630,19 @@ export default async function PilotDetailPage({
         description="Planned visits for this pilot. Research Assistants complete these through My Visits and Visit Reports."
         title="Monitoring Plan"
       >
-        {nextPlannedVisit ? (
-          <div className="mb-4 rounded-lg border border-brand-100 bg-brand-50 p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
-                  Next Visit
-                </p>
-                <h3 className="mt-1 text-base font-semibold text-slate-950">
-                  Visit {nextPlannedVisit.visit_number} ·{" "}
-                  {labelFor(nextPlannedVisit.visit_type, plannedVisitTypeOptions)}
-                </h3>
-                <p className="mt-1 text-sm text-slate-700">
-                  {formatDate(nextPlannedVisit.planned_visit_date)} ·{" "}
-                  {userLabel(
-                    userMap.get(nextPlannedVisit.assigned_user_id),
-                    nextPlannedVisit.assigned_user_id
-                  )}
-                </p>
-                {nextPlannedVisit.crop_stage_timing ? (
-                  <p className="mt-1 text-sm text-slate-600">
-                    {nextPlannedVisit.crop_stage_timing}
-                  </p>
-                ) : null}
-              </div>
-              <span className="w-fit rounded-full border border-brand-100 bg-white px-2.5 py-1 text-xs font-semibold text-brand-700">
-                {displayPlannedVisitStatus(nextPlannedVisit, today)}
-              </span>
+        <div className="space-y-2">
+          {plannedVisitsByDate.length > 0 ? (
+            <div className="hidden rounded-md bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid md:grid-cols-[0.9fr_1fr_1.4fr_1.3fr_1fr_1fr_auto] md:items-center md:gap-3">
+              <span>Visit</span>
+              <span>Planned Date</span>
+              <span>Visit Type</span>
+              <span>Assigned To</span>
+              <span>Crop Stage</span>
+              <span>Status</span>
+              <span>Actions</span>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {nextPlannedVisit.parameters_to_collect.map((parameter) => (
-                <span
-                  className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm"
-                  key={parameter}
-                >
-                  {displayVisitParameter(parameter)}
-                </span>
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {canWrite ? (
-                <Link
-                  className="inline-flex min-h-9 items-center justify-center rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
-                  href={`/pilots/${pilot.id}?planned_visit_id=${nextPlannedVisit.id}#add-visit-report`}
-                >
-                  Create Visit Report
-                </Link>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-        <div className="grid gap-4 lg:grid-cols-2">
-          {plannedVisitsList.map((plannedVisit) => {
+          ) : null}
+          {plannedVisitsByDate.map((plannedVisit) => {
             const assignedUser = userMap.get(plannedVisit.assigned_user_id);
             const linkedReport = plannedVisit.linked_visit_report_id
               ? reportMap.get(plannedVisit.linked_visit_report_id)
@@ -693,93 +654,152 @@ export default async function PilotDetailPage({
             );
 
             return (
-              <div
-                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+              <details
+                className="rounded-lg border border-slate-200 bg-white shadow-sm"
                 key={plannedVisit.id}
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <summary className="grid cursor-pointer list-none gap-3 px-4 py-3 text-sm transition hover:bg-slate-50 md:grid-cols-[0.9fr_1fr_1.4fr_1.3fr_1fr_1fr_auto] md:items-center [&::-webkit-details-marker]:hidden">
                   <div>
-                    <p className="text-sm font-semibold text-slate-950">
-                      Visit {plannedVisit.visit_number} ·{" "}
-                      {labelFor(plannedVisit.visit_type, plannedVisitTypeOptions)}
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">
+                      Visit
                     </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {formatDate(plannedVisit.planned_visit_date)} ·{" "}
-                      {userLabel(assignedUser, plannedVisit.assigned_user_id)}
+                    <p className="font-semibold text-slate-950">
+                      Visit {plannedVisit.visit_number}
+                      {nextPlannedVisit?.id === plannedVisit.id ? (
+                        <span className="ml-2 rounded-full border border-brand-100 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700">
+                          Next Visit
+                        </span>
+                      ) : null}
                     </p>
                   </div>
-                  <span className="w-fit rounded-full border border-brand-100 bg-white px-2.5 py-1 text-xs font-semibold text-brand-700">
-                    {displayPlannedVisitStatus(plannedVisit, today)}
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">
+                      Planned Date
+                    </p>
+                    <p className="text-slate-700">
+                      {formatDate(plannedVisit.planned_visit_date)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">
+                      Visit Type
+                    </p>
+                    <p className="text-slate-700">
+                      {labelFor(plannedVisit.visit_type, plannedVisitTypeOptions)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">
+                      Assigned To
+                    </p>
+                    <p className="text-slate-700">
+                      {assignedUser?.full_name ??
+                        userLabel(assignedUser, plannedVisit.assigned_user_id)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">
+                      Crop Stage
+                    </p>
+                    <p className="text-slate-700">
+                      {display(plannedVisit.crop_stage_timing)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 md:hidden">
+                      Status
+                    </p>
+                    <span className="inline-flex w-fit rounded-full border border-brand-100 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
+                      {displayPlannedVisitStatus(plannedVisit, today)}
+                    </span>
+                  </div>
+                  <span className="font-semibold text-brand-700">
+                    Show details
                   </span>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-slate-700">
-                  {plannedVisit.visit_purpose}
-                </p>
-                {plannedVisit.crop_stage_timing ? (
-                  <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                    {plannedVisit.crop_stage_timing}
-                  </p>
-                ) : null}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {plannedVisit.parameters_to_collect.map((parameter) => (
-                    <span
-                      className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-600"
-                      key={parameter}
-                    >
-                      {displayVisitParameter(parameter)}
-                    </span>
-                  ))}
-                </div>
-                {plannedVisit.special_instructions ? (
-                  <p className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                    <span className="font-semibold">Instructions:</span>{" "}
-                    {plannedVisit.special_instructions}
-                  </p>
-                ) : null}
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  {linkedReport ? (
-                    <span className="text-sm font-medium text-emerald-700">
-                      Report submitted: {linkedReport.visit_report_code}
-                    </span>
-                  ) : canWrite ? (
-                    <Link
-                      className="inline-flex min-h-9 items-center justify-center rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
-                      href={`/pilots/${pilot.id}?planned_visit_id=${plannedVisit.id}#add-visit-report`}
-                    >
-                      Create Visit Report
-                    </Link>
-                  ) : null}
-                  {canManageVisitPlans ? (
-                    <details className="w-full">
-                      <summary className="mt-2 cursor-pointer text-sm font-semibold text-brand-700">
-                        Edit planned visit
-                      </summary>
-                      <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
-                        <PlannedVisitForm
-                          action={updateAction}
-                          compact
-                          users={usersList}
-                          visit={plannedVisit}
-                        />
+                </summary>
+                <div className="border-t border-slate-200 bg-slate-50 p-4">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Parameters to Monitor
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {plannedVisit.parameters_to_collect.map((parameter) => (
+                          <span
+                            className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm"
+                            key={parameter}
+                          >
+                            {displayVisitParameter(parameter)}
+                          </span>
+                        ))}
                       </div>
-                    </details>
-                  ) : null}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Linked Report
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-slate-700">
+                        {linkedReport
+                          ? `Report submitted: ${linkedReport.visit_report_code}`
+                          : "No report linked yet."}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Visit Purpose
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">
+                        {plannedVisit.visit_purpose}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Special Instructions
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">
+                        {display(plannedVisit.special_instructions)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {!linkedReport && canWrite ? (
+                      <Link
+                        className="inline-flex min-h-9 items-center justify-center rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                        href={`/pilots/${pilot.id}?planned_visit_id=${plannedVisit.id}#add-visit-report`}
+                      >
+                        Create Visit Report
+                      </Link>
+                    ) : null}
+                    {canManageVisitPlans ? (
+                      <details className="w-full rounded-md border border-slate-200 bg-white">
+                        <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-brand-700">
+                          Edit
+                        </summary>
+                        <div className="border-t border-slate-200 p-3">
+                          <PlannedVisitForm
+                            action={updateAction}
+                            compact
+                            users={usersList}
+                            visit={plannedVisit}
+                          />
+                        </div>
+                      </details>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              </details>
             );
           })}
           {plannedVisitsList.length === 0 ? (
-            <div className="lg:col-span-2">
-              <EmptyState>
-                No planned pilot visits yet. Add the first planned visit with purpose, assignee, and parameters.
-              </EmptyState>
-            </div>
+            <EmptyState>
+              No planned visits yet. Add the first planned visit for this pilot.
+            </EmptyState>
           ) : null}
         </div>
         {canManageVisitPlans ? (
           <details className="mt-4 rounded-md border border-slate-200 bg-slate-50">
             <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-brand-700">
-              Add Visit
+              Add Planned Visit
             </summary>
             <div className="border-t border-slate-200 p-4">
               <PlannedVisitForm
