@@ -165,6 +165,15 @@ function canApproveFinalPilotReport(
   return hasAnyRole(profile, ["R&D Head", "Admin"]);
 }
 
+function canApprovePartnerSharing(
+  profile:
+    | Pick<InternalUser, "role" | "secondary_role">
+    | null
+    | undefined
+) {
+  return hasAnyRole(profile, ["Admin", "Management", "R&D Head"]);
+}
+
 function canManageVisitPlans(
   profile:
     | Pick<InternalUser, "role" | "secondary_role">
@@ -687,6 +696,49 @@ function stampFinalPilotReportApproval(
 
   payload.reviewed_by_user_id = profile.id;
   payload.reviewed_date = todayDate();
+}
+
+async function enforcePartnerSharingApprovalGuard({
+  errorPath,
+  payload,
+  pilotId,
+  profile,
+  reportId,
+  supabase
+}: {
+  errorPath: string;
+  payload: VisitReportUpdate;
+  pilotId: string;
+  profile: Pick<InternalUser, "role" | "secondary_role">;
+  reportId?: string;
+  supabase: SupabaseClient;
+}) {
+  if (canApprovePartnerSharing(profile)) {
+    return;
+  }
+
+  if (!reportId) {
+    payload.approved_for_partner_sharing = false;
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("visit_reports")
+    .select("approved_for_partner_sharing")
+    .eq("id", reportId)
+    .eq("pilot_id", pilotId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !data) {
+    redirectWithError(
+      errorPath,
+      error?.message ?? "Existing visit report was not found."
+    );
+  }
+
+  payload.approved_for_partner_sharing =
+    data.approved_for_partner_sharing ?? false;
 }
 
 function revalidatePilot(id: string) {
@@ -1464,6 +1516,13 @@ export async function createVisitReportAction(
   const profile = await getCurrentProfile(supabase, errorPath);
   const reportId = crypto.randomUUID();
   const payload = visitReportPayloadFromForm(formData);
+  await enforcePartnerSharingApprovalGuard({
+    errorPath,
+    payload,
+    pilotId,
+    profile,
+    supabase
+  });
   try {
     await applyUploadedFilesToPayload({
       fields: [
@@ -1620,6 +1679,14 @@ export async function updateVisitReportAction(
   const errorPath = `/pilots/${pilotId}/reports/${reportId}/edit`;
   const profile = await getCurrentProfile(supabase, errorPath);
   const payload = visitReportPayloadFromForm(formData);
+  await enforcePartnerSharingApprovalGuard({
+    errorPath,
+    payload,
+    pilotId,
+    profile,
+    reportId,
+    supabase
+  });
   try {
     await applyUploadedFilesToPayload({
       fields: [
