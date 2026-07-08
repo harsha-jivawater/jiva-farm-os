@@ -144,6 +144,43 @@ function SummaryCard({
   );
 }
 
+function PrimaryActionCard({
+  date,
+  helper,
+  label,
+  meta,
+  tone = "default"
+}: {
+  date?: React.ReactNode;
+  helper: React.ReactNode;
+  label: string;
+  meta?: React.ReactNode;
+  tone?: "default" | "amber" | "emerald" | "rose";
+}) {
+  const toneClasses = {
+    amber: "border-amber-200 bg-amber-50 text-amber-950",
+    default: "border-brand-200 bg-brand-50 text-brand-950",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-950",
+    rose: "border-rose-200 bg-rose-50 text-rose-950"
+  }[tone];
+
+  return (
+    <div className={`rounded-lg border p-5 shadow-sm ${toneClasses}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
+        Primary Action
+      </p>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+        <h3 className="text-xl font-semibold leading-7">{label}</h3>
+        {date ? (
+          <p className="shrink-0 text-sm font-semibold opacity-80">{date}</p>
+        ) : null}
+      </div>
+      {meta ? <p className="mt-2 text-sm font-semibold opacity-85">{meta}</p> : null}
+      <p className="mt-3 text-sm leading-6 opacity-85">{helper}</p>
+    </div>
+  );
+}
+
 function EmptyState({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm leading-6 text-slate-500">
@@ -337,12 +374,23 @@ export default async function PilotDetailPage({
       String(second.planned_visit_date ?? "")
     )
   );
-  const nextPlannedVisit = plannedVisitsByDate.find(
+  const activePlannedVisits = plannedVisitsByDate.filter(
     (visit) =>
       !["Completed", "Cancelled", "Unable to Complete"].includes(
         visit.planned_visit_status
       ) && !visit.linked_visit_report_id
   );
+  const overduePlannedVisit = activePlannedVisits.find(
+    (visit) => visit.planned_visit_date && visit.planned_visit_date < today
+  );
+  const dueTodayPlannedVisit = activePlannedVisits.find(
+    (visit) => visit.planned_visit_date === today
+  );
+  const upcomingPlannedVisit = activePlannedVisits.find(
+    (visit) => !visit.planned_visit_date || visit.planned_visit_date > today
+  );
+  const nextPlannedVisit =
+    overduePlannedVisit ?? dueTodayPlannedVisit ?? upcomingPlannedVisit ?? null;
   const plannedVisitNeedingReport = plannedVisitsByDate.find(
     (visit) =>
       visit.planned_visit_status === "Completed" && !visit.linked_visit_report_id
@@ -356,44 +404,159 @@ export default async function PilotDetailPage({
     pilot.pilot_status === "Final Report Submitted";
   const deviceReturnPending =
     pilot.device_removal_status === "Pending Customer Service Update";
-  const currentAction = deviceReturnPending
+  const pilotClosedOrCompleted = ["Closed", "Completed"].includes(
+    pilot.pilot_status
+  );
+  const deviceReturnPrimaryAction = pilotClosedOrCompleted && deviceReturnPending;
+  const primaryVisit = nextPlannedVisit ?? plannedVisitNeedingReport ?? null;
+  const primaryActionMeta = primaryVisit
+    ? `${labelFor(primaryVisit.visit_type, plannedVisitTypeOptions)} assigned to ${userLabel(
+        userMap.get(primaryVisit.assigned_user_id),
+        primaryVisit.assigned_user_id
+      )}`
+    : undefined;
+  const primaryAction = overduePlannedVisit
     ? {
-        label: "Device return needs Customer Service update",
-        helper: "Pilot field removal is recorded. Customer Service Team should update final stock status and location.",
-        tone: "amber" as const
+        date: formatDate(overduePlannedVisit.planned_visit_date),
+        helper: "Complete this planned visit or update the Monitoring Plan if the visit date changed.",
+        label: "Overdue visit",
+        meta: primaryActionMeta,
+        tone: "rose" as const
       }
-    : finalApprovalPending
+    : dueTodayPlannedVisit
       ? {
-          label: "Final pilot report awaiting approval",
-          helper: "R&D Head should review and approve the submitted final report.",
+          date: formatDate(dueTodayPlannedVisit.planned_visit_date),
+          helper: "Research Assistant should complete this visit through My Visits and submit the visit report.",
+          label: "Visit due today",
+          meta: primaryActionMeta,
           tone: "amber" as const
+        }
+      : upcomingPlannedVisit
+        ? {
+            date: formatDate(upcomingPlannedVisit.planned_visit_date),
+            helper: "Keep the team aligned on the next planned field visit.",
+            label: "Next visit",
+            meta: primaryActionMeta,
+            tone: "default" as const
+          }
+        : plannedVisitNeedingReport
+          ? {
+              date: formatDate(plannedVisitNeedingReport.planned_visit_date),
+              helper: "Create the visit report from the Monitoring Plan section.",
+              label: "Visit report pending",
+              meta: primaryActionMeta,
+              tone: "amber" as const
+            }
+          : finalApprovalPending
+            ? {
+                helper: "R&D Head should review and approve the submitted final pilot report.",
+                label: "R&D approval pending",
+                tone: "amber" as const
+              }
+            : deviceReturnPrimaryAction
+              ? {
+                  helper: "Customer Service Team should update final stock status and location after field removal.",
+                  label: "Device return pending",
+                  tone: "amber" as const
+                }
+              : {
+                  helper:
+                    plannedVisitsList.length === 0
+                      ? "Add planned visits in the Monitoring Plan section so the field team knows what to do next."
+                      : "Review pilot status, reports, result, and closure notes.",
+                  label:
+                    plannedVisitsList.length === 0
+                      ? "Review monitoring plan"
+                      : "Review pilot status",
+                  tone:
+                    pilot.pilot_status === "Completed"
+                      ? ("emerald" as const)
+                      : ("default" as const)
+                };
+  const visitReportStatus = overduePlannedVisit
+    ? {
+        helper: `Visit ${overduePlannedVisit.visit_number} was planned for ${formatDate(
+          overduePlannedVisit.planned_visit_date
+        )}.`,
+        tone: "rose" as const,
+        value: "Overdue"
+      }
+    : dueTodayPlannedVisit
+      ? {
+          helper: `Visit ${dueTodayPlannedVisit.visit_number} is assigned to ${userLabel(
+            userMap.get(dueTodayPlannedVisit.assigned_user_id),
+            dueTodayPlannedVisit.assigned_user_id
+          )}.`,
+          tone: "amber" as const,
+          value: "Due today"
         }
       : plannedVisitNeedingReport
         ? {
-            label: `Visit ${plannedVisitNeedingReport.visit_number} report pending`,
-            helper: "Create the visit report from the Monitoring Plan section.",
-            tone: "amber" as const
+            helper: `Visit ${plannedVisitNeedingReport.visit_number} is completed but has no linked report.`,
+            tone: "amber" as const,
+            value: "Report pending"
           }
-        : nextPlannedVisit
+        : latestReport
           ? {
-              label: `Next visit: ${formatDate(nextPlannedVisit.planned_visit_date)}`,
-              helper: `${nextPlannedVisit.visit_type} assigned to ${userLabel(
-                userMap.get(nextPlannedVisit.assigned_user_id),
-                nextPlannedVisit.assigned_user_id
-              )}.`,
-              tone: "default" as const
+              helper: `${latestReport.visit_report_code} · ${labelFor(
+                latestReport.report_status,
+                reportStatusOptions
+              )}`,
+              tone: "emerald" as const,
+              value: "Report submitted"
             }
-          : {
-              label:
-                pilot.pilot_status === "Completed"
-                  ? "Pilot completed"
-                  : "Plan the next visit",
-              helper:
-                pilot.pilot_status === "Completed"
-                  ? "Review final result, proof files, and closure notes."
-                  : "Use Monitoring Plan to add dates, assignees, crop stages, and parameters.",
-              tone: pilot.pilot_status === "Completed" ? ("emerald" as const) : ("default" as const)
-            };
+          : nextPlannedVisit
+            ? {
+                helper: `Visit ${nextPlannedVisit.visit_number} is planned for ${formatDate(
+                  nextPlannedVisit.planned_visit_date
+                )}.`,
+                tone: "default" as const,
+                value: "Visit planned"
+              }
+            : {
+                helper: "No planned visits or visit reports are available yet.",
+                tone: "default" as const,
+                value: "No planned visits"
+              };
+  const deviceStatus = deviceReturnPending
+    ? {
+        helper: display(pilot.device_removal_status),
+        tone: "amber" as const,
+        value: "Return pending"
+      }
+    : pilot.device_removed_date
+      ? {
+          helper: `Removed on ${formatDate(pilot.device_removed_date)}.`,
+          tone: "emerald" as const,
+          value: "Device returned"
+        }
+      : pilot.installation_completed
+        ? {
+            helper: pilot.device_serial_number_snapshot
+              ? `Device ${pilot.device_serial_number_snapshot}`
+              : "Pilot device is marked installed.",
+            tone: "emerald" as const,
+            value: "Pilot Device Installed"
+          }
+        : {
+            helper: "Pilot device installation is not marked complete.",
+            tone: "default" as const,
+            value: "Not installed"
+          };
+  const resultScaleUpStatus = {
+    helper: [
+      labelFor(pilot.pilot_result_status, pilotResultStatusOptions),
+      finalReport
+        ? `Final report: ${labelFor(finalReport.report_status, reportStatusOptions)}`
+        : "Final report: Not submitted"
+    ].join(" · "),
+    tone: pilot.scale_up_recommended ? ("emerald" as const) : ("default" as const),
+    value: pilot.scale_up_recommended
+      ? "Scale-up recommended"
+      : pilot.pilot_result_status === "Not Recommended"
+        ? "Not recommended"
+        : "Not marked"
+  };
 
   return (
     <section>
@@ -446,40 +609,34 @@ export default async function PilotDetailPage({
         description="A quick view of what needs attention before looking at the full record."
         title="Pilot action summary"
       >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard
-            helper={currentAction.helper}
-            label="Current action"
-            tone={currentAction.tone}
-            value={currentAction.label}
+        <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
+          <PrimaryActionCard
+            date={primaryAction.date}
+            helper={primaryAction.helper}
+            label={primaryAction.label}
+            meta={primaryAction.meta}
+            tone={primaryAction.tone}
           />
-          <SummaryCard
-            helper={
-              nextPlannedVisit
-                ? `${nextPlannedVisit.visit_type} · ${userLabel(
-                    userMap.get(nextPlannedVisit.assigned_user_id),
-                    nextPlannedVisit.assigned_user_id
-                  )}`
-                : "Add the next planned visit when the team is ready."
-            }
-            label="Next planned visit"
-            value={
-              nextPlannedVisit
-                ? formatDate(nextPlannedVisit.planned_visit_date)
-                : "Not planned"
-            }
-          />
-          <SummaryCard
-            helper="Count of planned visits with date, assignee, crop stage, and parameters."
-            label="Visit plan"
-            value={`${plannedVisitsList.length} planned`}
-          />
-          <SummaryCard
-            helper={pilot.scale_up_next_step ? pilot.scale_up_next_step : undefined}
-            label="Scale-up"
-            tone={pilot.scale_up_recommended ? "emerald" : "default"}
-            value={pilot.scale_up_recommended ? "Recommended" : "Not marked"}
-          />
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-1">
+            <SummaryCard
+              helper={visitReportStatus.helper}
+              label="Visit / Report Status"
+              tone={visitReportStatus.tone}
+              value={visitReportStatus.value}
+            />
+            <SummaryCard
+              helper={deviceStatus.helper}
+              label="Pilot Device Status"
+              tone={deviceStatus.tone}
+              value={deviceStatus.value}
+            />
+            <SummaryCard
+              helper={resultScaleUpStatus.helper}
+              label="Result / Scale-up"
+              tone={resultScaleUpStatus.tone}
+              value={resultScaleUpStatus.value}
+            />
+          </div>
         </div>
       </SectionCard>
 
