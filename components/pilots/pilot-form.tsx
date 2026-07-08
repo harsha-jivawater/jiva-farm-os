@@ -26,6 +26,7 @@ import {
   productModelOptions,
   waterSourceOptions
 } from "@/lib/pilots/options";
+import { suggestedPilotNameFromContext } from "@/lib/pilots/name-suggestions";
 import type {
   Pilot,
   PilotDealerOption,
@@ -341,36 +342,6 @@ function deviceLabel(device: PilotDeviceOption) {
   return `${device.serial_number}${code} · ${device.product_model} · ${device.device_status}`;
 }
 
-function shortPilotContextName(name: string | null | undefined) {
-  const cleaned = String(name ?? "")
-    .replace(/\b(LLP|PVT|PRIVATE|LIMITED|LTD|INC|COMPANY|CO)\b\.?/gi, " ")
-    .replace(/[^a-z0-9\s]/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!cleaned) {
-    return "Pilot";
-  }
-
-  const words = cleaned
-    .split(" ")
-    .filter(
-      (word) =>
-        word.length > 1 &&
-        !["and", "the", "of"].includes(word.toLowerCase())
-    );
-
-  if (words.length >= 2) {
-    return words
-      .slice(0, 3)
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase();
-  }
-
-  return words[0] ?? cleaned.split(" ")[0] ?? "Pilot";
-}
-
 function suggestedPilotName({
   dealer,
   farmer,
@@ -382,15 +353,22 @@ function suggestedPilotName({
   institution?: PilotInstitutionOption;
   pilotType: string;
 }) {
+  const contextName =
+    pilotType === "Institution Pilot"
+      ? institution?.organization_name
+      : pilotType === "Dealer Pilot"
+        ? dealer?.firm_name ?? dealer?.dealer_name
+        : farmer?.farmer_name;
+
   if (pilotType === "Institution Pilot") {
-    return `${shortPilotContextName(institution?.organization_name)} Pilot - 01`;
+    return suggestedPilotNameFromContext({ contextName, pilotType });
   }
 
   if (pilotType === "Dealer Pilot") {
-    return `${shortPilotContextName(dealer?.firm_name ?? dealer?.dealer_name)} Pilot - 01`;
+    return suggestedPilotNameFromContext({ contextName, pilotType });
   }
 
-  return `${farmer?.farmer_name || "Farmer"} Pilot - 01`;
+  return suggestedPilotNameFromContext({ contextName, pilotType });
 }
 
 export function PilotForm({
@@ -532,14 +510,14 @@ export function PilotForm({
     );
     const dealer = dealers.find((option) => option.id === nextDealerId);
 
-    setPilotName(
-      suggestedPilotName({
-        dealer,
-        farmer,
-        institution,
-        pilotType: nextPilotType
-      })
-    );
+    const nextName = suggestedPilotName({
+      dealer,
+      farmer,
+      institution,
+      pilotType: nextPilotType
+    });
+
+    setPilotName(nextName ?? "");
   }
 
   function handlePilotTypeChange(value: string) {

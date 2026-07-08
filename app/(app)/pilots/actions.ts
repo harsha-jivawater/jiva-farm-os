@@ -21,6 +21,7 @@ import {
   defaultPilotType,
   pilotResultStatusOptions
 } from "@/lib/pilots/options";
+import { suggestedPilotNameFromContext } from "@/lib/pilots/name-suggestions";
 import { plannedVisitTypeToActualVisitType } from "@/lib/pilots/visit-planning";
 import type {
   DeviceStatusUpdateTaskInsert,
@@ -242,34 +243,6 @@ function pilotLeadFunnelStage(status: string | null | undefined) {
   return "Pilot Agreed";
 }
 
-function shortPilotContextName(name: string | null | undefined) {
-  const cleaned = String(name ?? "")
-    .replace(/\b(LLP|PVT|PRIVATE|LIMITED|LTD|INC|COMPANY|CO)\b\.?/gi, " ")
-    .replace(/[^a-z0-9\s]/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!cleaned) {
-    return "Pilot";
-  }
-
-  const words = cleaned
-    .split(" ")
-    .filter((word) => word.length > 1 && !["and", "the", "of"].includes(word.toLowerCase()));
-
-  if (words.length >= 2) {
-    const acronym = words
-      .slice(0, 3)
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase();
-
-    return acronym || words[0];
-  }
-
-  return words[0] ?? cleaned.split(" ")[0] ?? "Pilot";
-}
-
 async function contextNameForPilot(
   supabase: SupabaseClient,
   payload: Pick<PilotFormPayload, "pilot_type" | "institution_id" | "dealer_id" | "farmer_lead_id">
@@ -312,11 +285,6 @@ async function autoPilotName(
   payload: Pick<PilotFormPayload, "pilot_type" | "institution_id" | "dealer_id" | "farmer_lead_id">
 ) {
   const contextName = await contextNameForPilot(supabase, payload);
-  const shortName =
-    payload.pilot_type === "Farmer Validation Pilot"
-      ? String(contextName ?? "Farmer").trim()
-      : shortPilotContextName(contextName);
-
   let query = supabase
     .from("pilots")
     .select("id", { count: "exact", head: true })
@@ -334,18 +302,32 @@ async function autoPilotName(
   const { count } = await query;
   const sequence = String((count ?? 0) + 1).padStart(2, "0");
 
-  return `${shortName} Pilot - ${sequence}`;
+  return suggestedPilotNameFromContext({
+    contextName,
+    pilotType: payload.pilot_type ?? defaultPilotType,
+    sequence
+  });
 }
 
 async function applyPilotNameFallback(
   supabase: SupabaseClient,
-  payload: PilotFormPayload
+  payload: PilotFormPayload,
+  errorPath: string
 ) {
   if (payload.pilot_name) {
     return;
   }
 
-  payload.pilot_name = await autoPilotName(supabase, payload);
+  const suggestedName = await autoPilotName(supabase, payload);
+
+  if (!suggestedName) {
+    redirectWithError(
+      errorPath,
+      "Enter a professional pilot name. The linked farmer or partner name cannot be Test, Demo, Sample, Unknown, or Not set."
+    );
+  }
+
+  payload.pilot_name = suggestedName;
 }
 
 async function syncFarmerLeadPilotState({
@@ -801,7 +783,7 @@ export async function createPilotAction(formData: FormData) {
   const pilotId = crypto.randomUUID();
   const payload = pilotPayloadFromForm(formData);
   const initialPlannedVisits = initialPlannedPilotVisitsFromForm(formData);
-  await applyPilotNameFallback(supabase, payload);
+  await applyPilotNameFallback(supabase, payload, errorPath);
   try {
     await applyUploadedFilesToPayload({
       fields: [
@@ -950,7 +932,7 @@ export async function updatePilotAction(id: string, formData: FormData) {
     redirectWithError(errorPath, "Pilot was not found.");
   }
   const payload = pilotPayloadFromForm(formData);
-  await applyPilotNameFallback(supabase, payload);
+  await applyPilotNameFallback(supabase, payload, errorPath);
   try {
     await applyUploadedFilesToPayload({
       fields: [
