@@ -655,7 +655,7 @@ export default async function PilotDetailPage({
 
             return (
               <details
-                className="rounded-lg border border-slate-200 bg-white shadow-sm"
+                className="group rounded-lg border border-slate-200 bg-white shadow-sm"
                 key={plannedVisit.id}
               >
                 <summary className="grid cursor-pointer list-none gap-3 px-4 py-3 text-sm transition hover:bg-slate-50 md:grid-cols-[0.9fr_1fr_1.4fr_1.3fr_1fr_1fr_auto] md:items-center [&::-webkit-details-marker]:hidden">
@@ -714,7 +714,8 @@ export default async function PilotDetailPage({
                     </span>
                   </div>
                   <span className="font-semibold text-brand-700">
-                    Show details
+                    <span className="group-open:hidden">Show details</span>
+                    <span className="hidden group-open:inline">Hide details</span>
                   </span>
                 </summary>
                 <div className="border-t border-slate-200 bg-slate-50 p-4">
@@ -773,7 +774,7 @@ export default async function PilotDetailPage({
                     {canManageVisitPlans ? (
                       <details className="w-full rounded-md border border-slate-200 bg-white">
                         <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-brand-700">
-                          Edit
+                          Edit planned visit
                         </summary>
                         <div className="border-t border-slate-200 p-3">
                           <PlannedVisitForm

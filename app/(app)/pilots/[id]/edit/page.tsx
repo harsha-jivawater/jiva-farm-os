@@ -252,23 +252,6 @@ export default async function EditPilotPage({
               through My Visits and Visit Reports.
             </p>
           </div>
-          {canManageVisitPlans ? (
-            <details className="rounded-md border border-slate-200 bg-slate-50">
-              <summary className="cursor-pointer px-4 py-2 text-sm font-semibold text-brand-700">
-                Add Planned Visit
-              </summary>
-              <div className="border-t border-slate-200 p-4">
-                <PlannedVisitForm
-                  action={createPlannedVisitAction}
-                  compact
-                  defaultAssigneeId={pilotRow.research_assistant_user_id}
-                  nextVisitNumber={plannedVisitsList.length + 1}
-                  submitLabel="Add visit"
-                  users={(users ?? []) as UserOption[]}
-                />
-              </div>
-            </details>
-          ) : null}
         </div>
         <div className="mt-4 space-y-2">
           {plannedVisitsList.length === 0 ? (
@@ -299,7 +282,7 @@ export default async function EditPilotPage({
 
             return (
               <details
-                className="rounded-lg border border-slate-200 bg-white shadow-sm"
+                className="group rounded-lg border border-slate-200 bg-white shadow-sm"
                 key={visit.id}
               >
                 <summary className="grid cursor-pointer list-none gap-3 px-4 py-3 text-sm transition hover:bg-slate-50 md:grid-cols-[0.9fr_1fr_1.4fr_1.3fr_1fr_1fr_auto] md:items-center [&::-webkit-details-marker]:hidden">
@@ -357,7 +340,8 @@ export default async function EditPilotPage({
                     </span>
                   </div>
                   <span className="font-semibold text-brand-700">
-                    Show details
+                    <span className="group-open:hidden">Show details</span>
+                    <span className="hidden group-open:inline">Hide details</span>
                   </span>
                 </summary>
                 <div className="border-t border-slate-200 bg-slate-50 p-4">
@@ -407,7 +391,7 @@ export default async function EditPilotPage({
                   {canManageVisitPlans ? (
                     <details className="mt-4 rounded-md border border-slate-200 bg-white">
                       <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-brand-700">
-                        Edit
+                        Edit planned visit
                       </summary>
                       <div className="border-t border-slate-200 p-3">
                         <PlannedVisitForm
@@ -425,6 +409,23 @@ export default async function EditPilotPage({
             );
           })}
         </div>
+        {canManageVisitPlans ? (
+          <details className="mt-4 rounded-md border border-slate-200 bg-slate-50">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-brand-700">
+              Add Planned Visit
+            </summary>
+            <div className="border-t border-slate-200 p-4">
+              <PlannedVisitForm
+                action={createPlannedVisitAction}
+                compact
+                defaultAssigneeId={pilotRow.research_assistant_user_id}
+                nextVisitNumber={plannedVisitsList.length + 1}
+                submitLabel="Add visit"
+                users={(users ?? []) as UserOption[]}
+              />
+            </div>
+          </details>
+        ) : null}
       </section>
     </section>
   );
