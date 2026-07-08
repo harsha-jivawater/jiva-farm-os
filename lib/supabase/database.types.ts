@@ -1357,6 +1357,8 @@ export type Database = {
           next_visit_due_date: string | null;
           total_visits_planned: number | null;
           monitoring_plan_link: string | null;
+          soil_report_link: string | null;
+          water_report_link: string | null;
           track_soil_moisture: boolean;
           track_crop_growth: boolean;
           track_irrigation_frequency: boolean;
@@ -1449,6 +1451,8 @@ export type Database = {
           next_visit_due_date?: string | null;
           total_visits_planned?: number | null;
           monitoring_plan_link?: string | null;
+          soil_report_link?: string | null;
+          water_report_link?: string | null;
           track_soil_moisture?: boolean;
           track_crop_growth?: boolean;
           track_irrigation_frequency?: boolean;
@@ -1541,6 +1545,8 @@ export type Database = {
           next_visit_due_date?: string | null;
           total_visits_planned?: number | null;
           monitoring_plan_link?: string | null;
+          soil_report_link?: string | null;
+          water_report_link?: string | null;
           track_soil_moisture?: boolean;
           track_crop_growth?: boolean;
           track_irrigation_frequency?: boolean;

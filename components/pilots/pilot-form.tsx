@@ -94,6 +94,8 @@ function Field({
   name,
   defaultValue,
   required = false,
+  helperText,
+  step,
   type = "text",
   value,
   onChange,
@@ -103,6 +105,8 @@ function Field({
   name: string;
   defaultValue?: string | number | null;
   required?: boolean;
+  helperText?: string;
+  step?: string;
   type?: string;
   value?: string;
   onChange?: (value: string) => void;
@@ -125,9 +129,13 @@ function Field({
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}
         readOnly={readOnly}
         required={required}
+        step={step}
         type={type}
         value={value}
       />
+      {helperText ? (
+        <p className="mt-1 text-xs leading-5 text-slate-500">{helperText}</p>
+      ) : null}
     </div>
   );
 }
@@ -136,11 +144,13 @@ function TextareaField({
   label,
   name,
   defaultValue,
+  helperText,
   required = false
 }: {
   label: string;
   name: string;
   defaultValue?: string | null;
+  helperText?: string;
   required?: boolean;
 }) {
   return (
@@ -158,6 +168,9 @@ function TextareaField({
         name={name}
         required={required}
       />
+      {helperText ? (
+        <p className="mt-1 text-xs leading-5 text-slate-500">{helperText}</p>
+      ) : null}
     </div>
   );
 }
@@ -243,7 +256,7 @@ function UserSelect({
         required={required}
         value={value}
       >
-        <option value="">Select {label.toLowerCase()}</option>
+        <option value="">Select {label}</option>
         {options.map((user) => (
           <option key={user.id} value={user.id}>
             {user.full_name} · {labelForRole(user.role)}
@@ -322,6 +335,58 @@ function deviceLabel(device: PilotDeviceOption) {
   return `${device.serial_number}${code} · ${device.product_model} · ${device.device_status}`;
 }
 
+function shortPilotContextName(name: string | null | undefined) {
+  const cleaned = String(name ?? "")
+    .replace(/\b(LLP|PVT|PRIVATE|LIMITED|LTD|INC|COMPANY|CO)\b\.?/gi, " ")
+    .replace(/[^a-z0-9\s]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) {
+    return "Pilot";
+  }
+
+  const words = cleaned
+    .split(" ")
+    .filter(
+      (word) =>
+        word.length > 1 &&
+        !["and", "the", "of"].includes(word.toLowerCase())
+    );
+
+  if (words.length >= 2) {
+    return words
+      .slice(0, 3)
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase();
+  }
+
+  return words[0] ?? cleaned.split(" ")[0] ?? "Pilot";
+}
+
+function suggestedPilotName({
+  dealer,
+  farmer,
+  institution,
+  pilotType
+}: {
+  dealer?: PilotDealerOption;
+  farmer?: PilotFarmerLeadOption;
+  institution?: PilotInstitutionOption;
+  pilotType: string;
+}) {
+  if (pilotType === "Institution Pilot") {
+    return `${shortPilotContextName(institution?.organization_name)} Pilot - 01`;
+  }
+
+  if (pilotType === "Dealer Pilot") {
+    return `${shortPilotContextName(dealer?.firm_name ?? dealer?.dealer_name)} Pilot - 01`;
+  }
+
+  return `${farmer?.farmer_name || "Farmer"} Pilot - 01`;
+}
+
 export function PilotForm({
   action,
   cancelHref,
@@ -360,6 +425,8 @@ export function PilotForm({
   const [pilotType, setPilotType] = useState(
     pilot?.pilot_type ?? defaultPilotType
   );
+  const [pilotName, setPilotName] = useState(pilot?.pilot_name ?? "");
+  const [pilotNameEdited, setPilotNameEdited] = useState(Boolean(pilot?.pilot_name));
   const [farmerName, setFarmerName] = useState(
     pilot?.farmer_name_snapshot ?? initialFarmer?.farmer_name ?? ""
   );
@@ -416,6 +483,47 @@ export function PilotForm({
   );
   const isInstitutionPilot = pilotType === "Institution Pilot";
   const isDealerPilot = pilotType === "Dealer Pilot";
+  const pilotTrialDescription =
+    pilot?.baseline_notes ??
+    [pilot?.treatment_plot_description, pilot?.control_plot_description]
+      .filter(Boolean)
+      .join("\n\n");
+
+  function suggestName({
+    nextDealerId = dealerId,
+    nextFarmerLeadId = selectedFarmerLeadId,
+    nextInstitutionId = institutionId,
+    nextPilotType = pilotType
+  }: {
+    nextDealerId?: string;
+    nextFarmerLeadId?: string;
+    nextInstitutionId?: string;
+    nextPilotType?: string;
+  } = {}) {
+    if (pilotNameEdited) {
+      return;
+    }
+
+    const farmer = farmerLeads.find((lead) => lead.id === nextFarmerLeadId);
+    const institution = institutions.find(
+      (option) => option.id === nextInstitutionId
+    );
+    const dealer = dealers.find((option) => option.id === nextDealerId);
+
+    setPilotName(
+      suggestedPilotName({
+        dealer,
+        farmer,
+        institution,
+        pilotType: nextPilotType
+      })
+    );
+  }
+
+  function handlePilotTypeChange(value: string) {
+    setPilotType(value);
+    suggestName({ nextPilotType: value });
+  }
 
   function applyFarmerLead(value: string) {
     const farmerLead = farmerLeads.find((lead) => lead.id === value);
@@ -436,6 +544,11 @@ export function PilotForm({
     setIrrigationType(farmerLead?.irrigation_type ?? defaultIrrigationType);
     setWaterSource(farmerLead?.water_source ?? "");
     setSoilType(farmerLead?.soil_type ?? "");
+    suggestName({
+      nextDealerId: farmerLead?.linked_dealer_id ?? "",
+      nextFarmerLeadId: value,
+      nextInstitutionId: farmerLead?.linked_institution_id ?? ""
+    });
   }
 
   function applyDevice(value: string) {
@@ -469,15 +582,19 @@ export function PilotForm({
             </div>
           ) : null}
           <Field
-            defaultValue={pilot?.pilot_name}
             label="Pilot name"
             name="pilot_name"
-            required
+            helperText="Auto-suggested from pilot type and linked context. You can edit if needed."
+            onChange={(value) => {
+              setPilotName(value);
+              setPilotNameEdited(true);
+            }}
+            value={pilotName}
           />
           <SelectField
             label="Pilot type"
             name="pilot_type"
-            onChange={setPilotType}
+            onChange={handlePilotTypeChange}
             options={pilotTypeOptions}
             required
             value={pilotType}
@@ -534,7 +651,7 @@ export function PilotForm({
               required
               value={selectedFarmerLeadId}
             >
-              <option value="">Select farmer lead</option>
+              <option value="">Select Farmer Lead</option>
               {farmerLeads.map((farmerLead) => (
                 <option key={farmerLead.id} value={farmerLead.id}>
                   {farmerLabel(farmerLead)}
@@ -542,20 +659,19 @@ export function PilotForm({
               ))}
             </select>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Every pilot must stay linked to a Farmer Lead. The selected lead
-              supplies the farmer, crop, location, RSM, and institution or dealer
-              where available.
+              Select a Farmer Lead to auto-fill farmer, crop, location, RSM,
+              and linked institution or dealer details where available.
             </p>
           </div>
           <Field
-            label="Farmer name snapshot"
+            label="Farmer Name"
             name="farmer_name_snapshot"
             onChange={setFarmerName}
             required
             value={farmerName}
           />
           <Field
-            label="Farmer mobile snapshot"
+            label="Farmer Mobile"
             name="farmer_mobile_snapshot"
             onChange={setFarmerMobile}
             required
@@ -579,18 +695,18 @@ export function PilotForm({
           />
           <Field
             defaultValue={pilot?.location_or_cluster_name}
-            label="Location or cluster name"
+            label="Location / Cluster"
             name="location_or_cluster_name"
           />
           <Field
             defaultValue={pilot?.gps_latitude}
-            label="GPS latitude"
+            label="GPS Latitude"
             name="gps_latitude"
             type="number"
           />
           <Field
             defaultValue={pilot?.gps_longitude}
-            label="GPS longitude"
+            label="GPS Longitude"
             name="gps_longitude"
             type="number"
           />
@@ -640,7 +756,7 @@ export function PilotForm({
               onChange={(event) => setRegionId(event.target.value)}
               value={regionId}
             >
-              <option value="">Select region</option>
+              <option value="">Select Region</option>
               {regions.map((region) => (
                 <option key={region.id} value={region.id}>
                   {region.region_name}
@@ -660,11 +776,14 @@ export function PilotForm({
                 className={inputClassName()}
                 id="institution_id"
                 name="institution_id"
-                onChange={(event) => setInstitutionId(event.target.value)}
+                onChange={(event) => {
+                  setInstitutionId(event.target.value);
+                  suggestName({ nextInstitutionId: event.target.value });
+                }}
                 required
                 value={institutionId}
               >
-                <option value="">Select institution</option>
+                <option value="">Select Institution</option>
                 {institutions.map((institution) => (
                   <option key={institution.id} value={institution.id}>
                     {institution.institution_code} · {institution.organization_name}
@@ -690,11 +809,14 @@ export function PilotForm({
                 className={inputClassName()}
                 id="dealer_id"
                 name="dealer_id"
-                onChange={(event) => setDealerId(event.target.value)}
+                onChange={(event) => {
+                  setDealerId(event.target.value);
+                  suggestName({ nextDealerId: event.target.value });
+                }}
                 required
                 value={dealerId}
               >
-                <option value="">Select dealer</option>
+                <option value="">Select Dealer</option>
                 {dealers.map((dealer) => (
                   <option key={dealer.id} value={dealer.id}>
                     {dealer.dealer_code} · {dealer.dealer_name}
@@ -713,7 +835,7 @@ export function PilotForm({
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-slate-950">
-          Crop, plots and device
+          Crop, plots, device, and baseline evidence
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <CropSelect
@@ -742,16 +864,18 @@ export function PilotForm({
           />
           <Field
             defaultValue={pilot?.pilot_area_acres ?? initialFarmer?.crop_area_acres ?? 0}
-            label="Pilot area acres"
+            label="Pilot Area Acres"
             name="pilot_area_acres"
             required
+            step="0.01"
             type="number"
           />
           <Field
             defaultValue={pilot?.control_area_acres ?? 0}
-            label="Control area acres"
+            label="Control Area Acres"
             name="control_area_acres"
             required
+            step="0.01"
             type="number"
           />
           <SelectField
@@ -805,7 +929,7 @@ export function PilotForm({
               className="mb-1.5 block text-sm font-medium text-slate-700"
               htmlFor="device_id"
             >
-              Device
+              Pilot Device
             </label>
             <select
               className={inputClassName()}
@@ -823,7 +947,7 @@ export function PilotForm({
             </select>
           </div>
           <SelectField
-            label="Product model"
+            label="Product Model"
             name="product_model"
             onChange={setProductModel}
             options={productModelOptions}
@@ -831,14 +955,14 @@ export function PilotForm({
             value={productModel}
           />
           <Field
-            label="Device serial number snapshot"
+            label="Pilot Device Serial Number"
             name="device_serial_number_snapshot"
             onChange={setSerialNumber}
             value={serialNumber}
           />
           <Field
             defaultValue={pilot?.device_installation_date}
-            label="Device installation date"
+            label="Pilot Device Installation Date"
             name="device_installation_date"
             type="date"
           />
@@ -846,27 +970,41 @@ export function PilotForm({
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <CheckboxField
             defaultChecked={pilot?.installation_completed}
-            label="Installation completed"
+            label="Pilot Device Installed"
             name="installation_completed"
           />
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <TextareaField
-            defaultValue={pilot?.baseline_notes}
-            label="Baseline notes"
-            name="baseline_notes"
-          />
-          <TextareaField
-            defaultValue={pilot?.treatment_plot_description}
-            label="Treatment plot description"
+          <div className="md:col-span-2">
+            <TextareaField
+              defaultValue={pilotTrialDescription}
+              helperText="Briefly describe the baseline condition, treatment plot, control plot, and important setup notes."
+              label="Pilot / Trial Description"
+              name="baseline_notes"
+              required
+            />
+          </div>
+          <input
             name="treatment_plot_description"
-            required
+            type="hidden"
+            value={pilot?.treatment_plot_description ?? ""}
           />
-          <TextareaField
-            defaultValue={pilot?.control_plot_description}
-            label="Control plot description"
+          <input
             name="control_plot_description"
-            required
+            type="hidden"
+            value={pilot?.control_plot_description ?? ""}
+          />
+          <FileUploadField
+            currentValue={pilot?.soil_report_link}
+            kind="lab-report"
+            label="Soil Report"
+            name="soil_report_link"
+          />
+          <FileUploadField
+            currentValue={pilot?.water_report_link}
+            kind="lab-report"
+            label="Water Report"
+            name="water_report_link"
           />
         </div>
         <p className="mt-3 text-sm leading-6 text-slate-500">
@@ -978,11 +1116,26 @@ export function PilotForm({
           Detailed visit dates, assignees, crop stages, and parameters are
           managed in the Visit Planning section after the pilot is created.
         </p>
+        <input
+          name="pilot_folder_link"
+          type="hidden"
+          value={pilot?.pilot_folder_link ?? ""}
+        />
+        <input
+          name="baseline_report_link"
+          type="hidden"
+          value={pilot?.baseline_report_link ?? ""}
+        />
+        <input
+          name="photo_folder_link"
+          type="hidden"
+          value={pilot?.photo_folder_link ?? ""}
+        />
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-slate-950">
-          Results and links
+          Final report and results
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <TextareaField
@@ -1018,28 +1171,10 @@ export function PilotForm({
             name="scale_up_next_step"
           />
           <FileUploadField
-            currentValue={pilot?.pilot_folder_link}
-            kind="zip"
-            label="Pilot files ZIP"
-            name="pilot_folder_link"
-          />
-          <FileUploadField
-            currentValue={pilot?.baseline_report_link}
-            kind="document"
-            label="Baseline report file"
-            name="baseline_report_link"
-          />
-          <FileUploadField
             currentValue={pilot?.final_pilot_report_link}
             kind="document"
             label="Final pilot report file"
             name="final_pilot_report_link"
-          />
-          <FileUploadField
-            currentValue={pilot?.photo_folder_link}
-            kind="zip"
-            label="Pilot photos ZIP"
-            name="photo_folder_link"
           />
           <FileUploadField
             currentValue={pilot?.data_sheet_link}
@@ -1105,7 +1240,7 @@ export function PilotForm({
           />
           <Field
             defaultValue={pilot?.device_serial_number_snapshot}
-            label="Device serial number"
+            label="Pilot Device Serial Number"
             name="device_removal_serial_snapshot"
           />
           <div className="md:col-span-2">

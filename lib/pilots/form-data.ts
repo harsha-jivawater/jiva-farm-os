@@ -76,6 +76,14 @@ function getBoolean(formData: FormData, key: string, defaultValue = false) {
   return value === "true" || value === "on";
 }
 
+function hasAtMostTwoDecimalPlaces(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return true;
+  }
+
+  return Number.isInteger(Math.round(value * 100) - value * 100);
+}
+
 function getAllText(formData: FormData, key: string) {
   return formData
     .getAll(key)
@@ -183,6 +191,7 @@ export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
   const comparisonMethod =
     getText(formData, "comparison_method") ?? defaultComparisonMethod;
   const comparisonValues = comparisonControlValues(comparisonMethod);
+  const trialDescription = getText(formData, "baseline_notes") ?? "";
 
   return {
     pilot_name: getText(formData, "pilot_name") ?? "",
@@ -226,11 +235,11 @@ export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
       getText(formData, "irrigation_type") ?? defaultIrrigationType,
     water_source: getText(formData, "water_source"),
     soil_type: getText(formData, "soil_type"),
-    baseline_notes: getText(formData, "baseline_notes"),
+    baseline_notes: trialDescription,
     treatment_plot_description:
-      getText(formData, "treatment_plot_description") ?? "",
+      getText(formData, "treatment_plot_description") ?? trialDescription,
     control_plot_description:
-      getText(formData, "control_plot_description") ?? "",
+      getText(formData, "control_plot_description") ?? trialDescription,
     control_available: comparisonValues.control_available,
     control_farmer_same: comparisonValues.control_farmer_same,
     control_crop_same: comparisonValues.control_crop_same,
@@ -265,6 +274,8 @@ export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
     next_visit_due_date: getText(formData, "next_visit_due_date"),
     total_visits_planned: getNumber(formData, "total_visits_planned"),
     monitoring_plan_link: getText(formData, "monitoring_plan_link"),
+    soil_report_link: getText(formData, "soil_report_link"),
+    water_report_link: getText(formData, "water_report_link"),
     track_soil_moisture: getBoolean(formData, "track_soil_moisture"),
     track_crop_growth: getBoolean(formData, "track_crop_growth"),
     track_irrigation_frequency: getBoolean(
@@ -353,8 +364,20 @@ export function validatePilotPayload(payload: PilotFormPayload) {
   if (payload.pilot_area_acres === undefined) {
     return "Pilot area acres must be a valid number.";
   }
+  if (payload.pilot_area_acres < 0) {
+    return "Pilot area acres cannot be negative.";
+  }
+  if (!hasAtMostTwoDecimalPlaces(payload.pilot_area_acres)) {
+    return "Pilot area acres can have up to 2 decimal places.";
+  }
   if (payload.control_area_acres === undefined) {
     return "Control area acres must be a valid number.";
+  }
+  if (payload.control_area_acres < 0) {
+    return "Control area acres cannot be negative.";
+  }
+  if (!hasAtMostTwoDecimalPlaces(payload.control_area_acres)) {
+    return "Control area acres can have up to 2 decimal places.";
   }
   if (!payload.irrigation_type) return "Irrigation type is required.";
   if (!payload.treatment_plot_description) {

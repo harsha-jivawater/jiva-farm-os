@@ -1,7 +1,13 @@
 export const UPLOAD_BUCKET = "app-uploads";
 export const STORAGE_REFERENCE_PREFIX = `storage://${UPLOAD_BUCKET}/`;
 
-export type UploadKind = "image" | "document" | "sheet" | "zip" | "evidence";
+export type UploadKind =
+  | "image"
+  | "document"
+  | "sheet"
+  | "zip"
+  | "evidence"
+  | "lab-report";
 
 export type UploadRule = {
   accept: string;
@@ -66,6 +72,31 @@ export const uploadRules = {
       "application/pdf",
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ]
+  },
+  "lab-report": {
+    accept:
+      ".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    description: "PDF, DOC, DOCX, JPG, PNG, XLS, or XLSX up to 25 MB.",
+    extensions: [
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".xls",
+      ".xlsx"
+    ],
+    maxBytes: 25 * MB,
+    mimeTypes: [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "image/jpeg",
+      "image/png",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     ]
   }
 } satisfies Record<UploadKind, UploadRule>;

@@ -16,6 +16,7 @@ import {
   visitReportPayloadFromForm
 } from "@/lib/pilots/form-data";
 import {
+  defaultPilotType,
   pilotResultStatusOptions
 } from "@/lib/pilots/options";
 import { plannedVisitTypeToActualVisitType } from "@/lib/pilots/visit-planning";
@@ -185,6 +186,112 @@ function pilotLeadFunnelStage(status: string | null | undefined) {
   }
 
   return "Pilot Agreed";
+}
+
+function shortPilotContextName(name: string | null | undefined) {
+  const cleaned = String(name ?? "")
+    .replace(/\b(LLP|PVT|PRIVATE|LIMITED|LTD|INC|COMPANY|CO)\b\.?/gi, " ")
+    .replace(/[^a-z0-9\s]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) {
+    return "Pilot";
+  }
+
+  const words = cleaned
+    .split(" ")
+    .filter((word) => word.length > 1 && !["and", "the", "of"].includes(word.toLowerCase()));
+
+  if (words.length >= 2) {
+    const acronym = words
+      .slice(0, 3)
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase();
+
+    return acronym || words[0];
+  }
+
+  return words[0] ?? cleaned.split(" ")[0] ?? "Pilot";
+}
+
+async function contextNameForPilot(
+  supabase: SupabaseClient,
+  payload: Pick<PilotFormPayload, "pilot_type" | "institution_id" | "dealer_id" | "farmer_lead_id">
+) {
+  if (payload.pilot_type === "Institution Pilot" && payload.institution_id) {
+    const { data } = await supabase
+      .from("institutions")
+      .select("organization_name")
+      .eq("id", payload.institution_id)
+      .maybeSingle();
+
+    return data?.organization_name ?? null;
+  }
+
+  if (payload.pilot_type === "Dealer Pilot" && payload.dealer_id) {
+    const { data } = await supabase
+      .from("dealers")
+      .select("firm_name, dealer_name")
+      .eq("id", payload.dealer_id)
+      .maybeSingle();
+
+    return data?.firm_name ?? data?.dealer_name ?? null;
+  }
+
+  if (payload.farmer_lead_id) {
+    const { data } = await supabase
+      .from("farmer_leads")
+      .select("farmer_name")
+      .eq("id", payload.farmer_lead_id)
+      .maybeSingle();
+
+    return data?.farmer_name ?? null;
+  }
+
+  return null;
+}
+
+async function autoPilotName(
+  supabase: SupabaseClient,
+  payload: Pick<PilotFormPayload, "pilot_type" | "institution_id" | "dealer_id" | "farmer_lead_id">
+) {
+  const contextName = await contextNameForPilot(supabase, payload);
+  const shortName =
+    payload.pilot_type === "Farmer Validation Pilot"
+      ? String(contextName ?? "Farmer").trim()
+      : shortPilotContextName(contextName);
+
+  let query = supabase
+    .from("pilots")
+    .select("id", { count: "exact", head: true })
+    .eq("pilot_type", payload.pilot_type ?? defaultPilotType)
+    .is("deleted_at", null);
+
+  if (payload.pilot_type === "Institution Pilot" && payload.institution_id) {
+    query = query.eq("institution_id", payload.institution_id);
+  } else if (payload.pilot_type === "Dealer Pilot" && payload.dealer_id) {
+    query = query.eq("dealer_id", payload.dealer_id);
+  } else if (payload.farmer_lead_id) {
+    query = query.eq("farmer_lead_id", payload.farmer_lead_id);
+  }
+
+  const { count } = await query;
+  const sequence = String((count ?? 0) + 1).padStart(2, "0");
+
+  return `${shortName} Pilot - ${sequence}`;
+}
+
+async function applyPilotNameFallback(
+  supabase: SupabaseClient,
+  payload: PilotFormPayload
+) {
+  if (payload.pilot_name) {
+    return;
+  }
+
+  payload.pilot_name = await autoPilotName(supabase, payload);
 }
 
 async function syncFarmerLeadPilotState({
@@ -639,14 +746,14 @@ export async function createPilotAction(formData: FormData) {
   const profile = await getCurrentProfile(supabase, errorPath);
   const pilotId = crypto.randomUUID();
   const payload = pilotPayloadFromForm(formData);
+  await applyPilotNameFallback(supabase, payload);
   try {
     await applyUploadedFilesToPayload({
       fields: [
         { fieldName: "monitoring_plan_link", kind: "document" },
-        { fieldName: "pilot_folder_link", kind: "zip" },
-        { fieldName: "baseline_report_link", kind: "document" },
+        { fieldName: "soil_report_link", kind: "lab-report" },
+        { fieldName: "water_report_link", kind: "lab-report" },
         { fieldName: "final_pilot_report_link", kind: "document" },
-        { fieldName: "photo_folder_link", kind: "zip" },
         { fieldName: "data_sheet_link", kind: "sheet" }
       ],
       folder: "pilots",
@@ -730,14 +837,14 @@ export async function updatePilotAction(id: string, formData: FormData) {
     redirectWithError(errorPath, "Pilot was not found.");
   }
   const payload = pilotPayloadFromForm(formData);
+  await applyPilotNameFallback(supabase, payload);
   try {
     await applyUploadedFilesToPayload({
       fields: [
         { fieldName: "monitoring_plan_link", kind: "document" },
-        { fieldName: "pilot_folder_link", kind: "zip" },
-        { fieldName: "baseline_report_link", kind: "document" },
+        { fieldName: "soil_report_link", kind: "lab-report" },
+        { fieldName: "water_report_link", kind: "lab-report" },
         { fieldName: "final_pilot_report_link", kind: "document" },
-        { fieldName: "photo_folder_link", kind: "zip" },
         { fieldName: "data_sheet_link", kind: "sheet" }
       ],
       folder: "pilots",

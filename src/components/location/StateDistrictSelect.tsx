@@ -30,7 +30,7 @@ export function StateDistrictSelect({
   onDistrictChange,
   stateName = "state",
   districtName = "district",
-  stateLabel = "State",
+  stateLabel = "State / UT",
   districtLabel = "District",
   required = false,
   disabled = false
