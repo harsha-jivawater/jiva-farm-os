@@ -10,10 +10,10 @@ on public.farmer_leads
 for select
 to authenticated
 using (
-  public.is_research_assistant()
+  public.get_current_user_role() = 'Research Assistant'
   and deleted_at is null
-  and coalesce(lead_status, '') not in ('Lost', 'Dropped', 'Parked')
-  and coalesce(funnel_stage, '') not in ('Lost', 'Dropped', 'Parked')
+  and coalesce(lead_status::text, '') not in ('Lost', 'Dropped', 'Parked')
+  and coalesce(funnel_stage::text, '') not in ('Lost', 'Dropped', 'Parked')
   and (
     region_id = public.current_region_id()
     or lower(coalesce(state, '')) = lower(coalesce(public.current_state(), ''))
