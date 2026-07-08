@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Search } from "lucide-react";
 import { CustomCropFields } from "@/components/crops/custom-crop-fields";
 import { CropMultiSelect } from "@/components/crops/crop-multi-select";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
@@ -231,6 +231,109 @@ function UserSelectField({
   );
 }
 
+function StateRegionMultiSelect({
+  label,
+  name,
+  onChange,
+  options,
+  values
+}: {
+  label: string;
+  name: string;
+  onChange: (values: string[]) => void;
+  options: string[];
+  values: string[];
+}) {
+  const [query, setQuery] = useState("");
+  const valueSet = useMemo(() => new Set(values), [values]);
+  const visibleOptions = useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+
+    return trimmed
+      ? options.filter((option) => option.toLowerCase().includes(trimmed))
+      : options;
+  }, [options, query]);
+
+  function toggleValue(value: string) {
+    onChange(
+      valueSet.has(value)
+        ? values.filter((current) => current !== value)
+        : [...values, value]
+    );
+  }
+
+  return (
+    <div>
+      <p className="mb-2 text-sm font-medium text-slate-700">{label}</p>
+      {values.map((value) => (
+        <input key={value} name={name} type="hidden" value={value} />
+      ))}
+      <div className="relative">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400"
+        />
+        <input
+          className={`${inputClassName()} pl-9`}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search state or region"
+          type="search"
+          value={query}
+        />
+      </div>
+      {values.length ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {values.map((value) => (
+            <button
+              className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-800 transition hover:bg-brand-100"
+              key={value}
+              onClick={() => toggleValue(value)}
+              type="button"
+            >
+              {value}
+              <span aria-hidden="true" className="text-brand-500">
+                ×
+              </span>
+              <span className="sr-only">Remove {value}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className="mt-2 max-h-72 overflow-y-auto rounded-md border border-slate-200 bg-white">
+        {visibleOptions.length === 0 ? (
+          <p className="px-3 py-4 text-sm text-slate-500">
+            No states or regions found.
+          </p>
+        ) : (
+          visibleOptions.map((option) => {
+            const checked = valueSet.has(option);
+
+            return (
+              <label
+                className={[
+                  "flex cursor-pointer items-start gap-3 border-b border-slate-100 px-3 py-2 text-sm transition last:border-b-0",
+                  checked
+                    ? "bg-brand-50 text-brand-900"
+                    : "text-slate-700 hover:bg-slate-50"
+                ].join(" ")}
+                key={option}
+              >
+                <input
+                  checked={checked}
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  onChange={() => toggleValue(option)}
+                  type="checkbox"
+                />
+                <span className="block font-semibold">{option}</span>
+              </label>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function InstitutionForm({
   action,
   canApproveLegalDocuments = false,
@@ -253,6 +356,9 @@ export function InstitutionForm({
   );
   const [selectedCropFocus, setSelectedCropFocus] =
     useState<string[]>(initialCropFocus);
+  const [selectedRegionsCovered, setSelectedRegionsCovered] = useState(
+    institution?.regions_covered ?? []
+  );
   const [clientError, setClientError] = useState<string | null>(null);
   const accountOwners = users.filter((user) =>
     Array.from(accountOwnerRoles).some((role) => hasRole(user, role))
@@ -266,12 +372,11 @@ export function InstitutionForm({
     Array.from(technicalOwnerRoles).some((role) => hasRole(user, role))
   );
   const missingSetup = accountOwners.length === 0 || salesHeads.length === 0;
-  const selectedRegions = institution?.regions_covered ?? [];
   const coverageOptions = Array.from(
     new Set([
       ...INDIAN_STATES_AND_UTS,
       ...regions.map((region) => region.region_name),
-      ...selectedRegions
+      ...selectedRegionsCovered
     ])
   ).sort((a, b) => a.localeCompare(b));
   const showOtherCropFocus = selectedCropFocus.includes("Other");
@@ -524,26 +629,13 @@ export function InstitutionForm({
             </select>
           </div>
           <div className="md:col-span-2">
-            <p className="mb-2 text-sm font-medium text-slate-700">
-              States / regions covered
-            </p>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {coverageOptions.map((regionName) => (
-                <label
-                  className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700"
-                  key={regionName}
-                >
-                  <input
-                    className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                    defaultChecked={selectedRegions.includes(regionName)}
-                    name="regions_covered"
-                    type="checkbox"
-                    value={regionName}
-                  />
-                  {regionName}
-                </label>
-              ))}
-            </div>
+            <StateRegionMultiSelect
+              label="States / regions covered"
+              name="regions_covered"
+              onChange={setSelectedRegionsCovered}
+              options={coverageOptions}
+              values={selectedRegionsCovered}
+            />
           </div>
         </div>
       </div>
