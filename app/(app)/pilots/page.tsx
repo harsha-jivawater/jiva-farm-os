@@ -92,10 +92,7 @@ const listSelectColumns = [
   "village",
   "district",
   "state",
-  "pilot_owner_user_id",
   "research_assistant_user_id",
-  "agronomist_user_id",
-  "rd_head_user_id",
   "next_visit_due_date",
   "scale_up_recommended"
 ].join(",");
@@ -645,7 +642,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
           ) : null}
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-[1500px] divide-y divide-slate-200 text-left text-sm">
+          <table className="min-w-[1200px] divide-y divide-slate-200 text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-semibold">Pilot</th>
@@ -657,10 +654,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
                 <th className="px-4 py-3 font-semibold">Dealer</th>
                 <th className="px-4 py-3 font-semibold">Crop</th>
                 <th className="px-4 py-3 font-semibold">Location</th>
-                <th className="px-4 py-3 font-semibold">Owner</th>
                 <th className="px-4 py-3 font-semibold">RA</th>
-                <th className="px-4 py-3 font-semibold">Agronomist</th>
-                <th className="px-4 py-3 font-semibold">R&D Head</th>
                 <th className="px-4 py-3 font-semibold">Next visit</th>
                 <th className="px-4 py-3 font-semibold">Scale-up</th>
                 <th className="px-4 py-3 font-semibold">Actions</th>
@@ -713,26 +707,9 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
                     {pilot.village}, {pilot.district}, {pilot.state}
                   </td>
                   <td className="px-4 py-3 text-slate-700">
-                    {display(userMap.get(pilot.pilot_owner_user_id)?.full_name)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
                     {display(
                       pilot.research_assistant_user_id
                         ? userMap.get(pilot.research_assistant_user_id)?.full_name
-                        : null
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {display(
-                      pilot.agronomist_user_id
-                        ? userMap.get(pilot.agronomist_user_id)?.full_name
-                        : null
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {display(
-                      pilot.rd_head_user_id
-                        ? userMap.get(pilot.rd_head_user_id)?.full_name
                         : null
                     )}
                   </td>
@@ -751,7 +728,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
                 <tr>
                   <td
                     className="px-4 py-10 text-center text-sm text-slate-500"
-                    colSpan={16}
+                    colSpan={13}
                   >
                     No pilots found. Clear filters or add a pilot.
                   </td>
