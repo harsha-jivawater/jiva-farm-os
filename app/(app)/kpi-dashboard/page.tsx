@@ -209,6 +209,7 @@ type CachedKpiDashboardResult = KpiCacheMeta & {
 };
 
 type CurrentUser = Database["public"]["Tables"]["users"]["Row"];
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 const FY_START = "2026-04-01";
 
@@ -336,6 +337,237 @@ function readCachedKpiDashboardResult(
     dirtySections: readStringArray(row.dirtySections),
     refreshId: typeof row.refreshId === "string" ? row.refreshId : null,
     message: typeof row.message === "string" ? row.message : null
+  };
+}
+
+function endOfDateFilter(date: string) {
+  return `${date}T23:59:59.999Z`;
+}
+
+function hasDashboardEntityFilters(filters: DashboardFilters) {
+  return Boolean(
+    filters.state ||
+      filters.regionId ||
+      filters.rsmUserId ||
+      filters.productModel ||
+      filters.crop
+  );
+}
+
+async function loadResearchAssistantPilotIds(
+  supabase: SupabaseClient,
+  userId: string,
+  filters: DashboardFilters
+) {
+  let query = supabase
+    .from("pilots")
+    .select("id")
+    .eq("research_assistant_user_id", userId)
+    .is("deleted_at", null);
+
+  if (filters.state) {
+    query = query.eq("state", filters.state);
+  }
+
+  if (filters.regionId) {
+    query = query.eq("region_id", filters.regionId);
+  }
+
+  if (filters.rsmUserId) {
+    query = query.eq("rsm_user_id", filters.rsmUserId);
+  }
+
+  if (filters.productModel) {
+    query = query.eq("product_model", filters.productModel);
+  }
+
+  if (filters.crop) {
+    query = query.eq("crop", filters.crop);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[KPI Dashboard] Research Assistant pilot scope failed", error);
+    return [];
+  }
+
+  return (data ?? []).map((pilot) => pilot.id);
+}
+
+async function countResearchAssistantKpis(
+  supabase: SupabaseClient,
+  currentUser: CurrentUser,
+  filters: DashboardFilters
+): Promise<KpiDashboardSummary["researchAssistant"]> {
+  const filterPilotIds = await loadResearchAssistantPilotIds(
+    supabase,
+    currentUser.id,
+    filters
+  );
+  const shouldFilterByPilotIds = hasDashboardEntityFilters(filters);
+
+  let leadsQuery = supabase
+    .from("farmer_leads")
+    .select("id", { count: "exact", head: true })
+    .eq("created_by_user_id", currentUser.id)
+    .is("deleted_at", null)
+    .gte("lead_date", filters.startDate)
+    .lte("lead_date", filters.endDate);
+
+  if (filters.state) {
+    leadsQuery = leadsQuery.eq("state", filters.state);
+  }
+
+  if (filters.regionId) {
+    leadsQuery = leadsQuery.eq("region_id", filters.regionId);
+  }
+
+  if (filters.rsmUserId) {
+    leadsQuery = leadsQuery.eq("rsm_user_id", filters.rsmUserId);
+  }
+
+  if (filters.productModel) {
+    leadsQuery = leadsQuery.eq("product_recommended", filters.productModel);
+  }
+
+  if (filters.crop) {
+    leadsQuery = leadsQuery.eq("primary_crop", filters.crop);
+  }
+
+  let assignedPilotsQuery = supabase
+    .from("pilots")
+    .select("id", { count: "exact", head: true })
+    .eq("research_assistant_user_id", currentUser.id)
+    .is("deleted_at", null)
+    .gte("created_at", filters.startDate)
+    .lte("created_at", endOfDateFilter(filters.endDate));
+
+  if (filters.state) {
+    assignedPilotsQuery = assignedPilotsQuery.eq("state", filters.state);
+  }
+
+  if (filters.regionId) {
+    assignedPilotsQuery = assignedPilotsQuery.eq("region_id", filters.regionId);
+  }
+
+  if (filters.rsmUserId) {
+    assignedPilotsQuery = assignedPilotsQuery.eq("rsm_user_id", filters.rsmUserId);
+  }
+
+  if (filters.productModel) {
+    assignedPilotsQuery = assignedPilotsQuery.eq(
+      "product_model",
+      filters.productModel
+    );
+  }
+
+  if (filters.crop) {
+    assignedPilotsQuery = assignedPilotsQuery.eq("crop", filters.crop);
+  }
+
+  let visitsQuery = supabase
+    .from("planned_pilot_visits")
+    .select("id", { count: "exact", head: true })
+    .eq("assigned_user_id", currentUser.id)
+    .eq("planned_visit_status", "Completed")
+    .is("deleted_at", null)
+    .gte("planned_visit_date", filters.startDate)
+    .lte("planned_visit_date", filters.endDate);
+
+  if (shouldFilterByPilotIds) {
+    visitsQuery = filterPilotIds.length
+      ? visitsQuery.in("pilot_id", filterPilotIds)
+      : visitsQuery.is("pilot_id", null);
+  }
+
+  let reportsQuery = supabase
+    .from("visit_reports")
+    .select("id", { count: "exact", head: true })
+    .eq("submitted_by_user_id", currentUser.id)
+    .is("deleted_at", null)
+    .gte("report_date", filters.startDate)
+    .lte("report_date", filters.endDate);
+
+  if (shouldFilterByPilotIds) {
+    reportsQuery = filterPilotIds.length
+      ? reportsQuery.in("pilot_id", filterPilotIds)
+      : reportsQuery.is("pilot_id", null);
+  }
+
+  let followupsQuery = supabase
+    .from("followups")
+    .select("id", { count: "exact", head: true })
+    .eq("followup_owner_user_id", currentUser.id)
+    .eq("followup_status", "Completed")
+    .is("deleted_at", null)
+    .gte("followup_due_date", filters.startDate)
+    .lte("followup_due_date", filters.endDate);
+
+  if (shouldFilterByPilotIds) {
+    followupsQuery = filterPilotIds.length
+      ? followupsQuery.in("pilot_id", filterPilotIds)
+      : followupsQuery.is("pilot_id", null);
+  }
+
+  const [
+    leadsResult,
+    assignedPilotsResult,
+    visitsResult,
+    reportsResult,
+    followupsResult
+  ] = await Promise.all([
+    timeAsync("kpi dashboard ra leads created live count", () => leadsQuery),
+    timeAsync("kpi dashboard ra assigned pilots live count", () =>
+      assignedPilotsQuery
+    ),
+    timeAsync("kpi dashboard ra visits completed live count", () => visitsQuery),
+    timeAsync("kpi dashboard ra reports submitted live count", () => reportsQuery),
+    timeAsync("kpi dashboard ra followups completed live count", () =>
+      followupsQuery
+    )
+  ]);
+
+  for (const [label, result] of [
+    ["leads created", leadsResult],
+    ["assigned pilots", assignedPilotsResult],
+    ["visits completed", visitsResult],
+    ["reports submitted", reportsResult],
+    ["follow-ups completed", followupsResult]
+  ] as const) {
+    if (result.error) {
+      console.error(`[KPI Dashboard] Research Assistant ${label} count failed`, result.error);
+    }
+  }
+
+  return {
+    leadsCreated: leadsResult.count ?? 0,
+    assignedPilots: assignedPilotsResult.count ?? 0,
+    visitsCompleted: visitsResult.count ?? 0,
+    reportsSubmitted: reportsResult.count ?? 0,
+    followupsCompleted: followupsResult.count ?? 0
+  };
+}
+
+async function withLiveResearchAssistantKpis(
+  supabase: SupabaseClient,
+  currentUser: CurrentUser,
+  filters: DashboardFilters,
+  summary: KpiDashboardSummary
+) {
+  if (!hasRole(currentUser, "Research Assistant")) {
+    return summary;
+  }
+
+  const researchAssistant = await countResearchAssistantKpis(
+    supabase,
+    currentUser,
+    filters
+  );
+
+  return {
+    ...summary,
+    researchAssistant
   };
 }
 
@@ -1113,7 +1345,10 @@ function KpiDashboardSummaryView({
 
         {hasRole(currentUser, "Research Assistant") ? (
           <section>
-            <SectionTitle title="Research Assistant KPIs" />
+            <SectionTitle
+              title="Research Assistant KPIs"
+              description="Research Assistant KPIs are calculated live for your account."
+            />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <KpiCard
                 icon={Tractor}
@@ -1513,6 +1748,16 @@ export default async function KpiDashboardPage({
     const cachedResult = readCachedKpiDashboardResult(summaryData);
 
     if (cachedResult.isReady && cachedResult.summary) {
+      const summary = await timeAsync(
+        "kpi dashboard live research assistant override",
+        () =>
+          withLiveResearchAssistantKpis(
+            supabase,
+            currentUser,
+            filters,
+            cachedResult.summary as KpiDashboardSummary
+          )
+      );
       logPerf("kpi dashboard page total server render", startedAt);
 
       return (
@@ -1522,7 +1767,7 @@ export default async function KpiDashboardPage({
           currentUser={currentUser}
           filters={filters}
           refreshStatus={refreshStatus}
-          summary={cachedResult.summary}
+          summary={summary}
         />
       );
     }
