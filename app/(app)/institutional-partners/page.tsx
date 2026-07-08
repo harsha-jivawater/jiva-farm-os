@@ -38,7 +38,7 @@ import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canWriteModule, hasRole } from "@/lib/users/permissions";
+import { canManageInstitutionProfile, hasRole } from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
 import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
@@ -239,7 +239,7 @@ export default async function InstitutionalPartnersPage({
   const { canWrite, scope } = await timeAsync(
     "institutional partners role/permission resolution",
     async () => ({
-      canWrite: canWriteModule(currentUser, "institutional-partners"),
+      canWrite: canManageInstitutionProfile(currentUser),
       scope: await institutionScope(supabase, currentUser)
     })
   );
@@ -346,6 +346,12 @@ export default async function InstitutionalPartnersPage({
           </Link>
         ) : null}
       </div>
+
+      {paramValue(params.error) ? (
+        <div className="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+          {paramValue(params.error)}
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard icon={Building2} label="Total Institutions" value={kpis.total} />

@@ -4,7 +4,8 @@ import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import {
   createInstitutionContactAction,
   createInstitutionMeetingAction,
-  deleteInstitutionContactAction
+  deleteInstitutionContactAction,
+  updateInstitutionReviewAction
 } from "@/app/(app)/institutional-partners/actions";
 import { ContactForm } from "@/components/institutions/contact-form";
 import { InstitutionStatusPill } from "@/components/institutions/institution-status-pill";
@@ -31,9 +32,9 @@ import {
   meetingTypeOptions,
   opportunityTypeOptions,
   organizationTypeOptions,
+  overallPilotStatusOptions,
   priorityOptions,
   scaleUpStatusOptions,
-  overallPilotStatusOptions,
   yesNoPendingNaOptions
 } from "@/lib/institutions/options";
 import {
@@ -51,7 +52,10 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canWriteModule } from "@/lib/users/permissions";
+import {
+  canApproveLegalDocuments,
+  canManageInstitutionProfile
+} from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
 
 type InstitutionDetailPageProps = {
@@ -60,6 +64,7 @@ type InstitutionDetailPageProps = {
   }>;
   searchParams: Promise<{
     error?: string;
+    saved?: string;
   }>;
 };
 
@@ -69,12 +74,15 @@ type RelatedPilot = {
   pilot_name: string;
   pilot_type: string;
   pilot_status: string;
+  pilot_result_status: string;
+  result_summary: string | null;
+  next_visit_due_date: string | null;
   farmer_name_snapshot: string;
 };
 
 type LinkedDealer = Pick<
   Dealer,
-  "dealer_code" | "dealer_name" | "id" | "rsm_user_id"
+  "dealer_code" | "dealer_name" | "firm_name" | "id" | "rsm_user_id"
 >;
 
 function DetailItem({
@@ -94,6 +102,28 @@ function DetailItem({
   );
 }
 
+function Section({
+  children,
+  description,
+  title
+}: {
+  children: React.ReactNode;
+  description?: string;
+  title: string;
+}) {
+  return (
+    <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+        {description ? (
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        ) : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function userLabel(user: UserOption | undefined, fallback?: string | null) {
   if (user) {
     return `${user.full_name} · ${labelForRole(user.role)}`;
@@ -108,6 +138,114 @@ function displayCrops(crops: string[] | null | undefined) {
     : "Not set";
 }
 
+function isOverdue(value: string | null | undefined) {
+  if (!value) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(value) < today;
+}
+
+function hasActivePilot(pilots: RelatedPilot[]) {
+  return pilots.some(
+    (pilot) =>
+      !["Completed", "Closed", "Cancelled"].includes(pilot.pilot_status)
+  );
+}
+
+function isScaleUpActive(value: string | null | undefined) {
+  return [
+    "Discussion Active",
+    "Proposal Shared",
+    "Commercial Negotiation",
+    "PO / Approval Pending",
+    "Order Received",
+    "Installation Started",
+    "Active Scale-up"
+  ].includes(value ?? "");
+}
+
+function currentActionNeeded(
+  institution: Institution,
+  relatedPilots: RelatedPilot[]
+) {
+  const mouStatus = institution.mou_agreement_status ?? "";
+  const mouApproval = institution.mou_approval_status ?? "";
+  const mouNeedsApproval =
+    ["Pending", "Rejected"].includes(mouApproval) &&
+    !["Not Required", "Dropped"].includes(mouStatus) &&
+    (Boolean(institution.mou_agreement_link) ||
+      !["", "Not Started"].includes(mouStatus));
+
+  if (mouNeedsApproval) {
+    return "Legal approval needed";
+  }
+
+  if (institution.proposal_shared !== "Yes") {
+    return "Share proposal";
+  }
+
+  if (institution.presentation_shared !== "Yes") {
+    return "Share presentation";
+  }
+
+  if (isOverdue(institution.next_action_date)) {
+    return "Follow-up overdue";
+  }
+
+  if (hasActivePilot(relatedPilots)) {
+    return "Pilot in progress";
+  }
+
+  if (isScaleUpActive(institution.scale_up_status)) {
+    return "Scale-up follow-up";
+  }
+
+  return "Review next action";
+}
+
+function normalizeContactValue(value: string | null | undefined) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function normalizePhone(value: string | null | undefined) {
+  return value?.replace(/\D/g, "") ?? "";
+}
+
+function contactMatchesProfile(
+  contact: InstitutionContact,
+  institution: Institution
+) {
+  const profileEmail = normalizeContactValue(institution.main_contact_email);
+  const contactEmail = normalizeContactValue(contact.email);
+  const profilePhone = normalizePhone(institution.main_contact_number);
+  const contactPhone = normalizePhone(contact.phone);
+
+  if (profileEmail && contactEmail) {
+    return profileEmail === contactEmail;
+  }
+
+  if (profilePhone && contactPhone) {
+    return profilePhone === contactPhone;
+  }
+
+  return (
+    normalizeContactValue(contact.contact_name) ===
+      normalizeContactValue(institution.main_contact_person) &&
+    Boolean(institution.main_contact_person)
+  );
+}
+
+function hasProfileContact(institution: Institution) {
+  return Boolean(
+    institution.main_contact_person ||
+      institution.main_contact_number ||
+      institution.main_contact_email
+  );
+}
+
 export default async function InstitutionDetailPage({
   params,
   searchParams
@@ -119,7 +257,9 @@ export default async function InstitutionDetailPage({
     supabase,
     "/institutional-partners"
   );
-  const canWrite = canWriteModule(currentUser, "institutional-partners");
+  const canManageProfile = canManageInstitutionProfile(currentUser);
+  const canApproveLegal = canApproveLegalDocuments(currentUser);
+  const canOpenLegalOnly = canApproveLegal && !canManageProfile;
   const scope = await institutionScope(supabase, currentUser);
   let institutionQuery = supabase
     .from("institutions")
@@ -171,12 +311,13 @@ export default async function InstitutionDetailPage({
       .from("institution_meetings")
       .select("*")
       .eq("institution_id", institution.id)
+      .is("deleted_at", null)
       .order("meeting_date", { ascending: false })
       .order("created_at", { ascending: false }),
     supabase
       .from("pilots")
       .select(
-        "id, pilot_code, pilot_name, pilot_type, pilot_status, farmer_name_snapshot"
+        "id, pilot_code, pilot_name, pilot_type, pilot_status, pilot_result_status, result_summary, next_visit_due_date, farmer_name_snapshot"
       )
       .eq("institution_id", institution.id)
       .is("deleted_at", null)
@@ -193,9 +334,9 @@ export default async function InstitutionDetailPage({
       .order("created_at", { ascending: false }),
     supabase
       .from("dealers")
-      .select("id, dealer_code, dealer_name, rsm_user_id")
+      .select("id, dealer_code, dealer_name, firm_name, rsm_user_id")
       .is("deleted_at", null)
-      .order("dealer_name", { ascending: true })
+      .order("firm_name", { ascending: true })
   ]);
 
   const usersList = (users ?? []) as UserOption[];
@@ -244,6 +385,13 @@ export default async function InstitutionDetailPage({
     null,
     institution.id
   );
+  const updateReviewAction = updateInstitutionReviewAction.bind(
+    null,
+    institution.id
+  );
+  const showProfileContact =
+    hasProfileContact(institution) &&
+    !contactsList.some((contact) => contactMatchesProfile(contact, institution));
 
   return (
     <section>
@@ -264,13 +412,13 @@ export default async function InstitutionDetailPage({
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Back
           </Link>
-          {canWrite ? (
+          {canManageProfile || canOpenLegalOnly ? (
             <Link
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
               href={`/institutional-partners/${institution.id}/edit`}
             >
               <Pencil className="h-4 w-4" aria-hidden="true" />
-              Edit
+              {canManageProfile ? "Edit" : "Legal approval"}
             </Link>
           ) : null}
         </div>
@@ -282,107 +430,246 @@ export default async function InstitutionDetailPage({
         </div>
       ) : null}
 
+      {query.saved === "review" ? (
+        <div className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
+          Institution review saved.
+        </div>
+      ) : null}
+
       <div className="mb-5">
         <InstitutionStatusPill status={institution.institution_status} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <DetailItem
-          label="Organization name"
-          value={institution.organization_name}
-        />
-        <DetailItem
-          label="Organization type"
-          value={labelFor(
-            institution.organization_type,
-            organizationTypeOptions
-          )}
-        />
-        <DetailItem
-          label="Institution status"
-          value={labelFor(
-            institution.institution_status,
-            institutionStatusOptions
-          )}
-        />
-        <DetailItem label="Website" value={display(institution.website)} />
-        <DetailItem
-          label="Main contact"
-          value={`${institution.main_contact_person} · ${institution.main_contact_number}`}
-        />
-        <DetailItem
-          label="Main contact email"
-          value={display(institution.main_contact_email)}
-        />
-        <DetailItem
-          label="Account owner"
-          value={userLabel(
-            userMap.get(institution.account_owner_user_id),
-            institution.account_owner_user_id
-          )}
-        />
-        <DetailItem
-          label="Sales Head"
-          value={userLabel(
-            userMap.get(institution.sales_head_user_id),
-            institution.sales_head_user_id
-          )}
-        />
-        <DetailItem
-          label="RSM"
-          value={
-            institution.rsm_user_id
-              ? userLabel(userMap.get(institution.rsm_user_id), institution.rsm_user_id)
-              : "Not set; Sales Head is accountable"
-          }
-        />
-        <DetailItem
-          label="R&D Head"
-          value={userLabel(
-            institution.rd_head_user_id
-              ? userMap.get(institution.rd_head_user_id)
-              : undefined,
-            institution.rd_head_user_id
-          )}
-        />
-        <DetailItem
-          label="Technical owner"
-          value={userLabel(
-            institution.technical_owner_user_id
-              ? userMap.get(institution.technical_owner_user_id)
-              : undefined,
-            institution.technical_owner_user_id
-          )}
-        />
-        <DetailItem
-          label="Primary region"
-          value={
-            institution.primary_region_id
-              ? display(regionMap.get(institution.primary_region_id)?.region_name)
-              : "Not set"
-          }
-        />
-        <DetailItem
-          label="Regions covered"
-          value={displayList(institution.regions_covered)}
-        />
-        <DetailItem
-          label="Primary geography"
-          value={`${institution.districts_covered ?? "Not set"}, ${
-            institution.primary_state
-          }`}
-        />
-        <DetailItem
-          label="Key operating areas"
-          value={display(institution.key_operating_areas)}
-        />
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-slate-950">
+          Institution progress / action summary
+        </h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <DetailItem
+            label="Current action needed"
+            value={currentActionNeeded(institution, relatedPilotsList)}
+          />
+          <DetailItem
+            label="Institution status"
+            value={labelFor(
+              institution.institution_status,
+              institutionStatusOptions
+            )}
+          />
+          <DetailItem
+            label="Priority"
+            value={labelFor(institution.priority, priorityOptions)}
+          />
+          <DetailItem
+            label="Next action date"
+            value={formatDate(institution.next_action_date)}
+          />
+          <DetailItem
+            label="Support / blocker"
+            value={display(institution.support_required)}
+          />
+          <DetailItem
+            label="MOU legal approval"
+            value={display(institution.mou_approval_status)}
+          />
+          <DetailItem
+            label="Proposal shared"
+            value={labelFor(institution.proposal_shared, yesNoPendingNaOptions)}
+          />
+          <DetailItem
+            label="Presentation shared"
+            value={labelFor(
+              institution.presentation_shared,
+              yesNoPendingNaOptions
+            )}
+          />
+          <DetailItem
+            label="Opportunity type"
+            value={labelFor(institution.opportunity_type, opportunityTypeOptions)}
+          />
+          <DetailItem
+            label="Scale-up status"
+            value={labelFor(institution.scale_up_status, scaleUpStatusOptions)}
+          />
+          <DetailItem
+            label="Account owner"
+            value={userLabel(
+              userMap.get(institution.account_owner_user_id),
+              institution.account_owner_user_id
+            )}
+          />
+          <DetailItem
+            label="RSM"
+            value={
+              institution.rsm_user_id
+                ? userLabel(
+                    userMap.get(institution.rsm_user_id),
+                    institution.rsm_user_id
+                  )
+                : "Not set; Sales Head is accountable"
+            }
+          />
+          <DetailItem
+            label="Sales Head"
+            value={userLabel(
+              userMap.get(institution.sales_head_user_id),
+              institution.sales_head_user_id
+            )}
+          />
+          <DetailItem
+            label="R&D Head"
+            value={userLabel(
+              institution.rd_head_user_id
+                ? userMap.get(institution.rd_head_user_id)
+                : undefined,
+              institution.rd_head_user_id
+            )}
+          />
+          <DetailItem
+            label="Technical owner"
+            value={userLabel(
+              institution.technical_owner_user_id
+                ? userMap.get(institution.technical_owner_user_id)
+                : undefined,
+              institution.technical_owner_user_id
+            )}
+          />
+        </div>
       </div>
 
-      <div className="mt-6">
-        <h2 className="mb-3 text-base font-semibold text-slate-950">
-          Opportunity and scale-up
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <Section
+        description="Update the operational follow-up without changing stable institution profile fields."
+        title="Institution review and next action"
+      >
+        <div className="p-4">
+          {canManageProfile ? (
+            <form action={updateReviewAction} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div>
+                  <label
+                    className="mb-1.5 block text-sm font-medium text-slate-700"
+                    htmlFor="priority"
+                  >
+                    Priority
+                  </label>
+                  <select
+                    className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                    defaultValue={institution.priority ?? ""}
+                    id="priority"
+                    name="priority"
+                    required
+                  >
+                    {priorityOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    className="mb-1.5 block text-sm font-medium text-slate-700"
+                    htmlFor="next_action_date"
+                  >
+                    Next action date
+                  </label>
+                  <input
+                    className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                    defaultValue={institution.next_action_date ?? ""}
+                    id="next_action_date"
+                    name="next_action_date"
+                    required
+                    type="date"
+                  />
+                </div>
+                <DetailItem
+                  label="Last meeting"
+                  value={formatDate(institution.last_meeting_date)}
+                />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label
+                    className="mb-1.5 block text-sm font-medium text-slate-700"
+                    htmlFor="support_required"
+                  >
+                    Support / blocker
+                  </label>
+                  <textarea
+                    className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                    defaultValue={institution.support_required ?? ""}
+                    id="support_required"
+                    name="support_required"
+                  />
+                </div>
+                <div>
+                  <label
+                    className="mb-1.5 block text-sm font-medium text-slate-700"
+                    htmlFor="notes_from_last_interaction"
+                  >
+                    Notes from last interaction
+                  </label>
+                  <textarea
+                    className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                    defaultValue={institution.notes_from_last_interaction ?? ""}
+                    id="notes_from_last_interaction"
+                    name="notes_from_last_interaction"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label
+                    className="mb-1.5 block text-sm font-medium text-slate-700"
+                    htmlFor="remarks"
+                  >
+                    Remarks
+                  </label>
+                  <textarea
+                    className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                    defaultValue={institution.remarks ?? ""}
+                    id="remarks"
+                    name="remarks"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  className="inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                  type="submit"
+                >
+                  Save review
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <DetailItem
+                label="Priority"
+                value={labelFor(institution.priority, priorityOptions)}
+              />
+              <DetailItem
+                label="Next action date"
+                value={formatDate(institution.next_action_date)}
+              />
+              <DetailItem
+                label="Last meeting"
+                value={formatDate(institution.last_meeting_date)}
+              />
+              <DetailItem
+                label="Support / blocker"
+                value={display(institution.support_required)}
+              />
+              <DetailItem
+                label="Notes from last interaction"
+                value={display(institution.notes_from_last_interaction)}
+              />
+              <DetailItem label="Remarks" value={display(institution.remarks)} />
+            </div>
+          )}
+        </div>
+      </Section>
+
+      <Section title="Connected opportunity / scale-up potential">
+        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
           <DetailItem
             label="Opportunity type"
             value={labelFor(institution.opportunity_type, opportunityTypeOptions)}
@@ -393,10 +680,6 @@ export default async function InstitutionDetailPage({
               institution.expected_commercial_model,
               expectedCommercialModelOptions
             )}
-          />
-          <DetailItem
-            label="Priority"
-            value={labelFor(institution.priority, priorityOptions)}
           />
           <DetailItem
             label="Expected close month"
@@ -414,20 +697,8 @@ export default async function InstitutionDetailPage({
             value={display(institution.farmer_base_count)}
           />
           <DetailItem
-            label="Crop focus"
-            value={displayCrops(institution.crop_focus)}
-          />
-          <DetailItem
-            label="Other crop focus"
-            value={display(institution.other_crop_focus)}
-          />
-          <DetailItem
             label="Approx acreage"
             value={display(institution.approx_acreage_covered)}
-          />
-          <DetailItem
-            label="Scale-up status"
-            value={labelFor(institution.scale_up_status, scaleUpStatusOptions)}
           />
           <DetailItem
             label="Potential devices"
@@ -437,64 +708,17 @@ export default async function InstitutionDetailPage({
             label="Potential farmers"
             value={display(institution.total_scale_up_potential_farmers)}
           />
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <h2 className="mb-3 text-base font-semibold text-slate-950">
-          Meetings, proposals and operational references
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <DetailItem
-            label="First meeting"
-            value={formatDate(institution.first_meeting_date)}
+            label="Jiva use case"
+            value={display(institution.jiva_use_case)}
           />
           <DetailItem
-            label="Last meeting"
-            value={formatDate(institution.last_meeting_date)}
+            label="Current need or pain point"
+            value={display(institution.current_need_or_pain_point)}
           />
           <DetailItem
-            label="Next action"
-            value={formatDate(institution.next_action_date)}
-          />
-          <DetailItem
-            label="Meeting count"
-            value={display(institution.meeting_count)}
-          />
-          <DetailItem
-            label="Proposal shared"
-            value={labelFor(institution.proposal_shared, yesNoPendingNaOptions)}
-          />
-          <DetailItem
-            label="Proposal link"
-            value={<FileLink href={proposalUrl} label="View proposal" />}
-          />
-          <DetailItem
-            label="Presentation shared"
-            value={labelFor(
-              institution.presentation_shared,
-              yesNoPendingNaOptions
-            )}
-          />
-          <DetailItem
-            label="Presentation link"
-            value={<FileLink href={presentationUrl} label="View presentation" />}
-          />
-          <DetailItem
-            label="MoU agreement status"
-            value={labelFor(institution.mou_agreement_status, agreementStatusOptions)}
-          />
-          <DetailItem
-            label="MoU agreement file"
-            value={<FileLink href={mouUrl} label="View MOU" />}
-          />
-          <DetailItem
-            label="MOU legal approval"
-            value={display(institution.mou_approval_status)}
-          />
-          <DetailItem
-            label="Corporate PO reference"
-            value={display(institution.corporate_po_reference)}
+            label="Scale-up next step"
+            value={display(institution.scale_up_next_step)}
           />
           <DetailItem
             label="Overall pilot status"
@@ -503,51 +727,23 @@ export default async function InstitutionDetailPage({
               overallPilotStatusOptions
             )}
           />
-          <DetailItem
-            label="Management notes"
-            value={display(institution.notes_from_last_interaction)}
-          />
         </div>
-      </div>
+      </Section>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <DetailItem
-          label="Current need or pain point"
-          value={display(institution.current_need_or_pain_point)}
-        />
-        <DetailItem
-          label="Jiva use case"
-          value={display(institution.jiva_use_case)}
-        />
-        <DetailItem
-          label="Scale-up next step"
-          value={display(institution.scale_up_next_step)}
-        />
-        <DetailItem
-          label="Support required"
-          value={display(institution.support_required)}
-        />
-        <DetailItem label="Remarks" value={display(institution.remarks)} />
-      </div>
-
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-950">
-            Institution-linked pilots
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Farmer pilots conducted through this institution/company.
-          </p>
-        </div>
+      <Section
+        description="Farmer pilots conducted through this institution/company."
+        title="Institution pilots"
+      >
         {relatedPilotsList.length ? (
           <div className="overflow-x-auto">
-            <table className="min-w-[760px] divide-y divide-slate-200 text-left text-sm">
+            <table className="min-w-[900px] divide-y divide-slate-200 text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Pilot</th>
                   <th className="px-4 py-3 font-semibold">Farmer</th>
                   <th className="px-4 py-3 font-semibold">Type</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Result / next visit</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -570,6 +766,17 @@ export default async function InstitutionDetailPage({
                     <td className="px-4 py-3 text-slate-700">
                       {pilot.pilot_status}
                     </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      <p>{display(pilot.pilot_result_status)}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Next visit: {formatDate(pilot.next_visit_due_date)}
+                      </p>
+                      {pilot.result_summary ? (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {pilot.result_summary}
+                        </p>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -577,24 +784,18 @@ export default async function InstitutionDetailPage({
           </div>
         ) : (
           <div className="p-6 text-sm text-slate-500">
-            No pilots are linked to this institution yet.
+            No institution pilots yet.
           </div>
         )}
-      </div>
+      </Section>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-950">
-            Dealer connections
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Dealers supporting introductions, discussions, or institutional
-            opportunities.
-          </p>
-        </div>
+      <Section
+        description="Dealer-led introductions, discussions, or institutional opportunities."
+        title="Dealer-introduced opportunities"
+      >
         {dealerConnectionsList.length ? (
           <div className="overflow-x-auto">
-            <table className="min-w-[860px] divide-y divide-slate-200 text-left text-sm">
+            <table className="min-w-[900px] divide-y divide-slate-200 text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Dealer</th>
@@ -610,6 +811,7 @@ export default async function InstitutionDetailPage({
               <tbody className="divide-y divide-slate-100">
                 {dealerConnectionsList.map((connection) => {
                   const dealer = dealerMap.get(connection.dealer_id);
+                  const dealerName = dealer?.firm_name || dealer?.dealer_name;
 
                   return (
                     <tr key={connection.id} className="align-top">
@@ -619,7 +821,13 @@ export default async function InstitutionDetailPage({
                             className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
                             href={`/dealers/${dealer.id}`}
                           >
-                            {dealer.dealer_code} · {dealer.dealer_name}
+                            {dealerName}
+                            <span className="block text-xs font-medium text-slate-500">
+                              {dealer.dealer_code}
+                              {dealer.firm_name
+                                ? ` · Contact: ${dealer.dealer_name}`
+                                : ""}
+                            </span>
                           </Link>
                         ) : (
                           <span className="font-semibold text-slate-950">
@@ -646,13 +854,17 @@ export default async function InstitutionDetailPage({
                         <p>
                           Owner:{" "}
                           {connection.owner_user_id
-                            ? display(userMap.get(connection.owner_user_id)?.full_name)
+                            ? display(
+                                userMap.get(connection.owner_user_id)?.full_name
+                              )
                             : "Not set"}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
                           RSM:{" "}
                           {connection.rsm_user_id
-                            ? display(userMap.get(connection.rsm_user_id)?.full_name)
+                            ? display(
+                                userMap.get(connection.rsm_user_id)?.full_name
+                              )
                             : "Not set"}
                         </p>
                       </td>
@@ -667,20 +879,83 @@ export default async function InstitutionDetailPage({
           </div>
         ) : (
           <div className="p-6 text-sm text-slate-500">
-            No dealer connections yet.
+            No dealer-introduced opportunities yet.
           </div>
         )}
-      </div>
+      </Section>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-950">
-            Institution Contacts
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Store decision makers, influencers, and field contacts separately.
-          </p>
+      <Section title="Documents and legal approvals">
+        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
+          <DetailItem
+            label="Proposal shared"
+            value={
+              <>
+                {labelFor(institution.proposal_shared, yesNoPendingNaOptions)}
+                <p className="mt-1 text-xs font-medium text-slate-500">
+                  {formatDate(institution.proposal_shared_date)}
+                </p>
+                <FileLink href={proposalUrl} label="View proposal" />
+              </>
+            }
+          />
+          <DetailItem
+            label="Presentation shared"
+            value={
+              <>
+                {labelFor(
+                  institution.presentation_shared,
+                  yesNoPendingNaOptions
+                )}
+                <p className="mt-1 text-xs font-medium text-slate-500">
+                  {formatDate(institution.presentation_shared_date)}
+                </p>
+                <FileLink href={presentationUrl} label="View presentation" />
+              </>
+            }
+          />
+          <DetailItem
+            label="MOU agreement status"
+            value={labelFor(
+              institution.mou_agreement_status,
+              agreementStatusOptions
+            )}
+          />
+          <DetailItem
+            label="MOU agreement file"
+            value={<FileLink href={mouUrl} label="View MOU" />}
+          />
+          <DetailItem
+            label="MOU legal approval"
+            value={display(institution.mou_approval_status)}
+          />
+          <DetailItem
+            label="Approved / rejected by"
+            value={userLabel(
+              institution.mou_approved_by_user_id
+                ? userMap.get(institution.mou_approved_by_user_id)
+                : undefined,
+              institution.mou_approved_by_user_id
+            )}
+          />
+          <DetailItem
+            label="Approval date"
+            value={formatDate(institution.mou_approved_at)}
+          />
+          <DetailItem
+            label="HR & Legal comments"
+            value={display(institution.mou_hr_legal_comments)}
+          />
+          <DetailItem
+            label="Corporate PO reference"
+            value={display(institution.corporate_po_reference)}
+          />
         </div>
+      </Section>
+
+      <Section
+        description="Decision makers, influencers, and field contacts."
+        title="Contacts"
+      >
         <div className="overflow-x-auto">
           <table className="min-w-[900px] divide-y divide-slate-200 text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -694,6 +969,30 @@ export default async function InstitutionDetailPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {showProfileContact ? (
+                <tr className="align-top">
+                  <td className="px-4 py-3">
+                    <p className="font-semibold text-slate-950">
+                      {display(institution.main_contact_person)}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {display(institution.main_contact_designation)} · Primary
+                      contact from profile
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {display(institution.main_contact_number)} ·{" "}
+                      {display(institution.main_contact_email)}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">Not set</td>
+                  <td className="px-4 py-3 text-slate-700">Not set</td>
+                  <td className="px-4 py-3 text-slate-700">Not set</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    Profile contact
+                  </td>
+                  <td className="px-4 py-3 text-slate-500">Not editable here</td>
+                </tr>
+              ) : null}
               {contactsList.map((contact) => {
                 const deleteAction = deleteInstitutionContactAction.bind(
                   null,
@@ -728,33 +1027,31 @@ export default async function InstitutionDetailPage({
                       {display(contact.relationship_notes)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {canWrite ? (
-                          <>
-                            <Link
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
-                              href={`/institutional-partners/${institution.id}/contacts/${contact.id}/edit`}
+                      {canManageProfile ? (
+                        <div className="flex items-center gap-2">
+                          <Link
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+                            href={`/institutional-partners/${institution.id}/contacts/${contact.id}/edit`}
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
+                            <span className="sr-only">Edit contact</span>
+                          </Link>
+                          <form action={deleteAction}>
+                            <button
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                              type="submit"
                             >
-                              <Pencil className="h-4 w-4" aria-hidden="true" />
-                              <span className="sr-only">Edit contact</span>
-                            </Link>
-                            <form action={deleteAction}>
-                              <button
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-                                type="submit"
-                              >
-                                <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                <span className="sr-only">Delete contact</span>
-                              </button>
-                            </form>
-                          </>
-                        ) : null}
-                      </div>
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              <span className="sr-only">Delete contact</span>
+                            </button>
+                          </form>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 );
               })}
-              {contactsList.length === 0 ? (
+              {contactsList.length === 0 && !showProfileContact ? (
                 <tr>
                   <td
                     className="px-4 py-8 text-center text-sm text-slate-500"
@@ -767,26 +1064,22 @@ export default async function InstitutionDetailPage({
             </tbody>
           </table>
         </div>
-        {canWrite ? (
-          <div className="border-t border-slate-200 p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-950">
+        {canManageProfile ? (
+          <details className="border-t border-slate-200 p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-brand-700">
               Add contact
-            </h3>
-            <ContactForm action={createContactAction} compact />
-          </div>
+            </summary>
+            <div className="mt-4">
+              <ContactForm action={createContactAction} compact />
+            </div>
+          </details>
         ) : null}
-      </div>
+      </Section>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-950">
-            Institution Meetings
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Meetings feed the institution KPI cards and update the last
-            interaction summary.
-          </p>
-        </div>
+      <Section
+        description="Meetings are the interaction history for this institution."
+        title="Meetings / interaction history"
+      >
         <div className="overflow-x-auto">
           <table className="min-w-[1000px] divide-y divide-slate-200 text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -856,7 +1149,7 @@ export default async function InstitutionDetailPage({
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      {canWrite ? (
+                      {canManageProfile ? (
                         <Link
                           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
                           href={`/institutional-partners/${institution.id}/meetings/${meeting.id}/edit`}
@@ -882,20 +1175,128 @@ export default async function InstitutionDetailPage({
             </tbody>
           </table>
         </div>
-        {canWrite ? (
-          <div className="border-t border-slate-200 p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-950">
+        {canManageProfile ? (
+          <details className="border-t border-slate-200 p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-brand-700">
               Add meeting
-            </h3>
-            <MeetingForm
-              action={createMeetingAction}
-              compact
-              contacts={contactsList}
-              users={usersList}
-            />
-          </div>
+            </summary>
+            <div className="mt-4">
+              <MeetingForm
+                action={createMeetingAction}
+                compact
+                contacts={contactsList}
+                users={usersList}
+              />
+            </div>
+          </details>
         ) : null}
-      </div>
+      </Section>
+
+      <Section title="Institution profile">
+        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+          <DetailItem
+            label="Organization name"
+            value={institution.organization_name}
+          />
+          <DetailItem
+            label="Organization type"
+            value={labelFor(
+              institution.organization_type,
+              organizationTypeOptions
+            )}
+          />
+          <DetailItem label="Website" value={display(institution.website)} />
+          <DetailItem
+            label="Main contact person"
+            value={display(institution.main_contact_person)}
+          />
+          <DetailItem
+            label="Main contact designation"
+            value={display(institution.main_contact_designation)}
+          />
+          <DetailItem
+            label="Main contact phone"
+            value={display(institution.main_contact_number)}
+          />
+          <DetailItem
+            label="Main contact email"
+            value={display(institution.main_contact_email)}
+          />
+          <DetailItem
+            label="Primary region"
+            value={
+              institution.primary_region_id
+                ? display(regionMap.get(institution.primary_region_id)?.region_name)
+                : "Not set"
+            }
+          />
+          <DetailItem
+            label="Regions covered"
+            value={displayList(institution.regions_covered)}
+          />
+          <DetailItem
+            label="Primary geography"
+            value={`${institution.districts_covered ?? "Not set"}, ${
+              institution.primary_state
+            }`}
+          />
+          <DetailItem
+            label="Key operating areas"
+            value={display(institution.key_operating_areas)}
+          />
+          <DetailItem
+            label="Crop focus"
+            value={displayCrops(institution.crop_focus)}
+          />
+          <DetailItem
+            label="Other crop focus"
+            value={display(institution.other_crop_focus)}
+          />
+          <DetailItem
+            label="Account owner"
+            value={userLabel(
+              userMap.get(institution.account_owner_user_id),
+              institution.account_owner_user_id
+            )}
+          />
+          <DetailItem
+            label="Sales Head"
+            value={userLabel(
+              userMap.get(institution.sales_head_user_id),
+              institution.sales_head_user_id
+            )}
+          />
+          <DetailItem
+            label="RSM"
+            value={
+              institution.rsm_user_id
+                ? userLabel(
+                    userMap.get(institution.rsm_user_id),
+                    institution.rsm_user_id
+                  )
+                : "Not set; Sales Head is accountable"
+            }
+          />
+          <DetailItem
+            label="R&D Head"
+            value={userLabel(
+              institution.rd_head_user_id
+                ? userMap.get(institution.rd_head_user_id)
+                : undefined,
+              institution.rd_head_user_id
+            )}
+          />
+          <DetailItem
+            label="Technical owner"
+            value={userLabel(
+              institution.technical_owner_user_id
+                ? userMap.get(institution.technical_owner_user_id)
+                : undefined,
+              institution.technical_owner_user_id
+            )}
+          />
+        </div>
+      </Section>
     </section>
   );
 }

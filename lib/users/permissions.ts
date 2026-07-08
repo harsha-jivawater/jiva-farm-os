@@ -306,6 +306,12 @@ export function canApproveLegalDocuments(
   return hasAnyRole(user, ["Admin", "HR & Legal"]);
 }
 
+export function canManageInstitutionProfile(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, ["Admin", "Sales Head", "RSM", "Agronomist"]);
+}
+
 export function canApproveDeviceReturn(
   user: RoleCapableUser | null | undefined
 ) {

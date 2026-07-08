@@ -24,6 +24,7 @@ import { createClient } from "@/lib/supabase/server";
 import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import {
   canApproveLegalDocuments,
+  canManageInstitutionProfile,
   hasRole
 } from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
@@ -40,6 +41,18 @@ async function getCurrentProfile(supabase: SupabaseClient, errorPath: string) {
     errorPath,
     "institutional-partners"
   );
+}
+
+function assertCanManageInstitutionProfile(
+  profile: Awaited<ReturnType<typeof getCurrentProfile>>,
+  errorPath: string
+) {
+  if (!canManageInstitutionProfile(profile)) {
+    redirectWithError(
+      errorPath,
+      "HR & Legal can approve institutional documents but cannot change institution profile details."
+    );
+  }
 }
 
 async function revalidateInstitution(id: string) {
@@ -94,12 +107,7 @@ export async function createInstitutionAction(formData: FormData) {
   const profile = await getCurrentProfile(supabase, errorPath);
   const institutionId = crypto.randomUUID();
 
-  if (hasRole(profile, "HR & Legal")) {
-    redirectWithError(
-      errorPath,
-      "HR & Legal can approve institutional documents but cannot create institutions."
-    );
-  }
+  assertCanManageInstitutionProfile(profile, errorPath);
 
   const payload = institutionPayloadFromForm(formData);
   try {
@@ -234,6 +242,8 @@ export async function updateInstitutionAction(id: string, formData: FormData) {
     redirect(`/institutional-partners/${id}`);
   }
 
+  assertCanManageInstitutionProfile(profile, errorPath);
+
   const payload = institutionPayloadFromForm(formData);
   try {
     await applyUploadedFilesToPayload({
@@ -293,6 +303,50 @@ export async function updateInstitutionAction(id: string, formData: FormData) {
   redirect(`/institutional-partners/${id}`);
 }
 
+export async function updateInstitutionReviewAction(
+  institutionId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const errorPath = `/institutional-partners/${institutionId}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+  assertCanManageInstitutionProfile(profile, errorPath);
+
+  const priority = String(formData.get("priority") ?? "").trim();
+  const nextActionDate = String(formData.get("next_action_date") ?? "").trim();
+  const updatePayload: InstitutionUpdate = {
+    priority,
+    next_action_date: nextActionDate,
+    support_required:
+      String(formData.get("support_required") ?? "").trim() || undefined,
+    notes_from_last_interaction:
+      String(formData.get("notes_from_last_interaction") ?? "").trim() ||
+      undefined,
+    remarks: String(formData.get("remarks") ?? "").trim() || undefined
+  };
+
+  if (!updatePayload.priority) {
+    redirectWithError(errorPath, "Priority is required.");
+  }
+
+  if (!updatePayload.next_action_date) {
+    redirectWithError(errorPath, "Next action date is required.");
+  }
+
+  const { error } = await supabase
+    .from("institutions")
+    .update(updatePayload)
+    .eq("id", institutionId)
+    .is("deleted_at", null);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  await revalidateInstitution(institutionId);
+  redirect(`/institutional-partners/${institutionId}?saved=review`);
+}
+
 export async function createInstitutionContactAction(
   institutionId: string,
   formData: FormData
@@ -300,6 +354,7 @@ export async function createInstitutionContactAction(
   const supabase = await createClient();
   const errorPath = `/institutional-partners/${institutionId}`;
   const profile = await getCurrentProfile(supabase, errorPath);
+  assertCanManageInstitutionProfile(profile, errorPath);
   const payload = contactPayloadFromForm(formData);
   const validationError = validateContactPayload(payload);
 
@@ -344,7 +399,8 @@ export async function updateInstitutionContactAction(
 ) {
   const supabase = await createClient();
   const errorPath = `/institutional-partners/${institutionId}/contacts/${contactId}/edit`;
-  await getCurrentProfile(supabase, errorPath);
+  const profile = await getCurrentProfile(supabase, errorPath);
+  assertCanManageInstitutionProfile(profile, errorPath);
   const payload = contactPayloadFromForm(formData);
   const validationError = validateContactPayload(payload);
 
@@ -385,7 +441,8 @@ export async function deleteInstitutionContactAction(
 ) {
   const supabase = await createClient();
   const errorPath = `/institutional-partners/${institutionId}`;
-  await getCurrentProfile(supabase, errorPath);
+  const profile = await getCurrentProfile(supabase, errorPath);
+  assertCanManageInstitutionProfile(profile, errorPath);
 
   const { error } = await supabase
     .from("institution_contacts")
@@ -428,6 +485,7 @@ export async function createInstitutionMeetingAction(
   const supabase = await createClient();
   const errorPath = `/institutional-partners/${institutionId}`;
   const profile = await getCurrentProfile(supabase, errorPath);
+  assertCanManageInstitutionProfile(profile, errorPath);
   const meetingId = crypto.randomUUID();
   const payload = meetingPayloadFromForm(formData);
   try {
@@ -483,7 +541,8 @@ export async function updateInstitutionMeetingAction(
 ) {
   const supabase = await createClient();
   const errorPath = `/institutional-partners/${institutionId}/meetings/${meetingId}/edit`;
-  await getCurrentProfile(supabase, errorPath);
+  const profile = await getCurrentProfile(supabase, errorPath);
+  assertCanManageInstitutionProfile(profile, errorPath);
   const payload = meetingPayloadFromForm(formData);
   try {
     await applyUploadedFilesToPayload({

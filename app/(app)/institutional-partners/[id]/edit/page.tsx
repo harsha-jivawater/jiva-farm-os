@@ -9,7 +9,10 @@ import type {
 } from "@/lib/institutions/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { canApproveLegalDocuments } from "@/lib/users/permissions";
+import {
+  canApproveLegalDocuments,
+  canManageInstitutionProfile
+} from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
 
 type EditInstitutionPageProps = {
@@ -67,6 +70,8 @@ export default async function EditInstitutionPage({
 
   const institution = data as Institution;
   const updateAction = updateInstitutionAction.bind(null, institution.id);
+  const canApproveLegal = canApproveLegalDocuments(currentUser);
+  const canManageProfile = canManageInstitutionProfile(currentUser);
 
   return (
     <section>
@@ -77,7 +82,8 @@ export default async function EditInstitutionPage({
       />
       <InstitutionForm
         action={updateAction}
-        canApproveLegalDocuments={canApproveLegalDocuments(currentUser)}
+        canApproveLegalDocuments={canApproveLegal}
+        legalApprovalOnly={canApproveLegal && !canManageProfile}
         cancelHref={`/institutional-partners/${institution.id}`}
         error={query.error}
         institution={institution}

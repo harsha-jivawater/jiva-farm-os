@@ -3,6 +3,9 @@ import { InstitutionForm } from "@/components/institutions/institution-form";
 import { PageHeader } from "@/components/page-header";
 import type { RegionOption, UserOption } from "@/lib/institutions/types";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentInternalUser } from "@/lib/users/current-user";
+import { canManageInstitutionProfile } from "@/lib/users/permissions";
+import { redirect } from "next/navigation";
 
 type NewInstitutionPageProps = {
   searchParams: Promise<{
@@ -15,6 +18,19 @@ export default async function NewInstitutionPage({
 }: NewInstitutionPageProps) {
   const query = await searchParams;
   const supabase = await createClient();
+  const currentUser = await getCurrentInternalUser(
+    supabase,
+    "/institutional-partners"
+  );
+
+  if (!canManageInstitutionProfile(currentUser)) {
+    redirect(
+      `/institutional-partners?error=${encodeURIComponent(
+        "HR & Legal can approve institutional documents but cannot create institutions."
+      )}`
+    );
+  }
+
   const [{ data: users }, { data: regions }] = await Promise.all([
     supabase
       .from("users")

@@ -46,6 +46,7 @@ type InstitutionFormProps = {
   cancelHref: string;
   error?: string | null;
   institution?: Institution;
+  legalApprovalOnly?: boolean;
   regions: RegionOption[];
   users: UserOption[];
 };
@@ -201,6 +202,8 @@ function UserSelectField({
   options: UserOption[];
   required?: boolean;
 }) {
+  const placeholder = `Select ${label}`;
+
   return (
     <div>
       <label
@@ -217,7 +220,7 @@ function UserSelectField({
         name={name}
         required={required}
       >
-        <option value="">Select {label.toLowerCase()}</option>
+        <option value="">{placeholder}</option>
         {options.map((user) => (
           <option key={user.id} value={user.id}>
             {user.full_name} · {labelForRole(user.role)}
@@ -234,6 +237,7 @@ export function InstitutionForm({
   cancelHref,
   error,
   institution,
+  legalApprovalOnly = false,
   regions,
   users
 }: InstitutionFormProps) {
@@ -264,6 +268,58 @@ export function InstitutionForm({
   const missingSetup = accountOwners.length === 0 || salesHeads.length === 0;
   const selectedRegions = institution?.regions_covered ?? [];
   const showOtherCropFocus = selectedCropFocus.includes("Other");
+
+  if (legalApprovalOnly) {
+    return (
+      <form action={action} className="space-y-6">
+        {error ? (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="text-base font-semibold text-slate-950">
+            MOU legal approval
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Review the MOU file and update only the legal approval status.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <FileUploadField
+              currentValue={institution?.mou_agreement_link}
+              kind="document"
+              label="MoU agreement file"
+              name="mou_agreement_link"
+            />
+            <SelectField
+              defaultValue={institution?.mou_approval_status ?? "Pending"}
+              label="MOU legal approval"
+              name="mou_approval_status"
+              options={legalApprovalStatusOptions}
+            />
+            <div className="md:col-span-2">
+              <TextareaField
+                defaultValue={institution?.mou_hr_legal_comments}
+                label="HR & Legal comments"
+                name="mou_hr_legal_comments"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <Link
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            href={cancelHref}
+          >
+            Cancel
+          </Link>
+          <SubmitButton />
+        </div>
+      </form>
+    );
+  }
 
   return (
     <form

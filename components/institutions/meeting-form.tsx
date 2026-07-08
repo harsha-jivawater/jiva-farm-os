@@ -142,6 +142,8 @@ function UserSelectField({
   options: UserOption[];
   required?: boolean;
 }) {
+  const placeholder = `Select ${label}`;
+
   return (
     <div>
       <label
@@ -157,7 +159,7 @@ function UserSelectField({
         name={name}
         required={required}
       >
-        <option value="">Select {label.toLowerCase()}</option>
+        <option value="">{placeholder}</option>
         {options.map((user) => (
           <option key={user.id} value={user.id}>
             {user.full_name} · {labelForRole(user.role)}
