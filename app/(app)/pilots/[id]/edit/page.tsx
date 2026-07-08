@@ -81,7 +81,7 @@ export default async function EditPilotPage({
     { data: plannedVisits }
   ] = await Promise.all([
     pilotQuery.single(),
-    loadPilotFarmerLeadOptions(supabase),
+    loadPilotFarmerLeadOptions(supabase, { user: currentUser }),
     supabase
       .from("devices")
       .select(deviceColumns)

@@ -31,7 +31,7 @@ export default async function NewPilotPage({ searchParams }: NewPilotPageProps) 
     { data: institutions },
     { data: dealers }
   ] = await Promise.all([
-    loadPilotFarmerLeadOptions(supabase),
+    loadPilotFarmerLeadOptions(supabase, { user: currentUser }),
     supabase
       .from("devices")
       .select("id, serial_number, device_code, product_model, device_status")

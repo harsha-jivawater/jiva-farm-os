@@ -21,6 +21,11 @@ import {
   defaultPilotType,
   pilotResultStatusOptions
 } from "@/lib/pilots/options";
+import {
+  farmerLeadMatchesResearchAssistantGeography,
+  isPilotEligibleFarmerLead,
+  pilotFarmerLeadOptionColumns
+} from "@/lib/pilots/farmer-lead-options";
 import { suggestedPilotNameFromContext } from "@/lib/pilots/name-suggestions";
 import { plannedVisitTypeToActualVisitType } from "@/lib/pilots/visit-planning";
 import type {
@@ -31,6 +36,7 @@ import type {
   FarmerLeadUpdate,
   Pilot,
   PilotFormPayload,
+  PilotFarmerLeadOption,
   PilotInsert,
   PilotUpdate,
   PilotVisitInsert,
@@ -328,6 +334,71 @@ async function applyPilotNameFallback(
   }
 
   payload.pilot_name = suggestedName;
+}
+
+async function requirePilotFarmerLeadAccess({
+  currentPilotId,
+  errorPath,
+  existingFarmerLeadId,
+  farmerLeadId,
+  profile,
+  supabase
+}: {
+  currentPilotId?: string | null;
+  errorPath: string;
+  existingFarmerLeadId?: string | null;
+  farmerLeadId: string;
+  profile: Pick<
+    InternalUser,
+    "id" | "role" | "secondary_role" | "region_id" | "state"
+  >;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("farmer_leads")
+    .select(pilotFarmerLeadOptionColumns)
+    .eq("id", farmerLeadId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  if (!data) {
+    redirectWithError(errorPath, "Selected farmer lead was not found.");
+  }
+
+  const lead = data as PilotFarmerLeadOption;
+  const isExistingLeadOnThisPilot =
+    Boolean(existingFarmerLeadId) && lead.id === existingFarmerLeadId;
+
+  if (lead.linked_pilot_id && lead.linked_pilot_id !== currentPilotId) {
+    redirectWithError(
+      errorPath,
+      "Selected Farmer Lead is already linked to another active pilot."
+    );
+  }
+
+  if (!isExistingLeadOnThisPilot && !isPilotEligibleFarmerLead(lead)) {
+    redirectWithError(
+      errorPath,
+      "Selected Farmer Lead is not eligible for pilot creation."
+    );
+  }
+
+  if (
+    hasAnyRole(profile, ["Research Assistant"]) &&
+    !isExistingLeadOnThisPilot &&
+    !farmerLeadMatchesResearchAssistantGeography(lead, profile)
+  ) {
+    redirectWithError(
+      errorPath,
+      "Research Assistants can create pilots only for eligible Farmer Leads in their assigned state/region."
+    );
+  }
+
+  return lead;
 }
 
 async function syncFarmerLeadPilotState({
@@ -822,6 +893,13 @@ export async function createPilotAction(formData: FormData) {
     );
   }
 
+  await requirePilotFarmerLeadAccess({
+    errorPath,
+    farmerLeadId,
+    profile,
+    supabase
+  });
+
   if (initialPlannedVisits.length > 0 && !canManageVisitPlans(profile)) {
     redirectWithError(
       errorPath,
@@ -965,6 +1043,15 @@ export async function updatePilotAction(id: string, formData: FormData) {
   if (validationError || !farmerLeadId) {
     redirectWithError(errorPath, validationError ?? "Select a farmer lead.");
   }
+
+  await requirePilotFarmerLeadAccess({
+    currentPilotId: id,
+    errorPath,
+    existingFarmerLeadId: existingPilot.farmer_lead_id,
+    farmerLeadId,
+    profile,
+    supabase
+  });
 
   if (
     !(await userHasRole(
