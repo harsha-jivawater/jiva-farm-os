@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canViewModule } from "@/lib/users/permissions";
+import { todayDate } from "@/lib/pilots/form-data";
 import {
   displayPlannedVisitStatus,
   plannedVisitStatusOptions
@@ -71,7 +72,7 @@ export default async function MyVisitsPage({
     notFound();
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayDate();
   const { data } = await supabase
     .from("planned_pilot_visits")
     .select("*")
@@ -87,6 +88,7 @@ export default async function MyVisitsPage({
         .from("pilots")
         .select("id, pilot_code, pilot_name, farmer_name_snapshot, village, district")
         .in("id", pilotIds)
+        .is("deleted_at", null)
     : { data: [] };
   const pilotMap = new Map(
     ((pilotData ?? []) as PilotSummary[]).map((pilot) => [pilot.id, pilot])
@@ -106,6 +108,11 @@ export default async function MyVisitsPage({
   );
   const overdueVisits = pendingVisits.filter(
     (visit) => visit.planned_visit_date < today
+  );
+  const needsReportVisits = pendingVisits.filter(
+    (visit) =>
+      visit.planned_visit_status === "In Progress" ||
+      visit.planned_visit_date <= today
   );
   const completedVisits = visits.filter((visit) => visit.linked_visit_report_id);
 
@@ -137,8 +144,8 @@ export default async function MyVisitsPage({
           <p className="mt-2 text-2xl font-semibold text-slate-950">{overdueVisits.length}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-slate-500">Pending report</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{pendingVisits.length}</p>
+          <p className="text-sm text-slate-500">Needs report</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{needsReportVisits.length}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Completed</p>
@@ -203,6 +210,13 @@ export default async function MyVisitsPage({
                 </p>
               ) : null}
 
+              {visit.planned_visit_status === "In Progress" &&
+              !visit.linked_visit_report_id ? (
+                <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                  Started · Report pending
+                </p>
+              ) : null}
+
               <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
                 {!visit.linked_visit_report_id ? (
                   <>
@@ -226,7 +240,9 @@ export default async function MyVisitsPage({
                       className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 sm:w-auto"
                       href={`/pilots/${visit.pilot_id}?planned_visit_id=${visit.id}#add-visit-report`}
                     >
-                      Submit report
+                      {visit.planned_visit_status === "In Progress"
+                        ? "Continue / Submit report"
+                        : "Submit report"}
                       <ArrowRight className="h-4 w-4" aria-hidden="true" />
                     </Link>
                   </>

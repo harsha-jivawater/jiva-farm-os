@@ -276,6 +276,12 @@ export function VisitReportForm({
     "R&D Head",
     "Admin"
   ]);
+  const isResearchAssistant = currentUser.role === "Research Assistant";
+  const canApprovePartnerSharing = hasAnyRole(currentUser, [
+    "Admin",
+    "Management",
+    "R&D Head"
+  ]);
   const selectedPlannedVisit = plannedVisits.find(
     (visit) => visit.id === selectedPlannedVisitId
   );
@@ -371,13 +377,25 @@ export function VisitReportForm({
             ))}
           </select>
         </div>
-        <UserSelect
-          defaultValue={report?.submitted_by_user_id ?? currentUser.id}
-          label="Submitted by"
-          name="submitted_by_user_id"
-          options={submittedByUsers}
-          required
-        />
+        {isResearchAssistant ? (
+          <div>
+            <p className="mb-1.5 block text-sm font-medium text-slate-700">
+              Submitted by
+            </p>
+            <input name="submitted_by_user_id" type="hidden" value={currentUser.id} />
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+              {currentUser.full_name} · Research Assistant
+            </div>
+          </div>
+        ) : (
+          <UserSelect
+            defaultValue={report?.submitted_by_user_id ?? currentUser.id}
+            label="Submitted by"
+            name="submitted_by_user_id"
+            options={submittedByUsers}
+            required
+          />
+        )}
         {showReviewApproval ? (
           <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
             <p className="text-sm font-medium text-slate-700">
@@ -541,7 +559,7 @@ export function VisitReportForm({
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3">
           <h3 className="text-sm font-semibold text-slate-950">
-            Evidence Uploads, optional
+            Evidence Uploads
           </h3>
           <p className="mt-1 text-sm text-slate-600">
             Add photos or a data sheet when the visit has supporting evidence.
@@ -550,8 +568,9 @@ export function VisitReportForm({
         <div className="grid gap-4 md:grid-cols-2">
           <FileUploadField
             currentValue={report?.photo_folder_link}
-            kind="zip"
-            label="Report photos ZIP"
+            helperText="Upload one visit photo. Existing ZIP links remain saved."
+            kind="image"
+            label="Report photos"
             name="photo_folder_link"
           />
           <FileUploadField
@@ -569,11 +588,20 @@ export function VisitReportForm({
           label="Issue observed"
           name="issue_observed"
         />
-        <CheckboxField
-          defaultChecked={report?.approved_for_partner_sharing}
-          label="Approved for partner sharing"
-          name="approved_for_partner_sharing"
-        />
+        {!canApprovePartnerSharing && report?.approved_for_partner_sharing ? (
+          <input
+            name="approved_for_partner_sharing"
+            type="hidden"
+            value="true"
+          />
+        ) : null}
+        {canApprovePartnerSharing ? (
+          <CheckboxField
+            defaultChecked={report?.approved_for_partner_sharing}
+            label="Approved for partner sharing"
+            name="approved_for_partner_sharing"
+          />
+        ) : null}
         {canApproveFinalPilotReport ? (
           <CheckboxField
             defaultChecked={pilot.scale_up_recommended}

@@ -1468,7 +1468,7 @@ export async function createVisitReportAction(
     await applyUploadedFilesToPayload({
       fields: [
         { fieldName: "report_link", kind: "document" },
-        { fieldName: "photo_folder_link", kind: "zip" },
+        { fieldName: "photo_folder_link", kind: "image" },
         { fieldName: "data_sheet_link", kind: "sheet" }
       ],
       folder: "visit-reports",
@@ -1624,7 +1624,7 @@ export async function updateVisitReportAction(
     await applyUploadedFilesToPayload({
       fields: [
         { fieldName: "report_link", kind: "document" },
-        { fieldName: "photo_folder_link", kind: "zip" },
+        { fieldName: "photo_folder_link", kind: "image" },
         { fieldName: "data_sheet_link", kind: "sheet" }
       ],
       folder: "visit-reports",
