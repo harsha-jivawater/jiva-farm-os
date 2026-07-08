@@ -110,6 +110,15 @@ export async function createInstitutionAction(formData: FormData) {
   assertCanManageInstitutionProfile(profile, errorPath);
 
   const payload = institutionPayloadFromForm(formData);
+
+  if (hasRole(profile, "R&D Head") && !payload.rd_head_user_id) {
+    payload.rd_head_user_id = profile.id;
+  }
+
+  if (hasRole(profile, "Agronomist") && !payload.technical_owner_user_id) {
+    payload.technical_owner_user_id = profile.id;
+  }
+
   try {
     await applyUploadedFilesToPayload({
       fields: [

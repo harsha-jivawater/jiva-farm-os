@@ -309,7 +309,13 @@ export function canApproveLegalDocuments(
 export function canManageInstitutionProfile(
   user: RoleCapableUser | null | undefined
 ) {
-  return hasAnyRole(user, ["Admin", "Sales Head", "RSM", "Agronomist"]);
+  return hasAnyRole(user, [
+    "Admin",
+    "Sales Head",
+    "RSM",
+    "R&D Head",
+    "Agronomist"
+  ]);
 }
 
 export function canApproveDeviceReturn(

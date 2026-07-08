@@ -19,11 +19,14 @@ import {
 } from "@/lib/dealers/options";
 import type { Dealer, DealerInstitutionLink } from "@/lib/dealers/types";
 import {
+  funnelStageOptions,
+  labelFor as leadLabelFor
+} from "@/lib/farmer-leads/options";
+import {
   agreementStatusOptions,
   decisionRoleOptions,
   departmentOptions,
   expectedCommercialModelOptions,
-  farmerRelationshipTypeOptions,
   influenceLevelOptions,
   institutionStatusOptions,
   labelFor,
@@ -32,7 +35,6 @@ import {
   meetingTypeOptions,
   opportunityTypeOptions,
   organizationTypeOptions,
-  overallPilotStatusOptions,
   priorityOptions,
   scaleUpStatusOptions,
   yesNoPendingNaOptions
@@ -70,6 +72,7 @@ type InstitutionDetailPageProps = {
 
 type RelatedPilot = {
   id: string;
+  farmer_lead_id: string;
   pilot_code: string;
   pilot_name: string;
   pilot_type: string;
@@ -78,6 +81,19 @@ type RelatedPilot = {
   result_summary: string | null;
   next_visit_due_date: string | null;
   farmer_name_snapshot: string;
+};
+
+type LinkedFarmerLead = {
+  id: string;
+  lead_code: string;
+  farmer_name: string;
+  funnel_stage: string;
+  lead_status: string;
+  primary_crop: string;
+  owner_user_id: string;
+  rsm_user_id: string;
+  linked_institution_id: string | null;
+  linked_pilot_id: string | null;
 };
 
 type LinkedDealer = Pick<
@@ -98,6 +114,37 @@ function DetailItem({
       <div className="mt-2 break-words text-sm font-semibold leading-6 text-slate-950">
         {value}
       </div>
+    </div>
+  );
+}
+
+function SummaryCard({
+  helper,
+  label,
+  tone = "neutral",
+  value
+}: {
+  helper?: React.ReactNode;
+  label: string;
+  tone?: "danger" | "neutral" | "success" | "warning";
+  value: React.ReactNode;
+}) {
+  const toneClassNames = {
+    danger: "border-red-200 bg-red-50",
+    neutral: "border-slate-200 bg-slate-50",
+    success: "border-emerald-200 bg-emerald-50",
+    warning: "border-amber-200 bg-amber-50"
+  };
+
+  return (
+    <div className={`rounded-lg border p-3 ${toneClassNames[tone]}`}>
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="mt-2 break-words text-lg font-semibold leading-6 text-slate-950">
+        {value}
+      </div>
+      {helper ? <p className="mt-1 text-xs text-slate-500">{helper}</p> : null}
     </div>
   );
 }
@@ -138,6 +185,14 @@ function displayCrops(crops: string[] | null | undefined) {
     : "Not set";
 }
 
+function formatNumber(value: number | null | undefined, suffix = "") {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "Not set";
+  }
+
+  return `${new Intl.NumberFormat("en-IN").format(value)}${suffix}`;
+}
+
 function isOverdue(value: string | null | undefined) {
   if (!value) {
     return false;
@@ -165,6 +220,26 @@ function isScaleUpActive(value: string | null | undefined) {
     "Installation Started",
     "Active Scale-up"
   ].includes(value ?? "");
+}
+
+function pilotRank(pilot: RelatedPilot) {
+  if (!["Completed", "Closed", "Cancelled"].includes(pilot.pilot_status)) {
+    return 0;
+  }
+
+  return 1;
+}
+
+function leadSourceLabel(lead: LinkedFarmerLead) {
+  if (lead.linked_institution_id) {
+    return "Direct institution link";
+  }
+
+  if (lead.linked_pilot_id) {
+    return "Linked through institution pilot";
+  }
+
+  return "Linked proof point";
 }
 
 function currentActionNeeded(
@@ -313,7 +388,7 @@ export default async function InstitutionDetailPage({
     supabase
       .from("pilots")
       .select(
-        "id, pilot_code, pilot_name, pilot_type, pilot_status, pilot_result_status, result_summary, next_visit_due_date, farmer_name_snapshot"
+        "id, farmer_lead_id, pilot_code, pilot_name, pilot_type, pilot_status, pilot_result_status, result_summary, next_visit_due_date, farmer_name_snapshot"
       )
       .eq("institution_id", institution.id)
       .is("deleted_at", null)
@@ -339,6 +414,29 @@ export default async function InstitutionDetailPage({
   const contactsList = (contacts ?? []) as InstitutionContact[];
   const meetingsList = (meetings ?? []) as InstitutionMeeting[];
   const relatedPilotsList = (relatedPilots ?? []) as RelatedPilot[];
+  const pilotFarmerLeadIds = Array.from(
+    new Set(
+      relatedPilotsList
+        .map((pilot) => pilot.farmer_lead_id)
+        .filter(Boolean)
+    )
+  );
+  const farmerLeadFilters = [
+    `linked_institution_id.eq.${institution.id}`,
+    ...(pilotFarmerLeadIds.length
+      ? [`id.in.(${pilotFarmerLeadIds.join(",")})`]
+      : [])
+  ];
+  const { data: linkedFarmerLeads } = await supabase
+    .from("farmer_leads")
+    .select(
+      "id, lead_code, farmer_name, funnel_stage, lead_status, primary_crop, owner_user_id, rsm_user_id, linked_institution_id, linked_pilot_id"
+    )
+    .or(farmerLeadFilters.join(","))
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(25);
+  const linkedFarmerLeadsList = (linkedFarmerLeads ?? []) as LinkedFarmerLead[];
   const dealerConnectionsList = (dealerConnections ?? []) as Pick<
     DealerInstitutionLink,
     | "id"
@@ -392,6 +490,18 @@ export default async function InstitutionDetailPage({
     Boolean(institution.presentation_link) ||
     Boolean(institution.presentation_shared_date) ||
     institution.presentation_shared === "Yes";
+  const farmerPotential =
+    institution.total_scale_up_potential_farmers ??
+    institution.farmer_base_count ??
+    null;
+  const minimumDeviceOpportunity = farmerPotential;
+  const statedPotentialDevices = institution.total_scale_up_potential_devices;
+  const leadProofPilot = [...relatedPilotsList].sort(
+    (a, b) => pilotRank(a) - pilotRank(b)
+  )[0];
+  const remainingPilots = leadProofPilot
+    ? relatedPilotsList.filter((pilot) => pilot.id !== leadProofPilot.id)
+    : [];
 
   return (
     <section>
@@ -442,83 +552,58 @@ export default async function InstitutionDetailPage({
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-slate-950">
-          Institution progress / action summary
+          Institution opportunity summary
         </h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DetailItem
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <SummaryCard
             label="Current action needed"
+            tone={isOverdue(institution.next_action_date) ? "warning" : "neutral"}
             value={currentActionNeeded(institution, relatedPilotsList)}
           />
-          <DetailItem
+          <SummaryCard
             label="Institution status"
             value={labelFor(
               institution.institution_status,
               institutionStatusOptions
             )}
           />
-          <DetailItem
+          <SummaryCard
             label="Priority"
+            tone={institution.priority === "High" ? "warning" : "neutral"}
             value={labelFor(institution.priority, priorityOptions)}
           />
-          <DetailItem
+          <SummaryCard
             label="Next action date"
             value={formatDate(institution.next_action_date)}
           />
-          <DetailItem
+          <SummaryCard
             label="Support / blocker"
             value={display(institution.support_required)}
           />
-          <DetailItem
-            label="MOU legal approval"
+          <SummaryCard
+            label="MOU/legal approval"
             value={display(institution.mou_approval_status)}
           />
-          <DetailItem
+          <SummaryCard
             label="Proposal shared"
             value={labelFor(institution.proposal_shared, yesNoPendingNaOptions)}
           />
-          <DetailItem
+          <SummaryCard
             label="Opportunity type"
             value={labelFor(institution.opportunity_type, opportunityTypeOptions)}
           />
-          <DetailItem
+          <SummaryCard
             label="Scale-up status"
             value={labelFor(institution.scale_up_status, scaleUpStatusOptions)}
           />
-          <DetailItem
+          <SummaryCard
             label="Account owner"
             value={userLabel(
               userMap.get(institution.account_owner_user_id),
               institution.account_owner_user_id
             )}
           />
-          <DetailItem
-            label="RSM"
-            value={
-              institution.rsm_user_id
-                ? userLabel(
-                    userMap.get(institution.rsm_user_id),
-                    institution.rsm_user_id
-                  )
-                : "Not set; Sales Head is accountable"
-            }
-          />
-          <DetailItem
-            label="Sales Head"
-            value={userLabel(
-              userMap.get(institution.sales_head_user_id),
-              institution.sales_head_user_id
-            )}
-          />
-          <DetailItem
-            label="R&D Head"
-            value={userLabel(
-              institution.rd_head_user_id
-                ? userMap.get(institution.rd_head_user_id)
-                : undefined,
-              institution.rd_head_user_id
-            )}
-          />
-          <DetailItem
+          <SummaryCard
             label="Technical owner"
             value={userLabel(
               institution.technical_owner_user_id
@@ -530,256 +615,492 @@ export default async function InstitutionDetailPage({
         </div>
       </div>
 
-      <Section
-        description="Update the operational follow-up without changing stable institution profile fields."
-        title="Institution review and next action"
-      >
-        <div className="p-4">
-          {canManageProfile ? (
-            <form action={updateReviewAction} className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <div>
-                  <label
-                    className="mb-1.5 block text-sm font-medium text-slate-700"
-                    htmlFor="priority"
-                  >
-                    Priority
-                  </label>
-                  <select
-                    className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                    defaultValue={institution.priority ?? ""}
-                    id="priority"
-                    name="priority"
-                    required
-                  >
-                    {priorityOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-sm font-medium text-slate-700"
-                    htmlFor="next_action_date"
-                  >
-                    Next action date
-                  </label>
-                  <input
-                    className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                    defaultValue={institution.next_action_date ?? ""}
-                    id="next_action_date"
-                    name="next_action_date"
-                    required
-                    type="date"
-                  />
-                </div>
-                <DetailItem
-                  label="Last meeting"
-                  value={formatDate(institution.last_meeting_date)}
-                />
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label
-                    className="mb-1.5 block text-sm font-medium text-slate-700"
-                    htmlFor="support_required"
-                  >
-                    Support / blocker
-                  </label>
-                  <textarea
-                    className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                    defaultValue={institution.support_required ?? ""}
-                    id="support_required"
-                    name="support_required"
-                  />
-                </div>
-                <div>
-                  <label
-                    className="mb-1.5 block text-sm font-medium text-slate-700"
-                    htmlFor="notes_from_last_interaction"
-                  >
-                    Notes from last interaction
-                  </label>
-                  <textarea
-                    className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                    defaultValue={institution.notes_from_last_interaction ?? ""}
-                    id="notes_from_last_interaction"
-                    name="notes_from_last_interaction"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label
-                    className="mb-1.5 block text-sm font-medium text-slate-700"
-                    htmlFor="remarks"
-                  >
-                    Remarks
-                  </label>
-                  <textarea
-                    className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-                    defaultValue={institution.remarks ?? ""}
-                    id="remarks"
-                    name="remarks"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <button
-                  className="inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
-                  type="submit"
-                >
-                  Save review
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <DetailItem
-                label="Priority"
-                value={labelFor(institution.priority, priorityOptions)}
-              />
-              <DetailItem
-                label="Next action date"
-                value={formatDate(institution.next_action_date)}
-              />
-              <DetailItem
-                label="Last meeting"
-                value={formatDate(institution.last_meeting_date)}
-              />
-              <DetailItem
-                label="Support / blocker"
-                value={display(institution.support_required)}
-              />
-              <DetailItem
-                label="Notes from last interaction"
-                value={display(institution.notes_from_last_interaction)}
-              />
-              <DetailItem label="Remarks" value={display(institution.remarks)} />
-            </div>
-          )}
+      <Section title="Business opportunity / scale-up potential">
+        <div className="grid gap-4 p-4 lg:grid-cols-[1.2fr_1fr]">
+          <div className="rounded-xl border border-brand-200 bg-brand-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+              Minimum device opportunity
+            </p>
+            <p className="mt-3 text-3xl font-semibold text-slate-950">
+              {formatNumber(minimumDeviceOpportunity, " devices")}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Based on at least 1 device per farmer.
+            </p>
+            {typeof statedPotentialDevices === "number" ? (
+              <p className="mt-3 text-sm font-medium text-slate-700">
+                Stated potential:{" "}
+                {formatNumber(statedPotentialDevices, " devices")}
+                {statedPotentialDevices !== minimumDeviceOpportunity
+                  ? " · differs from calculated minimum"
+                  : " · matches calculated minimum"}
+              </p>
+            ) : null}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SummaryCard
+              helper={
+                institution.total_scale_up_potential_farmers
+                  ? "From scale-up potential"
+                  : "From farmer base count"
+              }
+              label="Total farmer potential"
+              value={formatNumber(farmerPotential, " farmers")}
+            />
+            <SummaryCard
+              label="Current pilot proof count"
+              value={formatNumber(relatedPilotsList.length)}
+            />
+            <SummaryCard
+              label="Commercial model"
+              value={labelFor(
+                institution.expected_commercial_model,
+                expectedCommercialModelOptions
+              )}
+            />
+            <SummaryCard
+              label="Expected close month"
+              value={formatMonth(institution.expected_close_month)}
+            />
+          </div>
         </div>
-      </Section>
-
-      <Section title="Connected opportunity / scale-up potential">
-        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 border-t border-slate-100 p-4 md:grid-cols-3">
           <DetailItem
-            label="Opportunity type"
-            value={labelFor(institution.opportunity_type, opportunityTypeOptions)}
-          />
-          <DetailItem
-            label="Expected commercial model"
-            value={labelFor(
-              institution.expected_commercial_model,
-              expectedCommercialModelOptions
-            )}
-          />
-          <DetailItem
-            label="Expected close month"
-            value={formatMonth(institution.expected_close_month)}
-          />
-          <DetailItem
-            label="Farmer relationship"
-            value={labelFor(
-              institution.farmer_relationship_type,
-              farmerRelationshipTypeOptions
-            )}
-          />
-          <DetailItem
-            label="Farmer base"
-            value={display(institution.farmer_base_count)}
-          />
-          <DetailItem
-            label="Approx acreage"
-            value={display(institution.approx_acreage_covered)}
-          />
-          <DetailItem
-            label="Potential devices"
-            value={display(institution.total_scale_up_potential_devices)}
-          />
-          <DetailItem
-            label="Potential farmers"
-            value={display(institution.total_scale_up_potential_farmers)}
+            label="Current need / pain point"
+            value={display(institution.current_need_or_pain_point)}
           />
           <DetailItem
             label="Jiva use case"
             value={display(institution.jiva_use_case)}
           />
           <DetailItem
-            label="Current need or pain point"
-            value={display(institution.current_need_or_pain_point)}
-          />
-          <DetailItem
             label="Scale-up next step"
             value={display(institution.scale_up_next_step)}
-          />
-          <DetailItem
-            label="Overall pilot status"
-            value={labelFor(
-              institution.overall_pilot_status,
-              overallPilotStatusOptions
-            )}
           />
         </div>
       </Section>
 
       <Section
         description="Farmer pilots conducted through this institution/company."
-        title="Institution pilots"
+        title="Active pilot / proof point"
       >
-        {relatedPilotsList.length ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-[900px] divide-y divide-slate-200 text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Pilot</th>
-                  <th className="px-4 py-3 font-semibold">Farmer</th>
-                  <th className="px-4 py-3 font-semibold">Type</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Result / next visit</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {relatedPilotsList.map((pilot) => (
-                  <tr key={pilot.id}>
-                    <td className="px-4 py-3">
-                      <Link
-                        className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
-                        href={`/pilots/${pilot.id}`}
-                      >
-                        {pilot.pilot_code} · {pilot.pilot_name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {pilot.farmer_name_snapshot}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {pilot.pilot_type}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {pilot.pilot_status}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      <p>{display(pilot.pilot_result_status)}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Next visit: {formatDate(pilot.next_visit_due_date)}
-                      </p>
-                      {pilot.result_summary ? (
-                        <p className="mt-1 text-xs text-slate-500">
-                          {pilot.result_summary}
-                        </p>
-                      ) : null}
-                    </td>
-                  </tr>
+        {leadProofPilot ? (
+          <div className="space-y-4 p-4">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    {hasActivePilot([leadProofPilot])
+                      ? "Active pilot"
+                      : "Latest pilot"}
+                  </p>
+                  <h3 className="mt-1 text-lg font-semibold text-slate-950">
+                    {leadProofPilot.pilot_code} · {leadProofPilot.pilot_name}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {leadProofPilot.farmer_name_snapshot} ·{" "}
+                    {leadProofPilot.pilot_type}
+                  </p>
+                </div>
+                <Link
+                  className="inline-flex min-h-9 items-center justify-center rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                  href={`/pilots/${leadProofPilot.id}`}
+                >
+                  Open pilot
+                </Link>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <SummaryCard label="Pilot status" value={leadProofPilot.pilot_status} />
+                <SummaryCard
+                  label="Result status"
+                  value={display(leadProofPilot.pilot_result_status)}
+                />
+                <SummaryCard
+                  label="Next visit"
+                  value={formatDate(leadProofPilot.next_visit_due_date)}
+                />
+              </div>
+              {leadProofPilot.result_summary ? (
+                <p className="mt-3 text-sm text-slate-700">
+                  {leadProofPilot.result_summary}
+                </p>
+              ) : null}
+            </div>
+            {remainingPilots.length ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {remainingPilots.map((pilot) => (
+                  <Link
+                    className="rounded-lg border border-slate-200 bg-slate-50 p-3 hover:bg-slate-100"
+                    href={`/pilots/${pilot.id}`}
+                    key={pilot.id}
+                  >
+                    <p className="font-semibold text-slate-950">
+                      {pilot.pilot_code} · {pilot.pilot_name}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {pilot.farmer_name_snapshot} · {pilot.pilot_status}
+                    </p>
+                  </Link>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="p-6 text-sm text-slate-500">
             No institution pilots yet.
           </div>
         )}
+      </Section>
+
+      <Section
+        description="Farmer leads connected directly to this institution or through its pilots."
+        title="Linked farmer leads"
+      >
+        {linkedFarmerLeadsList.length ? (
+          <div className="grid gap-3 p-4 lg:grid-cols-2">
+            {linkedFarmerLeadsList.map((lead) => (
+              <Link
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50"
+                href={`/farmer-leads/${lead.id}`}
+                key={lead.id}
+              >
+                <p className="text-sm font-semibold text-brand-700">
+                  {lead.lead_code}
+                </p>
+                <h3 className="mt-1 text-base font-semibold text-slate-950">
+                  {lead.farmer_name}
+                </h3>
+                <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                  <p>
+                    Stage:{" "}
+                    <span className="font-medium text-slate-900">
+                      {leadLabelFor(lead.funnel_stage, funnelStageOptions)}
+                    </span>
+                  </p>
+                  <p>
+                    Crop:{" "}
+                    <span className="font-medium text-slate-900">
+                      {cropDisplayLabel(lead.primary_crop)}
+                    </span>
+                  </p>
+                  <p>
+                    Owner:{" "}
+                    <span className="font-medium text-slate-900">
+                      {userLabel(userMap.get(lead.owner_user_id), lead.owner_user_id)}
+                    </span>
+                  </p>
+                  <p>
+                    Source:{" "}
+                    <span className="font-medium text-slate-900">
+                      {leadSourceLabel(lead)}
+                    </span>
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="p-6 text-sm text-slate-500">
+            No farmer leads are linked to this institution yet.
+          </div>
+        )}
+      </Section>
+
+      <Section
+        description="Save review updates the current institution action plan. Add a meeting below to record an institution interaction."
+        title="Institution review and next action"
+      >
+        {canManageProfile ? (
+          <form action={updateReviewAction} className="grid gap-4 p-4 lg:grid-cols-2">
+            <label className="block text-sm font-medium text-slate-700">
+              Priority
+              <select
+                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                defaultValue={institution.priority}
+                name="priority"
+                required
+              >
+                {priorityOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-medium text-slate-700">
+              Next action date
+              <input
+                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                defaultValue={institution.next_action_date}
+                name="next_action_date"
+                required
+                type="date"
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-700 lg:col-span-2">
+              Support / blocker
+              <textarea
+                className="mt-2 min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                defaultValue={institution.support_required ?? ""}
+                name="support_required"
+                placeholder="Add any blocker, management support needed, or risk."
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-700 lg:col-span-2">
+              Notes from last interaction
+              <textarea
+                className="mt-2 min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                defaultValue={institution.notes_from_last_interaction ?? ""}
+                name="notes_from_last_interaction"
+                placeholder="Summarize the latest discussion or field update."
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-700 lg:col-span-2">
+              Remarks
+              <textarea
+                className="mt-2 min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                defaultValue={institution.remarks ?? ""}
+                name="remarks"
+                placeholder="Add internal context or longer notes."
+              />
+            </label>
+            <div className="lg:col-span-2">
+              <button
+                className="inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                type="submit"
+              >
+                Save review
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="grid gap-4 p-4 md:grid-cols-2">
+            <DetailItem
+              label="Priority"
+              value={labelFor(institution.priority, priorityOptions)}
+            />
+            <DetailItem
+              label="Next action date"
+              value={formatDate(institution.next_action_date)}
+            />
+            <DetailItem
+              label="Support / blocker"
+              value={display(institution.support_required)}
+            />
+            <DetailItem
+              label="Notes from last interaction"
+              value={display(institution.notes_from_last_interaction)}
+            />
+            <DetailItem label="Remarks" value={display(institution.remarks)} />
+          </div>
+        )}
+      </Section>
+
+      <Section
+        description="Meetings are the interaction history for this institution."
+        title="Meetings / interaction history"
+      >
+        {meetingsList[0] ? (
+          <div className="border-b border-slate-100 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Latest interaction
+            </p>
+            <h3 className="mt-1 text-sm font-semibold text-slate-950">
+              {meetingsList[0].meeting_code} ·{" "}
+              {formatDate(meetingsList[0].meeting_date)}
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              {meetingsList[0].meeting_summary}
+            </p>
+          </div>
+        ) : null}
+        <details className="p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-brand-700">
+            {meetingsList.length
+              ? `View ${meetingsList.length} meeting${
+                  meetingsList.length === 1 ? "" : "s"
+                }`
+              : "No meetings added yet"}
+          </summary>
+          {meetingsList.length ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-[1000px] divide-y divide-slate-200 text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Meeting</th>
+                    <th className="px-4 py-3 font-semibold">Owner</th>
+                    <th className="px-4 py-3 font-semibold">External contact</th>
+                    <th className="px-4 py-3 font-semibold">Outcome</th>
+                    <th className="px-4 py-3 font-semibold">Next action</th>
+                    <th className="px-4 py-3 font-semibold">Flags</th>
+                    <th className="px-4 py-3 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {meetingsList.map((meeting) => {
+                    const owner = userMap.get(
+                      meeting.primary_internal_owner_user_id
+                    );
+                    const externalContact = meeting.external_contact_id
+                      ? contactMap.get(meeting.external_contact_id)
+                      : null;
+
+                    return (
+                      <tr key={meeting.id} className="align-top">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-950">
+                            {meeting.meeting_code}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {formatDate(meeting.meeting_date)} ·{" "}
+                            {labelFor(meeting.meeting_type, meetingTypeOptions)} ·{" "}
+                            {labelFor(meeting.meeting_mode, meetingModeOptions)}
+                          </p>
+                          <p className="mt-1 text-slate-700">
+                            {meeting.meeting_summary}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {userLabel(owner, meeting.primary_internal_owner_user_id)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {externalContact
+                            ? externalContact.contact_name
+                            : display(meeting.external_contact_id)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {labelFor(meeting.outcome, meetingOutcomeOptions)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {display(meeting.next_action)}
+                          <p className="text-xs text-slate-500">
+                            {formatDate(meeting.next_action_date)}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          <p>
+                            Proposal: {meeting.proposal_required ? "Yes" : "No"}
+                          </p>
+                          <p>Pilot: {meeting.pilot_discussed ? "Yes" : "No"}</p>
+                          <p>
+                            Scale-up:{" "}
+                            {meeting.scale_up_discussed ? "Yes" : "No"}
+                          </p>
+                          <p>
+                            Notes:{" "}
+                            <FileLink
+                              href={meetingNotesUrls.get(meeting.id)}
+                              label="View notes"
+                            />
+                          </p>
+                        </td>
+                        <td className="px-4 py-3">
+                          {canManageProfile ? (
+                            <Link
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+                              href={`/institutional-partners/${institution.id}/meetings/${meeting.id}/edit`}
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                              <span className="sr-only">Edit meeting</span>
+                            </Link>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </details>
+        {canManageProfile ? (
+          <details className="border-t border-slate-200 p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-brand-700">
+              Add meeting
+            </summary>
+            <div className="mt-4">
+              <MeetingForm
+                action={createMeetingAction}
+                compact
+                contacts={contactsList}
+                users={usersList}
+              />
+            </div>
+          </details>
+        ) : null}
+      </Section>
+
+      <Section title="Commercial readiness / documents and legal approvals">
+        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
+          <DetailItem
+            label="MOU legal approval"
+            value={display(institution.mou_approval_status)}
+          />
+          <DetailItem
+            label="MOU agreement status"
+            value={labelFor(
+              institution.mou_agreement_status,
+              agreementStatusOptions
+            )}
+          />
+          <DetailItem
+            label="Proposal shared"
+            value={
+              <>
+                {labelFor(institution.proposal_shared, yesNoPendingNaOptions)}
+                <p className="mt-1 text-xs font-medium text-slate-500">
+                  {formatDate(institution.proposal_shared_date)}
+                </p>
+                <FileLink href={proposalUrl} label="View proposal" />
+              </>
+            }
+          />
+          <DetailItem
+            label="MOU agreement file"
+            value={<FileLink href={mouUrl} label="View MOU" />}
+          />
+          <DetailItem
+            label="HR & Legal comments"
+            value={display(institution.mou_hr_legal_comments)}
+          />
+          <DetailItem
+            label="Approved / rejected by"
+            value={userLabel(
+              institution.mou_approved_by_user_id
+                ? userMap.get(institution.mou_approved_by_user_id)
+                : undefined,
+              institution.mou_approved_by_user_id
+            )}
+          />
+          <DetailItem
+            label="Approval date"
+            value={formatDate(institution.mou_approved_at)}
+          />
+          <DetailItem
+            label="Corporate PO reference"
+            value={display(institution.corporate_po_reference)}
+          />
+          {hasHistoricalPresentation ? (
+            <DetailItem
+              label="Historical presentation"
+              value={
+                <>
+                  {labelFor(
+                    institution.presentation_shared,
+                    yesNoPendingNaOptions
+                  )}
+                  <p className="mt-1 text-xs font-medium text-slate-500">
+                    {formatDate(institution.presentation_shared_date)}
+                  </p>
+                  <FileLink
+                    href={presentationUrl}
+                    label="View historical presentation"
+                  />
+                </>
+              }
+            />
+          ) : null}
+        </div>
       </Section>
 
       <Section
@@ -872,195 +1193,104 @@ export default async function InstitutionDetailPage({
           </div>
         ) : (
           <div className="p-6 text-sm text-slate-500">
-            No dealer-introduced opportunities yet.
+            No dealer-introduced opportunities yet. Add these from a Dealer
+            profile when a dealer introduces or supports an institutional
+            opportunity.
           </div>
         )}
-      </Section>
-
-      <Section title="Documents and legal approvals">
-        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
-          <DetailItem
-            label="Proposal shared"
-            value={
-              <>
-                {labelFor(institution.proposal_shared, yesNoPendingNaOptions)}
-                <p className="mt-1 text-xs font-medium text-slate-500">
-                  {formatDate(institution.proposal_shared_date)}
-                </p>
-                <FileLink href={proposalUrl} label="View proposal" />
-              </>
-            }
-          />
-          {hasHistoricalPresentation ? (
-            <DetailItem
-              label="Historical presentation"
-              value={
-                <>
-                  {labelFor(
-                    institution.presentation_shared,
-                    yesNoPendingNaOptions
-                  )}
-                  <p className="mt-1 text-xs font-medium text-slate-500">
-                    {formatDate(institution.presentation_shared_date)}
-                  </p>
-                  <FileLink
-                    href={presentationUrl}
-                    label="View historical presentation"
-                  />
-                </>
-              }
-            />
-          ) : null}
-          <DetailItem
-            label="MOU agreement status"
-            value={labelFor(
-              institution.mou_agreement_status,
-              agreementStatusOptions
-            )}
-          />
-          <DetailItem
-            label="MOU agreement file"
-            value={<FileLink href={mouUrl} label="View MOU" />}
-          />
-          <DetailItem
-            label="MOU legal approval"
-            value={display(institution.mou_approval_status)}
-          />
-          <DetailItem
-            label="Approved / rejected by"
-            value={userLabel(
-              institution.mou_approved_by_user_id
-                ? userMap.get(institution.mou_approved_by_user_id)
-                : undefined,
-              institution.mou_approved_by_user_id
-            )}
-          />
-          <DetailItem
-            label="Approval date"
-            value={formatDate(institution.mou_approved_at)}
-          />
-          <DetailItem
-            label="HR & Legal comments"
-            value={display(institution.mou_hr_legal_comments)}
-          />
-          <DetailItem
-            label="Corporate PO reference"
-            value={display(institution.corporate_po_reference)}
-          />
-        </div>
       </Section>
 
       <Section
         description="Decision makers, influencers, and field contacts."
         title="Contacts"
       >
-        <div className="overflow-x-auto">
-          <table className="min-w-[900px] divide-y divide-slate-200 text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Contact</th>
-                <th className="px-4 py-3 font-semibold">Department</th>
-                <th className="px-4 py-3 font-semibold">Influence</th>
-                <th className="px-4 py-3 font-semibold">Decision role</th>
-                <th className="px-4 py-3 font-semibold">Notes</th>
-                <th className="px-4 py-3 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {showProfileContact ? (
-                <tr className="align-top">
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-950">
-                      {display(institution.main_contact_person)}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {display(institution.main_contact_designation)} · Primary
-                      contact from profile
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {display(institution.main_contact_number)} ·{" "}
-                      {display(institution.main_contact_email)}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">Not set</td>
-                  <td className="px-4 py-3 text-slate-700">Not set</td>
-                  <td className="px-4 py-3 text-slate-700">Not set</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    Profile contact
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">Not editable here</td>
-                </tr>
-              ) : null}
-              {contactsList.map((contact) => {
-                const deleteAction = deleteInstitutionContactAction.bind(
-                  null,
-                  institution.id,
-                  contact.id
-                );
+        <div className="grid gap-3 p-4 md:grid-cols-2">
+          {showProfileContact ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p className="font-semibold text-slate-950">
+                {display(institution.main_contact_person)}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {display(institution.main_contact_designation)} · Primary contact
+                from profile
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                {display(institution.main_contact_number)} ·{" "}
+                {display(institution.main_contact_email)}
+              </p>
+            </div>
+          ) : null}
+          {contactsList.map((contact) => {
+            const deleteAction = deleteInstitutionContactAction.bind(
+              null,
+              institution.id,
+              contact.id
+            );
 
-                return (
-                  <tr key={contact.id} className="align-top">
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-950">
-                        {contact.contact_name}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {display(contact.designation)}
-                        {contact.is_primary_contact ? " · Primary" : ""}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {display(contact.phone)} · {display(contact.email)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {labelFor(contact.department, departmentOptions)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {labelFor(contact.influence_level, influenceLevelOptions)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {labelFor(contact.decision_role, decisionRoleOptions)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {display(contact.relationship_notes)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {canManageProfile ? (
-                        <div className="flex items-center gap-2">
-                          <Link
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
-                            href={`/institutional-partners/${institution.id}/contacts/${contact.id}/edit`}
-                          >
-                            <Pencil className="h-4 w-4" aria-hidden="true" />
-                            <span className="sr-only">Edit contact</span>
-                          </Link>
-                          <form action={deleteAction}>
-                            <button
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-                              type="submit"
-                            >
-                              <Trash2 className="h-4 w-4" aria-hidden="true" />
-                              <span className="sr-only">Delete contact</span>
-                            </button>
-                          </form>
-                        </div>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-              {contactsList.length === 0 && !showProfileContact ? (
-                <tr>
-                  <td
-                    className="px-4 py-8 text-center text-sm text-slate-500"
-                    colSpan={6}
-                  >
-                    No contacts added yet.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+            return (
+              <div
+                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                key={contact.id}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-950">
+                      {contact.contact_name}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {display(contact.designation)}
+                      {contact.is_primary_contact ? " · Primary" : ""}
+                    </p>
+                  </div>
+                  {canManageProfile ? (
+                    <div className="flex items-center gap-2">
+                      <Link
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+                        href={`/institutional-partners/${institution.id}/contacts/${contact.id}/edit`}
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                        <span className="sr-only">Edit contact</span>
+                      </Link>
+                      <form action={deleteAction}>
+                        <button
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                          type="submit"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          <span className="sr-only">Delete contact</span>
+                        </button>
+                      </form>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                  <p>{display(contact.phone)}</p>
+                  <p>{display(contact.email)}</p>
+                  <p>
+                    Department:{" "}
+                    {labelFor(contact.department, departmentOptions)}
+                  </p>
+                  <p>
+                    Role: {labelFor(contact.decision_role, decisionRoleOptions)}
+                  </p>
+                  <p>
+                    Influence:{" "}
+                    {labelFor(contact.influence_level, influenceLevelOptions)}
+                  </p>
+                </div>
+                {contact.relationship_notes ? (
+                  <p className="mt-3 text-sm text-slate-700">
+                    {contact.relationship_notes}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
+          {contactsList.length === 0 && !showProfileContact ? (
+            <div className="rounded-lg border border-dashed border-slate-300 p-6 text-sm text-slate-500">
+              No contacts added yet.
+            </div>
+          ) : null}
         </div>
         {canManageProfile ? (
           <details className="border-t border-slate-200 p-4">
@@ -1069,122 +1299,6 @@ export default async function InstitutionDetailPage({
             </summary>
             <div className="mt-4">
               <ContactForm action={createContactAction} compact />
-            </div>
-          </details>
-        ) : null}
-      </Section>
-
-      <Section
-        description="Meetings are the interaction history for this institution."
-        title="Meetings / interaction history"
-      >
-        <div className="overflow-x-auto">
-          <table className="min-w-[1000px] divide-y divide-slate-200 text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Meeting</th>
-                <th className="px-4 py-3 font-semibold">Owner</th>
-                <th className="px-4 py-3 font-semibold">External contact</th>
-                <th className="px-4 py-3 font-semibold">Outcome</th>
-                <th className="px-4 py-3 font-semibold">Next action</th>
-                <th className="px-4 py-3 font-semibold">Flags</th>
-                <th className="px-4 py-3 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {meetingsList.map((meeting) => {
-                const owner = userMap.get(
-                  meeting.primary_internal_owner_user_id
-                );
-                const externalContact = meeting.external_contact_id
-                  ? contactMap.get(meeting.external_contact_id)
-                  : null;
-
-                return (
-                  <tr key={meeting.id} className="align-top">
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-950">
-                        {meeting.meeting_code}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {formatDate(meeting.meeting_date)} ·{" "}
-                        {labelFor(meeting.meeting_type, meetingTypeOptions)} ·{" "}
-                        {labelFor(meeting.meeting_mode, meetingModeOptions)}
-                      </p>
-                      <p className="mt-1 text-slate-700">
-                        {meeting.meeting_summary}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {userLabel(owner, meeting.primary_internal_owner_user_id)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {externalContact
-                        ? externalContact.contact_name
-                        : display(meeting.external_contact_id)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {labelFor(meeting.outcome, meetingOutcomeOptions)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {display(meeting.next_action)}
-                      <p className="text-xs text-slate-500">
-                        {formatDate(meeting.next_action_date)}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-600">
-                      <p>Proposal: {meeting.proposal_required ? "Yes" : "No"}</p>
-                      <p>Pilot: {meeting.pilot_discussed ? "Yes" : "No"}</p>
-                      <p>
-                        Scale-up: {meeting.scale_up_discussed ? "Yes" : "No"}
-                      </p>
-                      <p>
-                        Notes:{" "}
-                        <FileLink
-                          href={meetingNotesUrls.get(meeting.id)}
-                          label="View notes"
-                        />
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      {canManageProfile ? (
-                        <Link
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
-                          href={`/institutional-partners/${institution.id}/meetings/${meeting.id}/edit`}
-                        >
-                          <Pencil className="h-4 w-4" aria-hidden="true" />
-                          <span className="sr-only">Edit meeting</span>
-                        </Link>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-              {meetingsList.length === 0 ? (
-                <tr>
-                  <td
-                    className="px-4 py-8 text-center text-sm text-slate-500"
-                    colSpan={7}
-                  >
-                    No meetings added yet.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-        {canManageProfile ? (
-          <details className="border-t border-slate-200 p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-brand-700">
-              Add meeting
-            </summary>
-            <div className="mt-4">
-              <MeetingForm
-                action={createMeetingAction}
-                compact
-                contacts={contactsList}
-                users={usersList}
-              />
             </div>
           </details>
         ) : null}
