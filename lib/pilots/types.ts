@@ -93,6 +93,9 @@ export type PilotFarmerLeadOption = Pick<
   | "crop_area_acres"
   | "linked_dealer_id"
   | "linked_institution_id"
+  | "linked_pilot_id"
+  | "lead_status"
+  | "funnel_stage"
   | "rsm_user_id"
   | "region_id"
 >;

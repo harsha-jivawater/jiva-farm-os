@@ -9,6 +9,7 @@ import type {
   RegionOption,
   UserOption
 } from "@/lib/pilots/types";
+import { loadPilotFarmerLeadOptions } from "@/lib/pilots/farmer-lead-options";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 
@@ -23,21 +24,14 @@ export default async function NewPilotPage({ searchParams }: NewPilotPageProps) 
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/pilots");
   const [
-    { data: farmerLeads },
+    { data: farmerLeads, error: farmerLeadsError },
     { data: devices },
     { data: users },
     { data: regions },
     { data: institutions },
     { data: dealers }
   ] = await Promise.all([
-    supabase
-      .from("farmer_leads")
-      .select(
-        "id, lead_code, farmer_name, mobile_number, state, district, taluk, village, primary_crop, other_primary_crop, crop_stage, irrigation_type, water_source, soil_type, crop_area_acres, linked_dealer_id, linked_institution_id, rsm_user_id, region_id"
-      )
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(200),
+    loadPilotFarmerLeadOptions(supabase),
     supabase
       .from("devices")
       .select("id, serial_number, device_code, product_model, device_status")
@@ -67,6 +61,13 @@ export default async function NewPilotPage({ searchParams }: NewPilotPageProps) 
       .order("dealer_name", { ascending: true })
       .limit(200)
   ]);
+  const farmerLeadLoadError = farmerLeadsError
+    ? "Unable to load farmer leads for pilot creation. Please contact Admin."
+    : null;
+
+  if (farmerLeadsError) {
+    console.error("[pilots] Farmer Lead option load failed", farmerLeadsError);
+  }
 
   return (
     <section>
@@ -80,7 +81,7 @@ export default async function NewPilotPage({ searchParams }: NewPilotPageProps) 
         cancelHref="/pilots"
         dealers={(dealers ?? []) as PilotDealerOption[]}
         devices={(devices ?? []) as PilotDeviceOption[]}
-        error={query.error}
+        error={query.error ?? farmerLeadLoadError}
         farmerLeads={(farmerLeads ?? []) as PilotFarmerLeadOption[]}
         institutions={(institutions ?? []) as PilotInstitutionOption[]}
         currentUser={{

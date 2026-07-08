@@ -696,8 +696,9 @@ export function PilotForm({
               ))}
             </select>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Select a Farmer Lead to auto-fill farmer, crop, location, RSM,
-              and linked institution or dealer details where available.
+              {farmerLeads.length === 0
+                ? "No eligible farmer leads found. Check lead status, funnel stage, or assignment."
+                : "Select a Farmer Lead to auto-fill farmer, crop, location, RSM, and linked institution or dealer details where available."}
             </p>
           </div>
           <Field

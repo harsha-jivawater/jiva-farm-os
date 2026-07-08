@@ -17,6 +17,10 @@ import type {
   UserOption
 } from "@/lib/pilots/types";
 import type { PlannedPilotVisit } from "@/lib/pilots/types";
+import {
+  loadPilotFarmerLeadOptions,
+  pilotFarmerLeadOptionColumns
+} from "@/lib/pilots/farmer-lead-options";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { hasAnyRole } from "@/lib/users/permissions";
@@ -38,8 +42,6 @@ type EditPilotPageProps = {
   }>;
 };
 
-const farmerLeadColumns =
-  "id, lead_code, farmer_name, mobile_number, state, district, taluk, village, primary_crop, other_primary_crop, crop_stage, irrigation_type, water_source, soil_type, crop_area_acres, linked_dealer_id, linked_institution_id, rsm_user_id, region_id";
 const deviceColumns =
   "id, serial_number, device_code, product_model, device_status";
 const institutionColumns = "id, institution_code, organization_name";
@@ -70,7 +72,7 @@ export default async function EditPilotPage({
 
   const [
     { data: pilot, error },
-    { data: farmerLeads },
+    { data: farmerLeads, error: farmerLeadsError },
     { data: devices },
     { data: users },
     { data: regions },
@@ -79,12 +81,7 @@ export default async function EditPilotPage({
     { data: plannedVisits }
   ] = await Promise.all([
     pilotQuery.single(),
-    supabase
-      .from("farmer_leads")
-      .select(farmerLeadColumns)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(200),
+    loadPilotFarmerLeadOptions(supabase),
     supabase
       .from("devices")
       .select(deviceColumns)
@@ -125,6 +122,10 @@ export default async function EditPilotPage({
     notFound();
   }
 
+  if (farmerLeadsError) {
+    console.error("[pilots] Farmer Lead option load failed", farmerLeadsError);
+  }
+
   const pilotRow = pilot as Pilot;
   let farmerLeadOptions = (farmerLeads ?? []) as PilotFarmerLeadOption[];
   let deviceOptions = (devices ?? []) as PilotDeviceOption[];
@@ -140,7 +141,7 @@ export default async function EditPilotPage({
     !farmerLeadOptions.some((lead) => lead.id === pilotRow.farmer_lead_id)
       ? supabase
           .from("farmer_leads")
-          .select(farmerLeadColumns)
+          .select(pilotFarmerLeadOptionColumns)
           .eq("id", pilotRow.farmer_lead_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -230,7 +231,12 @@ export default async function EditPilotPage({
         cancelHref={`/pilots/${pilotRow.id}`}
         dealers={dealerOptions}
         devices={deviceOptions}
-        error={query.error}
+        error={
+          query.error ??
+          (farmerLeadsError
+            ? "Unable to load farmer leads for pilot editing. Please contact Admin."
+            : null)
+        }
         farmerLeads={farmerLeadOptions}
         institutions={institutionOptions}
         currentUser={{
