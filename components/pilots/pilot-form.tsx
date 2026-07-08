@@ -1088,7 +1088,7 @@ export function PilotForm({
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-slate-950">
-          Monitoring dates and plan file
+          Pilot Monitoring Period
         </h2>
         <input
           name="monitoring_frequency"
@@ -1165,6 +1165,11 @@ export function PilotForm({
           type="hidden"
           value={booleanValue(pilot?.track_farmer_feedback, true)}
         />
+        <input
+          name="monitoring_plan_link"
+          type="hidden"
+          value={pilot?.monitoring_plan_link ?? ""}
+        />
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field
             defaultValue={pilot?.monitoring_start_date ?? todayDate()}
@@ -1178,16 +1183,9 @@ export function PilotForm({
             name="expected_monitoring_end_date"
             type="date"
           />
-          <FileUploadField
-            currentValue={pilot?.monitoring_plan_link}
-            kind="document"
-            label="Monitoring plan file"
-            name="monitoring_plan_link"
-          />
         </div>
         <p className="mt-3 text-sm leading-6 text-slate-500">
-          Detailed visit dates, assignees, crop stages, and parameters are
-          managed in the Monitoring Plan section after the pilot is created.
+          Use these dates to define the overall pilot monitoring period.
         </p>
         <input
           name="pilot_folder_link"
@@ -1228,7 +1226,7 @@ export function PilotForm({
               }
               type="button"
             >
-              Add Visit
+              Add Planned Visit
             </button>
           </div>
           <input
