@@ -48,6 +48,10 @@ import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import type { InternalUser } from "@/lib/users/types";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+type PlannedVisitActionState = {
+  status: "idle" | "success" | "error";
+  message: string | null;
+};
 
 const pilotOwnerRoles = ["Agronomist", "Research Assistant", "R&D Head"];
 const reportSubmitterRoles = [
@@ -1095,8 +1099,9 @@ export async function updatePilotAction(id: string, formData: FormData) {
 
 export async function createPlannedPilotVisitAction(
   pilotId: string,
+  _state: PlannedVisitActionState,
   formData: FormData
-) {
+): Promise<PlannedVisitActionState> {
   const supabase = await createClient();
   const errorPath = `/pilots/${pilotId}`;
   const profile = await getCurrentProfile(supabase, errorPath);
@@ -1105,7 +1110,7 @@ export async function createPlannedPilotVisitAction(
   const validationError = validatePlannedPilotVisitPayload(payload);
 
   if (validationError) {
-    redirectWithError(errorPath, validationError);
+    return { status: "error", message: validationError };
   }
 
   if (
@@ -1113,7 +1118,10 @@ export async function createPlannedPilotVisitAction(
       "Research Assistant"
     ]))
   ) {
-    redirectWithError(errorPath, "Assign the visit to a Research Assistant.");
+    return {
+      status: "error",
+      message: "Assign the visit to a Research Assistant."
+    };
   }
 
   const insertPayload: PlannedPilotVisitInsert = {
@@ -1128,24 +1136,29 @@ export async function createPlannedPilotVisitAction(
     .insert(insertPayload);
 
   if (error) {
-    redirectWithError(errorPath, error.message);
+    return { status: "error", message: error.message };
   }
 
-  await supabase
+  const { error: pilotUpdateError } = await supabase
     .from("pilots")
     .update({ next_visit_due_date: payload.planned_visit_date })
     .eq("id", pilotId);
 
+  if (pilotUpdateError) {
+    return { status: "error", message: pilotUpdateError.message };
+  }
+
   revalidatePilot(pilotId);
   revalidatePath("/my-visits");
-  redirect(errorPath);
+  return { status: "success", message: "Planned visit saved." };
 }
 
 export async function updatePlannedPilotVisitAction(
   pilotId: string,
   plannedVisitId: string,
+  _state: PlannedVisitActionState,
   formData: FormData
-) {
+): Promise<PlannedVisitActionState> {
   const supabase = await createClient();
   const errorPath = `/pilots/${pilotId}`;
   const profile = await getCurrentProfile(supabase, errorPath);
@@ -1154,7 +1167,7 @@ export async function updatePlannedPilotVisitAction(
   const validationError = validatePlannedPilotVisitPayload(payload);
 
   if (validationError) {
-    redirectWithError(errorPath, validationError);
+    return { status: "error", message: validationError };
   }
 
   if (
@@ -1162,7 +1175,10 @@ export async function updatePlannedPilotVisitAction(
       "Research Assistant"
     ]))
   ) {
-    redirectWithError(errorPath, "Assign the visit to a Research Assistant.");
+    return {
+      status: "error",
+      message: "Assign the visit to a Research Assistant."
+    };
   }
 
   const { error } = await supabase
@@ -1172,17 +1188,21 @@ export async function updatePlannedPilotVisitAction(
     .eq("pilot_id", pilotId);
 
   if (error) {
-    redirectWithError(errorPath, error.message);
+    return { status: "error", message: error.message };
   }
 
-  await supabase
+  const { error: pilotUpdateError } = await supabase
     .from("pilots")
     .update({ next_visit_due_date: payload.planned_visit_date })
     .eq("id", pilotId);
 
+  if (pilotUpdateError) {
+    return { status: "error", message: pilotUpdateError.message };
+  }
+
   revalidatePilot(pilotId);
   revalidatePath("/my-visits");
-  redirect(errorPath);
+  return { status: "success", message: "Planned visit saved." };
 }
 
 export async function updatePlannedPilotVisitStatusAction(

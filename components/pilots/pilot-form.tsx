@@ -1254,7 +1254,6 @@ export function PilotForm({
                 </summary>
                 <div className="border-t border-slate-200 p-4">
                   <PlannedVisitForm
-                    action={action}
                     compact
                     fieldPrefix={`initial_planned_visit_${index}_`}
                     nextVisitNumber={index + 1}

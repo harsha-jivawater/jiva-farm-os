@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { CalendarPlus } from "lucide-react";
 import { todayDate } from "@/lib/pilots/form-data";
@@ -18,7 +19,10 @@ import { hasAnyRole } from "@/lib/users/permissions";
 import type { PlannedPilotVisit, UserOption } from "@/lib/pilots/types";
 
 type PlannedVisitFormProps = {
-  action: (formData: FormData) => void | Promise<void>;
+  action?: (
+    state: PlannedVisitActionState,
+    formData: FormData
+  ) => Promise<PlannedVisitActionState>;
   cancelHref?: string;
   compact?: boolean;
   defaultAssigneeId?: string | null;
@@ -28,6 +32,16 @@ type PlannedVisitFormProps = {
   submitLabel?: string;
   users: UserOption[];
   visit?: PlannedPilotVisit;
+};
+
+export type PlannedVisitActionState = {
+  status: "idle" | "success" | "error";
+  message: string | null;
+};
+
+const initialActionState: PlannedVisitActionState = {
+  status: "idle",
+  message: null
 };
 
 function inputClassName() {
@@ -73,6 +87,16 @@ export function PlannedVisitForm({
   users,
   visit
 }: PlannedVisitFormProps) {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [state, formAction] = useActionState(
+    action ??
+      (async () => ({
+        status: "error" as const,
+        message: "This form is not ready to save."
+      })),
+    initialActionState
+  );
   const assignableUsers = users.filter((user) =>
     hasAnyRole(user, ["Research Assistant"])
   );
@@ -96,8 +120,27 @@ export function PlannedVisitForm({
     });
   }
 
+  useEffect(() => {
+    if (state.status === "success") {
+      formRef.current?.closest("details")?.removeAttribute("open");
+      router.refresh();
+    }
+  }, [router, state.status]);
+
   const content = (
     <>
+      {showSubmit && state.message ? (
+        <div
+          className={[
+            "rounded-md border px-3 py-2 text-sm leading-6",
+            state.status === "error"
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+          ].join(" ")}
+        >
+          {state.message}
+        </div>
+      ) : null}
       <input
         name={fieldName("visit_number")}
         type="hidden"
@@ -309,7 +352,7 @@ export function PlannedVisitForm({
   }
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={formAction} className="space-y-4" ref={formRef}>
       {content}
     </form>
   );
