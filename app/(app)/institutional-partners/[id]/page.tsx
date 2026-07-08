@@ -187,10 +187,6 @@ function currentActionNeeded(
     return "Share proposal";
   }
 
-  if (institution.presentation_shared !== "Yes") {
-    return "Share presentation";
-  }
-
   if (isOverdue(institution.next_action_date)) {
     return "Follow-up overdue";
   }
@@ -392,6 +388,10 @@ export default async function InstitutionDetailPage({
   const showProfileContact =
     hasProfileContact(institution) &&
     !contactsList.some((contact) => contactMatchesProfile(contact, institution));
+  const hasHistoricalPresentation =
+    Boolean(institution.presentation_link) ||
+    Boolean(institution.presentation_shared_date) ||
+    institution.presentation_shared === "Yes";
 
   return (
     <section>
@@ -475,13 +475,6 @@ export default async function InstitutionDetailPage({
           <DetailItem
             label="Proposal shared"
             value={labelFor(institution.proposal_shared, yesNoPendingNaOptions)}
-          />
-          <DetailItem
-            label="Presentation shared"
-            value={labelFor(
-              institution.presentation_shared,
-              yesNoPendingNaOptions
-            )}
           />
           <DetailItem
             label="Opportunity type"
@@ -898,21 +891,26 @@ export default async function InstitutionDetailPage({
               </>
             }
           />
-          <DetailItem
-            label="Presentation shared"
-            value={
-              <>
-                {labelFor(
-                  institution.presentation_shared,
-                  yesNoPendingNaOptions
-                )}
-                <p className="mt-1 text-xs font-medium text-slate-500">
-                  {formatDate(institution.presentation_shared_date)}
-                </p>
-                <FileLink href={presentationUrl} label="View presentation" />
-              </>
-            }
-          />
+          {hasHistoricalPresentation ? (
+            <DetailItem
+              label="Historical presentation"
+              value={
+                <>
+                  {labelFor(
+                    institution.presentation_shared,
+                    yesNoPendingNaOptions
+                  )}
+                  <p className="mt-1 text-xs font-medium text-slate-500">
+                    {formatDate(institution.presentation_shared_date)}
+                  </p>
+                  <FileLink
+                    href={presentationUrl}
+                    label="View historical presentation"
+                  />
+                </>
+              }
+            />
+          ) : null}
           <DetailItem
             label="MOU agreement status"
             value={labelFor(
@@ -1231,7 +1229,7 @@ export default async function InstitutionDetailPage({
             }
           />
           <DetailItem
-            label="Regions covered"
+            label="States / regions covered"
             value={displayList(institution.regions_covered)}
           />
           <DetailItem

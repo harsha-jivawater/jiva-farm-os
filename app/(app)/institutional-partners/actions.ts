@@ -114,7 +114,6 @@ export async function createInstitutionAction(formData: FormData) {
     await applyUploadedFilesToPayload({
       fields: [
         { fieldName: "proposal_link", kind: "document" },
-        { fieldName: "presentation_link", kind: "document" },
         { fieldName: "mou_agreement_link", kind: "document" }
       ],
       folder: "institutions",
@@ -249,7 +248,6 @@ export async function updateInstitutionAction(id: string, formData: FormData) {
     await applyUploadedFilesToPayload({
       fields: [
         { fieldName: "proposal_link", kind: "document" },
-        { fieldName: "presentation_link", kind: "document" },
         { fieldName: "mou_agreement_link", kind: "document" }
       ],
       folder: "institutions",

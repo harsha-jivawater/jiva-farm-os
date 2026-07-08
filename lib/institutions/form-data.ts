@@ -14,7 +14,6 @@ import {
   defaultOpportunityType,
   defaultOrganizationType,
   defaultOverallPilotStatus,
-  defaultPresentationShared,
   defaultPriority,
   defaultProposalShared,
   defaultScaleUpStatus,
@@ -196,13 +195,17 @@ export function institutionPayloadFromForm(
       getText(formData, "proposal_shared") ?? defaultProposalShared,
     proposal_shared_date: getText(formData, "proposal_shared_date"),
     proposal_link: getText(formData, "proposal_link"),
-    presentation_shared:
-      getText(formData, "presentation_shared") ?? defaultPresentationShared,
-    presentation_shared_date: getText(
-      formData,
-      "presentation_shared_date"
-    ),
-    presentation_link: getText(formData, "presentation_link"),
+    ...(formData.has("presentation_shared")
+      ? {
+          presentation_shared:
+            getText(formData, "presentation_shared") ?? undefined,
+          presentation_shared_date: getText(
+            formData,
+            "presentation_shared_date"
+          ),
+          presentation_link: getText(formData, "presentation_link")
+        }
+      : {}),
     mou_agreement_status:
       getText(formData, "mou_agreement_status") ?? defaultAgreementStatus,
     mou_agreement_link: getText(formData, "mou_agreement_link"),

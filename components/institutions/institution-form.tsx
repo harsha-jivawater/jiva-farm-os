@@ -15,7 +15,6 @@ import {
   defaultOpportunityType,
   defaultOrganizationType,
   defaultOverallPilotStatus,
-  defaultPresentationShared,
   defaultPriority,
   defaultProposalShared,
   defaultScaleUpStatus,
@@ -39,6 +38,7 @@ import type {
 import { labelForRole } from "@/lib/users/options";
 import { hasRole } from "@/lib/users/permissions";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
+import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
 type InstitutionFormProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -267,6 +267,13 @@ export function InstitutionForm({
   );
   const missingSetup = accountOwners.length === 0 || salesHeads.length === 0;
   const selectedRegions = institution?.regions_covered ?? [];
+  const coverageOptions = Array.from(
+    new Set([
+      ...INDIAN_STATES_AND_UTS,
+      ...regions.map((region) => region.region_name),
+      ...selectedRegions
+    ])
+  ).sort((a, b) => a.localeCompare(b));
   const showOtherCropFocus = selectedCropFocus.includes("Other");
 
   if (legalApprovalOnly) {
@@ -518,22 +525,22 @@ export function InstitutionForm({
           </div>
           <div className="md:col-span-2">
             <p className="mb-2 text-sm font-medium text-slate-700">
-              Regions covered
+              States / regions covered
             </p>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {regions.map((region) => (
+              {coverageOptions.map((regionName) => (
                 <label
                   className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700"
-                  key={region.id}
+                  key={regionName}
                 >
                   <input
                     className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                    defaultChecked={selectedRegions.includes(region.region_name)}
+                    defaultChecked={selectedRegions.includes(regionName)}
                     name="regions_covered"
                     type="checkbox"
-                    value={region.region_name}
+                    value={regionName}
                   />
-                  {region.region_name}
+                  {regionName}
                 </label>
               ))}
             </div>
@@ -723,26 +730,6 @@ export function InstitutionForm({
             kind="document"
             label="Proposal file"
             name="proposal_link"
-          />
-          <SelectField
-            defaultValue={
-              institution?.presentation_shared ?? defaultPresentationShared
-            }
-            label="Presentation shared"
-            name="presentation_shared"
-            options={yesNoPendingNaOptions}
-          />
-          <Field
-            defaultValue={institution?.presentation_shared_date}
-            label="Presentation shared date"
-            name="presentation_shared_date"
-            type="date"
-          />
-          <FileUploadField
-            currentValue={institution?.presentation_link}
-            kind="document"
-            label="Presentation file"
-            name="presentation_link"
           />
         </div>
       </div>
