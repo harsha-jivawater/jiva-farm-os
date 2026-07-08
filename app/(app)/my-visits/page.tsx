@@ -48,7 +48,7 @@ function StatusButton({
   return (
     <form action={action}>
       <button
-        className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+        className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
         type="submit"
       >
         {icon}
@@ -203,7 +203,7 @@ export default async function MyVisitsPage({
                 </p>
               ) : null}
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
                 {!visit.linked_visit_report_id ? (
                   <>
                     {visit.planned_visit_status !== "In Progress" ? (
@@ -223,7 +223,7 @@ export default async function MyVisitsPage({
                       status="Unable to Complete"
                     />
                     <Link
-                      className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                      className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 sm:w-auto"
                       href={`/pilots/${visit.pilot_id}?planned_visit_id=${visit.id}#add-visit-report`}
                     >
                       Submit report
@@ -231,7 +231,7 @@ export default async function MyVisitsPage({
                     </Link>
                   </>
                 ) : (
-                  <span className="inline-flex min-h-9 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+                  <span className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 sm:w-auto">
                     <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                     Report submitted
                   </span>

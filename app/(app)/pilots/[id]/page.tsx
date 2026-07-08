@@ -973,7 +973,82 @@ export default async function PilotDetailPage({
       </SectionCard>
 
       <SectionCard id="add-visit-report" title="Visit Reports">
-        <div className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {reportsList.map((report) => (
+            <article
+              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+              key={report.id}
+            >
+              <div className="flex flex-col gap-2">
+                <div>
+                  <p className="font-semibold text-slate-950">
+                    {report.visit_report_code}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {formatDate(report.report_date)} ·{" "}
+                    {labelFor(report.report_type, reportTypeOptions)}
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-slate-700">
+                    {report.report_title}
+                  </p>
+                </div>
+                <span className="w-fit rounded-full border border-brand-100 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
+                  {labelFor(report.report_status, reportStatusOptions)}
+                </span>
+              </div>
+              <dl className="mt-3 space-y-2 text-sm">
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Submitted by
+                  </dt>
+                  <dd className="mt-1 text-slate-700">
+                    {userLabel(
+                      userMap.get(report.submitted_by_user_id),
+                      report.submitted_by_user_id
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Reviewed by
+                  </dt>
+                  <dd className="mt-1 text-slate-700">
+                    {userLabel(
+                      report.reviewed_by_user_id
+                        ? userMap.get(report.reviewed_by_user_id)
+                        : undefined,
+                      report.reviewed_by_user_id
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Summary
+                  </dt>
+                  <dd className="mt-1 leading-6 text-slate-700">
+                    {report.report_summary}
+                  </dd>
+                </div>
+              </dl>
+              <div className="mt-4 grid gap-2">
+                <FileLink href={reportUrls.get(report.id)} label="View report" />
+                {canWrite ? (
+                  <Link
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                    href={`/pilots/${pilot.id}/reports/${report.id}/edit`}
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden="true" />
+                    Edit report
+                  </Link>
+                ) : null}
+              </div>
+            </article>
+          ))}
+          {reportsList.length === 0 ? (
+            <EmptyState>No visit reports added yet.</EmptyState>
+          ) : null}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
           <table className="min-w-[1000px] divide-y divide-slate-200 text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
@@ -1055,7 +1130,7 @@ export default async function PilotDetailPage({
             open={Boolean(selectedPlannedVisitId || selectedPilotVisitId)}
           >
             <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-brand-700">
-              Add report
+              Submit Visit Report
             </summary>
             <div className="border-t border-slate-200 p-4">
               <VisitReportForm
@@ -1113,7 +1188,104 @@ export default async function PilotDetailPage({
               </button>
             </form>
           ) : null}
-          <div className="overflow-x-auto">
+          <div className="space-y-3 md:hidden">
+            {visitsList.map((visit) => {
+              const report = visit.visit_report_id
+                ? reportMap.get(visit.visit_report_id)
+                : undefined;
+
+              return (
+                <article
+                  className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                  key={visit.id}
+                >
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <p className="font-semibold text-slate-950">
+                        Visit {display(visit.visit_number)}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        {visit.visit_code}
+                      </p>
+                    </div>
+                    <span className="w-fit rounded-full border border-brand-100 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
+                      {labelFor(visit.visit_status, visitStatusOptions)}
+                    </span>
+                  </div>
+                  <dl className="mt-3 grid gap-3 text-sm">
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Visit Date
+                      </dt>
+                      <dd className="mt-1 text-slate-700">
+                        {formatDate(visit.visit_date)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Visit Type
+                      </dt>
+                      <dd className="mt-1 text-slate-700">
+                        {labelFor(visit.visit_type, visitTypeOptions)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Report Status
+                      </dt>
+                      <dd className="mt-1 text-slate-700">
+                        {report
+                          ? labelFor(report.report_status, reportStatusOptions)
+                          : visit.visit_report_required
+                            ? "Pending"
+                            : "Not required"}
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="mt-4 grid gap-2">
+                    {visitPhotoUrls.get(visit.id) ? (
+                      <FileLink
+                        href={visitPhotoUrls.get(visit.id)}
+                        label="View photos"
+                      />
+                    ) : null}
+                    {visitDataSheetUrls.get(visit.id) ? (
+                      <FileLink
+                        href={visitDataSheetUrls.get(visit.id)}
+                        label="View data sheet"
+                      />
+                    ) : null}
+                    {report?.report_link ? (
+                      <FileLink
+                        href={reportUrls.get(report.id)}
+                        label="Open report"
+                      />
+                    ) : canWrite && visit.visit_report_required ? (
+                      <Link
+                        className="inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                        href={`/pilots/${pilot.id}?pilot_visit_id=${visit.id}#add-visit-report`}
+                      >
+                        Create Visit Report
+                      </Link>
+                    ) : null}
+                    {canWrite ? (
+                      <Link
+                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                        href={`/pilots/${pilot.id}/visits/${visit.id}/edit`}
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                        Edit visit
+                      </Link>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+            {visitsList.length === 0 ? (
+              <EmptyState>No actual visit history added yet.</EmptyState>
+            ) : null}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="min-w-[1050px] divide-y divide-slate-200 text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>

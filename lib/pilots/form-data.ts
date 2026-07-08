@@ -594,11 +594,14 @@ export function visitReportPayloadFromForm(
   formData: FormData
 ): VisitReportFormPayload {
   const reportStatus = getText(formData, "report_status") ?? defaultReportStatus;
+  const reportType = getText(formData, "report_type") ?? defaultReportType;
+  const reportDate = getText(formData, "report_date") ?? todayDate();
+  const generatedReportTitle = `${reportType} - ${reportDate}`;
   const parameterObservations = getParameterObservations(formData);
 
   return {
-    report_date: getText(formData, "report_date") ?? todayDate(),
-    report_type: getText(formData, "report_type") ?? defaultReportType,
+    report_date: reportDate,
+    report_type: reportType,
     submitted_by_user_id: getText(formData, "submitted_by_user_id") ?? "",
     reviewed_by_user_id: getText(formData, "reviewed_by_user_id"),
     report_status: reportStatus,
@@ -609,7 +612,7 @@ export function visitReportPayloadFromForm(
     installation_id: getText(formData, "installation_id"),
     crop: getText(formData, "crop"),
     other_crop: getText(formData, "other_crop"),
-    report_title: getText(formData, "report_title") ?? "",
+    report_title: getText(formData, "report_title") ?? generatedReportTitle,
     report_summary: getText(formData, "report_summary") ?? "",
     farmer_feedback: getText(formData, "farmer_feedback"),
     fitment_inspection_status: getText(
@@ -650,8 +653,7 @@ export function validateVisitReportPayload(payload: VisitReportFormPayload) {
   if (!payload.submitted_by_user_id) return "Select submitted by.";
   if (!payload.report_status) return "Report status is required.";
   if (!payload.report_title) return "Report title is required.";
-  if (!payload.report_summary) return "Report summary is required.";
-  if (!payload.report_link) return "Report link is required.";
+  if (!payload.report_summary) return "Visit Report Notes are required.";
   if (isLegacyCropValue(payload.crop)) {
     return legacyCropValidationMessage();
   }

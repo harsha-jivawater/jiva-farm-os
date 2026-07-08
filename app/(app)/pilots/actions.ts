@@ -1754,7 +1754,10 @@ async function updatePilotFromReport(
     payload.report_status === "Approved"
   ) {
     updatePayload.pilot_status = "Final Report Reviewed";
-    updatePayload.final_pilot_report_link = payload.report_link;
+
+    if (payload.report_link) {
+      updatePayload.final_pilot_report_link = payload.report_link;
+    }
 
     const resultUpdate = pilotResultUpdateFromReport(formData);
     if (

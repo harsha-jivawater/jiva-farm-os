@@ -1040,41 +1040,84 @@ export default async function FarmerLeadDetailPage({
         >
           <div className="space-y-3">
             {followups.length ? (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[42rem] text-left text-sm">
-                  <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th className="px-3 py-2">Follow-up</th>
-                      <th className="px-3 py-2">Type</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Due date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {followups.map((followup) => (
-                      <tr key={followup.id}>
-                        <td className="px-3 py-2">
-                          <Link
-                            className="font-semibold text-brand-700 hover:text-brand-800"
-                            href={`/follow-ups/${followup.id}`}
-                          >
-                            {followup.followup_code}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2 text-slate-600">
-                          {followup.followup_type}
-                        </td>
-                        <td className="px-3 py-2 text-slate-600">
-                          {followup.followup_status}
-                        </td>
-                        <td className="px-3 py-2 text-slate-600">
-                          {formatDate(followup.followup_due_date)}
-                        </td>
+              <>
+                <div className="grid gap-3 md:hidden">
+                  {followups.map((followup) => (
+                    <article
+                      className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                      key={followup.id}
+                    >
+                      <Link
+                        className="font-semibold text-brand-700 hover:text-brand-800"
+                        href={`/follow-ups/${followup.id}`}
+                      >
+                        {followup.followup_code}
+                      </Link>
+                      <dl className="mt-3 grid gap-3 text-sm">
+                        <div>
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Type
+                          </dt>
+                          <dd className="mt-1 text-slate-700">
+                            {followup.followup_type}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Status
+                          </dt>
+                          <dd className="mt-1 text-slate-700">
+                            {followup.followup_status}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Due date
+                          </dt>
+                          <dd className="mt-1 text-slate-700">
+                            {formatDate(followup.followup_due_date)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </article>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full min-w-[42rem] text-left text-sm">
+                    <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2">Follow-up</th>
+                        <th className="px-3 py-2">Type</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Due date</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {followups.map((followup) => (
+                        <tr key={followup.id}>
+                          <td className="px-3 py-2">
+                            <Link
+                              className="font-semibold text-brand-700 hover:text-brand-800"
+                              href={`/follow-ups/${followup.id}`}
+                            >
+                              {followup.followup_code}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">
+                            {followup.followup_type}
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">
+                            {followup.followup_status}
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">
+                            {formatDate(followup.followup_due_date)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             ) : (
               <CompactEmpty>No follow-up records linked yet.</CompactEmpty>
             )}

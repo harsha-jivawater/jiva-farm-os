@@ -49,17 +49,17 @@ function textareaClassName() {
   return "min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100";
 }
 
-function SubmitButton({ compact = false }: { compact?: boolean }) {
+function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
     <button
-      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
       disabled={pending}
       type="submit"
     >
       <Save className="h-4 w-4" aria-hidden="true" />
-      {pending ? "Saving..." : compact ? "Add report" : "Save report"}
+      {pending ? "Saving..." : "Submit Visit Report"}
     </button>
   );
 }
@@ -176,7 +176,7 @@ function CheckboxField({
   name: string;
 }) {
   return (
-    <label className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700">
+    <label className="flex min-h-11 items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
       <input
         className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
         defaultChecked={Boolean(defaultChecked)}
@@ -188,10 +188,74 @@ function CheckboxField({
   );
 }
 
+const legacyNarrativeFields: Array<{
+  key: keyof VisitReport;
+  label: string;
+}> = [
+  { key: "farmer_feedback", label: "Farmer feedback" },
+  {
+    key: "treatment_vs_control_summary",
+    label: "Treatment vs control summary"
+  },
+  { key: "crop_observation_summary", label: "Crop observation summary" },
+  { key: "issue_details", label: "Issue details" },
+  { key: "recommendation", label: "Recommendation" },
+  { key: "next_action", label: "Next action" },
+  { key: "review_comments", label: "Review comments" }
+];
+
+function buildVisitReportNotes(report?: VisitReport) {
+  if (!report) {
+    return "";
+  }
+
+  const summary = report.report_summary?.trim() ?? "";
+  const sections = [summary];
+
+  legacyNarrativeFields.forEach(({ key, label }) => {
+    const value = report[key];
+
+    if (typeof value !== "string") {
+      return;
+    }
+
+    const trimmedValue = value.trim();
+
+    if (!trimmedValue || summary.includes(trimmedValue)) {
+      return;
+    }
+
+    sections.push(`${label}:\n${trimmedValue}`);
+  });
+
+  return sections.filter(Boolean).join("\n\n");
+}
+
+function buildReportTitle({
+  pilot,
+  report,
+  reportType,
+  selectedPlannedVisit
+}: {
+  pilot: Pilot;
+  report?: VisitReport;
+  reportType: string;
+  selectedPlannedVisit?: PlannedPilotVisit;
+}) {
+  if (report?.report_title) {
+    return report.report_title;
+  }
+
+  if (selectedPlannedVisit) {
+    return `Visit ${selectedPlannedVisit.visit_number} Report`;
+  }
+
+  return `${pilot.pilot_name} - ${reportType}`;
+}
+
 export function VisitReportForm({
   action,
   cancelHref,
-  compact = false,
   currentUser,
   defaultPlannedVisitId,
   defaultPilotVisitId,
@@ -204,6 +268,9 @@ export function VisitReportForm({
   const [crop, setCrop] = useState(report?.crop ?? pilot.crop ?? "");
   const [selectedPlannedVisitId, setSelectedPlannedVisitId] = useState(
     report?.planned_pilot_visit_id ?? defaultPlannedVisitId ?? ""
+  );
+  const [reportType, setReportType] = useState(
+    report?.report_type ?? defaultReportType
   );
   const canApproveFinalPilotReport = hasAnyRole(currentUser, [
     "R&D Head",
@@ -236,6 +303,16 @@ export function VisitReportForm({
       "Admin"
     ])
   );
+  const generatedReportTitle = buildReportTitle({
+    pilot,
+    report,
+    reportType,
+    selectedPlannedVisit
+  });
+  const showReviewApproval =
+    reportType === "Final Pilot Report" ||
+    report?.report_type === "Final Pilot Report" ||
+    report?.report_status === "Approved";
 
   return (
     <form action={action} className="space-y-4">
@@ -253,6 +330,16 @@ export function VisitReportForm({
         type="hidden"
         value={report?.reviewed_date ?? ""}
       />
+      <input name="report_title" type="hidden" value={generatedReportTitle} />
+      <input name="report_link" type="hidden" value={report?.report_link ?? ""} />
+      {legacyNarrativeFields.map(({ key }) => (
+        <input
+          key={key}
+          name={key}
+          type="hidden"
+          value={typeof report?.[key] === "string" ? report[key] : ""}
+        />
+      ))}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field
@@ -271,10 +358,11 @@ export function VisitReportForm({
           </label>
           <select
             className={inputClassName()}
-            defaultValue={report?.report_type ?? defaultReportType}
             id="report_type"
             name="report_type"
+            onChange={(event) => setReportType(event.target.value)}
             required
+            value={reportType}
           >
             {reportTypeOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -290,16 +378,20 @@ export function VisitReportForm({
           options={submittedByUsers}
           required
         />
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-          <p className="text-sm font-medium text-slate-700">Review approval</p>
-          <p className="mt-1 text-sm leading-5 text-slate-600">
-            {reviewer
-              ? `Reviewed by ${reviewer.full_name} · ${labelForRole(reviewer.role)}`
-              : canApproveFinalPilotReport
-                ? `Final approval will be stamped as ${currentUser.full_name} · ${labelForRole(currentUser.role)}.`
-                : "Only the R&D Head can approve final pilot reports."}
-          </p>
-        </div>
+        {showReviewApproval ? (
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-sm font-medium text-slate-700">
+              R&D approval
+            </p>
+            <p className="mt-1 text-sm leading-5 text-slate-600">
+              {reviewer
+                ? `Reviewed by ${reviewer.full_name} · ${labelForRole(reviewer.role)}`
+                : canApproveFinalPilotReport
+                  ? `Final approval will be stamped as ${currentUser.full_name} · ${labelForRole(currentUser.role)}.`
+                  : "Only the R&D Head can approve final pilot reports."}
+            </p>
+          </div>
+        ) : null}
         <div>
           <label
             className="mb-1.5 block text-sm font-medium text-slate-700"
@@ -379,19 +471,6 @@ export function VisitReportForm({
             value={report?.other_crop ?? pilot.other_crop ?? ""}
           />
         )}
-        <Field
-          defaultValue={report?.report_title}
-          label="Report title"
-          name="report_title"
-          required
-        />
-        <FileUploadField
-          currentValue={report?.report_link}
-          kind="document"
-          label="Report file"
-          name="report_link"
-          required
-        />
         <div>
           <label
             className="mb-1.5 block text-sm font-medium text-slate-700"
@@ -419,18 +498,6 @@ export function VisitReportForm({
           name="next_visit_date"
           type="date"
         />
-        <FileUploadField
-          currentValue={report?.photo_folder_link}
-          kind="zip"
-          label="Report photos ZIP"
-          name="photo_folder_link"
-        />
-        <FileUploadField
-          currentValue={report?.data_sheet_link}
-          kind="sheet"
-          label="Report data sheet"
-          name="data_sheet_link"
-        />
       </div>
 
       {selectedPlannedVisit?.parameters_to_collect.length ? (
@@ -443,7 +510,7 @@ export function VisitReportForm({
               Enter the observations collected during this assigned visit.
             </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             {selectedPlannedVisit.parameters_to_collect.map((parameter) => (
               <TextareaField
                 defaultValue={parameterObservations[parameter]}
@@ -462,51 +529,41 @@ export function VisitReportForm({
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div>
         <TextareaField
-          defaultValue={report?.report_summary}
-          label="Report summary"
+          defaultValue={buildVisitReportNotes(report)}
+          label="Visit Report Notes"
           name="report_summary"
           required
         />
-        <TextareaField
-          defaultValue={report?.farmer_feedback}
-          label="Farmer feedback"
-          name="farmer_feedback"
-        />
-        <TextareaField
-          defaultValue={report?.treatment_vs_control_summary}
-          label="Treatment vs control summary"
-          name="treatment_vs_control_summary"
-        />
-        <TextareaField
-          defaultValue={report?.crop_observation_summary}
-          label="Crop observation summary"
-          name="crop_observation_summary"
-        />
-        <TextareaField
-          defaultValue={report?.issue_details}
-          label="Issue details"
-          name="issue_details"
-        />
-        <TextareaField
-          defaultValue={report?.recommendation}
-          label="Recommendation"
-          name="recommendation"
-        />
-        <TextareaField
-          defaultValue={report?.next_action}
-          label="Next action"
-          name="next_action"
-        />
-        <TextareaField
-          defaultValue={report?.review_comments}
-          label="Review comments"
-          name="review_comments"
-        />
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold text-slate-950">
+            Evidence Uploads, optional
+          </h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Add photos or a data sheet when the visit has supporting evidence.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <FileUploadField
+            currentValue={report?.photo_folder_link}
+            kind="zip"
+            label="Report photos ZIP"
+            name="photo_folder_link"
+          />
+          <FileUploadField
+            currentValue={report?.data_sheet_link}
+            kind="sheet"
+            label="Report data sheet"
+            name="data_sheet_link"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-3">
         <CheckboxField
           defaultChecked={report?.issue_observed}
           label="Issue observed"
@@ -526,7 +583,7 @@ export function VisitReportForm({
         ) : null}
       </div>
 
-      {canApproveFinalPilotReport ? (
+      {canApproveFinalPilotReport && reportType === "Final Pilot Report" ? (
         <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
           <label
             className="mb-1.5 block text-sm font-medium text-slate-700"
@@ -557,13 +614,13 @@ export function VisitReportForm({
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
         {cancelHref ? (
           <Link
-            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
             href={cancelHref}
           >
             Cancel
           </Link>
         ) : null}
-        <SubmitButton compact={compact} />
+        <SubmitButton />
       </div>
     </form>
   );
