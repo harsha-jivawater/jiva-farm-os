@@ -35,7 +35,7 @@ import type {
   UserOption
 } from "@/lib/pilots/types";
 import { labelForRole } from "@/lib/users/options";
-import { hasRole } from "@/lib/users/permissions";
+import { hasAnyRole, hasRole } from "@/lib/users/permissions";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
 
 type PilotFormProps = {
@@ -48,10 +48,15 @@ type PilotFormProps = {
   institutions: PilotInstitutionOption[];
   pilot?: Pilot;
   regions: RegionOption[];
+  currentUser: {
+    role: string;
+    secondary_role: string | null;
+  };
   users: UserOption[];
 };
 
 const pilotOwnerRoles = new Set(["Agronomist", "Research Assistant", "R&D Head"]);
+const pilotDeviceInstallRoles = ["Admin", "R&D Head", "Agronomist"];
 
 function inputClassName() {
   return "h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500";
@@ -397,6 +402,7 @@ export function PilotForm({
   institutions,
   pilot,
   regions,
+  currentUser,
   users
 }: PilotFormProps) {
   const initialFarmer = useMemo(
@@ -483,6 +489,15 @@ export function PilotForm({
   );
   const isInstitutionPilot = pilotType === "Institution Pilot";
   const isDealerPilot = pilotType === "Dealer Pilot";
+  const canManagePilotDeviceInstall = hasAnyRole(
+    currentUser,
+    pilotDeviceInstallRoles
+  );
+  const pilotStatusFieldOptions = canManagePilotDeviceInstall
+    ? pilotStatusOptions
+    : pilotStatusOptions.filter((option) => option.value !== "Device Installed");
+  const lockPilotStatusAsDeviceInstalled =
+    !canManagePilotDeviceInstall && pilot?.pilot_status === "Device Installed";
   const pilotTrialDescription =
     pilot?.baseline_notes ??
     [pilot?.treatment_plot_description, pilot?.control_plot_description]
@@ -606,13 +621,28 @@ export function PilotForm({
                 ? "Use this when the farmer pilot is conducted through a dealer."
                 : "Pilot devices are temporary and return to Jiva after completion. Farmer sales follow-up starts after pilot completion."}
           </div>
-          <SelectField
-            defaultValue={pilot?.pilot_status ?? defaultPilotStatus}
-            label="Pilot status"
-            name="pilot_status"
-            options={pilotStatusOptions}
-            required
-          />
+          {lockPilotStatusAsDeviceInstalled ? (
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-slate-700">
+                Pilot status
+              </p>
+              <p className="min-h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
+                Device Installed
+              </p>
+              <input name="pilot_status" type="hidden" value="Device Installed" />
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Only Admin, R&D Head, or Agronomist can change this milestone.
+              </p>
+            </div>
+          ) : (
+            <SelectField
+              defaultValue={pilot?.pilot_status ?? defaultPilotStatus}
+              label="Pilot status"
+              name="pilot_status"
+              options={pilotStatusFieldOptions}
+              required
+            />
+          )}
           <SelectField
             defaultValue={pilot?.pilot_result_status ?? defaultPilotResultStatus}
             label="Pilot result status"
@@ -960,20 +990,56 @@ export function PilotForm({
             onChange={setSerialNumber}
             value={serialNumber}
           />
-          <Field
-            defaultValue={pilot?.device_installation_date}
-            label="Pilot Device Installation Date"
-            name="device_installation_date"
-            type="date"
-          />
+          {canManagePilotDeviceInstall ? (
+            <Field
+              defaultValue={pilot?.device_installation_date}
+              label="Pilot Device Installation Date"
+              name="device_installation_date"
+              type="date"
+            />
+          ) : (
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-slate-700">
+                Pilot Device Installation Date
+              </p>
+              <p className="min-h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
+                {pilot?.device_installation_date ?? "Not set"}
+              </p>
+              <input
+                name="device_installation_date"
+                type="hidden"
+                value={pilot?.device_installation_date ?? ""}
+              />
+            </div>
+          )}
         </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <CheckboxField
-            defaultChecked={pilot?.installation_completed}
-            label="Pilot Device Installed"
-            name="installation_completed"
-          />
-        </div>
+        {canManagePilotDeviceInstall ? (
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <CheckboxField
+              defaultChecked={pilot?.installation_completed}
+              label="Pilot Device Installed"
+              name="installation_completed"
+            />
+          </div>
+        ) : (
+          <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-sm font-medium text-slate-700">
+              Pilot Device Installed
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-950">
+              {pilot?.installation_completed ? "Yes" : "No"}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Only Admin, R&D Head, or Agronomist can mark the pilot device as
+              installed.
+            </p>
+            <input
+              name="installation_completed"
+              type="hidden"
+              value={booleanValue(pilot?.installation_completed)}
+            />
+          </div>
+        )}
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
             <TextareaField

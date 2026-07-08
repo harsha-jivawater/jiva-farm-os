@@ -16,6 +16,7 @@ import {
   visitReportPayloadFromForm
 } from "@/lib/pilots/form-data";
 import {
+  defaultPilotStatus,
   defaultPilotType,
   pilotResultStatusOptions
 } from "@/lib/pilots/options";
@@ -57,6 +58,7 @@ const reportSubmitterRoles = [
 ];
 const finalPilotReportApproverRoles = ["R&D Head", "Admin"];
 const visitPlanManagerRoles = ["Agronomist", "R&D Head", "Admin"];
+const pilotDeviceInstallRoles = ["Admin", "R&D Head", "Agronomist"];
 const pilotCompletionRoles = ["Admin", "Management", "R&D Head", "Agronomist"];
 const pilotCompletionStatuses = [
   "Closed - Successful",
@@ -158,6 +160,53 @@ function canManageVisitPlans(
     | undefined
 ) {
   return hasAnyRole(profile, visitPlanManagerRoles);
+}
+
+function canManagePilotDeviceInstall(
+  profile:
+    | Pick<InternalUser, "role" | "secondary_role">
+    | null
+    | undefined
+) {
+  return hasAnyRole(profile, pilotDeviceInstallRoles);
+}
+
+function enforcePilotDeviceInstallAuthority({
+  existingPilot,
+  payload,
+  profile
+}: {
+  existingPilot?: Pick<
+    Pilot,
+    "device_installation_date" | "installation_completed" | "pilot_status"
+  > | null;
+  payload: PilotFormPayload;
+  profile: Pick<InternalUser, "role" | "secondary_role">;
+}) {
+  if (canManagePilotDeviceInstall(profile)) {
+    return;
+  }
+
+  if (existingPilot) {
+    payload.installation_completed = existingPilot.installation_completed;
+    payload.device_installation_date = existingPilot.device_installation_date;
+
+    if (
+      existingPilot.pilot_status === "Device Installed" ||
+      payload.pilot_status === "Device Installed"
+    ) {
+      payload.pilot_status = existingPilot.pilot_status;
+    }
+
+    return;
+  }
+
+  payload.installation_completed = false;
+  payload.device_installation_date = null;
+
+  if (payload.pilot_status === "Device Installed") {
+    payload.pilot_status = defaultPilotStatus;
+  }
 }
 
 function isPilotCompletionStatus(status: string | null | undefined) {
@@ -768,6 +817,10 @@ export async function createPilotAction(formData: FormData) {
       error instanceof Error ? error.message : "File upload failed."
     );
   }
+  enforcePilotDeviceInstallAuthority({
+    payload,
+    profile
+  });
   const validationError = validatePilotPayload(payload);
   const farmerLeadId = payload.farmer_lead_id;
 
@@ -859,6 +912,11 @@ export async function updatePilotAction(id: string, formData: FormData) {
       error instanceof Error ? error.message : "File upload failed."
     );
   }
+  enforcePilotDeviceInstallAuthority({
+    existingPilot: existingPilot as Pilot,
+    payload,
+    profile
+  });
   const validationError = validatePilotPayload(payload);
   const farmerLeadId = payload.farmer_lead_id;
 

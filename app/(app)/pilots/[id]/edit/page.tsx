@@ -189,6 +189,10 @@ export default async function EditPilotPage({
         error={query.error}
         farmerLeads={farmerLeadOptions}
         institutions={institutionOptions}
+        currentUser={{
+          role: currentUser.role,
+          secondary_role: currentUser.secondary_role
+        }}
         pilot={pilotRow}
         regions={(regions ?? []) as RegionOption[]}
         users={(users ?? []) as UserOption[]}

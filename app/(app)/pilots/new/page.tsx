@@ -10,6 +10,7 @@ import type {
   UserOption
 } from "@/lib/pilots/types";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentInternalUser } from "@/lib/users/current-user";
 
 type NewPilotPageProps = {
   searchParams: Promise<{
@@ -20,6 +21,7 @@ type NewPilotPageProps = {
 export default async function NewPilotPage({ searchParams }: NewPilotPageProps) {
   const query = await searchParams;
   const supabase = await createClient();
+  const currentUser = await getCurrentInternalUser(supabase, "/pilots");
   const [
     { data: farmerLeads },
     { data: devices },
@@ -81,6 +83,10 @@ export default async function NewPilotPage({ searchParams }: NewPilotPageProps) 
         error={query.error}
         farmerLeads={(farmerLeads ?? []) as PilotFarmerLeadOption[]}
         institutions={(institutions ?? []) as PilotInstitutionOption[]}
+        currentUser={{
+          role: currentUser.role,
+          secondary_role: currentUser.secondary_role
+        }}
         regions={(regions ?? []) as RegionOption[]}
         users={(users ?? []) as UserOption[]}
       />
