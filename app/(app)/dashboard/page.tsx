@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CircleDollarSign,
   ClipboardCheck,
+  ClipboardList,
   Package,
   Send,
   Tractor,
@@ -28,6 +29,7 @@ type CountCard = {
   label: string;
   module: ModuleKey;
   value: number | null;
+  valueLabel?: string;
 };
 
 type DashboardCounts = {
@@ -100,7 +102,7 @@ function DailyActionCard({ card }: { card: CountCard }) {
         </span>
       </div>
       <p className="mt-3 text-2xl font-semibold text-slate-950">
-        {formatCount(card.value)}
+        {card.valueLabel ?? formatCount(card.value)}
       </p>
       <p className="mt-1 min-h-5 text-xs leading-5 text-slate-500">
         {card.helper}
@@ -117,6 +119,7 @@ export default async function DashboardPage() {
     "dashboard role/permission resolution",
     async () => ({
       farmerLeads: canViewModule(currentUser, "farmer-leads"),
+      myPendingWork: canViewModule(currentUser, "my-pending-work"),
       dispatches: canViewModule(currentUser, "dispatches"),
       installations: canViewModule(currentUser, "installations"),
       devices: canViewModule(currentUser, "devices"),
@@ -294,6 +297,20 @@ export default async function DashboardPage() {
     .filter((card) => card.includeInToday)
     .reduce((sum, card) => sum + (card.value ?? 0), 0);
   const cardsWithToday: CountCard[] = [
+    ...(moduleAccess.myPendingWork
+      ? [
+          {
+            href: "/my-pending-work",
+            helper: "Open a live list of records that need your action.",
+            icon: ClipboardList,
+            includeInToday: false,
+            label: "My Pending Work",
+            module: "my-pending-work" as ModuleKey,
+            value: null,
+            valueLabel: "Open"
+          }
+        ]
+      : []),
     {
       href: "/kpi-dashboard",
       helper: "Sum of visible urgent cards below, excluding warehouse stock.",

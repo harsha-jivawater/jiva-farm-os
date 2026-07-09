@@ -3,6 +3,7 @@ import {
   Building2,
   CalendarCheck2,
   ClipboardCheck,
+  ClipboardList,
   Gauge,
   Handshake,
   LayoutDashboard,
@@ -22,6 +23,12 @@ export const navigationItems = [
     href: "/dashboard",
     module: "dashboard" satisfies ModuleKey,
     icon: LayoutDashboard
+  },
+  {
+    label: "My Pending Work",
+    href: "/my-pending-work",
+    module: "my-pending-work" satisfies ModuleKey,
+    icon: ClipboardList
   },
   {
     label: "Farmer Leads",

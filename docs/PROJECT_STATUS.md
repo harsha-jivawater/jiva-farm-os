@@ -39,6 +39,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - Pilots
 - Pilot Visit Planning
 - My Visits
+- My Pending Work
 - Visit Reports
 - Devices
 - Dispatches
@@ -56,13 +57,14 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.5 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.6 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
 - The v0.3 update adds controlled soft-delete guidance for Dealers, Institutional Partners, and Pilots.
 - The v0.4 update adds paid farmer sale dispatch vs free pilot dispatch routing and device pool guidance.
 - The v0.5 update adds soft-delete audit trail and Admin-only restore guidance for Dealers, Institutional Partners, and Pilots.
+- The v0.6 update adds My Pending Work guidance for live role-scoped action lists.
 
 ## Role Model
 
@@ -121,6 +123,16 @@ Role notes:
 - Designers can work assigned requests and update progress/draft/final links.
 - Requesters can edit core brief details only while the request is `Requested` or `Needs Clarification`; after that they add comments/corrections.
 - No seed/demo/test data was added for this module.
+
+## My Pending Work
+
+- My Pending Work is available at `/my-pending-work`.
+- It is a live role-scoped work view built from existing operational records.
+- It is not a stored notification system and does not send email notifications.
+- It does not add SQL, schema, or RLS changes.
+- It groups pending records into Sales, Dispatch, Pilots & Visits, and Marketing.
+- Normal record visibility is preserved through existing RLS-safe queries and app record-scope helpers.
+- The Home dashboard includes a lightweight My Pending Work card/link without running heavy pending-work count queries.
 
 ## Farmer Leads Workflow
 

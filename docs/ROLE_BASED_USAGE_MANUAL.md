@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.5
+Version: v0.6
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.6 | 09 Jul 2026 | Draft | Adds My Pending Work as a live role-scoped action list for Sales, Dispatch, Pilots & Visits, and Marketing. |
 | v0.5 | 09 Jul 2026 | Draft | Adds soft-delete audit trail, delete reason capture, Admin-only deleted-record views, and restore guidance for Dealers, Institutional Partners, and Pilots. |
 | v0.4 | 09 Jul 2026 | Draft | Adds paid farmer sale dispatch vs free pilot dispatch routing, device pool rules, and dispatch handoff guidance. |
 | v0.3 | 09 Jul 2026 | Draft | Adds controlled soft-delete guidance for Dealers, Institutional Partners, and Pilots. |
@@ -70,22 +71,22 @@ Notes:
 
 ### Operations Menus
 
-| Role | Home | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard | Marketing Requests |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Admin | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ |
-| Management | ✅ | 👁 | 👁 | 👁 | ⚠️ ✏️ | ⚠️ | 🔒 | 👁 | 👁 | 👁 | ✅ | ✅ ✏️ |
-| Sales Head | ✅ | ⭐ ✏️ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | ✏️ | ✏️ | 👁 | ✅ | ✏️ ⚠️ |
-| RSM | ✅ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | ✏️ ⚠️ |
-| Salesperson | ✅ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 👁 ⚠️ | ✏️ ⚠️ |
-| Agronomist | ✅ | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | ⭐ ⚠️ | 👁 | 👁 | ✏️ | 👁 | ✅ | ✏️ ⚠️ |
-| Research Assistant | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | ⭐ ✏️ ⚠️ | ⭐ ✏️ | 🔒 | 🔒 | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | ✏️ ⚠️ |
-| R&D Head | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | ✅ | ✏️ ⚠️ |
-| Marketing Head | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ |
-| Designer | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ |
-| Accounts | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | ✏️ | ✅ | 🔒 |
-| Stock / Dispatch | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | ✅ | 🔒 |
-| HR & Legal | 🔒 | 🔒 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
-| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 |
+| Role | Home | My Pending Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard | Marketing Requests |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Admin | ✅ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ |
+| Management | ✅ | ✅ | 👁 | 👁 | 👁 | ⚠️ ✏️ | ⚠️ | 🔒 | 👁 | 👁 | 👁 | ✅ | ✅ ✏️ |
+| Sales Head | ✅ | ✅ | ⭐ ✏️ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | ✏️ | ✏️ | 👁 | ✅ | ✏️ ⚠️ |
+| RSM | ✅ | ✅ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | ✏️ ⚠️ |
+| Salesperson | ✅ | ✅ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 👁 ⚠️ | ✏️ ⚠️ |
+| Agronomist | ✅ | ✅ | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | ⭐ ⚠️ | 👁 | 👁 | ✏️ | 👁 | ✅ | ✏️ ⚠️ |
+| Research Assistant | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | ⭐ ✏️ ⚠️ | ⭐ ✏️ | 🔒 | 🔒 | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | ✏️ ⚠️ |
+| R&D Head | ✅ | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | ✅ | ✏️ ⚠️ |
+| Marketing Head | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ |
+| Designer | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ |
+| Accounts | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | ✏️ | ✅ | 🔒 |
+| Stock / Dispatch | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | ✅ | 🔒 |
+| HR & Legal | 🔒 | ✅ | 🔒 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
+| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 |
 
 ### Team And Utility Menus
 
@@ -863,6 +864,23 @@ flowchart LR
   F --> G["Delivered"]
 ```
 
+### My Pending Work Triage
+
+```mermaid
+flowchart LR
+  A["Open My Pending Work"] --> B["Review grouped pending items"]
+  B --> C["Open source record"]
+  C --> D["Complete action in source module"]
+  D --> E["Pending item clears when source data changes"]
+```
+
+Rules:
+
+- My Pending Work is a live view, not a stored notification table.
+- It uses existing records, permissions, RLS-safe queries, and role-scope helpers.
+- It groups pending work into Sales, Dispatch, Pilots & Visits, and Marketing.
+- Updating the source record is what clears the pending item.
+
 ### Dispatch To Installation
 
 ```mermaid
@@ -935,6 +953,15 @@ flowchart TD
 | Used by | Most operational roles except HR & Legal. |
 | Primary actions | Review current workload and open modules. |
 | Important rules | Use source modules to update records; Home is not the source of truth. |
+
+### My Pending Work
+
+| Item | Detail |
+|---|---|
+| Purpose | Show role-scoped records that need the user's action or attention. |
+| Used by | All signed-in roles. |
+| Primary actions | Open pending items and continue work in the source module. |
+| Important rules | This is a live view only. It does not send notifications, store notification rows, or change record permissions. |
 
 ### Farmer Leads
 

@@ -24,6 +24,22 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Agronomist",
     "Viewer"
   ],
+  "my-pending-work": [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "RSM",
+    "Salesperson",
+    "Agronomist",
+    "Research Assistant",
+    "R&D Head",
+    "Marketing Head",
+    "Designer",
+    "Stock / Dispatch",
+    "Accounts",
+    "HR & Legal",
+    "Viewer"
+  ],
   "farmer-leads": [
     "Admin",
     "Management",
