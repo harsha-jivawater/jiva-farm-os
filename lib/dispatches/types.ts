@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/database.types";
+import { formatDisplayDate } from "@/lib/date-utils";
 
 export type Dispatch = Database["public"]["Tables"]["dispatches"]["Row"];
 export type DispatchInsert =
@@ -18,6 +19,7 @@ export type DispatchDeviceOption = Pick<
   | "serial_number"
   | "device_code"
   | "product_model"
+  | "inventory_pool"
   | "device_status"
   | "current_holder_type"
   | "current_holder_id"
@@ -43,6 +45,25 @@ export type DispatchFarmerLeadOption = {
   region_id: string;
 };
 
+export type DispatchPilotOption = {
+  id: string;
+  pilot_code: string;
+  pilot_name: string;
+  pilot_type: string;
+  pilot_status: string;
+  farmer_lead_id: string;
+  institution_id: string | null;
+  dealer_id: string | null;
+  farmer_name_snapshot: string;
+  farmer_mobile_snapshot: string;
+  village: string;
+  district: string;
+  state: string;
+  product_model: string;
+  device_id: string | null;
+  dispatch_id: string | null;
+};
+
 export type DispatchFilters = {
   q: string;
   dispatch_status: string;
@@ -60,15 +81,7 @@ export function display(value: string | null | undefined) {
 }
 
 export function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
+  return formatDisplayDate(value);
 }
 
 export function formatDispatchLocation(
