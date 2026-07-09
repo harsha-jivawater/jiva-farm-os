@@ -51,8 +51,9 @@ Jiva Farm OS is the production operating system for Jiva Water's farmer sales, d
 
 ## Documentation Updates
 
-- Role-based usage manual draft created at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual created as v0.1 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
+- Future updates to the manual should increment the version number.
 - This update is documentation-only.
 
 ## Role Model

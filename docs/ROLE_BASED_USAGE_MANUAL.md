@@ -1,8 +1,16 @@
 # Jiva Farm OS Role-Based Usage Manual
 
+Version: v0.1  
+Status: Draft  
+Last updated: 09 Jul 2026  
+Owner: Jiva Farm OS Admin / Management  
+Audience: Internal Jiva Farm OS users  
+
 ## 1. How To Use This Manual
 
 This is a practical ready-reckoner for day-to-day Jiva Farm OS use. It shows what each role can see, what each role should do, where work moves next, and where not to take action.
+
+This manual will be updated as Jiva Farm OS workflows, role permissions, modules, and operating practices evolve.
 
 Use it when:
 
@@ -10,6 +18,12 @@ Use it when:
 - deciding which menu to use for a task
 - checking whether a user should create, update, approve, or only view
 - explaining how workflows move between teams
+
+## Version history
+
+| Version | Date | Status | Notes |
+|---|---|---|---|
+| v0.1 | 09 Jul 2026 | Draft | Initial role-based ready-reckoner covering menu access, workflows, role guides, status references, and items to confirm. |
 
 ## 2. Role Legend
 
