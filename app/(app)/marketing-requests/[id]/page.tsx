@@ -188,6 +188,63 @@ function finalWorkingDeadline(request: MarketingRequest) {
   return request.deadline_date;
 }
 
+function marketingHandoff(request: MarketingRequest, assignedTo: string) {
+  if (request.marketing_status === "Delivered") {
+    return {
+      currentStage: "Delivered",
+      nextAction:
+        "Requester and Marketing Head can review the final OneDrive link.",
+      nextOwner: "Requester / Marketing Head",
+      whereNext: "Final OneDrive link"
+    };
+  }
+
+  if (request.marketing_status === "Requested") {
+    return {
+      currentStage: "Awaiting Marketing review",
+      nextAction:
+        "Accept or revise the deadline, then assign a Marketing owner.",
+      nextOwner: "Marketing Head",
+      whereNext: "Marketing action panel"
+    };
+  }
+
+  if (request.marketing_status === "Needs Clarification") {
+    return {
+      currentStage: "Clarification needed",
+      nextAction: "Requester should clarify the brief in comments or edit it.",
+      nextOwner: "Requester",
+      whereNext: "Corrections, comments, and history"
+    };
+  }
+
+  if (
+    ["Accepted", "In Progress", "Draft Shared", "Corrections Requested"].includes(
+      request.marketing_status
+    )
+  ) {
+    return {
+      currentStage:
+        request.marketing_status === "Draft Shared"
+          ? "Draft shared"
+          : "Design in progress",
+      nextAction:
+        request.marketing_status === "Draft Shared"
+          ? "Requester should review the draft and add corrections if needed."
+          : "Designer should update progress and add draft or final links.",
+      nextOwner: assignedTo,
+      whereNext: "Marketing action panel"
+    };
+  }
+
+  return {
+    currentStage: "Request stopped",
+    nextAction: "No active handoff is pending.",
+    nextOwner: "Not assigned",
+    whereNext: "Comments and history"
+  };
+}
+
 function LinkValue({
   href,
   label
@@ -281,6 +338,10 @@ export default async function MarketingRequestDetailPage({
           option.value
         )
       );
+  const handoff = marketingHandoff(
+    request,
+    userLabel(userMap, request.assigned_to_user_id)
+  );
 
   return (
     <section className="space-y-6">
@@ -357,6 +418,18 @@ export default async function MarketingRequestDetailPage({
           </div>
         </div>
       </div>
+
+      <SectionPanel
+        title="Marketing handoff"
+        description="Current stage, next owner, and where the request should move next."
+      >
+        <div>
+          <InfoRow label="Current stage" value={handoff.currentStage} />
+          <InfoRow label="Next owner" value={handoff.nextOwner} />
+          <InfoRow label="Next action" value={handoff.nextAction} />
+          <InfoRow label="Where next" value={handoff.whereNext} />
+        </div>
+      </SectionPanel>
 
       <SectionPanel title="Deadline decision">
         <div>

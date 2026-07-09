@@ -59,7 +59,8 @@ import { labelForRole } from "@/lib/users/options";
 import {
   canApproveLegalDocuments,
   canManageInstitutionProfile,
-  canSoftDeleteInstitution
+  canSoftDeleteInstitution,
+  canWriteModule
 } from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
 
@@ -280,6 +281,55 @@ function currentActionNeeded(
   return "Review next action";
 }
 
+function institutionHandoff(
+  institution: Institution,
+  relatedPilots: RelatedPilot[],
+  leadProofPilot: RelatedPilot | undefined,
+  canCreatePilot: boolean,
+  accountOwnerLabel: string,
+  technicalOwnerLabel: string
+) {
+  if (hasActivePilot(relatedPilots) && leadProofPilot) {
+    return {
+      currentStage: "Pilot in progress",
+      nextAction: "Capture proof through pilot visits and reports.",
+      nextHref: `/pilots/${leadProofPilot.id}`,
+      nextLinkLabel: "Go to pilot",
+      nextOwner: technicalOwnerLabel
+    };
+  }
+
+  if (leadProofPilot) {
+    return {
+      currentStage: "Proof / scale-up review",
+      nextAction: isScaleUpActive(institution.scale_up_status)
+        ? "Review commercial readiness and continue scale-up follow-up."
+        : "Review pilot proof and decide the next commercial action.",
+      nextHref: `/pilots/${leadProofPilot.id}`,
+      nextLinkLabel: "Go to pilot proof",
+      nextOwner: accountOwnerLabel
+    };
+  }
+
+  if (institution.proposal_shared !== "Yes") {
+    return {
+      currentStage: "Opportunity development",
+      nextAction: "Share proposal or schedule the next institution meeting.",
+      nextHref: canCreatePilot ? "/pilots/new" : undefined,
+      nextLinkLabel: "Create pilot",
+      nextOwner: accountOwnerLabel
+    };
+  }
+
+  return {
+    currentStage: "Pilot / proof needed",
+    nextAction: "Create or link a pilot, then capture proof for scale-up.",
+    nextHref: canCreatePilot ? "/pilots/new" : undefined,
+    nextLinkLabel: "Create pilot",
+    nextOwner: technicalOwnerLabel
+  };
+}
+
 function normalizeContactValue(value: string | null | undefined) {
   return value?.trim().toLowerCase() ?? "";
 }
@@ -332,6 +382,7 @@ export default async function InstitutionDetailPage({
     "/institutional-partners"
   );
   const canManageProfile = canManageInstitutionProfile(currentUser);
+  const canCreatePilot = canWriteModule(currentUser, "pilots");
   const canDelete = canSoftDeleteInstitution(currentUser);
   const canApproveLegal = canApproveLegalDocuments(currentUser);
   const canOpenLegalOnly = canApproveLegal && !canManageProfile;
@@ -507,6 +558,22 @@ export default async function InstitutionDetailPage({
   const remainingPilots = leadProofPilot
     ? relatedPilotsList.filter((pilot) => pilot.id !== leadProofPilot.id)
     : [];
+  const institutionHandoffState = institutionHandoff(
+    institution,
+    relatedPilotsList,
+    leadProofPilot,
+    canCreatePilot,
+    userLabel(
+      userMap.get(institution.account_owner_user_id),
+      institution.account_owner_user_id
+    ),
+    userLabel(
+      institution.technical_owner_user_id
+        ? userMap.get(institution.technical_owner_user_id)
+        : undefined,
+      institution.technical_owner_user_id
+    )
+  );
 
   return (
     <section>
@@ -616,6 +683,35 @@ export default async function InstitutionDetailPage({
                 : undefined,
               institution.technical_owner_user_id
             )}
+          />
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard
+            label="Current stage"
+            value={institutionHandoffState.currentStage}
+          />
+          <SummaryCard
+            label="Next owner"
+            value={institutionHandoffState.nextOwner}
+          />
+          <SummaryCard
+            label="Next action"
+            value={institutionHandoffState.nextAction}
+          />
+          <SummaryCard
+            label="Where next"
+            value={
+              institutionHandoffState.nextHref ? (
+                <Link
+                  className="text-brand-700 hover:text-brand-800 hover:underline"
+                  href={institutionHandoffState.nextHref}
+                >
+                  {institutionHandoffState.nextLinkLabel}
+                </Link>
+              ) : (
+                "No direct action"
+              )
+            }
           />
         </div>
       </div>

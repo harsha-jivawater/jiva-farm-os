@@ -44,6 +44,146 @@ function DetailItem({
   );
 }
 
+function HandoffItem({
+  children,
+  label,
+  value,
+  helper,
+  href,
+  linkLabel
+}: {
+  children?: React.ReactNode;
+  helper?: React.ReactNode;
+  href?: string;
+  label: string;
+  linkLabel?: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="mt-2 break-words text-base font-semibold leading-6 text-slate-950">
+        {value}
+      </div>
+      {children ? <div className="mt-1 text-sm text-slate-600">{children}</div> : null}
+      {helper ? <p className="mt-1 text-sm text-slate-600">{helper}</p> : null}
+      {href ? (
+        <Link
+          className="mt-3 inline-flex font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+          href={href}
+        >
+          {linkLabel ?? "Open"}
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+function dispatchRoute(dispatch: Dispatch) {
+  if (
+    dispatch.dispatch_type === "Farmer Sale Dispatch" ||
+    dispatch.linked_farmer_lead_id ||
+    dispatch.destination_farmer_lead_id
+  ) {
+    return "Paid Farmer Sale";
+  }
+
+  if (
+    dispatch.dispatch_type === "Pilot Dispatch" ||
+    dispatch.linked_pilot_id ||
+    dispatch.destination_pilot_id
+  ) {
+    return "Free Pilot";
+  }
+
+  return "Manual admin exception";
+}
+
+function dispatchDevicePool(dispatch: Dispatch) {
+  const route = dispatchRoute(dispatch);
+
+  if (route === "Paid Farmer Sale") {
+    return "Fresh Sale";
+  }
+
+  if (route === "Free Pilot") {
+    return "Pilot Stock";
+  }
+
+  return "Selected device pool";
+}
+
+function dispatchSourceLink(dispatch: Dispatch) {
+  const farmerLeadId =
+    dispatch.linked_farmer_lead_id ?? dispatch.destination_farmer_lead_id;
+  const pilotId = dispatch.linked_pilot_id ?? dispatch.destination_pilot_id;
+
+  if (farmerLeadId) {
+    return {
+      href: `/farmer-leads/${farmerLeadId}`,
+      label: "Go to farmer lead",
+      value: "Farmer Lead"
+    };
+  }
+
+  if (pilotId) {
+    return {
+      href: `/pilots/${pilotId}`,
+      label: "Go to pilot",
+      value: "Pilot"
+    };
+  }
+
+  return {
+    href: undefined,
+    label: undefined,
+    value: "Manual / other source"
+  };
+}
+
+function dispatchHandoff(
+  dispatch: Dispatch,
+  canCreateInstallation: boolean
+) {
+  if (dispatch.dispatch_status === "Installed" || dispatch.linked_installation_id) {
+    return {
+      currentStage: "Installation linked",
+      nextAction: "Continue post-installation follow-up.",
+      nextHref: dispatch.linked_installation_id
+        ? `/installations/${dispatch.linked_installation_id}`
+        : undefined,
+      nextLinkLabel: "Go to installation",
+      nextOwner: "Sales / service team"
+    };
+  }
+
+  if (
+    ["Dispatched", "Delivered", "Installation Pending"].includes(
+      dispatch.dispatch_status
+    )
+  ) {
+    return {
+      currentStage: "Device dispatched",
+      nextAction: "Create or complete the installation record.",
+      nextHref: canCreateInstallation
+        ? `/installations/new?dispatch_id=${dispatch.id}`
+        : undefined,
+      nextLinkLabel: "Go to installation",
+      nextOwner: "Installation / field team"
+    };
+  }
+
+  return {
+    currentStage: "Dispatch in progress",
+    nextAction: "Assign or dispatch the device and update dispatch status.",
+    nextHref: `/dispatches/${dispatch.id}/edit`,
+    nextLinkLabel: "Update dispatch",
+    nextOwner: "Stock / Dispatch"
+  };
+}
+
 export default async function DispatchDetailPage({
   params
 }: DispatchDetailPageProps) {
@@ -51,6 +191,7 @@ export default async function DispatchDetailPage({
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
   const canWrite = canWriteModule(currentUser, "dispatches");
+  const canCreateInstallation = canWriteModule(currentUser, "installations");
   const scope = await dispatchScope(supabase, currentUser);
   let dispatchQuery = supabase
     .from("dispatches")
@@ -73,6 +214,8 @@ export default async function DispatchDetailPage({
   }
 
   const dispatch = data as Dispatch;
+  const source = dispatchSourceLink(dispatch);
+  const handoff = dispatchHandoff(dispatch, canCreateInstallation);
 
   return (
     <section>
@@ -107,6 +250,39 @@ export default async function DispatchDetailPage({
 
       <div className="mb-5">
         <DispatchStatusPill status={dispatch.dispatch_status} />
+      </div>
+
+      <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">
+            Dispatch handoff
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Route, source, owner, and next step for this dispatch.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <HandoffItem
+            helper={`Device pool: ${dispatchDevicePool(dispatch)}`}
+            label="Route"
+            value={dispatchRoute(dispatch)}
+          />
+          <HandoffItem
+            href={source.href}
+            label="Source"
+            linkLabel={source.label}
+            value={source.value}
+          />
+          <HandoffItem label="Next owner" value={handoff.nextOwner} />
+          <HandoffItem
+            href={handoff.nextHref}
+            label="Next action"
+            linkLabel={handoff.nextLinkLabel}
+            value={handoff.currentStage}
+          >
+            {handoff.nextAction}
+          </HandoffItem>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

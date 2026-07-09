@@ -120,6 +120,7 @@ Role notes:
 ## Farmer Leads Workflow
 
 - Lead status is derived from funnel/payment logic.
+- Key detail pages now include explicit handoff guidance: current stage, next owner, next action, and where to go next.
 - Payment confirmation can be done only by Admin or Accounts.
 - A paid Farmer Lead becomes dispatch-ready when `payment_confirmed = true`, `device_dispatched = false`, and no active dispatch request exists.
 - Farmer Sale Dispatches must be created from the selected Farmer Lead; manual farmer destination entry is not part of the normal path.

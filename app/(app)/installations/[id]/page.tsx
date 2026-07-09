@@ -47,6 +47,72 @@ function DetailItem({
   );
 }
 
+function HandoffItem({
+  helper,
+  href,
+  label,
+  linkLabel,
+  value
+}: {
+  helper?: React.ReactNode;
+  href?: string;
+  label: string;
+  linkLabel?: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <div className="mt-2 break-words text-base font-semibold leading-6 text-slate-950">
+        {value}
+      </div>
+      {helper ? <p className="mt-1 text-sm text-slate-600">{helper}</p> : null}
+      {href ? (
+        <Link
+          className="mt-3 inline-flex font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+          href={href}
+        >
+          {linkLabel ?? "Open"}
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+function installationHandoff(installation: Installation) {
+  if (installation.issue_observed) {
+    return {
+      currentStage: "Installation issue reported",
+      nextAction: "Review issue details and resolve before normal follow-up.",
+      nextOwner: "Installation / service team"
+    };
+  }
+
+  if (installation.installation_status !== "Completed") {
+    return {
+      currentStage: "Installation in progress",
+      nextAction: "Complete installation details and farmer confirmation.",
+      nextOwner: "Installation / field team"
+    };
+  }
+
+  if (!installation.followup_completed) {
+    return {
+      currentStage: "Installed, follow-up pending",
+      nextAction: "Complete the post-installation follow-up.",
+      nextOwner: "Sales / service team"
+    };
+  }
+
+  return {
+    currentStage: "Installed and followed up",
+    nextAction: "Continue normal account support if needed.",
+    nextOwner: "Sales / service team"
+  };
+}
+
 export default async function InstallationDetailPage({
   params
 }: InstallationDetailPageProps) {
@@ -76,6 +142,7 @@ export default async function InstallationDetailPage({
   }
 
   const installation = data as Installation;
+  const handoff = installationHandoff(installation);
   const installationPhotoUrl = await resolveFileUrl(
     supabase,
     installation.installation_photo_link
@@ -111,6 +178,40 @@ export default async function InstallationDetailPage({
 
       <div className="mb-5">
         <InstallationStatusPill status={installation.installation_status} />
+      </div>
+
+      <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">
+            Installation handoff
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Current field status, next owner, and the next workflow step.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <HandoffItem
+            helper={labelFor(
+              installation.installation_status,
+              installationStatusOptions
+            )}
+            label="Current stage"
+            value={handoff.currentStage}
+          />
+          <HandoffItem label="Next owner" value={handoff.nextOwner} />
+          <HandoffItem
+            href={`/farmer-leads/${installation.farmer_lead_id}`}
+            label="Source"
+            linkLabel="Go to farmer lead"
+            value="Farmer Lead"
+          />
+          <HandoffItem
+            href={canWrite ? `/installations/${installation.id}/edit` : undefined}
+            label="Next action"
+            linkLabel="Update installation"
+            value={handoff.nextAction}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -595,6 +595,57 @@ export default async function PilotDetailPage({
   ].includes(pilot.pilot_status);
   const pilotReadyForDispatch = !dispatch && !pilotClosedForDispatch;
   const pilotDispatchAlreadyRequested = Boolean(dispatch);
+  const pilotHandoff = pilotReadyForDispatch
+    ? {
+        currentStage: "Pilot ready for dispatch",
+        nextAction: "Create Pilot Dispatch using a Pilot Stock device.",
+        nextHref: canCreateDispatch ? `/dispatches/new?pilot_id=${pilot.id}` : undefined,
+        nextLinkLabel: "Create Pilot Dispatch",
+        nextOwner: "Stock / Dispatch"
+      }
+    : dispatch && !pilot.installation_completed
+      ? {
+          currentStage: "Pilot dispatch requested / dispatched",
+          nextAction: "Complete pilot device installation before monitoring starts.",
+          nextHref: `/dispatches/${dispatch.id}`,
+          nextLinkLabel: "Go to dispatch",
+          nextOwner: ["Dispatched", "Delivered", "Installation Pending"].includes(
+            dispatch.dispatch_status
+          )
+            ? "Installation / field team"
+            : "Stock / Dispatch"
+        }
+      : pilot.installation_completed && plannedVisitsList.length > 0
+        ? {
+            currentStage: "Monitoring active",
+            nextAction: nextPlannedVisit
+              ? "Complete the next planned visit and submit its report."
+              : "Review completed monitoring visits and reports.",
+            nextHref: "#monitoring-plan",
+            nextLinkLabel: "Go to Monitoring Plan",
+            nextOwner:
+              nextPlannedVisit?.assigned_user_id
+                ? userLabel(
+                    userMap.get(nextPlannedVisit.assigned_user_id),
+                    nextPlannedVisit.assigned_user_id
+                  )
+                : "Research Assistant / Agronomist"
+          }
+        : reportsList.length > 0
+          ? {
+              currentStage: "Proof building / review",
+              nextAction: "Review results and decide the next commercial action.",
+              nextHref: "#add-visit-report",
+              nextLinkLabel: "Go to Visit Reports",
+              nextOwner: "R&D Head / Agronomist"
+            }
+          : {
+              currentStage: "Review monitoring plan",
+              nextAction: "Add planned visits so the field team knows what to do next.",
+              nextHref: "#monitoring-plan",
+              nextLinkLabel: "Go to Monitoring Plan",
+              nextOwner: "R&D Head / Agronomist"
+            };
 
   return (
     <section>
@@ -702,6 +753,29 @@ export default async function PilotDetailPage({
             </Link>
           </div>
         ) : null}
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard
+            label="Current stage"
+            value={pilotHandoff.currentStage}
+          />
+          <SummaryCard label="Next owner" value={pilotHandoff.nextOwner} />
+          <SummaryCard label="Next action" value={pilotHandoff.nextAction} />
+          <SummaryCard
+            label="Where next"
+            value={
+              pilotHandoff.nextHref ? (
+                <Link
+                  className="text-brand-700 hover:text-brand-800 hover:underline"
+                  href={pilotHandoff.nextHref}
+                >
+                  {pilotHandoff.nextLinkLabel}
+                </Link>
+              ) : (
+                "No direct action"
+              )
+            }
+          />
+        </div>
       </SectionCard>
 
       <SectionCard
@@ -849,6 +923,7 @@ export default async function PilotDetailPage({
 
       <SectionCard
         description="Planned visits for this pilot. Research Assistants complete these through My Visits and Visit Reports."
+        id="monitoring-plan"
         title="Monitoring Plan"
       >
         <div className="space-y-2">

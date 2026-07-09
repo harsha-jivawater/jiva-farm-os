@@ -315,6 +315,7 @@ export default async function FarmerLeadDetailPage({
   const currentUser = await getCurrentInternalUser(supabase, "/farmer-leads");
   const canWrite = canWriteModule(currentUser, "farmer-leads");
   const canCreateDispatch = canWriteModule(currentUser, "dispatches");
+  const canCreateInstallation = canWriteModule(currentUser, "installations");
   const scope = await farmerLeadScope(supabase, currentUser);
   let leadQuery = supabase
     .from("farmer_leads")
@@ -492,6 +493,53 @@ export default async function FarmerLeadDetailPage({
     lead.payment_confirmed && !lead.device_dispatched && !dispatch;
   const dispatchAlreadyRequested =
     lead.payment_confirmed && !lead.device_dispatched && Boolean(dispatch);
+  const leadHandoff = !lead.payment_confirmed
+    ? {
+        currentStage: "Sales follow-up / payment pending",
+        nextAction: "Confirm payment or continue follow-up.",
+        nextHref: canWrite ? `/farmer-leads/${lead.id}/edit` : undefined,
+        nextLinkLabel: "Update lead",
+        nextOwner: userLabel(userMap.get(lead.owner_user_id), lead.owner_user_id)
+      }
+    : readyForDispatch
+      ? {
+          currentStage: "Paid lead ready for dispatch",
+          nextAction: "Create Farmer Sale Dispatch using a Fresh Sale device.",
+          nextHref: canCreateDispatch
+            ? `/dispatches/new?farmer_lead_id=${lead.id}`
+            : undefined,
+          nextLinkLabel: "Create Dispatch",
+          nextOwner: "Stock / Dispatch"
+        }
+      : dispatchAlreadyRequested && dispatch
+        ? {
+            currentStage: "Dispatch requested",
+            nextAction: "Assign or dispatch the Fresh Sale device.",
+            nextHref: `/dispatches/${dispatch.id}`,
+            nextLinkLabel: "Go to dispatch",
+            nextOwner: "Stock / Dispatch"
+          }
+        : lead.device_dispatched && !lead.installation_completed
+          ? {
+              currentStage: "Device dispatched",
+              nextAction: "Create or complete farmer installation.",
+              nextHref: installation
+                ? `/installations/${installation.id}`
+                : canCreateInstallation
+                  ? `/installations/new?farmer_lead_id=${lead.id}`
+                  : dispatch
+                    ? `/dispatches/${dispatch.id}`
+                    : undefined,
+              nextLinkLabel: installation ? "Go to installation" : "Go to installation",
+              nextOwner: "Installation / field team"
+            }
+          : {
+              currentStage: "Installed",
+              nextAction: "Continue post-installation follow-up.",
+              nextHref: followups[0] ? `/follow-ups/${followups[0].id}` : "/follow-ups",
+              nextLinkLabel: "Go to follow-ups",
+              nextOwner: "Sales / service team"
+            };
   const nextFollowupDate = lead.followup_due_date ?? lead.next_action_date;
   const followupOverdue = isPastDate(nextFollowupDate);
   const nextActionOverdue = isPastDate(lead.next_action_date);
@@ -592,6 +640,16 @@ export default async function FarmerLeadDetailPage({
             <SummaryCard
               label="RSM"
               value={userLabel(userMap.get(lead.rsm_user_id), lead.rsm_user_id)}
+            />
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <WorkflowCard label="Current stage" value={leadHandoff.currentStage} />
+            <WorkflowCard label="Next owner" value={leadHandoff.nextOwner} />
+            <WorkflowCard label="Next action" value={leadHandoff.nextAction} />
+            <WorkflowCard
+              href={leadHandoff.nextHref}
+              label="Where next"
+              value={leadHandoff.nextLinkLabel ?? "No direct action"}
             />
           </div>
           {readyForDispatch ? (
