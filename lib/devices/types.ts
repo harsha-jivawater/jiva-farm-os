@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/database.types";
+import { formatDisplayDate } from "@/lib/date-utils";
 
 export type Device = Database["public"]["Tables"]["devices"]["Row"];
 export type DeviceInsert = Database["public"]["Tables"]["devices"]["Insert"];
@@ -8,6 +9,7 @@ export type DeviceFormPayload = Partial<DeviceInsert> & DeviceUpdate;
 export type DeviceFilters = {
   q: string;
   product_model: string;
+  inventory_pool: string;
   device_status: string;
   current_holder_type: string;
   current_state: string;
@@ -19,15 +21,7 @@ export function display(value: string | null | undefined) {
 }
 
 export function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
+  return formatDisplayDate(value);
 }
 
 export function formatDeviceLocation(
