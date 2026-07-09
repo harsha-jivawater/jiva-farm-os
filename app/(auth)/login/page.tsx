@@ -4,7 +4,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { LoginSubmitButton } from "@/components/auth/login-submit-button";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { defaultHomePathForUser } from "@/lib/users/default-route";
+import { postLoginPathForUser } from "@/lib/users/default-route";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   INTERNAL_EMAIL_DOMAIN_MESSAGE,
@@ -15,6 +15,7 @@ type LoginPageProps = {
   searchParams: Promise<{
     error?: string;
     message?: string;
+    next?: string;
     setup?: string;
   }>;
 };
@@ -25,7 +26,7 @@ function getErrorMessage(error?: string) {
   }
 
   if (error === "Please log in before continuing.") {
-    return null;
+    return "Your session expired. Please log in again.";
   }
 
   if (error === "missing-supabase-config") {
@@ -44,6 +45,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const configured = isSupabaseConfigured();
   const errorMessage = getErrorMessage(params.error);
   const successMessage = params.message;
+  const nextPath = params.next;
 
   if (configured) {
     const supabase = await createClient();
@@ -60,7 +62,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       }
 
       const profile = await getCurrentInternalUser(supabase, "/login");
-      redirect(defaultHomePathForUser(profile));
+      redirect(postLoginPathForUser(profile, nextPath));
     }
   }
 
@@ -95,6 +97,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           ) : null}
 
           <form action={signInAction} className="space-y-4">
+            <input name="next" type="hidden" value={nextPath ?? ""} />
             <div>
               <label
                 className="mb-1.5 block text-sm font-medium text-slate-700"

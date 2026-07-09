@@ -18,6 +18,9 @@ type CurrentUserOptions = {
 
 const inactiveOrMissingProfileMessage =
   "Your internal user profile is not active or has not been created. Please contact Admin.";
+const missingProfileMessage =
+  "Your internal user profile could not be found. Please contact Admin.";
+const sessionExpiredMessage = "Your session expired. Please log in again.";
 
 const currentUserSelectColumns = [
   "id",
@@ -38,6 +41,14 @@ const currentUserSelectColumns = [
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+function redirectToLogin(nextPath: string, message = sessionExpiredMessage): never {
+  const params = new URLSearchParams({
+    error: message,
+    next: nextPath
+  });
+  redirect(`/login?${params.toString()}`);
 }
 
 const getProfileByEmail = cache(async (normalizedEmail: string) => {
@@ -79,13 +90,13 @@ export async function getCurrentInternalUser(
     const {
       data: { user }
     } = await getAuthenticatedUser();
-    const missingProfileMessage =
-      options.missingProfileMessage ?? inactiveOrMissingProfileMessage;
+    const userProfileMissingMessage =
+      options.missingProfileMessage ?? missingProfileMessage;
     const inactiveProfileMessage =
       options.inactiveProfileMessage ?? inactiveOrMissingProfileMessage;
 
     if (!user) {
-      redirectWithError(errorPath, "Please log in before continuing.");
+      redirectToLogin(errorPath);
     }
 
     const normalizedEmail = user.email?.trim().toLowerCase() ?? "";
@@ -106,7 +117,7 @@ export async function getCurrentInternalUser(
     const profile = profileByEmail as InternalUser | null;
 
     if (!profile) {
-      redirectWithError(errorPath, missingProfileMessage);
+      redirectWithError(errorPath, userProfileMissingMessage);
     }
 
     if (!isJivawaterEmail(profile.email)) {

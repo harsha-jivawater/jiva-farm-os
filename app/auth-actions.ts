@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { defaultHomePathForUser } from "@/lib/users/default-route";
+import { postLoginPathForUser } from "@/lib/users/default-route";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   INTERNAL_EMAIL_DOMAIN_MESSAGE,
@@ -15,6 +15,7 @@ import {
 export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const nextPath = String(formData.get("next") ?? "").trim();
 
   if (!isSupabaseConfigured()) {
     redirect("/login?error=missing-supabase-config");
@@ -40,7 +41,7 @@ export async function signInAction(formData: FormData) {
 
   revalidatePath("/", "layout");
   const profile = await getCurrentInternalUser(supabase, "/login");
-  redirect(defaultHomePathForUser(profile));
+  redirect(postLoginPathForUser(profile, nextPath));
 }
 
 export async function signOutAction() {

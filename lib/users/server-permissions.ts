@@ -16,7 +16,7 @@ export async function requireModuleWriteAccess(
   supabase: SupabaseClient,
   errorPath: string,
   module: ModuleKey,
-  message = "Access denied. You cannot save changes in this module."
+  message = "You do not have permission to edit this record."
 ) {
   const currentUser = await getCurrentInternalUser(supabase, errorPath);
 
