@@ -9,14 +9,20 @@ import {
   defaultDispatchStatus,
   defaultPaymentRequirementType,
   destinationTypeOptions,
+  dispatchRouteOptions,
   dispatchStatusOptions,
   dispatchTypeOptions,
   paymentRequirementOptions
 } from "@/lib/dispatches/options";
+import {
+  inventoryPoolOptions,
+  labelFor as labelForDeviceOption
+} from "@/lib/devices/options";
 import type {
   Dispatch,
   DispatchDeviceOption,
-  DispatchFarmerLeadOption
+  DispatchFarmerLeadOption,
+  DispatchPilotOption
 } from "@/lib/dispatches/types";
 
 type DispatchFormProps = {
@@ -26,7 +32,11 @@ type DispatchFormProps = {
   devices: DispatchDeviceOption[];
   error?: string | null;
   farmerLeads?: DispatchFarmerLeadOption[];
+  initialFarmerLeadId?: string;
+  initialPilotId?: string;
+  canUseManualException?: boolean;
   mode: "create" | "edit";
+  pilots?: DispatchPilotOption[];
 };
 
 function inputClassName() {
@@ -43,11 +53,28 @@ function dateValue(value?: string | null) {
 
 function deviceLabel(device: DispatchDeviceOption) {
   const code = device.device_code ? ` · ${device.device_code}` : "";
-  return `${device.serial_number}${code} · ${device.product_model} · ${device.device_status}`;
+  const pool = labelForDeviceOption(device.inventory_pool, inventoryPoolOptions);
+  return `${device.serial_number}${code} · ${device.product_model} · ${pool} · ${device.device_status}`;
 }
 
 function leadLabel(lead: DispatchFarmerLeadOption) {
   return `${lead.lead_code} · ${lead.farmer_name} · ${lead.village}, ${lead.district}`;
+}
+
+function pilotLabel(pilot: DispatchPilotOption) {
+  return `${pilot.pilot_code} · ${pilot.pilot_name} · ${pilot.farmer_name_snapshot}, ${pilot.district}`;
+}
+
+function routeForDispatch(dispatch?: Dispatch) {
+  if (dispatch?.dispatch_type === "Farmer Sale Dispatch") {
+    return "Paid Farmer Sale";
+  }
+
+  if (dispatch?.dispatch_type === "Pilot Dispatch") {
+    return "Free Pilot";
+  }
+
+  return "Admin Manual Exception";
 }
 
 function SubmitButton({ label }: { label: string }) {
@@ -72,8 +99,24 @@ export function DispatchForm({
   devices,
   error,
   farmerLeads = [],
-  mode
+  initialFarmerLeadId,
+  initialPilotId,
+  canUseManualException = false,
+  mode,
+  pilots = []
 }: DispatchFormProps) {
+  const initialLead = farmerLeads.find(
+    (lead) =>
+      lead.id ===
+      (initialFarmerLeadId ??
+        dispatch?.destination_farmer_lead_id ??
+        dispatch?.linked_farmer_lead_id)
+  );
+  const initialPilot = pilots.find(
+    (pilot) =>
+      pilot.id ===
+      (initialPilotId ?? dispatch?.destination_pilot_id ?? dispatch?.linked_pilot_id)
+  );
   const initialDevice = useMemo(
     () =>
       devices.find((device) => device.id === dispatch?.device_id) ??
@@ -94,37 +137,96 @@ export function DispatchForm({
   const [dispatchType, setDispatchType] = useState(
     dispatch?.dispatch_type ?? ""
   );
+  const [dispatchRoute, setDispatchRoute] = useState(
+    initialPilotId
+      ? "Free Pilot"
+      : initialFarmerLeadId
+        ? "Paid Farmer Sale"
+        : mode === "edit"
+          ? routeForDispatch(dispatch)
+          : "Paid Farmer Sale"
+  );
   const [destinationType, setDestinationType] = useState(
-    dispatch?.destination_type ?? ""
+    initialLead ? "Farmer" : initialPilot ? "Pilot" : dispatch?.destination_type ?? ""
   );
   const [selectedLeadId, setSelectedLeadId] = useState(
-    dispatch?.destination_farmer_lead_id ?? dispatch?.linked_farmer_lead_id ?? ""
+    initialFarmerLeadId ??
+      dispatch?.destination_farmer_lead_id ??
+      dispatch?.linked_farmer_lead_id ??
+      ""
+  );
+  const [selectedPilotId, setSelectedPilotId] = useState(
+    initialPilotId ??
+      dispatch?.destination_pilot_id ??
+      dispatch?.linked_pilot_id ??
+      ""
   );
   const [destinationName, setDestinationName] = useState(
-    dispatch?.destination_name_snapshot ?? ""
+    initialLead?.farmer_name ??
+      initialPilot?.pilot_name ??
+      dispatch?.destination_name_snapshot ??
+      ""
   );
   const [destinationContact, setDestinationContact] = useState(
-    dispatch?.destination_contact_snapshot ?? ""
+    initialLead?.mobile_number ??
+      initialPilot?.farmer_mobile_snapshot ??
+      dispatch?.destination_contact_snapshot ??
+      ""
   );
   const [destinationAddress, setDestinationAddress] = useState(
-    dispatch?.destination_address ?? ""
+    initialLead?.village ??
+      initialPilot?.village ??
+      dispatch?.destination_address ??
+      ""
   );
   const [paymentConfirmed, setPaymentConfirmed] = useState(
-    dispatch?.payment_confirmed ?? false
+    initialLead?.payment_confirmed ?? dispatch?.payment_confirmed ?? false
   );
   const [stateValue, setStateValue] = useState(
-    dispatch?.destination_state ?? ""
+    initialLead?.state ?? initialPilot?.state ?? dispatch?.destination_state ?? ""
   );
   const [districtValue, setDistrictValue] = useState(
-    dispatch?.destination_district ?? ""
+    initialLead?.district ??
+      initialPilot?.district ??
+      dispatch?.destination_district ??
+      ""
   );
-  const isFarmerSaleDispatch = dispatchType === "Farmer Sale Dispatch";
+  const isFarmerSaleRoute = dispatchRoute === "Paid Farmer Sale";
+  const isPilotRoute = dispatchRoute === "Free Pilot";
+  const isManualRoute = dispatchRoute === "Admin Manual Exception";
+  const effectiveDispatchType = isFarmerSaleRoute
+    ? "Farmer Sale Dispatch"
+    : isPilotRoute
+      ? "Pilot Dispatch"
+      : dispatchType;
+  const effectiveDestinationType = isFarmerSaleRoute
+    ? "Farmer"
+    : isPilotRoute
+      ? "Pilot"
+      : destinationType;
+  const filteredDevices = devices.filter((device) => {
+    if (isFarmerSaleRoute) {
+      return device.inventory_pool === "Fresh Sale";
+    }
+
+    if (isPilotRoute) {
+      return device.inventory_pool === "Pilot Stock";
+    }
+
+    return true;
+  });
 
   function applyLead(leadId: string) {
     setSelectedLeadId(leadId);
     const lead = farmerLeads.find((option) => option.id === leadId);
 
     if (!lead) {
+      setDestinationName("");
+      setDestinationContact("");
+      setStateValue("");
+      setDistrictValue("");
+      setDestinationAddress("");
+      setPaymentConfirmed(false);
       return;
     }
 
@@ -135,6 +237,56 @@ export function DispatchForm({
     setDistrictValue(lead.district);
     setDestinationAddress(lead.village);
     setPaymentConfirmed(lead.payment_confirmed);
+  }
+
+  function applyPilot(pilotId: string) {
+    setSelectedPilotId(pilotId);
+    const pilot = pilots.find((option) => option.id === pilotId);
+
+    if (!pilot) {
+      setDestinationName("");
+      setDestinationContact("");
+      setStateValue("");
+      setDistrictValue("");
+      setDestinationAddress("");
+      setPaymentConfirmed(false);
+      return;
+    }
+
+    setDestinationType("Pilot");
+    setDestinationName(pilot.pilot_name);
+    setDestinationContact(pilot.farmer_mobile_snapshot);
+    setStateValue(pilot.state);
+    setDistrictValue(pilot.district);
+    setDestinationAddress(pilot.village);
+    setPaymentConfirmed(false);
+  }
+
+  function changeRoute(nextRoute: string) {
+    setDispatchRoute(nextRoute);
+    setSelectedDeviceId("");
+    setSerialNumber("");
+    setProductModel("");
+    setSelectedLeadId("");
+    setSelectedPilotId("");
+
+    if (nextRoute === "Paid Farmer Sale") {
+      setDispatchType("Farmer Sale Dispatch");
+      setDestinationType("Farmer");
+      setPaymentConfirmed(false);
+      return;
+    }
+
+    if (nextRoute === "Free Pilot") {
+      setDispatchType("Pilot Dispatch");
+      setDestinationType("Pilot");
+      setPaymentConfirmed(false);
+      return;
+    }
+
+    setDispatchType("");
+    setDestinationType("");
+    setPaymentConfirmed(false);
   }
 
   return (
@@ -149,7 +301,55 @@ export function DispatchForm({
         <h2 className="text-base font-semibold text-slate-950">
           Dispatch details
         </h2>
+        <input name="dispatch_route" type="hidden" value={dispatchRoute} />
+        {!isManualRoute ? (
+          <>
+            <input name="dispatch_type" type="hidden" value={effectiveDispatchType} />
+            <input
+              name="destination_type"
+              type="hidden"
+              value={effectiveDestinationType}
+            />
+          </>
+        ) : null}
         <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="dispatch_route"
+            >
+              Dispatch route
+            </label>
+            <select
+              className={inputClassName()}
+              disabled={mode === "edit"}
+              id="dispatch_route"
+              onChange={(event) => changeRoute(event.target.value)}
+              required
+              value={dispatchRoute}
+            >
+              {dispatchRouteOptions
+                .filter(
+                  (option) =>
+                    option.value !== "Admin Manual Exception" ||
+                    canUseManualException ||
+                    isManualRoute
+                )
+                .map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+            </select>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {isFarmerSaleRoute
+                ? "Paid farmer dispatches use fresh sale devices only."
+                : isPilotRoute
+                  ? "Free pilots use pilot-dedicated devices only."
+                  : "Manual dispatch is an Admin exception for unusual stock movement."}
+            </p>
+          </div>
+
           <div>
             <label
               className="mb-1.5 block text-sm font-medium text-slate-700"
@@ -205,7 +405,8 @@ export function DispatchForm({
             </select>
           </div>
 
-          <div>
+          {isManualRoute ? (
+            <div>
             <label
               className="mb-1.5 block text-sm font-medium text-slate-700"
               htmlFor="dispatch_type"
@@ -235,6 +436,7 @@ export function DispatchForm({
               ))}
             </select>
           </div>
+          ) : null}
         </div>
       </div>
 
@@ -266,12 +468,18 @@ export function DispatchForm({
               value={selectedDeviceId}
             >
               <option value="">Select serial-numbered device</option>
-              {devices.map((device) => (
+              {filteredDevices.map((device) => (
                 <option key={device.id} value={device.id}>
                   {deviceLabel(device)}
                 </option>
               ))}
             </select>
+            {filteredDevices.length === 0 ? (
+              <p className="mt-1 text-xs leading-5 text-amber-700">
+                No eligible devices found for this route. Check device pool and
+                warehouse status.
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -317,7 +525,7 @@ export function DispatchForm({
           Destination
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {isFarmerSaleDispatch ? (
+          {isFarmerSaleRoute ? (
             <div className="md:col-span-2">
               <label
                 className="mb-1.5 block text-sm font-medium text-slate-700"
@@ -349,89 +557,187 @@ export function DispatchForm({
             <input name="destination_farmer_lead_id" type="hidden" value="" />
           )}
 
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="destination_type"
-            >
-              Destination type
-            </label>
-            <select
-              className={inputClassName()}
-              id="destination_type"
-              name="destination_type"
-              onChange={(event) => setDestinationType(event.target.value)}
-              required
-              value={destinationType}
-            >
-              <option value="">Select destination type</option>
-              {destinationTypeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isPilotRoute ? (
+            <div className="md:col-span-2">
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="destination_pilot_id"
+              >
+                Pilot ready for dispatch
+              </label>
+              <select
+                className={inputClassName()}
+                id="destination_pilot_id"
+                name="destination_pilot_id"
+                onChange={(event) => applyPilot(event.target.value)}
+                required
+                value={selectedPilotId}
+              >
+                <option value="">Select active pilot</option>
+                {pilots.map((pilot) => (
+                  <option key={pilot.id} value={pilot.id}>
+                    {pilotLabel(pilot)}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Pilot Dispatches do not require payment and use pilot-dedicated
+                devices only.
+              </p>
+            </div>
+          ) : (
+            <input name="destination_pilot_id" type="hidden" value="" />
+          )}
 
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="destination_name_snapshot"
-            >
-              Destination name
-            </label>
-            <input
-              className={inputClassName()}
-              id="destination_name_snapshot"
-              name="destination_name_snapshot"
-              onChange={(event) => setDestinationName(event.target.value)}
-              required
-              type="text"
-              value={destinationName}
-            />
-          </div>
+          {!isManualRoute ? (
+            <>
+              <input
+                name="destination_name_snapshot"
+                type="hidden"
+                value={destinationName}
+              />
+              <input
+                name="destination_contact_snapshot"
+                type="hidden"
+                value={destinationContact}
+              />
+              <input
+                name="destination_state"
+                type="hidden"
+                value={stateValue}
+              />
+              <input
+                name="destination_district"
+                type="hidden"
+                value={districtValue}
+              />
+              <input
+                name="destination_address"
+                type="hidden"
+                value={destinationAddress}
+              />
+              <div className="md:col-span-2 rounded-md border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Destination preview
+                </p>
+                <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2">
+                  <div>
+                    <dt className="text-slate-500">Name</dt>
+                    <dd className="mt-1 font-semibold text-slate-950">
+                      {destinationName || "Select a source record"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Contact</dt>
+                    <dd className="mt-1 font-semibold text-slate-950">
+                      {destinationContact || "Not set"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Location</dt>
+                    <dd className="mt-1 font-semibold text-slate-950">
+                      {[destinationAddress, districtValue, stateValue]
+                        .filter(Boolean)
+                        .join(", ") || "Not set"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Route</dt>
+                    <dd className="mt-1 font-semibold text-slate-950">
+                      {dispatchRoute}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            </>
+          ) : (
+            <>
+              <input name="destination_pilot_id" type="hidden" value="" />
+              <div>
+                <label
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  htmlFor="destination_type"
+                >
+                  Destination type
+                </label>
+                <select
+                  className={inputClassName()}
+                  id="destination_type"
+                  name="destination_type"
+                  onChange={(event) => setDestinationType(event.target.value)}
+                  required
+                  value={destinationType}
+                >
+                  <option value="">Select destination type</option>
+                  {destinationTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="destination_contact_snapshot"
-            >
-              Destination contact
-            </label>
-            <input
-              className={inputClassName()}
-              id="destination_contact_snapshot"
-              name="destination_contact_snapshot"
-              onChange={(event) => setDestinationContact(event.target.value)}
-              type="text"
-              value={destinationContact}
-            />
-          </div>
+              <div>
+                <label
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  htmlFor="destination_name_snapshot"
+                >
+                  Destination name
+                </label>
+                <input
+                  className={inputClassName()}
+                  id="destination_name_snapshot"
+                  name="destination_name_snapshot"
+                  onChange={(event) => setDestinationName(event.target.value)}
+                  required
+                  type="text"
+                  value={destinationName}
+                />
+              </div>
 
-          <StateDistrictSelect
-            districtName="destination_district"
-            districtValue={districtValue}
-            onDistrictChange={setDistrictValue}
-            onStateChange={setStateValue}
-            stateName="destination_state"
-            stateValue={stateValue}
-          />
+              <div>
+                <label
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  htmlFor="destination_contact_snapshot"
+                >
+                  Destination contact
+                </label>
+                <input
+                  className={inputClassName()}
+                  id="destination_contact_snapshot"
+                  name="destination_contact_snapshot"
+                  onChange={(event) => setDestinationContact(event.target.value)}
+                  type="text"
+                  value={destinationContact}
+                />
+              </div>
 
-          <div className="md:col-span-2">
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="destination_address"
-            >
-              Destination address
-            </label>
-            <textarea
-              className={textAreaClassName()}
-              id="destination_address"
-              name="destination_address"
-              onChange={(event) => setDestinationAddress(event.target.value)}
-              value={destinationAddress}
-            />
-          </div>
+              <StateDistrictSelect
+                districtName="destination_district"
+                districtValue={districtValue}
+                onDistrictChange={setDistrictValue}
+                onStateChange={setStateValue}
+                stateName="destination_state"
+                stateValue={stateValue}
+              />
+
+              <div className="md:col-span-2">
+                <label
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  htmlFor="destination_address"
+                >
+                  Destination address
+                </label>
+                <textarea
+                  className={textAreaClassName()}
+                  id="destination_address"
+                  name="destination_address"
+                  onChange={(event) => setDestinationAddress(event.target.value)}
+                  value={destinationAddress}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -447,36 +753,52 @@ export function DispatchForm({
             >
               Payment requirement
             </label>
-            <select
-              className={inputClassName()}
-              defaultValue={
-                dispatch?.payment_requirement_type ??
-                defaultPaymentRequirementType
-              }
-              id="payment_requirement_type"
-              name="payment_requirement_type"
-              required
-            >
-              {paymentRequirementOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {isManualRoute ? (
+              <select
+                className={inputClassName()}
+                defaultValue={
+                  dispatch?.payment_requirement_type ??
+                  defaultPaymentRequirementType
+                }
+                id="payment_requirement_type"
+                name="payment_requirement_type"
+                required
+              >
+                {paymentRequirementOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input
+                  name="payment_requirement_type"
+                  type="hidden"
+                  value={isPilotRoute ? "Unpaid Pilot" : "Payment Required"}
+                />
+                <input
+                  className={inputClassName()}
+                  readOnly
+                  type="text"
+                  value={isPilotRoute ? "Unpaid Pilot" : "Payment Required"}
+                />
+              </>
+            )}
           </div>
 
           <label className="flex min-h-10 items-center gap-3 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700">
             <input
               className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
               checked={paymentConfirmed}
-              disabled={isFarmerSaleDispatch}
+              disabled={isFarmerSaleRoute || isPilotRoute}
               name="payment_confirmed"
               onChange={(event) => setPaymentConfirmed(event.target.checked)}
               type="checkbox"
             />
             Payment confirmed
           </label>
-          {isFarmerSaleDispatch ? (
+          {isFarmerSaleRoute ? (
             <input name="payment_confirmed" type="hidden" value="on" />
           ) : null}
 

@@ -6,10 +6,12 @@ import { preferredDispatchDeviceStatuses } from "@/lib/dispatches/options";
 import type {
   Dispatch,
   DispatchDeviceOption,
-  DispatchFarmerLeadOption
+  DispatchFarmerLeadOption,
+  DispatchPilotOption
 } from "@/lib/dispatches/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
+import { hasAnyRole } from "@/lib/users/permissions";
 import { dispatchScope } from "@/lib/users/record-scope";
 
 type EditDispatchPageProps = {
@@ -26,6 +28,7 @@ const deviceSelectColumns = [
   "serial_number",
   "device_code",
   "product_model",
+  "inventory_pool",
   "device_status",
   "current_holder_type",
   "current_holder_id",
@@ -33,6 +36,25 @@ const deviceSelectColumns = [
   "current_location_text",
   "current_state",
   "current_district"
+].join(",");
+
+const pilotSelectColumns = [
+  "id",
+  "pilot_code",
+  "pilot_name",
+  "pilot_type",
+  "pilot_status",
+  "farmer_lead_id",
+  "institution_id",
+  "dealer_id",
+  "farmer_name_snapshot",
+  "farmer_mobile_snapshot",
+  "village",
+  "district",
+  "state",
+  "product_model",
+  "device_id",
+  "dispatch_id"
 ].join(",");
 
 const farmerLeadSelectColumns = [
@@ -59,6 +81,7 @@ export default async function EditDispatchPage({
   const query = await searchParams;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
+  const canUseManualException = hasAnyRole(currentUser, ["Admin"]);
   const scope = await dispatchScope(supabase, currentUser);
   let dispatchQuery = supabase
     .from("dispatches")
@@ -136,6 +159,36 @@ export default async function EditDispatchPage({
     }
   }
 
+  const { data: activePilots } = await supabase
+    .from("pilots")
+    .select(pilotSelectColumns)
+    .is("deleted_at", null)
+    .not(
+      "pilot_status",
+      "in",
+      "(Cancelled,Closed - Successful,Closed - Failed,Closed - Inconclusive)"
+    )
+    .order("created_at", { ascending: false })
+    .limit(200);
+  let pilots = (activePilots ?? []) as unknown as DispatchPilotOption[];
+  const selectedPilotId =
+    dispatch.destination_pilot_id ?? dispatch.linked_pilot_id;
+
+  if (
+    selectedPilotId &&
+    !pilots.some((pilot) => pilot.id === selectedPilotId)
+  ) {
+    const { data: selectedPilot } = await supabase
+      .from("pilots")
+      .select(pilotSelectColumns)
+      .eq("id", selectedPilotId)
+      .single();
+
+    if (selectedPilot) {
+      pilots = [selectedPilot as unknown as DispatchPilotOption, ...pilots];
+    }
+  }
+
   const updateAction = updateDispatchAction.bind(null, dispatch.id);
 
   return (
@@ -148,11 +201,13 @@ export default async function EditDispatchPage({
       <DispatchForm
         action={updateAction}
         cancelHref={`/dispatches/${dispatch.id}`}
+        canUseManualException={canUseManualException}
         devices={devices}
         dispatch={dispatch}
         error={query.error}
         farmerLeads={farmerLeads}
         mode="edit"
+        pilots={pilots}
       />
     </section>
   );

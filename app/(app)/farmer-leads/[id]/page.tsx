@@ -18,6 +18,7 @@ import {
   formatCrop,
   type FarmerLead
 } from "@/lib/farmer-leads/types";
+import { formatDisplayDate } from "@/lib/date-utils";
 import {
   funnelStageOptions,
   labelFor,
@@ -83,15 +84,7 @@ function display(value: string | null | undefined) {
 }
 
 function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
+  return formatDisplayDate(value);
 }
 
 function isPastDate(value: string | null | undefined) {
@@ -321,6 +314,7 @@ export default async function FarmerLeadDetailPage({
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/farmer-leads");
   const canWrite = canWriteModule(currentUser, "farmer-leads");
+  const canCreateDispatch = canWriteModule(currentUser, "dispatches");
   const scope = await farmerLeadScope(supabase, currentUser);
   let leadQuery = supabase
     .from("farmer_leads")
@@ -377,14 +371,19 @@ export default async function FarmerLeadDetailPage({
           .is("deleted_at", null)
           .maybeSingle()
       : Promise.resolve({ data: null }),
-    lead.linked_dispatch_id
-      ? supabase
-          .from("dispatches")
-          .select("id, dispatch_code, dispatch_status, dispatch_date, serial_number_snapshot")
-          .eq("id", lead.linked_dispatch_id)
-          .is("deleted_at", null)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+    supabase
+      .from("dispatches")
+      .select(
+        "id, dispatch_code, dispatch_status, dispatch_date, serial_number_snapshot"
+      )
+      .is("deleted_at", null)
+      .neq("dispatch_status", "Cancelled")
+      .or(
+        `linked_farmer_lead_id.eq.${lead.id},destination_farmer_lead_id.eq.${lead.id}`
+      )
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     lead.linked_installation_id
       ? supabase
           .from("installations")
@@ -489,6 +488,10 @@ export default async function FarmerLeadDetailPage({
   const canSeeWorkflowWarning = hasAnyRole(currentUser, ["Admin", "Management"]);
   const canSeeContextWarning = hasAnyRole(currentUser, ["Admin", "Management"]);
   const currentAction = deriveCurrentAction(lead);
+  const readyForDispatch =
+    lead.payment_confirmed && !lead.device_dispatched && !dispatch;
+  const dispatchAlreadyRequested =
+    lead.payment_confirmed && !lead.device_dispatched && Boolean(dispatch);
   const nextFollowupDate = lead.followup_due_date ?? lead.next_action_date;
   const followupOverdue = isPastDate(nextFollowupDate);
   const nextActionOverdue = isPastDate(lead.next_action_date);
@@ -591,6 +594,34 @@ export default async function FarmerLeadDetailPage({
               value={userLabel(userMap.get(lead.rsm_user_id), lead.rsm_user_id)}
             />
           </div>
+          {readyForDispatch ? (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
+              <p className="font-semibold">Ready for dispatch</p>
+              {canCreateDispatch ? (
+                <Link
+                  className="mt-3 inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                  href={`/dispatches/new?farmer_lead_id=${lead.id}`}
+                >
+                  Create Dispatch
+                </Link>
+              ) : (
+                <p className="mt-1">
+                  Payment received. Dispatch is ready for Stock / Dispatch team.
+                </p>
+              )}
+            </div>
+          ) : null}
+          {dispatchAlreadyRequested && dispatch ? (
+            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+              <p className="font-semibold">Dispatch already requested</p>
+              <Link
+                className="mt-1 inline-flex font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                href={`/dispatches/${dispatch.id}`}
+              >
+                {dispatch.dispatch_code} · {dispatch.dispatch_status}
+              </Link>
+            </div>
+          ) : null}
         </SectionPanel>
       </div>
 

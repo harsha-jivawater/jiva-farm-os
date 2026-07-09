@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/page-header";
 import {
   deviceStatusOptions,
   holderTypeOptions,
+  inventoryPoolOptions,
   labelFor,
   productModelOptions
 } from "@/lib/devices/options";
@@ -45,6 +46,7 @@ type DevicesPageProps = {
 
 const filterColumns = [
   "product_model",
+  "inventory_pool",
   "device_status",
   "current_holder_type"
 ] as const;
@@ -55,6 +57,7 @@ const listSelectColumns = [
   "device_code",
   "product_model",
   "device_status",
+  "inventory_pool",
   "current_holder_type",
   "current_holder_name_snapshot",
   "current_location_text",
@@ -116,6 +119,10 @@ function readFilters(
     product_model: optionFilterValue(
       searchParams.product_model,
       productModelOptions
+    ),
+    inventory_pool: optionFilterValue(
+      searchParams.inventory_pool,
+      inventoryPoolOptions
     ),
     device_status: optionFilterValue(
       searchParams.device_status,
@@ -356,6 +363,24 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
 
           <label>
             <span className="mb-1.5 block text-sm font-medium text-slate-700">
+              Device pool
+            </span>
+            <select
+              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+              defaultValue={filters.inventory_pool}
+              name="inventory_pool"
+            >
+              <option value="">All pools</option>
+              {inventoryPoolOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">
               Device status
             </span>
             <select
@@ -459,6 +484,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
                   <tr>
                     <th className="px-4 py-3">Device</th>
                     <th className="px-4 py-3">Model</th>
+                    <th className="px-4 py-3">Pool</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Holder</th>
                     <th className="px-4 py-3">Location</th>
@@ -479,6 +505,9 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {labelFor(device.product_model, productModelOptions)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {labelFor(device.inventory_pool, inventoryPoolOptions)}
                       </td>
                       <td className="px-4 py-3">
                         <DeviceStatusPill status={device.device_status} />
@@ -550,6 +579,12 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
                           device.current_holder_type,
                           holderTypeOptions
                         )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Pool</dt>
+                      <dd className="mt-1 font-medium text-slate-700">
+                        {labelFor(device.inventory_pool, inventoryPoolOptions)}
                       </dd>
                     </div>
                     <div>

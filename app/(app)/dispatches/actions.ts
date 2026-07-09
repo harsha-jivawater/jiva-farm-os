@@ -20,7 +20,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import {
   canConfirmPayment,
-  canManageDispatch
+  canManageDispatch,
+  hasAnyRole
 } from "@/lib/users/permissions";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -42,8 +43,60 @@ type FarmerSaleDispatchLead = {
   linked_dispatch_id: string | null;
 };
 
+type PilotDispatchSource = {
+  id: string;
+  pilot_code: string;
+  pilot_name: string;
+  pilot_type: string;
+  pilot_status: string;
+  farmer_lead_id: string;
+  institution_id: string | null;
+  dealer_id: string | null;
+  farmer_name_snapshot: string;
+  farmer_mobile_snapshot: string;
+  village: string;
+  district: string;
+  state: string;
+  product_model: string;
+  device_id: string | null;
+  dispatch_id: string | null;
+};
+
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+function getDispatchRoute(formData: FormData) {
+  const route = String(formData.get("dispatch_route") ?? "").trim();
+
+  if (
+    route === "Paid Farmer Sale" ||
+    route === "Free Pilot" ||
+    route === "Admin Manual Exception"
+  ) {
+    return route;
+  }
+
+  return "";
+}
+
+function routeFromPayloadFallback(
+  route: string,
+  payload: Pick<DispatchInsert | DispatchUpdate, "dispatch_type">
+) {
+  if (route) {
+    return route;
+  }
+
+  if (payload.dispatch_type === "Farmer Sale Dispatch") {
+    return "Paid Farmer Sale";
+  }
+
+  if (payload.dispatch_type === "Pilot Dispatch") {
+    return "Free Pilot";
+  }
+
+  return "Admin Manual Exception";
 }
 
 function todayDate() {
@@ -113,6 +166,7 @@ async function getDeviceForDispatch(
         "serial_number",
         "device_code",
         "product_model",
+        "inventory_pool",
         "device_status",
         "current_holder_type",
         "current_holder_id",
@@ -131,6 +185,80 @@ async function getDeviceForDispatch(
   }
 
   return data as unknown as DispatchDeviceOption;
+}
+
+async function ensureNoOpenDispatchForFarmerLead({
+  supabase,
+  farmerLeadId,
+  errorPath,
+  existingDispatchId
+}: {
+  supabase: SupabaseClient;
+  farmerLeadId: string;
+  errorPath: string;
+  existingDispatchId?: string;
+}) {
+  let query = supabase
+    .from("dispatches")
+    .select("id, dispatch_code")
+    .is("deleted_at", null)
+    .neq("dispatch_status", "Cancelled")
+    .or(
+      `linked_farmer_lead_id.eq.${farmerLeadId},destination_farmer_lead_id.eq.${farmerLeadId}`
+    );
+
+  if (existingDispatchId) {
+    query = query.neq("id", existingDispatchId);
+  }
+
+  const { data, error } = await query.limit(1);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  if (data?.length) {
+    redirectWithError(
+      errorPath,
+      `Dispatch already requested for this farmer lead (${data[0].dispatch_code}).`
+    );
+  }
+}
+
+async function ensureNoOpenDispatchForPilot({
+  supabase,
+  pilotId,
+  errorPath,
+  existingDispatchId
+}: {
+  supabase: SupabaseClient;
+  pilotId: string;
+  errorPath: string;
+  existingDispatchId?: string;
+}) {
+  let query = supabase
+    .from("dispatches")
+    .select("id, dispatch_code")
+    .is("deleted_at", null)
+    .neq("dispatch_status", "Cancelled")
+    .or(`linked_pilot_id.eq.${pilotId},destination_pilot_id.eq.${pilotId}`);
+
+  if (existingDispatchId) {
+    query = query.neq("id", existingDispatchId);
+  }
+
+  const { data, error } = await query.limit(1);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  if (data?.length) {
+    redirectWithError(
+      errorPath,
+      `Pilot dispatch already requested (${data[0].dispatch_code}).`
+    );
+  }
 }
 
 async function getFarmerSaleLeadForDispatch(
@@ -200,6 +328,7 @@ function applyFarmerSaleLeadSnapshot(
   payload: DispatchInsert | DispatchUpdate,
   lead: FarmerSaleDispatchLead
 ) {
+  payload.dispatch_type = "Farmer Sale Dispatch";
   payload.destination_type = "Farmer";
   payload.destination_farmer_lead_id = lead.id;
   payload.linked_farmer_lead_id = lead.id;
@@ -211,6 +340,105 @@ function applyFarmerSaleLeadSnapshot(
   payload.payment_confirmed = true;
   payload.payment_confirmed_by_user_id = lead.payment_confirmed_by_user_id;
   payload.payment_confirmed_date = lead.payment_confirmed_date;
+}
+
+async function getPilotForDispatch(
+  supabase: SupabaseClient,
+  pilotId: string | null | undefined,
+  errorPath: string
+) {
+  if (!pilotId) {
+    redirectWithError(errorPath, "Select a pilot before creating a Pilot Dispatch.");
+  }
+
+  const { data, error } = await supabase
+    .from("pilots")
+    .select(
+      [
+        "id",
+        "pilot_code",
+        "pilot_name",
+        "pilot_type",
+        "pilot_status",
+        "farmer_lead_id",
+        "institution_id",
+        "dealer_id",
+        "farmer_name_snapshot",
+        "farmer_mobile_snapshot",
+        "village",
+        "district",
+        "state",
+        "product_model",
+        "device_id",
+        "dispatch_id"
+      ].join(",")
+    )
+    .eq("id", pilotId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !data) {
+    redirectWithError(errorPath, "Selected pilot was not found.");
+  }
+
+  const pilot = data as unknown as PilotDispatchSource;
+
+  if (
+    [
+      "Cancelled",
+      "Closed - Successful",
+      "Closed - Failed",
+      "Closed - Inconclusive"
+    ].includes(pilot.pilot_status)
+  ) {
+    redirectWithError(errorPath, "Closed or cancelled pilots cannot be dispatched.");
+  }
+
+  return pilot;
+}
+
+function applyPilotDispatchSnapshot(
+  payload: DispatchInsert | DispatchUpdate,
+  pilot: PilotDispatchSource
+) {
+  payload.dispatch_type = "Pilot Dispatch";
+  payload.destination_type = "Pilot";
+  payload.destination_pilot_id = pilot.id;
+  payload.linked_pilot_id = pilot.id;
+  payload.linked_farmer_lead_id = pilot.farmer_lead_id;
+  payload.destination_name_snapshot = pilot.pilot_name;
+  payload.destination_contact_snapshot = pilot.farmer_mobile_snapshot;
+  payload.destination_address = pilot.village;
+  payload.destination_state = pilot.state;
+  payload.destination_district = pilot.district;
+  payload.payment_requirement_type = "Unpaid Pilot";
+  payload.payment_confirmed = false;
+  payload.payment_confirmed_by_user_id = null;
+  payload.payment_confirmed_date = null;
+}
+
+function validateDevicePoolForRoute({
+  device,
+  errorPath,
+  route
+}: {
+  device: DispatchDeviceOption;
+  errorPath: string;
+  route: string;
+}) {
+  if (route === "Paid Farmer Sale" && device.inventory_pool !== "Fresh Sale") {
+    redirectWithError(
+      errorPath,
+      "Paid farmer dispatches can use Fresh Sale devices only."
+    );
+  }
+
+  if (route === "Free Pilot" && device.inventory_pool !== "Pilot Stock") {
+    redirectWithError(
+      errorPath,
+      "Pilot dispatches can use Pilot Stock devices only."
+    );
+  }
 }
 
 async function markFarmerSaleLeadDispatched({
@@ -322,7 +550,9 @@ async function applyDispatchedSideEffects({
 
 export async function createDispatchAction(formData: FormData) {
   const supabase = await createClient();
+  const route = getDispatchRoute(formData);
   const payload = dispatchPayloadFromForm(formData);
+  const effectiveRoute = routeFromPayloadFallback(route, payload);
   const validationError = validateDispatchPayload(payload);
 
   if (validationError) {
@@ -330,17 +560,49 @@ export async function createDispatchAction(formData: FormData) {
   }
 
   const profile = await getCurrentProfile(supabase, "/dispatches/new");
+  if (
+    effectiveRoute === "Admin Manual Exception" &&
+    !hasAnyRole(profile, ["Admin"])
+  ) {
+    redirectWithError(
+      "/dispatches/new",
+      "Only Admin can create a manual dispatch exception."
+    );
+  }
+
   const farmerSaleLead =
-    payload.dispatch_type === "Farmer Sale Dispatch"
+    effectiveRoute === "Paid Farmer Sale"
       ? await getFarmerSaleLeadForDispatch(
           supabase,
           payload.destination_farmer_lead_id,
           "/dispatches/new"
         )
       : null;
+  const pilotDispatch =
+    effectiveRoute === "Free Pilot"
+      ? await getPilotForDispatch(
+          supabase,
+          payload.destination_pilot_id,
+          "/dispatches/new"
+        )
+      : null;
 
   if (farmerSaleLead) {
+    await ensureNoOpenDispatchForFarmerLead({
+      supabase,
+      farmerLeadId: farmerSaleLead.id,
+      errorPath: "/dispatches/new"
+    });
     applyFarmerSaleLeadSnapshot(payload, farmerSaleLead);
+  }
+
+  if (pilotDispatch) {
+    await ensureNoOpenDispatchForPilot({
+      supabase,
+      pilotId: pilotDispatch.id,
+      errorPath: "/dispatches/new"
+    });
+    applyPilotDispatchSnapshot(payload, pilotDispatch);
   }
 
   const device = await getDeviceForDispatch(
@@ -348,6 +610,11 @@ export async function createDispatchAction(formData: FormData) {
     payload.device_id ?? "",
     "/dispatches/new"
   );
+  validateDevicePoolForRoute({
+    device,
+    errorPath: "/dispatches/new",
+    route: effectiveRoute
+  });
   const now = todayDate();
   const shouldMarkApproved = advancedStatus(payload.dispatch_status);
 
@@ -434,12 +701,18 @@ export async function createDispatchAction(formData: FormData) {
     revalidatePath("/farmer-leads");
     revalidatePath(`/farmer-leads/${farmerSaleLead.id}`);
   }
+  if (pilotDispatch) {
+    revalidatePath("/pilots");
+    revalidatePath(`/pilots/${pilotDispatch.id}`);
+  }
   redirect(`/dispatches/${data.id}`);
 }
 
 export async function updateDispatchAction(id: string, formData: FormData) {
   const supabase = await createClient();
+  const route = getDispatchRoute(formData);
   const payload = dispatchPayloadFromForm(formData);
+  const effectiveRoute = routeFromPayloadFallback(route, payload);
   const validationError = validateDispatchPayload(payload);
 
   if (validationError) {
@@ -460,6 +733,16 @@ export async function updateDispatchAction(id: string, formData: FormData) {
 
   const existing = existingData as Dispatch;
 
+  if (
+    effectiveRoute === "Admin Manual Exception" &&
+    !hasAnyRole(profile, ["Admin"])
+  ) {
+    redirectWithError(
+      `/dispatches/${id}/edit`,
+      "Only Admin can save a manual dispatch exception."
+    );
+  }
+
   if (existing.dispatch_status === "Dispatched" && payload.device_id !== existing.device_id) {
     redirectWithError(
       `/dispatches/${id}/edit`,
@@ -468,7 +751,7 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   }
 
   const farmerSaleLead =
-    payload.dispatch_type === "Farmer Sale Dispatch"
+    effectiveRoute === "Paid Farmer Sale"
       ? await getFarmerSaleLeadForDispatch(
           supabase,
           payload.destination_farmer_lead_id,
@@ -476,9 +759,33 @@ export async function updateDispatchAction(id: string, formData: FormData) {
           id
         )
       : null;
+  const pilotDispatch =
+    effectiveRoute === "Free Pilot"
+      ? await getPilotForDispatch(
+          supabase,
+          payload.destination_pilot_id,
+          `/dispatches/${id}/edit`
+        )
+      : null;
 
   if (farmerSaleLead) {
+    await ensureNoOpenDispatchForFarmerLead({
+      supabase,
+      farmerLeadId: farmerSaleLead.id,
+      errorPath: `/dispatches/${id}/edit`,
+      existingDispatchId: id
+    });
     applyFarmerSaleLeadSnapshot(payload, farmerSaleLead);
+  }
+
+  if (pilotDispatch) {
+    await ensureNoOpenDispatchForPilot({
+      supabase,
+      pilotId: pilotDispatch.id,
+      errorPath: `/dispatches/${id}/edit`,
+      existingDispatchId: id
+    });
+    applyPilotDispatchSnapshot(payload, pilotDispatch);
   }
 
   const device = await getDeviceForDispatch(
@@ -486,6 +793,11 @@ export async function updateDispatchAction(id: string, formData: FormData) {
     payload.device_id ?? "",
     `/dispatches/${id}/edit`
   );
+  validateDevicePoolForRoute({
+    device,
+    errorPath: `/dispatches/${id}/edit`,
+    route: effectiveRoute
+  });
   const now = todayDate();
   const shouldMarkApproved =
     advancedStatus(payload.dispatch_status) && !existing.approved_by_user_id;
@@ -601,6 +913,10 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   if (farmerSaleLead) {
     revalidatePath("/farmer-leads");
     revalidatePath(`/farmer-leads/${farmerSaleLead.id}`);
+  }
+  if (pilotDispatch) {
+    revalidatePath("/pilots");
+    revalidatePath(`/pilots/${pilotDispatch.id}`);
   }
   redirect(`/dispatches/${id}`);
 }

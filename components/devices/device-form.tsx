@@ -10,9 +10,11 @@ import {
   approvalStatusOptions,
   defaultDeviceStatus,
   defaultHolderType,
+  defaultInventoryPool,
   defaultStockEntrySource,
   deviceStatusOptions,
   holderTypeOptions,
+  inventoryPoolOptions,
   productModelOptions,
   returnDecisionOptions,
   stockEntrySourceOptions
@@ -27,6 +29,7 @@ type DeviceFormProps = {
   existingDevices?: Device[];
   canApproveManualAdjustment?: boolean;
   canApproveReturn?: boolean;
+  canSetInventoryPool?: boolean;
   mode: "create" | "edit";
   readOnlyDetails?: boolean;
 };
@@ -70,6 +73,7 @@ export function DeviceForm({
   existingDevices = [],
   canApproveManualAdjustment = false,
   canApproveReturn = false,
+  canSetInventoryPool = false,
   mode,
   readOnlyDetails = false
 }: DeviceFormProps) {
@@ -87,6 +91,9 @@ export function DeviceForm({
   );
   const [deviceStatus, setDeviceStatus] = useState(
     currentDevice?.device_status ?? defaultDeviceStatus
+  );
+  const [inventoryPool, setInventoryPool] = useState(
+    currentDevice?.inventory_pool ?? defaultInventoryPool
   );
   const [stockEntrySource, setStockEntrySource] = useState(
     currentDevice?.stock_entry_source ?? defaultStockEntrySource
@@ -131,6 +138,7 @@ export function DeviceForm({
     setProductModel(existing.product_model ?? "");
     setStockEntryDate(dateValue(existing.stock_entry_date) || todayDate());
     setDeviceStatus(existing.device_status ?? defaultDeviceStatus);
+    setInventoryPool(existing.inventory_pool ?? defaultInventoryPool);
     setStockEntrySource(existing.stock_entry_source ?? defaultStockEntrySource);
     setHolderType(existing.current_holder_type ?? defaultHolderType);
     setHolderName(existing.current_holder_name_snapshot ?? "");
@@ -166,6 +174,7 @@ export function DeviceForm({
           <input name="product_model" type="hidden" value={productModel} />
           <input name="stock_entry_date" type="hidden" value={stockEntryDate} />
           <input name="device_status" type="hidden" value={deviceStatus} />
+          <input name="inventory_pool" type="hidden" value={inventoryPool} />
           <input name="stock_entry_source" type="hidden" value={stockEntrySource} />
           <input name="current_holder_type" type="hidden" value={holderType} />
           <input
@@ -295,6 +304,37 @@ export function DeviceForm({
           Stock and holder
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {!readOnlyDetails && canSetInventoryPool ? (
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="inventory_pool"
+              >
+                Device pool
+              </label>
+              <select
+                className={inputClassName()}
+                id="inventory_pool"
+                name="inventory_pool"
+                onChange={(event) => setInventoryPool(event.target.value)}
+                required
+                value={inventoryPool}
+              >
+                {inventoryPoolOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Fresh Sale devices are used for paid farmer dispatches. Pilot
+                devices are used for free pilot dispatches.
+              </p>
+            </div>
+          ) : (
+            <input name="inventory_pool" type="hidden" value={inventoryPool} />
+          )}
+
           <div>
             <label
               className="mb-1.5 block text-sm font-medium text-slate-700"

@@ -70,6 +70,14 @@ type LinkedFarmerLead = {
   mobile_number: string;
 };
 
+type LinkedDispatch = {
+  id: string;
+  dispatch_code: string;
+  dispatch_status: string;
+  dispatch_date: string | null;
+  serial_number_snapshot: string;
+};
+
 function DetailItem({
   label,
   value
@@ -210,6 +218,7 @@ export default async function PilotDetailPage({
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/pilots");
   const canWrite = canWriteModule(currentUser, "pilots");
+  const canCreateDispatch = canWriteModule(currentUser, "dispatches");
   const canDelete = canSoftDeletePilot(currentUser);
   const canManageVisitPlans = hasAnyRole(currentUser, [
     "Admin",
@@ -245,7 +254,8 @@ export default async function PilotDetailPage({
     { data: farmerLead },
     { data: plannedVisits },
     { data: visits },
-    { data: reports }
+    { data: reports },
+    { data: linkedDispatch }
   ] = await Promise.all([
     supabase
       .from("users")
@@ -285,7 +295,18 @@ export default async function PilotDetailPage({
       .select("*")
       .eq("pilot_id", pilot.id)
       .is("deleted_at", null)
-      .order("report_date", { ascending: false })
+      .order("report_date", { ascending: false }),
+    supabase
+      .from("dispatches")
+      .select(
+        "id, dispatch_code, dispatch_status, dispatch_date, serial_number_snapshot"
+      )
+      .is("deleted_at", null)
+      .neq("dispatch_status", "Cancelled")
+      .or(`linked_pilot_id.eq.${pilot.id},destination_pilot_id.eq.${pilot.id}`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
   ]);
 
   const usersList = (users ?? []) as UserOption[];
@@ -295,6 +316,7 @@ export default async function PilotDetailPage({
   const plannedVisitsList = (plannedVisits ?? []) as PlannedPilotVisit[];
   const visitsList = (visits ?? []) as PilotVisit[];
   const reportsList = (reports ?? []) as VisitReport[];
+  const dispatch = linkedDispatch as LinkedDispatch | null;
   const [
     monitoringPlanUrl,
     pilotFolderUrl,
@@ -565,6 +587,14 @@ export default async function PilotDetailPage({
         ? "Not recommended"
         : "Not marked"
   };
+  const pilotClosedForDispatch = [
+    "Cancelled",
+    "Closed - Successful",
+    "Closed - Failed",
+    "Closed - Inconclusive"
+  ].includes(pilot.pilot_status);
+  const pilotReadyForDispatch = !dispatch && !pilotClosedForDispatch;
+  const pilotDispatchAlreadyRequested = Boolean(dispatch);
 
   return (
     <section>
@@ -646,6 +676,32 @@ export default async function PilotDetailPage({
             />
           </div>
         </div>
+        {pilotReadyForDispatch ? (
+          <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
+            <p className="font-semibold">Pilot ready for dispatch</p>
+            {canCreateDispatch ? (
+              <Link
+                className="mt-3 inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                href={`/dispatches/new?pilot_id=${pilot.id}`}
+              >
+                Create Pilot Dispatch
+              </Link>
+            ) : (
+              <p className="mt-1">Pilot is ready for Stock / Dispatch team.</p>
+            )}
+          </div>
+        ) : null}
+        {pilotDispatchAlreadyRequested && dispatch ? (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+            <p className="font-semibold">Pilot dispatch already requested</p>
+            <Link
+              className="mt-1 inline-flex font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+              href={`/dispatches/${dispatch.id}`}
+            >
+              {dispatch.dispatch_code} · {dispatch.dispatch_status}
+            </Link>
+          </div>
+        ) : null}
       </SectionCard>
 
       <SectionCard

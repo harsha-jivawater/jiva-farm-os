@@ -7,6 +7,7 @@ import { FileLink } from "@/components/uploads/file-link";
 import {
   deviceStatusOptions,
   holderTypeOptions,
+  inventoryPoolOptions,
   labelFor,
   productModelOptions,
   stockEntrySourceOptions
@@ -128,6 +129,10 @@ export default async function DeviceDetailPage({
         <DetailItem
           label="Product model"
           value={labelFor(device.product_model, productModelOptions)}
+        />
+        <DetailItem
+          label="Device pool"
+          value={labelFor(device.inventory_pool, inventoryPoolOptions)}
         />
         <DetailItem
           label="Device status"

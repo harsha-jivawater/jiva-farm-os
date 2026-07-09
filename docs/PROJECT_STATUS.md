@@ -15,6 +15,8 @@ Jiva Farm OS is the production operating system for Jiva Water's farmer sales, d
 
 Marketing Requests has been added as a SQL-dependent Team Workflows module for internal creative requests. Apply the Marketing Requests migration in Supabase before deploying code that uses the module.
 
+Dispatch creation now depends on the device inventory pool migration. Apply the device inventory pool migration before deploying code that separates Fresh Sale devices from Pilot Stock devices.
+
 ## Deployment State
 
 - GitHub `main` deploys to Vercel production.
@@ -54,11 +56,12 @@ Marketing Requests has been added as a SQL-dependent Team Workflows module for i
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.3 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.4 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
 - The v0.3 update adds controlled soft-delete guidance for Dealers, Institutional Partners, and Pilots.
+- The v0.4 update adds paid farmer sale dispatch vs free pilot dispatch routing and device pool guidance.
 
 ## Role Model
 
@@ -116,6 +119,10 @@ Role notes:
 
 - Lead status is derived from funnel/payment logic.
 - Payment confirmation can be done only by Admin or Accounts.
+- A paid Farmer Lead becomes dispatch-ready when `payment_confirmed = true`, `device_dispatched = false`, and no active dispatch request exists.
+- Farmer Sale Dispatches must be created from the selected Farmer Lead; manual farmer destination entry is not part of the normal path.
+- Farmer Sale Dispatches use Fresh Sale devices only.
+- `farmer_leads.device_dispatched` is set only when the dispatch status becomes `Dispatched`, not when the dispatch request is created.
 - `Device Installed` is workflow-controlled.
 - Users cannot manually mark a Farmer Lead as `Device Installed`.
 - Farmer Lead `Device Installed` means a real Farmer Sale Installation or Dealer Farmer Installation is completed.
@@ -154,10 +161,26 @@ Default Sales Head fallback routing:
 - Institution Pilot requires institution context.
 - Dealer Pilot requires dealer context.
 - A pilot device is temporary/free-of-cost and returns to Jiva after completion.
+- Free Pilot Dispatches must be created from the selected Pilot; they do not require payment.
+- Free Pilot Dispatches use Pilot Stock devices only.
+- Creating a Pilot Dispatch does not mark the pilot device as installed.
 - Pilot installation does not mark the linked Farmer Lead as `Device Installed`.
 - Pilot completion returns the device to inventory and moves the linked Farmer Lead to `Pilot Completed - Sales Follow-up`.
 - Follow-up due date after pilot completion is the completion date.
 - A lead is not `Won` unless `payment_confirmed = true`.
+
+## Dispatch And Device Pool Workflow
+
+- Dispatch creation has two normal routes:
+  - Paid Farmer Sale: selected paid Farmer Lead, Fresh Sale device only.
+  - Free Pilot: selected active Pilot, Pilot Stock device only.
+- Admin can use `Manual dispatch — admin exception` for unusual stock movement.
+- Normal users should not manually enter farmer destination details for paid farmer-sale dispatches.
+- Sales and R&D roles can see readiness messages on Farmer Lead/Pilot detail pages, but device assignment remains with Admin, Accounts, and Stock / Dispatch.
+- Devices now have an inventory pool:
+  - Fresh Sale Device
+  - Pilot Device
+- Existing devices default to Fresh Sale when the migration is applied because the earlier schema did not reliably identify pilot-only stock.
 
 ## Field Visit Reporting And Mobile UX
 

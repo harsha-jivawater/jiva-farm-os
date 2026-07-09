@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.3  
+Version: v0.4  
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.4 | 09 Jul 2026 | Draft | Adds paid farmer sale dispatch vs free pilot dispatch routing, device pool rules, and dispatch handoff guidance. |
 | v0.3 | 09 Jul 2026 | Draft | Adds controlled soft-delete guidance for Dealers, Institutional Partners, and Pilots. |
 | v0.2 | 09 Jul 2026 | Draft | Adds Marketing Requests module, Marketing Head and Designer role guidance, and marketing request workflow/access rules. |
 | v0.1 | 09 Jul 2026 | Draft | Initial role-based ready-reckoner covering menu access, workflows, role guides, status references, and items to confirm. |
@@ -253,6 +254,7 @@ flowchart LR
 | Prospect | Dealer is early-stage | Push RSM for profile/review |
 | Onboarding | Dealer setup is in progress | Track terms, training, agreement, first order |
 | Payment Confirmed | Farmer lead is ready for dispatch planning | Coordinate Accounts/Dispatch |
+| Ready for dispatch | Paid lead has payment confirmed and no active dispatch request | Stock / Dispatch creates Farmer Sale Dispatch |
 
 #### Escalate to
 
@@ -680,11 +682,16 @@ flowchart LR
 
 - Keep serial number and device status accurate.
 - Use Dispatches for device movement.
+- Use Paid Farmer Sale for paid farmer leads and Free Pilot for free pilot movement.
+- Use Fresh Sale devices for paid farmer sale dispatches.
+- Use Pilot Stock devices for free pilot dispatches.
 - Use Installations for field installation records.
 
 #### Don't
 
 - Do not confirm payment unless your role also permits it.
+- Do not mark a Farmer Lead dispatched until dispatch status is `Dispatched`.
+- Do not mark Pilot Device Installed from dispatch creation.
 - Do not change pilot technical results.
 
 #### Common statuses they will see
@@ -864,6 +871,44 @@ flowchart LR
   D --> E["Post Installation Follow-up"]
 ```
 
+### Paid Farmer Sale Dispatch
+
+```mermaid
+flowchart LR
+  A["Payment Confirmed Farmer Lead"] --> B["Stock / Dispatch creates Farmer Sale Dispatch"]
+  B --> C["Fresh Sale Device selected"]
+  C --> D["Dispatch Requested"]
+  D --> E["Dispatched"]
+  E --> F["Farmer Lead marked Device Dispatched"]
+```
+
+Rules:
+
+- Farmer Sale Dispatch must be created from a selected paid Farmer Lead.
+- The Farmer Lead must have `payment_confirmed = true`, `device_dispatched = false`, and no active non-cancelled dispatch.
+- Farmer destination details come from the selected Farmer Lead.
+- Manual farmer destination entry is not part of the normal paid sale path.
+- `device_dispatched` changes only when dispatch status becomes `Dispatched`.
+
+### Free Pilot Dispatch
+
+```mermaid
+flowchart LR
+  A["Active Pilot"] --> B["Stock / Dispatch creates Pilot Dispatch"]
+  B --> C["Pilot Stock Device selected"]
+  C --> D["Dispatch Requested"]
+  D --> E["Dispatched"]
+  E --> F["Pilot continues to installation / monitoring workflow"]
+```
+
+Rules:
+
+- Pilot Dispatch must be created from a selected active Pilot.
+- Pilot dispatch does not require payment.
+- Pilot dispatch uses Pilot Stock devices only.
+- Dispatch creation does not mark Pilot Device Installed.
+- If a non-cancelled pilot dispatch already exists, create another only after business review.
+
 ### Pilot Authority Map
 
 ```mermaid
@@ -943,6 +988,12 @@ flowchart TD
 | Primary actions | Request/approve/dispatch/deliver devices, track payment requirement. |
 | Important rules | Dispatched workflow depends on payment/approval rules and Stock / Dispatch authority. |
 
+Dispatch creation routes:
+
+- Paid Farmer Sale: selected paid Farmer Lead, Fresh Sale device only.
+- Free Pilot: selected active Pilot, Pilot Stock device only.
+- Manual dispatch — admin exception: Admin-only for unusual movement.
+
 ### Installations
 
 | Item | Detail |
@@ -969,6 +1020,12 @@ flowchart TD
 | Used by | Admin, Management, Sales Head, Accounts, Stock / Dispatch, Agronomist, R&D Head, Viewer. |
 | Primary actions | Add/update device status, track warehouse/dealer/farmer/pilot/device return. |
 | Important rules | Agronomist is view-only for Devices. Stock / Dispatch owns operational stock movement. |
+
+Device pool:
+
+- Fresh Sale Device: used for paid farmer-sale dispatches.
+- Pilot Device: used for free pilot dispatches.
+- Admin and Stock / Dispatch can set the device pool on device create/edit.
 
 ### KPI Dashboard
 
