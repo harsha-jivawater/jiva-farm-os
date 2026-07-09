@@ -1602,7 +1602,7 @@ export default async function InstitutionDetailPage({
             <DeleteRecordButton
               action={deleteAction}
               confirmMessage="Delete this institutional partner from active records? Contacts, meetings, linked pilots, and history will be preserved."
-              label="Delete Institutional Partner"
+              label="Remove Institutional Partner from Active Records"
             />
           </div>
         </div>
