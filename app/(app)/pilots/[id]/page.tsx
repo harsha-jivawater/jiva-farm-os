@@ -1766,7 +1766,7 @@ export default async function PilotDetailPage({
             <DeleteRecordButton
               action={deleteAction}
               confirmMessage="Delete this pilot from active records? Visit plans, reports, and linked context will be preserved."
-              label="Delete Pilot"
+              label="Remove Pilot from Active Records"
             />
           </div>
         </div>

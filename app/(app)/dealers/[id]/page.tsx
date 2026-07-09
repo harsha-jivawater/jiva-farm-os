@@ -1531,7 +1531,7 @@ export default async function DealerDetailPage({
             <DeleteRecordButton
               action={deleteAction}
               confirmMessage="Delete this dealer from active records? Linked history will be preserved."
-              label="Delete Dealer"
+              label="Remove Dealer from Active Records"
             />
           </div>
         </div>

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
-import { HelpCircle, KeyRound, LogOut, Menu, X } from "lucide-react";
+import { KeyRound, LogOut, Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
-import { navigationItems, teamItems, teamWorkflowItems } from "@/lib/navigation";
+import { navigationGroups } from "@/lib/navigation";
 import { CurrentUserProvider, type CurrentInternalUser } from "@/components/auth/current-user-context";
 import { canViewModule } from "@/lib/users/permissions";
 import { labelForRole } from "@/lib/users/options";
@@ -29,17 +29,16 @@ export function AppShell({
   const isPasswordPage = pathname === "/account/password";
   const shouldBlockContent = mustChangePassword && !isPasswordPage;
   const defaultHomePath = defaultHomePathForUser(currentUser);
-  const visibleNavigationItems = mustChangePassword
+  const visibleNavigationGroups = mustChangePassword
     ? []
-    : navigationItems.filter((item) => canViewModule(currentUser, item.module));
-  const visibleTeamItems = mustChangePassword
-    ? []
-    : teamItems.filter(
-        (item) => !("module" in item) || canViewModule(currentUser, item.module)
-      );
-  const visibleTeamWorkflowItems = mustChangePassword
-    ? []
-    : teamWorkflowItems.filter((item) => canViewModule(currentUser, item.module));
+    : navigationGroups
+        .map((group) => ({
+          ...group,
+          items: group.items.filter(
+            (item) => !item.module || canViewModule(currentUser, item.module)
+          )
+        }))
+        .filter((group) => group.items.length > 0);
 
   useEffect(() => {
     if (shouldBlockContent) {
@@ -90,72 +89,13 @@ export function AppShell({
             </div>
           ) : (
             <>
-              <div>
-                <p className="px-3 text-xs font-medium uppercase tracking-wide text-slate-400">
-                  Operations
-                </p>
-                <div className="mt-2 space-y-1">
-                  {visibleNavigationItems.map((item) => {
-                    const isActive = pathname === item.href;
-                    const Icon = item.icon;
-
-                    return (
-                      <Link
-                        className={[
-                          "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition",
-                          isActive
-                            ? "bg-brand-50 text-brand-700"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
-                          "gapAfter" in item && item.gapAfter ? "mb-3" : ""
-                        ].join(" ")}
-                        href={item.href}
-                        key={item.href}
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span className="min-w-0 truncate">{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <p className="px-3 text-xs font-medium uppercase tracking-wide text-slate-400">
-                  Network
-                </p>
-                <div className="mt-2 space-y-1">
-                  {visibleTeamItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname === item.href;
-
-                    return (
-                      <Link
-                        className={[
-                          "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition",
-                          isActive
-                            ? "bg-brand-50 text-brand-700"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
-                        ].join(" ")}
-                        href={item.href}
-                        key={item.label}
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span className="min-w-0 truncate">{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {visibleTeamWorkflowItems.length ? (
-                <div>
+              {visibleNavigationGroups.map((group) => (
+                <div key={group.label}>
                   <p className="px-3 text-xs font-medium uppercase tracking-wide text-slate-400">
-                    Team Workflows
+                    {group.label}
                   </p>
                   <div className="mt-2 space-y-1">
-                    {visibleTeamWorkflowItems.map((item) => {
+                    {group.items.map((item) => {
                       const Icon = item.icon;
                       const isActive = pathname === item.href;
 
@@ -168,7 +108,7 @@ export function AppShell({
                               : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
                           ].join(" ")}
                           href={item.href}
-                          key={item.label}
+                          key={item.href}
                           onClick={() => setIsOpen(false)}
                         >
                           <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -178,7 +118,7 @@ export function AppShell({
                     })}
                   </div>
                 </div>
-              ) : null}
+              ))}
             </>
           )}
         </nav>
@@ -198,32 +138,21 @@ export function AppShell({
                 : ""}
             </p>
           </div>
-          {mustChangePassword ? null : (
+          {mustChangePassword ? (
             <Link
               className={[
                 "mb-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold shadow-sm hover:bg-slate-50",
-                pathname === "/help" ? "text-brand-700" : "text-slate-700"
+                pathname === "/account/password"
+                  ? "text-brand-700"
+                  : "text-slate-700"
               ].join(" ")}
-              href="/help"
+              href="/account/password"
               onClick={() => setIsOpen(false)}
             >
-              <HelpCircle className="h-4 w-4" aria-hidden="true" />
-              Help
+              <KeyRound className="h-4 w-4" aria-hidden="true" />
+              Change Password
             </Link>
-          )}
-          <Link
-            className={[
-              "mb-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold shadow-sm hover:bg-slate-50",
-              pathname === "/account/password"
-                ? "text-brand-700"
-                : "text-slate-700"
-            ].join(" ")}
-            href="/account/password"
-            onClick={() => setIsOpen(false)}
-          >
-            <KeyRound className="h-4 w-4" aria-hidden="true" />
-            Change Password
-          </Link>
+          ) : null}
           <form action={signOutAction}>
             <button
               className="flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"

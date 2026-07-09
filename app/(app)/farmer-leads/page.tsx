@@ -293,7 +293,7 @@ export default async function FarmerLeadsPage({
               href="/farmer-leads/new"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
-              Add lead
+              Add Farmer Lead
             </Link>
           </div>
         ) : null}
@@ -461,7 +461,8 @@ export default async function FarmerLeadsPage({
           </div>
         ) : leads.length === 0 ? (
           <div className="p-8 text-center text-sm leading-6 text-slate-500">
-            No farmer leads found. Clear filters or add a new farmer lead.
+            No farmer leads match these filters. Reset filters or add a Farmer
+            Lead when a new farmer opportunity comes in.
           </div>
         ) : (
           <>

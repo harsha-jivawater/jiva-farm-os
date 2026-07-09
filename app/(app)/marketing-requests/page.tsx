@@ -261,7 +261,7 @@ export default async function MarketingRequestsPage({
             href="/marketing-requests/new"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
-            Create Request
+            Create Marketing Request
           </Link>
         </div>
       ) : null}
@@ -569,7 +569,8 @@ export default async function MarketingRequestsPage({
 
         {!requests.length ? (
           <div className="px-4 py-8 text-center text-sm text-slate-500">
-            No Marketing Requests found for the current filters.
+            No Marketing Requests match these filters. Reset filters or create
+            a request when a team needs marketing support.
           </div>
         ) : null}
       </div>

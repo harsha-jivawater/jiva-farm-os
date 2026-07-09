@@ -728,7 +728,8 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
           </div>
         ) : dealerRows.length === 0 ? (
           <div className="p-8 text-center text-sm leading-6 text-slate-500">
-            No dealers found. Clear filters or add a dealer.
+            No dealers match these filters. Reset filters or add a Dealer when
+            a new channel partner is being onboarded.
           </div>
         ) : (
           <>

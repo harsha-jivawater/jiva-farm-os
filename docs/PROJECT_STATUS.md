@@ -59,7 +59,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.8 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.9 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
@@ -69,6 +69,24 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - The v0.6 update adds My Pending Work guidance for live role-scoped action lists.
 - The v0.7 update adds Admin/Management Data Quality warning guidance.
 - The v0.8 update adds Admin/Management System Health guidance for operational risk and process bottlenecks.
+- The v0.9 update adds final launch-polish guidance for sidebar navigation groups, session/password behavior, Marketing deadline workflow, brief document links, and soft-delete/restore training notes.
+
+## Final Launch Polish
+
+- Sidebar navigation is grouped for rollout readiness:
+  - Daily Work: Dashboard, My Pending Work, My Visits.
+  - Sales & Partners: Farmer Leads, Dealers, Institutional Partners.
+  - R&D: Pilots.
+  - Operations: Devices, Dispatches, Installations, Post Installation Follow-ups.
+  - Team Workflows: Marketing Requests.
+  - Management: KPI Dashboard, Data Quality, System Health, Regions, Internal Users.
+  - Support: Help / SOP, Change Password.
+- Navigation grouping is presentation-only; role visibility continues to use existing module permissions.
+- Pilots stay under R&D only.
+- Devices, Dispatches, Installations, and Post Installation Follow-ups stay under Operations only.
+- Launch-facing empty states and action labels were clarified on core list/detail pages.
+- Field-user mobile touch targets were checked, with the Farmer Lead dispatch CTA made full-width on phones.
+- No SQL, schema, RLS, business permission, or workflow-rule changes were made in the launch polish pass.
 
 ## Role Model
 

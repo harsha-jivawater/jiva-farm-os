@@ -657,10 +657,10 @@ export default async function FarmerLeadDetailPage({
               <p className="font-semibold">Ready for dispatch</p>
               {canCreateDispatch ? (
                 <Link
-                  className="mt-3 inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                  className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 sm:w-auto"
                   href={`/dispatches/new?farmer_lead_id=${lead.id}`}
                 >
-                  Create Dispatch
+                  Create Farmer Sale Dispatch
                 </Link>
               ) : (
                 <p className="mt-1">

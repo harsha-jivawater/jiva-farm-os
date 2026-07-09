@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.8
+Version: v0.9
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.9 | 09 Jul 2026 | Draft | Final launch polish: updates sidebar navigation groups, session/password guidance, Marketing deadline workflow notes, brief document link guidance, and soft-delete/restore training notes. |
 | v0.8 | 09 Jul 2026 | Draft | Adds Admin/Management System Health for KPI cache, dispatch aging, installation aging, pilot visit risk, marketing risk, and deleted-record visibility. |
 | v0.7 | 09 Jul 2026 | Draft | Adds Admin/Management Data Quality warnings for duplicate, incomplete, dispatch-readiness, pilot setup, and marketing workflow review. |
 | v0.6 | 09 Jul 2026 | Draft | Adds My Pending Work as a live role-scoped action list for Sales, Dispatch, Pilots & Visits, and Marketing. |
@@ -68,8 +69,22 @@ Notes:
 - Viewer remains read-only.
 - Help / SOP and Change Password are available to signed-in users.
 - First-login password-change users see only Change Password and Sign out until password is changed.
+- If a user's session expires, they should log in again and return to the page they were using. The app separates expired-session messages from permission-denied messages.
+- Marketing Head and Designer use Marketing Requests as their role home page.
 
 ## 4. Master Role-Menu Access Matrix
+
+### Sidebar Navigation Groups
+
+| Group | Menus | Training notes |
+|---|---|---|
+| Daily Work | Dashboard; My Pending Work; My Visits | Daily action areas. Visit Reports are submitted through My Visits or Pilot detail, not as a standalone sidebar page. |
+| Sales & Partners | Farmer Leads; Dealers; Institutional Partners | Contacts and meetings are managed inside Institutional Partner detail where available. |
+| R&D | Pilots | Pilots stay under R&D only. |
+| Operations | Devices; Dispatches; Installations; Post Installation Follow-ups | Device movement, dispatch, installation, and after-installation work stay under Operations only. |
+| Team Workflows | Marketing Requests | Creative request workflow for briefs, deadlines, draft links, comments, and final OneDrive links. |
+| Management | KPI Dashboard; Data Quality; System Health; Regions; Internal Users | Visibility is role-controlled; most items are Admin/Management-only. |
+| Support | Help / SOP; Change Password | Support items are available to signed-in users; Change Password remains available during forced first-login password change. |
 
 ### Operations Menus
 
@@ -866,6 +881,13 @@ flowchart LR
   F --> G["Delivered"]
 ```
 
+Rules:
+
+- Requesters provide the brief in the app and may add an optional brief document link when extra context lives outside the app.
+- Admin, Management, and Marketing Head can accept the requested deadline or propose a revised working deadline.
+- Designers work from assigned requests and update draft/final links; they do not control final deadline acceptance unless they also have a management/marketing-head role.
+- Heavy design files stay outside the app; Jiva Farm OS stores the request, links, comments, and status trail.
+
 ### My Pending Work Triage
 
 ```mermaid
@@ -1126,7 +1148,7 @@ Device pool:
 | Purpose | Track marketing briefs, brief document links, requested/final deadlines, assignment, corrections, draft links, final OneDrive links, and delivery status. |
 | Used by | Admin, Management, Sales Head, RSM, Salesperson, Agronomist, Research Assistant, R&D Head, Marketing Head, Designer. |
 | Primary actions | Create request, review brief, assign owner, share draft/final links, add comments, mark delivered where allowed. |
-| Important rules | Heavy design files stay outside the app. Only the brief and optional links are stored. Admin, Management, and Marketing Head can accept or revise requested deadlines. OneDrive link is optional until delivery. Accounts, Stock / Dispatch, HR & Legal, and Viewer do not create requests by default. |
+| Important rules | Heavy design files stay outside the app. The in-app brief is required; the brief document link is optional. Admin, Management, and Marketing Head can accept the requested deadline or propose a revised working deadline. OneDrive link is optional until delivery. Accounts, Stock / Dispatch, HR & Legal, and Viewer do not create requests by default. |
 
 ### Regions
 

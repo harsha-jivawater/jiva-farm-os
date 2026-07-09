@@ -941,7 +941,7 @@ export default async function MyPendingWorkPage() {
       <PageHeader
         eyebrow="Daily work"
         title="My Pending Work"
-        description="Items that need your action or attention."
+        description="Your role-based action list from sales, dispatch, pilots, visits, and marketing."
       />
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">

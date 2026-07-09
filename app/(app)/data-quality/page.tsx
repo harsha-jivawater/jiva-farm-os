@@ -854,7 +854,7 @@ export default async function DataQualityPage() {
       <PageHeader
         eyebrow="Admin review"
         title="Data Quality"
-        description="Warnings that may need cleanup before reporting or handoff."
+        description="Duplicate, incomplete, or cleanup warnings to review before reporting or handoff."
       />
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">

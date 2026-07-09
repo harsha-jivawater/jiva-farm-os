@@ -773,7 +773,8 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
                     className="px-4 py-10 text-center text-sm text-slate-500"
                     colSpan={13}
                   >
-                    No pilots found. Clear filters or add a pilot.
+                    No pilots match these filters. Reset filters or add a Pilot
+                    after selecting an eligible Farmer Lead.
                   </td>
                 </tr>
               ) : null}

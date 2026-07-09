@@ -526,7 +526,9 @@ export default async function DispatchesPage({
           </div>
         ) : dispatches.length === 0 ? (
           <div className="p-8 text-center text-sm leading-6 text-slate-500">
-            No dispatches found. Clear filters or create a dispatch.
+            No dispatches match these filters. Reset filters or create a
+            dispatch from a paid Farmer Lead, an active Pilot, or an approved
+            admin exception.
           </div>
         ) : (
           <>
