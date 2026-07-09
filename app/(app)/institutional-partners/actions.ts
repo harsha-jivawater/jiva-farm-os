@@ -25,6 +25,7 @@ import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import {
   canApproveLegalDocuments,
   canManageInstitutionProfile,
+  canSoftDeleteInstitution,
   hasRole
 } from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
@@ -352,6 +353,33 @@ export async function updateInstitutionReviewAction(
 
   await revalidateInstitution(institutionId);
   redirect(`/institutional-partners/${institutionId}?saved=review`);
+}
+
+export async function deleteInstitutionAction(id: string) {
+  const supabase = await createClient();
+  const errorPath = `/institutional-partners/${id}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (!canSoftDeleteInstitution(profile)) {
+    redirectWithError(
+      errorPath,
+      "Only Admin or Sales Head can delete institutional partners."
+    );
+  }
+
+  const { error } = await supabase
+    .from("institutions")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("deleted_at", null);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  revalidatePath("/institutional-partners");
+  revalidatePath(`/institutional-partners/${id}`);
+  redirect("/institutional-partners?deleted=1");
 }
 
 export async function createInstitutionContactAction(

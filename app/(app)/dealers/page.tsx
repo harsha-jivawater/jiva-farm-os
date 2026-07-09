@@ -422,6 +422,12 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
         ) : null}
       </div>
 
+      {paramValue(params.deleted) ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          Dealer removed from active records. Linked history was preserved.
+        </div>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard icon={Store} label="Total Dealers" value={dealerRows.length} />
         <KpiCard

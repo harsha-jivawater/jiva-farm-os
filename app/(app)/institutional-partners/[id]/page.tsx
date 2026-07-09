@@ -4,9 +4,11 @@ import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import {
   createInstitutionContactAction,
   createInstitutionMeetingAction,
+  deleteInstitutionAction,
   deleteInstitutionContactAction,
   updateInstitutionReviewAction
 } from "@/app/(app)/institutional-partners/actions";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { ContactForm } from "@/components/institutions/contact-form";
 import { InstitutionStatusPill } from "@/components/institutions/institution-status-pill";
 import { MeetingForm } from "@/components/institutions/meeting-form";
@@ -56,7 +58,8 @@ import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import {
   canApproveLegalDocuments,
-  canManageInstitutionProfile
+  canManageInstitutionProfile,
+  canSoftDeleteInstitution
 } from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
 
@@ -329,6 +332,7 @@ export default async function InstitutionDetailPage({
     "/institutional-partners"
   );
   const canManageProfile = canManageInstitutionProfile(currentUser);
+  const canDelete = canSoftDeleteInstitution(currentUser);
   const canApproveLegal = canApproveLegalDocuments(currentUser);
   const canOpenLegalOnly = canApproveLegal && !canManageProfile;
   const scope = await institutionScope(supabase, currentUser);
@@ -483,6 +487,7 @@ export default async function InstitutionDetailPage({
     null,
     institution.id
   );
+  const deleteAction = deleteInstitutionAction.bind(null, institution.id);
   const showProfileContact =
     hasProfileContact(institution) &&
     !contactsList.some((contact) => contactMatchesProfile(contact, institution));
@@ -1409,6 +1414,34 @@ export default async function InstitutionDetailPage({
           />
         </div>
       </Section>
+
+      {canDelete ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-red-950">
+                Danger Zone
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-red-700">
+                Delete this institutional partner from active records? Contacts,
+                meetings, linked pilots, and history will be preserved.
+              </p>
+              {relatedPilotsList.length ? (
+                <p className="mt-1 text-xs font-medium text-red-700">
+                  Warning: {relatedPilotsList.length} active linked pilot
+                  {relatedPilotsList.length === 1 ? "" : "s"} will remain
+                  preserved and linked historically.
+                </p>
+              ) : null}
+            </div>
+            <DeleteRecordButton
+              action={deleteAction}
+              confirmMessage="Delete this institutional partner from active records? Contacts, meetings, linked pilots, and history will be preserved."
+              label="Delete Institutional Partner"
+            />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -54,10 +54,11 @@ Marketing Requests has been added as a SQL-dependent Team Workflows module for i
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.2 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.3 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
+- The v0.3 update adds controlled soft-delete guidance for Dealers, Institutional Partners, and Pilots.
 
 ## Role Model
 
@@ -86,6 +87,17 @@ Role notes:
 - Agronomist is not region-specific; Agronomist has all permitted read scope for relevant agronomy and operations modules.
 - Device Installed and pilot workflow transitions are controlled by backend/server actions and RLS.
 - Do not implement role changes only in the UI; server actions and RLS must remain aligned.
+
+## Controlled Soft Delete
+
+- Dealers, Institutional Partners, and Pilots use soft delete only.
+- Soft delete sets `deleted_at = now()` and removes the record from normal active list/detail views.
+- Soft delete does not hard-delete records and does not cascade-delete linked history.
+- Sales Head can soft-delete Dealers and Institutional Partners.
+- R&D Head can soft-delete Pilots.
+- Admin can soft-delete Dealers, Institutional Partners, and Pilots.
+- Management can soft-delete Pilots because the existing Pilot write/full-access model includes Management.
+- Management is not enabled for Dealer or Institutional Partner soft-delete because the current profile management write model does not treat Management as a Dealer/Institution profile manager.
 
 ## Marketing Requests Workflow
 

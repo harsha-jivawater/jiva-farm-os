@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
-import { updateDealerReviewAction } from "@/app/(app)/dealers/actions";
+import {
+  deleteDealerAction,
+  updateDealerReviewAction
+} from "@/app/(app)/dealers/actions";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { DealerStatusPill } from "@/components/dealers/dealer-status-pill";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
@@ -45,7 +49,12 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canViewModule, canWriteModule, hasRole } from "@/lib/users/permissions";
+import {
+  canSoftDeleteDealer,
+  canViewModule,
+  canWriteModule,
+  hasRole
+} from "@/lib/users/permissions";
 import { dealerScope } from "@/lib/users/record-scope";
 
 type DealerDetailPageProps = {
@@ -326,6 +335,7 @@ export default async function DealerDetailPage({
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dealers");
   const canWrite = canWriteModule(currentUser, "dealers");
+  const canDelete = canSoftDeleteDealer(currentUser);
   const canViewDispatches = canViewModule(currentUser, "dispatches");
   const canViewInstallations = canViewModule(currentUser, "installations");
   const scope = await dealerScope(supabase, currentUser);
@@ -589,6 +599,7 @@ export default async function DealerDetailPage({
     hasRole(currentUser, "Sales Head") ||
     hasRole(currentUser, "RSM");
   const saveReviewAction = updateDealerReviewAction.bind(null, dealer.id);
+  const deleteAction = deleteDealerAction.bind(null, dealer.id);
   const editDealerAction = canWrite ? (
     <Link
       className="font-semibold text-brand-700 hover:text-brand-800"
@@ -1438,6 +1449,27 @@ export default async function DealerDetailPage({
           </CompactEmpty>
         )}
       </div>
+
+      {canDelete ? (
+        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-red-950">
+                Danger Zone
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-red-700">
+                Delete this dealer from active records? Linked history will be
+                preserved.
+              </p>
+            </div>
+            <DeleteRecordButton
+              action={deleteAction}
+              confirmMessage="Delete this dealer from active records? Linked history will be preserved."
+              label="Delete Dealer"
+            />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

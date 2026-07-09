@@ -483,6 +483,13 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
         ) : null}
       </div>
 
+      {paramValue(params.deleted) ? (
+        <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          Pilot removed from active records. Visit plans, reports, and linked
+          context were preserved.
+        </div>
+      ) : null}
+
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard icon={Microscope} label="Total Pilots" value={kpis.total} />
         <KpiCard icon={ClipboardList} label="Active Pilots" value={kpis.active} />

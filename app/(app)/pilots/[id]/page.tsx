@@ -5,9 +5,11 @@ import {
   createPlannedPilotVisitAction,
   createPilotVisitAction,
   createVisitReportAction,
+  deletePilotAction,
   generatePilotVisitScheduleAction,
   updatePlannedPilotVisitAction
 } from "@/app/(app)/pilots/actions";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { PageHeader } from "@/components/page-header";
 import { PlannedVisitForm } from "@/components/pilots/planned-visit-form";
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
@@ -43,7 +45,11 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrl } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canWriteModule, hasAnyRole } from "@/lib/users/permissions";
+import {
+  canSoftDeletePilot,
+  canWriteModule,
+  hasAnyRole
+} from "@/lib/users/permissions";
 import { pilotScope } from "@/lib/users/record-scope";
 
 type PilotDetailPageProps = {
@@ -204,6 +210,7 @@ export default async function PilotDetailPage({
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/pilots");
   const canWrite = canWriteModule(currentUser, "pilots");
+  const canDelete = canSoftDeletePilot(currentUser);
   const canManageVisitPlans = hasAnyRole(currentUser, [
     "Admin",
     "R&D Head",
@@ -315,6 +322,7 @@ export default async function PilotDetailPage({
       ] as [string, string | null])
     )
   );
+  const deleteAction = deletePilotAction.bind(null, pilot.id);
   const visitPhotoUrls = new Map<string, string | null>(
     await Promise.all(
       visitsList.map(async (visit) => [
@@ -1524,6 +1532,45 @@ export default async function PilotDetailPage({
           />
         </div>
       </SectionCard>
+
+      {canDelete ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-red-950">
+                Danger Zone
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-red-700">
+                Delete this pilot from active records? Visit plans, reports,
+                and linked context will be preserved.
+              </p>
+              {plannedVisitsList.length ||
+              reportsList.length ||
+              pilot.installation_completed ? (
+                <p className="mt-1 text-xs font-medium text-red-700">
+                  Warning: this pilot has{" "}
+                  {plannedVisitsList.length
+                    ? `${plannedVisitsList.length} planned visit${
+                        plannedVisitsList.length === 1 ? "" : "s"
+                      }`
+                    : "no planned visits"}
+                  , {reportsList.length} visit report
+                  {reportsList.length === 1 ? "" : "s"}
+                  {pilot.installation_completed
+                    ? ", and a completed pilot device installation"
+                    : ""}
+                  . These records will remain preserved.
+                </p>
+              ) : null}
+            </div>
+            <DeleteRecordButton
+              action={deleteAction}
+              confirmMessage="Delete this pilot from active records? Visit plans, reports, and linked context will be preserved."
+              label="Delete Pilot"
+            />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

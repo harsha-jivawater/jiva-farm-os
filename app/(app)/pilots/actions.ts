@@ -50,7 +50,7 @@ import type {
 } from "@/lib/pilots/types";
 import { createClient } from "@/lib/supabase/server";
 import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
-import { hasAnyRole } from "@/lib/users/permissions";
+import { canSoftDeletePilot, hasAnyRole } from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import type { InternalUser } from "@/lib/users/types";
 
@@ -96,6 +96,33 @@ function redirectWithError(path: string, message: string): never {
 
 async function getCurrentProfile(supabase: SupabaseClient, errorPath: string) {
   return requireModuleWriteAccess(supabase, errorPath, "pilots");
+}
+
+export async function deletePilotAction(id: string) {
+  const supabase = await createClient();
+  const errorPath = `/pilots/${id}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (!canSoftDeletePilot(profile)) {
+    redirectWithError(
+      errorPath,
+      "Only Admin, Management, or R&D Head can delete pilots."
+    );
+  }
+
+  const { error } = await supabase
+    .from("pilots")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("deleted_at", null);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  revalidatePath("/pilots");
+  revalidatePath(`/pilots/${id}`);
+  redirect("/pilots?deleted=1");
 }
 
 async function userHasRole(

@@ -19,6 +19,7 @@ import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import {
   canApproveLegalDocuments,
   canEditDealerProfile,
+  canSoftDeleteDealer,
   hasRole
 } from "@/lib/users/permissions";
 
@@ -304,6 +305,33 @@ export async function updateDealerReviewAction(id: string, formData: FormData) {
   revalidatePath("/dealers");
   revalidatePath(`/dealers/${id}`);
   redirect(`/dealers/${id}?review_saved=1`);
+}
+
+export async function deleteDealerAction(id: string) {
+  const supabase = await createClient();
+  const errorPath = `/dealers/${id}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (!canSoftDeleteDealer(profile)) {
+    redirectWithError(
+      errorPath,
+      "Only Admin or Sales Head can delete dealer profiles."
+    );
+  }
+
+  const { error } = await supabase
+    .from("dealers")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("deleted_at", null);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  revalidatePath("/dealers");
+  revalidatePath(`/dealers/${id}`);
+  redirect("/dealers?deleted=1");
 }
 
 export async function createDealerInstitutionLinkAction(

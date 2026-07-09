@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.2  
+Version: v0.3  
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.3 | 09 Jul 2026 | Draft | Adds controlled soft-delete guidance for Dealers, Institutional Partners, and Pilots. |
 | v0.2 | 09 Jul 2026 | Draft | Adds Marketing Requests module, Marketing Head and Designer role guidance, and marketing request workflow/access rules. |
 | v0.1 | 09 Jul 2026 | Draft | Initial role-based ready-reckoner covering menu access, workflows, role guides, status references, and items to confirm. |
 
@@ -237,6 +238,7 @@ flowchart LR
 - Create Dealer profiles when needed.
 - Use Dealer review and next action to keep dealer progress moving.
 - Use Institutions for partner opportunities and scale-up.
+- Soft-delete Dealers or Institutional Partners only when they should be removed from active views; linked history is preserved.
 - Refresh KPI Dashboard after data refresh cycles.
 
 #### Don't
@@ -391,6 +393,7 @@ flowchart LR
 - Use Pilots as the main technical cockpit.
 - Add planned visits with date, RA, crop stage, and parameters.
 - Review observations and evidence.
+- Soft-delete Pilots only when they should be removed from active views; visit plans, reports, and linked context are preserved.
 - Keep technical follow-ups clean.
 
 #### Don't
@@ -902,7 +905,7 @@ flowchart TD
 | Purpose | Manage dealer profiles, onboarding, reviews, and dealer-linked performance. |
 | Used by | Admin, Sales Head, RSM, Salesperson, Management, Agronomist, R&D Head, HR & Legal, Viewer. |
 | Primary actions | Create dealer, update review/next action, manage institution opportunities, legal approval where allowed. |
-| Important rules | Sales Head can create Dealer profiles. Dealer statuses are Prospect, Onboarding, Active, Dormant, Dropped. Dealer performance counts dealer-linked Dealer Farmer Installations. |
+| Important rules | Sales Head can create and soft-delete Dealer profiles. Soft-deleted dealers are removed from active views, but linked history is preserved. Dealer performance counts dealer-linked Dealer Farmer Installations. |
 
 ### Institutional Partners
 
@@ -911,7 +914,7 @@ flowchart TD
 | Purpose | Manage institution relationships, pilots, proposals, MOU/legal status, and scale-up opportunity. |
 | Used by | Admin, Management, Sales Head, RSM, R&D Head, Agronomist, HR & Legal, Viewer. |
 | Primary actions | Create/manage institution profile, contacts/meetings, pilot opportunity, MOU/legal approval where allowed. |
-| Important rules | Presentation tracking is not used in Add/Edit forms. Proposal and MOU fields remain. |
+| Important rules | Sales Head can soft-delete Institutional Partners. Soft-deleted institutions are removed from active views, but contacts, meetings, linked pilots, and history are preserved. Proposal and MOU fields remain. |
 
 ### Pilots
 
@@ -920,7 +923,7 @@ flowchart TD
 | Purpose | Track trials, monitoring visits, results, and scale-up proof. |
 | Used by | Admin, Management, R&D Head, Agronomist, Research Assistant, Sales Head, RSM, Salesperson, Viewer. |
 | Primary actions | Create pilot, add monitoring plan, assign visits, submit reports, review result, mark Pilot Device Installed where allowed. |
-| Important rules | Research Assistant can submit visit reports. Research Assistant cannot mark Pilot Device Installed. Partner sharing approval is Admin/Management/R&D Head. |
+| Important rules | R&D Head can soft-delete Pilots. Admin and Management can also soft-delete Pilots. Visit plans, reports, and linked context are preserved. Research Assistant cannot mark Pilot Device Installed. |
 
 ### My Visits
 

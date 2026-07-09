@@ -327,6 +327,12 @@ export function canApproveDealer(
   return hasAnyRole(user, ["Admin", "Sales Head"]);
 }
 
+export function canSoftDeleteDealer(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, ["Admin", "Sales Head"]);
+}
+
 export function canApproveLegalDocuments(
   user: RoleCapableUser | null | undefined
 ) {
@@ -343,6 +349,18 @@ export function canManageInstitutionProfile(
     "R&D Head",
     "Agronomist"
   ]);
+}
+
+export function canSoftDeleteInstitution(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, ["Admin", "Sales Head"]);
+}
+
+export function canSoftDeletePilot(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, ["Admin", "Management", "R&D Head"]);
 }
 
 export function canApproveDeviceReturn(
