@@ -9,6 +9,10 @@ import {
   restoreInstitutionAction,
   updateInstitutionReviewAction
 } from "@/app/(app)/institutional-partners/actions";
+import {
+  ActivityTimeline,
+  type ActivityTimelineItem
+} from "@/components/activity-timeline";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { formatDisplayDateTime } from "@/lib/date-utils";
 import { ContactForm } from "@/components/institutions/contact-form";
@@ -80,6 +84,7 @@ type InstitutionDetailPageProps = {
 
 type RelatedPilot = {
   id: string;
+  created_at: string;
   farmer_lead_id: string;
   pilot_code: string;
   pilot_name: string;
@@ -93,6 +98,7 @@ type RelatedPilot = {
 
 type LinkedFarmerLead = {
   id: string;
+  created_at: string;
   lead_code: string;
   farmer_name: string;
   funnel_stage: string;
@@ -185,6 +191,10 @@ function userLabel(user: UserOption | undefined, fallback?: string | null) {
   }
 
   return display(fallback);
+}
+
+function actorLabel(user: UserOption | undefined) {
+  return user ? `${user.full_name} · ${labelForRole(user.role)}` : null;
 }
 
 function displayCrops(crops: string[] | null | undefined) {
@@ -456,7 +466,7 @@ export default async function InstitutionDetailPage({
     supabase
       .from("pilots")
       .select(
-        "id, farmer_lead_id, pilot_code, pilot_name, pilot_type, pilot_status, pilot_result_status, result_summary, next_visit_due_date, farmer_name_snapshot"
+        "id, created_at, farmer_lead_id, pilot_code, pilot_name, pilot_type, pilot_status, pilot_result_status, result_summary, next_visit_due_date, farmer_name_snapshot"
       )
       .eq("institution_id", institution.id)
       .is("deleted_at", null)
@@ -465,7 +475,7 @@ export default async function InstitutionDetailPage({
     supabase
       .from("dealer_institution_links")
       .select(
-        "id, dealer_id, institution_id, relationship_status, opportunity_name, expected_devices, next_action_date, concern_or_blocker, owner_user_id, rsm_user_id"
+        "id, created_at, dealer_id, institution_id, relationship_status, opportunity_name, expected_devices, next_action_date, concern_or_blocker, owner_user_id, rsm_user_id"
       )
       .eq("institution_id", institution.id)
       .is("deleted_at", null)
@@ -498,7 +508,7 @@ export default async function InstitutionDetailPage({
   const { data: linkedFarmerLeads } = await supabase
     .from("farmer_leads")
     .select(
-      "id, lead_code, farmer_name, funnel_stage, lead_status, primary_crop, owner_user_id, rsm_user_id, linked_institution_id, linked_pilot_id"
+      "id, created_at, lead_code, farmer_name, funnel_stage, lead_status, primary_crop, owner_user_id, rsm_user_id, linked_institution_id, linked_pilot_id"
     )
     .or(farmerLeadFilters.join(","))
     .is("deleted_at", null)
@@ -508,6 +518,7 @@ export default async function InstitutionDetailPage({
   const dealerConnectionsList = (dealerConnections ?? []) as Pick<
     DealerInstitutionLink,
     | "id"
+    | "created_at"
     | "dealer_id"
     | "institution_id"
     | "relationship_status"
@@ -591,6 +602,89 @@ export default async function InstitutionDetailPage({
       institution.technical_owner_user_id
     )
   );
+  const activityItems: ActivityTimelineItem[] = [
+    {
+      actor: actorLabel(userMap.get(institution.created_by_user_id)),
+      category: "Institution",
+      date: institution.created_at,
+      title: "Institution created"
+    },
+    institution.deleted_at
+      ? {
+          actor: actorLabel(
+            institution.deleted_by_user_id
+              ? userMap.get(institution.deleted_by_user_id)
+              : undefined
+          ),
+          category: "Deleted",
+          date: institution.deleted_at,
+          description:
+            institution.deletion_reason ?? "Removed from active records.",
+          title: "Removed from active records"
+        }
+      : null,
+    institution.restored_at
+      ? {
+          actor: actorLabel(
+            institution.restored_by_user_id
+              ? userMap.get(institution.restored_by_user_id)
+              : undefined
+          ),
+          category: "Restored",
+          date: institution.restored_at,
+          title: "Restored to active records"
+        }
+      : null,
+    ...meetingsList.map((meeting) => ({
+      actor: actorLabel(userMap.get(meeting.created_by_user_id)),
+      category: "Meeting",
+      date: meeting.created_at,
+      description:
+        meeting.meeting_summary ||
+        `${labelFor(meeting.meeting_type, meetingTypeOptions)} · ${labelFor(
+          meeting.outcome,
+          meetingOutcomeOptions
+        )}`,
+      title: "Meeting recorded"
+    })),
+    ...contactsList.map((contact) => ({
+      actor: actorLabel(userMap.get(contact.created_by_user_id)),
+      category: "Contact",
+      date: contact.created_at,
+      description: `${contact.contact_name} · ${display(contact.designation)}`,
+      title: "Contact added"
+    })),
+    ...relatedPilotsList.map((pilot) => ({
+      category: "Pilot",
+      date: pilot.created_at,
+      description: `${pilot.pilot_code} · ${pilot.pilot_status}`,
+      href: `/pilots/${pilot.id}`,
+      title: "Institution-linked pilot created"
+    })),
+    ...linkedFarmerLeadsList.map((lead) => ({
+      category: "Farmer Lead",
+      date: lead.created_at,
+      description: `${lead.lead_code} · ${lead.lead_status}`,
+      href: `/farmer-leads/${lead.id}`,
+      title: "Linked Farmer Lead recorded"
+    })),
+    ...dealerConnectionsList.map((connection) => ({
+      actor: actorLabel(
+        connection.owner_user_id
+          ? userMap.get(connection.owner_user_id)
+          : undefined
+      ),
+      category: "Dealer Opportunity",
+      date: connection.created_at,
+      description:
+        connection.opportunity_name ||
+        dealerLabelFor(
+          connection.relationship_status,
+          dealerInstitutionRelationshipStatusOptions
+        ),
+      title: "Dealer institution opportunity recorded"
+    }))
+  ].filter(Boolean) as ActivityTimelineItem[];
 
   return (
     <section>
@@ -1555,6 +1649,10 @@ export default async function InstitutionDetailPage({
           />
         </div>
       </Section>
+
+      <div className="mt-6">
+        <ActivityTimeline items={activityItems} />
+      </div>
 
       {canRestore ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 shadow-sm">

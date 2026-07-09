@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.11
+Version: v0.12
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.12 | 09 Jul 2026 | Draft | Adds Activity Timeline guidance for important detail pages using existing follow-ups, reviews, meetings, visits, reports, marketing updates, and delete/restore audit fields. |
 | v0.11 | 09 Jul 2026 | Draft | Adds lightweight Getting Started checklist guidance for account readiness, first actions, and role-specific onboarding inside Help / SOP and Dashboard. |
 | v0.10 | 09 Jul 2026 | Draft | Adds in-app Help / SOP role-wise training guide alignment, including daily checklists, main pages, handoffs, avoid lists, and escalation points for each role. |
 | v0.9 | 09 Jul 2026 | Draft | Final launch polish: updates sidebar navigation groups, session/password guidance, Marketing deadline workflow notes, brief document link guidance, and soft-delete/restore training notes. |
@@ -116,6 +117,20 @@ It helps users confirm:
 - user knows to contact Admin for profile/access corrections
 
 The checklist is guidance only. It does not store completed steps, change permissions, or create a new onboarding workflow.
+
+### Activity Timelines
+
+Important detail pages include an Activity Timeline section where existing history data is available. Timelines are read-only and help users understand recent record history.
+
+Current timeline sources include:
+
+- Farmer Lead creation, follow-ups, payment confirmation, dispatch, installation, and linked follow-up records
+- Dealer creation, dealer reviews, dispatches, installations, linked pilots, and delete/restore audit fields
+- Institutional Partner creation, contacts, meetings, linked pilots, linked Farmer Leads, dealer opportunities, and delete/restore audit fields
+- Pilot creation, Monitoring Plan visits, actual visits, Visit Reports, pilot dispatch, device installation, and delete/restore audit fields
+- Marketing Request creation, deadline decisions, workflow updates, comments, draft/final links, and delivery timestamps
+
+Activity Timelines do not use a generic audit table yet. They do not change permissions, RLS, schema, or workflows.
 
 ### Operations Menus
 

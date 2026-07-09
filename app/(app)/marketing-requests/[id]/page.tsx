@@ -7,6 +7,10 @@ import {
   updateMarketingWorkflowAction
 } from "@/app/(app)/marketing-requests/actions";
 import {
+  ActivityTimeline,
+  type ActivityTimelineItem
+} from "@/components/activity-timeline";
+import {
   MarketingStatusPill,
   PriorityPill
 } from "@/components/marketing-requests/marketing-status-pill";
@@ -104,6 +108,18 @@ function userLabel(
 
   const user = userMap.get(userId);
   return user?.email ? `${user.full_name} (${user.email})` : display(user?.full_name);
+}
+
+function actorLabel(
+  userMap: Map<string, UserOption>,
+  userId: string | null | undefined
+) {
+  if (!userId) {
+    return null;
+  }
+
+  const user = userMap.get(userId);
+  return user ? `${user.full_name} · ${user.role}` : null;
 }
 
 function relatedLabel(
@@ -342,6 +358,76 @@ export default async function MarketingRequestDetailPage({
     request,
     userLabel(userMap, request.assigned_to_user_id)
   );
+  const activityItems: ActivityTimelineItem[] = [
+    {
+      actor: actorLabel(userMap, request.requested_by_user_id),
+      category: "Request",
+      date: request.created_at,
+      title: "Marketing request created"
+    },
+    request.deadline_decided_at
+      ? {
+          actor: actorLabel(userMap, request.deadline_decided_by_user_id),
+          category: "Deadline",
+          date: request.deadline_decided_at,
+          description:
+            request.deadline_status === "Revised"
+              ? `Revised to ${formatDate(workingDeadline)}${
+                  request.deadline_revision_note
+                    ? ` · ${request.deadline_revision_note}`
+                    : ""
+                }`
+              : `Accepted for ${formatDate(workingDeadline)}`,
+          title:
+            request.deadline_status === "Revised"
+              ? "Deadline revised"
+              : "Deadline accepted"
+        }
+      : null,
+    request.accepted_at
+      ? {
+          actor: actorLabel(userMap, request.marketing_head_user_id),
+          category: "Workflow",
+          date: request.accepted_at,
+          description: "Marketing accepted this request.",
+          title: "Request accepted"
+        }
+      : null,
+    request.draft_link
+      ? {
+          actor: actorLabel(userMap, request.assigned_to_user_id),
+          category: "Draft",
+          date: request.updated_at,
+          description: "Draft link is available.",
+          title: "Draft link added"
+        }
+      : null,
+    request.final_onedrive_link
+      ? {
+          actor: actorLabel(userMap, request.assigned_to_user_id),
+          category: "Final Link",
+          date: request.delivered_at ?? request.updated_at,
+          description: "Final OneDrive link is available.",
+          title: "Final link added"
+        }
+      : null,
+    request.delivered_at
+      ? {
+          actor: actorLabel(userMap, request.marketing_head_user_id),
+          category: "Delivered",
+          date: request.delivered_at,
+          description: "Marketing request delivered.",
+          title: "Request delivered"
+        }
+      : null,
+    ...updates.map((update) => ({
+      actor: actorLabel(userMap, update.created_by_user_id),
+      category: labelFor(marketingRequestUpdateTypeOptions, update.update_type),
+      date: update.created_at,
+      description: update.note,
+      title: "Update added"
+    }))
+  ].filter(Boolean) as ActivityTimelineItem[];
 
   return (
     <section className="space-y-6">
@@ -780,6 +866,8 @@ export default async function MarketingRequestDetailPage({
           ) : null}
         </div>
       </SectionPanel>
+
+      <ActivityTimeline items={activityItems} />
 
       <SectionPanel title="Related business context">
         <div>

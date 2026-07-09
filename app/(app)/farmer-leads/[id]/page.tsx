@@ -6,6 +6,10 @@ import {
   CheckCircle2,
   Pencil
 } from "lucide-react";
+import {
+  ActivityTimeline,
+  type ActivityTimelineItem
+} from "@/components/activity-timeline";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
 import { StatusPill } from "@/components/farmer-leads/status-pill";
@@ -57,6 +61,7 @@ type LinkedPilot = {
 
 type LinkedDispatch = {
   id: string;
+  created_at: string;
   dispatch_code: string;
   dispatch_status: string;
   dispatch_date: string | null;
@@ -65,6 +70,7 @@ type LinkedDispatch = {
 
 type LinkedInstallation = {
   id: string;
+  created_at: string;
   installation_code: string;
   installation_status: string;
   installation_date: string;
@@ -73,6 +79,7 @@ type LinkedInstallation = {
 
 type LinkedFollowup = {
   id: string;
+  created_at: string;
   followup_code: string;
   followup_status: string;
   followup_due_date: string;
@@ -225,6 +232,15 @@ function userLabel(
     : display(fallback);
 }
 
+function actorLabel(
+  user:
+    | { full_name: string; email?: string | null; role: string }
+    | null
+    | undefined
+) {
+  return user ? `${user.full_name} · ${labelForRole(user.role)}` : null;
+}
+
 function dateInputValue(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "";
 }
@@ -342,6 +358,7 @@ export default async function FarmerLeadDetailPage({
       [
         lead.owner_user_id,
         lead.rsm_user_id,
+        lead.created_by_user_id,
         lead.payment_confirmed_by_user_id
       ].flatMap((userId) => (userId ? [userId] : []))
     )
@@ -375,7 +392,7 @@ export default async function FarmerLeadDetailPage({
     supabase
       .from("dispatches")
       .select(
-        "id, dispatch_code, dispatch_status, dispatch_date, serial_number_snapshot"
+        "id, created_at, dispatch_code, dispatch_status, dispatch_date, serial_number_snapshot"
       )
       .is("deleted_at", null)
       .neq("dispatch_status", "Cancelled")
@@ -389,7 +406,7 @@ export default async function FarmerLeadDetailPage({
       ? supabase
           .from("installations")
           .select(
-            "id, installation_code, installation_status, installation_date, serial_number_snapshot"
+            "id, created_at, installation_code, installation_status, installation_date, serial_number_snapshot"
           )
           .eq("id", lead.linked_installation_id)
           .is("deleted_at", null)
@@ -397,7 +414,7 @@ export default async function FarmerLeadDetailPage({
       : Promise.resolve({ data: null }),
     supabase
       .from("followups")
-      .select("id, followup_code, followup_status, followup_due_date, followup_type")
+      .select("id, created_at, followup_code, followup_status, followup_due_date, followup_type")
       .eq("farmer_lead_id", lead.id)
       .is("deleted_at", null)
       .order("followup_due_date", { ascending: false })
@@ -548,6 +565,63 @@ export default async function FarmerLeadDetailPage({
     : null;
   const saveFollowupAction = updateFarmerLeadFollowupAction.bind(null, lead.id);
   const latestFarmerLeadFollowup = farmerLeadFollowups[0];
+  const activityItems: ActivityTimelineItem[] = [
+    {
+      actor: actorLabel(userMap.get(lead.created_by_user_id)),
+      category: "Lead",
+      date: lead.created_at,
+      title: "Lead created"
+    },
+    lead.payment_confirmed && lead.payment_confirmed_date
+      ? {
+          actor: actorLabel(paymentConfirmedBy),
+          category: "Payment",
+          date: lead.payment_confirmed_date,
+          description: "Payment confirmed for this Farmer Lead.",
+          title: "Payment confirmed"
+        }
+      : null,
+    dispatch
+      ? {
+          category: "Dispatch",
+          date: dispatch.created_at ?? dispatch.dispatch_date,
+          description: `${dispatch.dispatch_code} · ${dispatch.dispatch_status}`,
+          href: `/dispatches/${dispatch.id}`,
+          title: "Dispatch linked"
+        }
+      : null,
+    installation
+      ? {
+          category: "Installation",
+          date: installation.created_at ?? installation.installation_date,
+          description: `${installation.installation_code} · ${installation.installation_status}`,
+          href: `/installations/${installation.id}`,
+          title: "Installation linked"
+        }
+      : null,
+    ...farmerLeadFollowups.map((followup) => ({
+      actor: actorLabel(
+        followup.followed_up_by_user_id
+          ? userMap.get(followup.followed_up_by_user_id)
+          : null
+      ),
+      category: "Follow-up",
+      date: followup.created_at,
+      description:
+        followup.interaction_note ||
+        followup.remarks ||
+        followup.concern_or_blocker ||
+        "Follow-up recorded.",
+      title: "Follow-up recorded"
+    })),
+    ...followups.map((followup) => ({
+      category: "Post-installation",
+      date: followup.created_at,
+      description: `${followup.followup_code} · ${followup.followup_status}`,
+      href: `/follow-ups/${followup.id}`,
+      title: "Linked follow-up created"
+    }))
+  ].filter(Boolean) as ActivityTimelineItem[];
 
   return (
     <section>
@@ -1104,6 +1178,10 @@ export default async function FarmerLeadDetailPage({
             />
           </div>
         </SectionPanel>
+      </div>
+
+      <div className="mt-6">
+        <ActivityTimeline items={activityItems} />
       </div>
 
       <div className="mt-6">

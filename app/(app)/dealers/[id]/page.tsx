@@ -6,6 +6,10 @@ import {
   restoreDealerAction,
   updateDealerReviewAction
 } from "@/app/(app)/dealers/actions";
+import {
+  ActivityTimeline,
+  type ActivityTimelineItem
+} from "@/components/activity-timeline";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { formatDisplayDateTime } from "@/lib/date-utils";
 import { DealerStatusPill } from "@/components/dealers/dealer-status-pill";
@@ -74,6 +78,7 @@ type DealerDetailPageProps = {
 
 type RelatedPilot = {
   id: string;
+  created_at: string;
   pilot_code: string;
   pilot_name: string;
   pilot_type: string;
@@ -312,6 +317,10 @@ function reviewerDisplay(
   return user.email ? `${user.full_name} · ${user.email}` : user.full_name;
 }
 
+function actorLabel(user: Pick<UserOption, "full_name" | "role"> | null | undefined) {
+  return user ? `${user.full_name} · ${labelForRole(user.role)}` : null;
+}
+
 function formFieldClassName() {
   return "h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100";
 }
@@ -407,7 +416,7 @@ export default async function DealerDetailPage({
     supabase
       .from("dispatches")
       .select(
-        "id, dispatch_code, dispatch_date, dispatch_status, serial_number_snapshot, linked_installation_id"
+        "id, created_at, dispatch_code, dispatch_date, dispatch_status, serial_number_snapshot, linked_installation_id"
       )
       .eq("destination_type", "Dealer")
       .eq("destination_dealer_id", dealer.id)
@@ -435,7 +444,7 @@ export default async function DealerDetailPage({
     supabase
       .from("pilots")
       .select(
-        "id, pilot_code, pilot_name, pilot_type, pilot_status, farmer_name_snapshot"
+        "id, created_at, pilot_code, pilot_name, pilot_type, pilot_status, farmer_name_snapshot"
       )
       .eq("dealer_id", dealer.id)
       .is("deleted_at", null)
@@ -485,6 +494,7 @@ export default async function DealerDetailPage({
   const dealerDispatches = (dispatchesThisMonth ?? []) as Pick<
     Dispatch,
     | "id"
+    | "created_at"
     | "dispatch_code"
     | "dispatch_date"
     | "dispatch_status"
@@ -633,6 +643,75 @@ export default async function DealerDetailPage({
       Go to Installations
     </Link>
   ) : null;
+  const activityItems: ActivityTimelineItem[] = [
+    {
+      actor: actorLabel(userMap.get(dealer.created_by_user_id)),
+      category: "Dealer",
+      date: dealer.created_at,
+      title: "Dealer created"
+    },
+    dealer.deleted_at
+      ? {
+          actor: actorLabel(
+            dealer.deleted_by_user_id
+              ? userMap.get(dealer.deleted_by_user_id)
+              : null
+          ),
+          category: "Deleted",
+          date: dealer.deleted_at,
+          description: dealer.deletion_reason ?? "Removed from active records.",
+          title: "Removed from active records"
+        }
+      : null,
+    dealer.restored_at
+      ? {
+          actor: actorLabel(
+            dealer.restored_by_user_id
+              ? userMap.get(dealer.restored_by_user_id)
+              : null
+          ),
+          category: "Restored",
+          date: dealer.restored_at,
+          title: "Restored to active records"
+        }
+      : null,
+    ...dealerReviewsList.map((review) => ({
+      actor: actorLabel(
+        review.reviewed_by_user_id
+          ? userMap.get(review.reviewed_by_user_id)
+          : null
+      ),
+      category: "Review",
+      date: review.created_at,
+      description:
+        review.remarks ||
+        review.concern_or_blocker ||
+        review.next_action ||
+        "Dealer review recorded.",
+      title: "Dealer review recorded"
+    })),
+    ...dealerDispatches.map((dispatch) => ({
+      category: "Dispatch",
+      date: dispatch.created_at ?? dispatch.dispatch_date,
+      description: `${dispatch.dispatch_code} · ${dispatch.dispatch_status}`,
+      href: `/dispatches/${dispatch.id}`,
+      title: "Dealer dispatch recorded"
+    })),
+    ...dealerInstallations.map((installation) => ({
+      category: "Installation",
+      date: installation.installation_date,
+      description: `${installation.installation_code} · ${installation.installation_status}`,
+      href: `/installations/${installation.id}`,
+      title: "Dealer installation recorded"
+    })),
+    ...relatedPilotsList.map((pilot) => ({
+      category: "Pilot",
+      date: pilot.created_at,
+      description: `${pilot.pilot_code} · ${pilot.pilot_status}`,
+      href: `/pilots/${pilot.id}`,
+      title: "Dealer-linked pilot created"
+    }))
+  ].filter(Boolean) as ActivityTimelineItem[];
 
   return (
     <section>
@@ -1490,6 +1569,10 @@ export default async function DealerDetailPage({
             No installations are linked to this dealer yet.
           </CompactEmpty>
         )}
+      </div>
+
+      <div className="mt-6">
+        <ActivityTimeline items={activityItems} />
       </div>
 
       {canRestore ? (

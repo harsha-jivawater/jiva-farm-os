@@ -10,6 +10,10 @@ import {
   restorePilotAction,
   updatePlannedPilotVisitAction
 } from "@/app/(app)/pilots/actions";
+import {
+  ActivityTimeline,
+  type ActivityTimelineItem
+} from "@/components/activity-timeline";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { formatDisplayDateTime } from "@/lib/date-utils";
 import { PageHeader } from "@/components/page-header";
@@ -76,6 +80,7 @@ type LinkedFarmerLead = {
 
 type LinkedDispatch = {
   id: string;
+  created_at: string;
   dispatch_code: string;
   dispatch_status: string;
   dispatch_date: string | null;
@@ -213,6 +218,10 @@ function userLabel(user: UserOption | undefined, fallback?: string | null) {
     : display(fallback);
 }
 
+function actorLabel(user: UserOption | undefined) {
+  return user ? `${user.full_name} · ${labelForRole(user.role)}` : null;
+}
+
 export default async function PilotDetailPage({
   params,
   searchParams
@@ -313,7 +322,7 @@ export default async function PilotDetailPage({
     supabase
       .from("dispatches")
       .select(
-        "id, dispatch_code, dispatch_status, dispatch_date, serial_number_snapshot"
+        "id, created_at, dispatch_code, dispatch_status, dispatch_date, serial_number_snapshot"
       )
       .is("deleted_at", null)
       .neq("dispatch_status", "Cancelled")
@@ -664,6 +673,92 @@ export default async function PilotDetailPage({
               nextLinkLabel: "Go to Monitoring Plan",
               nextOwner: "R&D Head / Agronomist"
             };
+  const activityItems: ActivityTimelineItem[] = [
+    {
+      actor: actorLabel(userMap.get(pilot.created_by_user_id)),
+      category: "Pilot",
+      date: pilot.created_at,
+      title: "Pilot created"
+    },
+    pilot.deleted_at
+      ? {
+          actor: actorLabel(
+            pilot.deleted_by_user_id
+              ? userMap.get(pilot.deleted_by_user_id)
+              : undefined
+          ),
+          category: "Deleted",
+          date: pilot.deleted_at,
+          description: pilot.deletion_reason ?? "Removed from active records.",
+          title: "Removed from active records"
+        }
+      : null,
+    pilot.restored_at
+      ? {
+          actor: actorLabel(
+            pilot.restored_by_user_id
+              ? userMap.get(pilot.restored_by_user_id)
+              : undefined
+          ),
+          category: "Restored",
+          date: pilot.restored_at,
+          title: "Restored to active records"
+        }
+      : null,
+    dispatch
+      ? {
+          category: "Dispatch",
+          date: dispatch.created_at ?? dispatch.dispatch_date,
+          description: `${dispatch.dispatch_code} · ${dispatch.dispatch_status}`,
+          href: `/dispatches/${dispatch.id}`,
+          title: "Pilot dispatch linked"
+        }
+      : null,
+    pilot.installation_completed && pilot.device_installation_date
+      ? {
+          category: "Device",
+          date: pilot.device_installation_date,
+          description: pilot.device_serial_number_snapshot
+            ? `Device ${pilot.device_serial_number_snapshot}`
+            : "Pilot device marked installed.",
+          title: "Pilot device installed"
+        }
+      : null,
+    ...plannedVisitsList.map((visit) => ({
+      actor: actorLabel(
+        visit.created_by_user_id
+          ? userMap.get(visit.created_by_user_id)
+          : undefined
+      ),
+      category: "Monitoring Plan",
+      date: visit.created_at,
+      description: `Visit ${visit.visit_number} · ${displayPlannedVisitStatus(
+        visit,
+        today
+      )}`,
+      href: "#monitoring-plan",
+      title: "Monitoring visit planned"
+    })),
+    ...visitsList.map((visit) => ({
+      category: "Actual Visit",
+      date: visit.created_at,
+      description: `Visit ${visit.visit_number} · ${labelFor(
+        visit.visit_status,
+        visitStatusOptions
+      )}`,
+      title: "Actual visit recorded"
+    })),
+    ...reportsList.map((report) => ({
+      actor: actorLabel(userMap.get(report.submitted_by_user_id)),
+      category: "Visit Report",
+      date: report.created_at,
+      description: `${report.visit_report_code} · ${labelFor(
+        report.report_status,
+        reportStatusOptions
+      )}`,
+      title: "Visit report submitted"
+    }))
+  ].filter(Boolean) as ActivityTimelineItem[];
 
   return (
     <section>
@@ -1708,6 +1803,10 @@ export default async function PilotDetailPage({
           />
         </div>
       </SectionCard>
+
+      <div className="mt-6">
+        <ActivityTimeline items={activityItems} />
+      </div>
 
       {canRestore ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 shadow-sm">

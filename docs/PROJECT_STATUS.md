@@ -59,7 +59,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.11 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.12 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
@@ -72,6 +72,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - The v0.9 update adds final launch-polish guidance for sidebar navigation groups, session/password behavior, Marketing deadline workflow, brief document links, and soft-delete/restore training notes.
 - The v0.10 update aligns the in-app Help / SOP page with role-wise rollout training: purpose, daily checklist, main pages, handoffs, avoid list, and escalation points.
 - The v0.11 update adds a lightweight Getting Started checklist for account readiness and role-specific first actions.
+- The v0.12 update adds Activity Timeline guidance for important detail pages using existing history records and audit fields.
 
 ## Final Launch Polish
 
@@ -100,6 +101,14 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - Help / SOP shows first actions for the signed-in user's primary/secondary roles.
 - Getting Started is dynamic guidance only; there is no stored onboarding table or completed-checkbox persistence.
 - The guide is training-only and does not change permissions, RLS, SQL, schema, or business workflow rules.
+
+## Activity Timelines
+
+- Farmer Lead, Dealer, Institutional Partner, Pilot, and Marketing Request detail pages show a read-only Activity Timeline where existing history data is available.
+- Timelines use existing records only, such as follow-ups, dealer reviews, institution contacts/meetings, pilot planned visits, visit reports, marketing request updates, linked dispatches/installations, and soft-delete/restore fields.
+- Actor names are shown as internal user name and role when the user is already available to the page; raw backend IDs are not shown.
+- Timelines show the latest activity first and limit long histories to the newest items.
+- No generic audit table, SQL migration, schema change, RLS change, permission change, or workflow change was added for this phase.
 
 ## Role Model
 
