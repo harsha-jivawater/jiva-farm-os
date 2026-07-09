@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.1  
+Version: v0.2  
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.2 | 09 Jul 2026 | Draft | Adds Marketing Requests module, Marketing Head and Designer role guidance, and marketing request workflow/access rules. |
 | v0.1 | 09 Jul 2026 | Draft | Initial role-based ready-reckoner covering menu access, workflows, role guides, status references, and items to confirm. |
 
 ## 2. Role Legend
@@ -37,6 +38,8 @@ Use it when:
 | Agronomist | Agronomy / technical | Pilot visibility, technical oversight, visit/report review, field guidance |
 | Research Assistant | Field research | My Visits, visit reports, pilot observations, field evidence |
 | R&D Head | R&D leadership | Pilot review, R&D approval, reports, agronomy performance |
+| Marketing Head | Marketing leadership | Review, assign, progress, and deliver Marketing Requests |
+| Designer | Marketing execution | Work assigned Marketing Requests, share draft/final links, and add comments |
 | Accounts | Finance | Payment confirmation, device/dispatch finance checks |
 | Stock / Dispatch | Customer Service Team | Devices, dispatches, operational installation support |
 | HR & Legal | Legal / compliance | Dealer and institution legal approval workflows |
@@ -64,20 +67,22 @@ Notes:
 
 ### Operations Menus
 
-| Role | Home | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Admin | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ |
-| Management | ✅ | 👁 | 👁 | 👁 | ⚠️ ✏️ | ⚠️ | 🔒 | 👁 | 👁 | 👁 | ✅ |
-| Sales Head | ✅ | ⭐ ✏️ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | ✏️ | ✏️ | 👁 | ✅ |
-| RSM | ✅ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | ✅ ⚠️ |
-| Salesperson | ✅ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 👁 ⚠️ |
-| Agronomist | ✅ | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | ⭐ ⚠️ | 👁 | 👁 | ✏️ | 👁 | ✅ |
-| Research Assistant | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | ⭐ ✏️ ⚠️ | ⭐ ✏️ | 🔒 | 🔒 | ✏️ ⚠️ | 🔒 | ✅ ⚠️ |
-| R&D Head | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | ✅ |
-| Accounts | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | ✏️ | ✅ |
-| Stock / Dispatch | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | ✅ |
-| HR & Legal | 🔒 | 🔒 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
-| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 |
+| Role | Home | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard | Marketing Requests |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Admin | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ |
+| Management | ✅ | 👁 | 👁 | 👁 | ⚠️ ✏️ | ⚠️ | 🔒 | 👁 | 👁 | 👁 | ✅ | ✅ ✏️ |
+| Sales Head | ✅ | ⭐ ✏️ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | ✏️ | ✏️ | 👁 | ✅ | ✏️ ⚠️ |
+| RSM | ✅ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | ✏️ ⚠️ |
+| Salesperson | ✅ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 👁 ⚠️ | ✏️ ⚠️ |
+| Agronomist | ✅ | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | ⭐ ⚠️ | 👁 | 👁 | ✏️ | 👁 | ✅ | ✏️ ⚠️ |
+| Research Assistant | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | ⭐ ✏️ ⚠️ | ⭐ ✏️ | 🔒 | 🔒 | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | ✏️ ⚠️ |
+| R&D Head | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | ✅ | ✏️ ⚠️ |
+| Marketing Head | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ |
+| Designer | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ |
+| Accounts | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | ✏️ | ✅ | 🔒 |
+| Stock / Dispatch | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | ✅ | 🔒 |
+| HR & Legal | 🔒 | 🔒 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
+| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 |
 
 ### Team And Utility Menus
 
@@ -91,6 +96,8 @@ Notes:
 | Agronomist | 🔒 | 🔒 | ✅ | ✅ |
 | Research Assistant | 🔒 | 🔒 | ✅ | ✅ |
 | R&D Head | 🔒 | 🔒 | ✅ | ✅ |
+| Marketing Head | 🔒 | 🔒 | ✅ | ✅ |
+| Designer | 🔒 | 🔒 | ✅ | ✅ |
 | Accounts | 🔒 | 🔒 | ✅ | ✅ |
 | Stock / Dispatch | 🔒 | 🔒 | ✅ | ✅ |
 | HR & Legal | 🔒 | 🔒 | ✅ | ✅ |
@@ -509,6 +516,87 @@ Management for strategic scale-up decisions; Admin for access/data issues.
 
 ---
 
+### Role: Marketing Head
+
+#### Daily purpose
+
+Review, assign, and control Marketing Requests through draft, correction, final link, and delivery.
+
+#### Primary menus
+
+| Menu | What Marketing Head does there | Access |
+|---|---|---|
+| Marketing Requests | Review all requests, assign owner, update workflow, share links, deliver | ⭐ ✅ ✏️ |
+
+#### Daily workflow map
+
+```mermaid
+flowchart LR
+  A["Review new request"] --> B["Accept or ask clarification"]
+  B --> C["Assign Marketing Head / Designer"]
+  C --> D["Share draft link"]
+  D --> E["Handle corrections"]
+  E --> F["Add final OneDrive link"]
+  F --> G["Mark delivered"]
+```
+
+#### Do
+
+- Keep deadline, status, assigned owner, draft link, and final OneDrive link current.
+- Use comments for clarification, corrections, and delivery notes.
+- Keep heavy design files in local drive / OneDrive, not in the app.
+
+#### Don't
+
+- Do not upload large design assets into Jiva Farm OS.
+- Do not mark delivered without a final link when one is expected.
+
+#### Escalate to
+
+Management for priority conflicts; requester for missing brief details.
+
+---
+
+### Role: Designer
+
+#### Daily purpose
+
+Work assigned Marketing Requests and share draft/final links for review.
+
+#### Primary menus
+
+| Menu | What Designer does there | Access |
+|---|---|---|
+| Marketing Requests | Create requests, view own/assigned requests, update progress and links | ⭐ ✏️ ⚠️ |
+
+#### Daily workflow map
+
+```mermaid
+flowchart LR
+  A["Open assigned request"] --> B["Review brief"]
+  B --> C["Work outside app"]
+  C --> D["Add draft link"]
+  D --> E["Handle corrections"]
+  E --> F["Add final OneDrive link"]
+```
+
+#### Do
+
+- Update progress when work moves to In Progress, Draft Shared, or Corrections Requested.
+- Add draft and final links when available.
+- Add comments when clarification is needed.
+
+#### Don't
+
+- Do not cancel or finally deliver requests unless you also have Marketing Head/Admin/Management access.
+- Do not store heavy design files inside the app.
+
+#### Escalate to
+
+Marketing Head for acceptance, cancellation, delivery, deadline changes, or priority conflicts.
+
+---
+
 ### Role: Accounts
 
 #### Daily purpose
@@ -751,6 +839,18 @@ flowchart LR
   F --> G["R&D Review"]
 ```
 
+### Marketing Request Workflow
+
+```mermaid
+flowchart LR
+  A["Request Created"] --> B["Marketing Review"]
+  B --> C["Assigned Owner"]
+  C --> D["Draft Shared"]
+  D --> E["Corrections"]
+  E --> F["Final OneDrive Link"]
+  F --> G["Delivered"]
+```
+
 ### Dispatch To Installation
 
 ```mermaid
@@ -875,6 +975,15 @@ flowchart TD
 | Used by | All operational roles except HR & Legal. |
 | Primary actions | Review KPIs; Admin/Management/Sales Head can refresh cached dashboard. |
 | Important rules | Admin/Management/Sales Head use cached company dashboard. RSM uses live scoped KPIs. Research Assistant uses live user-specific KPI counts. |
+
+### Marketing Requests
+
+| Item | Detail |
+|---|---|
+| Purpose | Track marketing briefs, deadlines, assignment, corrections, draft links, final OneDrive links, and delivery status. |
+| Used by | Admin, Management, Sales Head, RSM, Salesperson, Agronomist, Research Assistant, R&D Head, Marketing Head, Designer. |
+| Primary actions | Create request, review brief, assign owner, share draft/final links, add comments, mark delivered where allowed. |
+| Important rules | Heavy design files stay outside the app. Only the brief and optional links are stored. OneDrive link is optional until delivery. Accounts, Stock / Dispatch, HR & Legal, and Viewer do not create requests by default. |
 
 ### Regions
 

@@ -7,6 +7,7 @@ import {
   Handshake,
   LayoutDashboard,
   Package,
+  Palette,
   Store,
   Tractor,
   Truck,
@@ -99,5 +100,14 @@ export const teamItems = [
     href: "/internal-users",
     module: "internal-users" satisfies ModuleKey,
     icon: UsersRound
+  }
+] as const;
+
+export const teamWorkflowItems = [
+  {
+    label: "Marketing Requests",
+    href: "/marketing-requests",
+    module: "marketing-requests" satisfies ModuleKey,
+    icon: Palette
   }
 ] as const;

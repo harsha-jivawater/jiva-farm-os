@@ -9,6 +9,8 @@ export type UserRole =
   | "Agronomist"
   | "Research Assistant"
   | "R&D Head"
+  | "Marketing Head"
+  | "Designer"
   | "HR & Legal"
   | "Stock / Dispatch"
   | "Accounts"
@@ -26,6 +28,7 @@ export type ModuleKey =
   | "follow-ups"
   | "monitoring-devices"
   | "kpi-dashboard"
+  | "marketing-requests"
   | "internal-users"
   | "regions";
 
@@ -153,6 +156,18 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Stock / Dispatch",
     "Viewer"
   ],
+  "marketing-requests": [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "RSM",
+    "Salesperson",
+    "Agronomist",
+    "Research Assistant",
+    "R&D Head",
+    "Marketing Head",
+    "Designer"
+  ],
   "internal-users": ["Admin"],
   regions: ["Admin", "Sales Head", "Management"]
 };
@@ -195,6 +210,18 @@ const moduleWriteRoles: Record<ModuleKey, readonly UserRole[]> = {
   ],
   "monitoring-devices": ["Admin", "Accounts", "Stock / Dispatch"],
   "kpi-dashboard": [],
+  "marketing-requests": [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "RSM",
+    "Salesperson",
+    "Agronomist",
+    "Research Assistant",
+    "R&D Head",
+    "Marketing Head",
+    "Designer"
+  ],
   "internal-users": ["Admin"],
   regions: ["Admin", "Sales Head"]
 };
@@ -340,6 +367,35 @@ export function canCreateTechnicalReport(
     "Agronomist",
     "Research Assistant"
   ]);
+}
+
+export function canCreateMarketingRequest(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "RSM",
+    "Salesperson",
+    "Agronomist",
+    "Research Assistant",
+    "R&D Head",
+    "Marketing Head",
+    "Designer"
+  ]);
+}
+
+export function canManageMarketingRequests(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, ["Admin", "Management", "Marketing Head"]);
+}
+
+export function canWorkOnAssignedMarketingRequest(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, ["Designer", "Marketing Head", "Admin", "Management"]);
 }
 
 export function canSeeAllRecords(user: RoleCapableUser) {

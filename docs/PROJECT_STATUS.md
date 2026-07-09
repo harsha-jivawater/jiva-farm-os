@@ -13,6 +13,8 @@
 
 Jiva Farm OS is the production operating system for Jiva Water's farmer sales, dealer network, institutional partner, pilot, device, dispatch, installation, follow-up, internal user, regional, and KPI workflows.
 
+Marketing Requests has been added as a SQL-dependent Team Workflows module for internal creative requests. Apply the Marketing Requests migration in Supabase before deploying code that uses the module.
+
 ## Deployment State
 
 - GitHub `main` deploys to Vercel production.
@@ -41,6 +43,7 @@ Jiva Farm OS is the production operating system for Jiva Water's farmer sales, d
 - Installations
 - Post-installation Follow-ups
 - KPI Dashboard
+- Marketing Requests
 - Regions
 - Internal Users
 - Help/SOP
@@ -51,10 +54,10 @@ Jiva Farm OS is the production operating system for Jiva Water's farmer sales, d
 
 ## Documentation Updates
 
-- Role-based usage manual created as v0.1 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.2 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
-- This update is documentation-only.
+- The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
 
 ## Role Model
 
@@ -68,6 +71,8 @@ Current roles:
 - Agronomist
 - Research Assistant
 - R&D Head
+- Marketing Head
+- Designer
 - Accounts
 - Stock / Dispatch, shown in the UI as Customer Service Team
 - HR & Legal
@@ -81,6 +86,19 @@ Role notes:
 - Agronomist is not region-specific; Agronomist has all permitted read scope for relevant agronomy and operations modules.
 - Device Installed and pilot workflow transitions are controlled by backend/server actions and RLS.
 - Do not implement role changes only in the UI; server actions and RLS must remain aligned.
+
+## Marketing Requests Workflow
+
+- Marketing Requests lives under the Team Workflows sidebar group.
+- The module tracks creative requests for flyers, standees, brochures, presentations, social media creatives, and other lightweight marketing needs.
+- The app stores request briefs, assignment, deadline, comments/corrections, optional reference links, draft links, and final OneDrive links.
+- Heavy design files stay outside Jiva Farm OS in local drive / OneDrive.
+- Create access is allowed for Admin, Management, Sales Head, RSM, Salesperson, Agronomist, Research Assistant, R&D Head, Marketing Head, and Designer.
+- Accounts, Stock / Dispatch, HR & Legal, and Viewer do not see/create Marketing Requests by default unless a future secondary-role decision explicitly grants access.
+- Admin, Management, and Marketing Head can manage all requests.
+- Designers can work assigned requests and update progress/draft/final links.
+- Requesters can edit core brief details only while the request is `Requested` or `Needs Clarification`; after that they add comments/corrections.
+- No seed/demo/test data was added for this module.
 
 ## Farmer Leads Workflow
 
