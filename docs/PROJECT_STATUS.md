@@ -46,6 +46,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - Installations
 - Post-installation Follow-ups
 - KPI Dashboard
+- System Health
 - Data Quality
 - Marketing Requests
 - Regions
@@ -58,7 +59,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.7 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.8 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
@@ -67,6 +68,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - The v0.5 update adds soft-delete audit trail and Admin-only restore guidance for Dealers, Institutional Partners, and Pilots.
 - The v0.6 update adds My Pending Work guidance for live role-scoped action lists.
 - The v0.7 update adds Admin/Management Data Quality warning guidance.
+- The v0.8 update adds Admin/Management System Health guidance for operational risk and process bottlenecks.
 
 ## Role Model
 
@@ -146,6 +148,18 @@ Role notes:
 - It does not block user workflows, merge records, delete records, or create cleanup actions.
 - It groups warnings into duplicate farmer leads, duplicate dealers, duplicate institutions, missing assignments, dispatch readiness, pilot setup, and marketing workflow checks.
 - It scans a bounded live set and shows the first 50 warnings per group to protect page performance.
+
+## System Health
+
+- System Health is available at `/system-health`.
+- It is visible only to Admin and Management.
+- It is a live read-only operational risk page built from existing records.
+- It is separate from Data Quality:
+  - Data Quality focuses on duplicate, incomplete, and cleanup warnings.
+  - System Health focuses on process bottlenecks, aging handoffs, stale KPI cache signals, and operational risk.
+- It does not add SQL, schema, RLS changes, stored alert tables, hard constraints, or email notifications.
+- It groups checks into KPI Refresh, Dispatch & Installation, Pilots & Visits, Marketing, and Deleted Records.
+- It scans a bounded live set and shows the first 50 health items per section to protect page performance.
 
 ## Farmer Leads Workflow
 

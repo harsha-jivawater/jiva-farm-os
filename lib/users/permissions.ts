@@ -20,6 +20,7 @@ export type ModuleKey =
   | "dashboard"
   | "my-pending-work"
   | "data-quality"
+  | "system-health"
   | "farmer-leads"
   | "devices"
   | "dispatches"
@@ -65,6 +66,7 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Viewer"
   ],
   "data-quality": ["Admin", "Management"],
+  "system-health": ["Admin", "Management"],
   "farmer-leads": [
     "Admin",
     "Management",
@@ -195,6 +197,7 @@ const moduleWriteRoles: Record<ModuleKey, readonly UserRole[]> = {
   dashboard: [],
   "my-pending-work": [],
   "data-quality": [],
+  "system-health": [],
   "farmer-leads": [
     "Admin",
     "Sales Head",

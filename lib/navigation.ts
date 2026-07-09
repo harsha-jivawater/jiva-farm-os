@@ -10,6 +10,7 @@ import {
   Package,
   Palette,
   ShieldAlert,
+  Stethoscope,
   Store,
   Tractor,
   Truck,
@@ -112,6 +113,12 @@ export const teamItems = [
 ] as const;
 
 export const teamWorkflowItems = [
+  {
+    label: "System Health",
+    href: "/system-health",
+    module: "system-health" satisfies ModuleKey,
+    icon: Stethoscope
+  },
   {
     label: "Data Quality",
     href: "/data-quality",

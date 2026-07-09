@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.7
+Version: v0.8
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.8 | 09 Jul 2026 | Draft | Adds Admin/Management System Health for KPI cache, dispatch aging, installation aging, pilot visit risk, marketing risk, and deleted-record visibility. |
 | v0.7 | 09 Jul 2026 | Draft | Adds Admin/Management Data Quality warnings for duplicate, incomplete, dispatch-readiness, pilot setup, and marketing workflow review. |
 | v0.6 | 09 Jul 2026 | Draft | Adds My Pending Work as a live role-scoped action list for Sales, Dispatch, Pilots & Visits, and Marketing. |
 | v0.5 | 09 Jul 2026 | Draft | Adds soft-delete audit trail, delete reason capture, Admin-only deleted-record views, and restore guidance for Dealers, Institutional Partners, and Pilots. |
@@ -72,22 +73,22 @@ Notes:
 
 ### Operations Menus
 
-| Role | Home | My Pending Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard | Data Quality | Marketing Requests |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Admin | ✅ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ | ✅ ✏️ |
-| Management | ✅ | ✅ | 👁 | 👁 | 👁 | ⚠️ ✏️ | ⚠️ | 🔒 | 👁 | 👁 | 👁 | ✅ | ✅ | ✅ ✏️ |
-| Sales Head | ✅ | ✅ | ⭐ ✏️ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | ✏️ | ✏️ | 👁 | ✅ | 🔒 | ✏️ ⚠️ |
-| RSM | ✅ | ✅ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | 🔒 | ✏️ ⚠️ |
-| Salesperson | ✅ | ✅ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 👁 ⚠️ | 🔒 | ✏️ ⚠️ |
-| Agronomist | ✅ | ✅ | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | ⭐ ⚠️ | 👁 | 👁 | ✏️ | 👁 | ✅ | 🔒 | ✏️ ⚠️ |
-| Research Assistant | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | ⭐ ✏️ ⚠️ | ⭐ ✏️ | 🔒 | 🔒 | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | 🔒 | ✏️ ⚠️ |
-| R&D Head | ✅ | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | ✅ | 🔒 | ✏️ ⚠️ |
-| Marketing Head | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ |
-| Designer | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ |
-| Accounts | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | ✏️ | ✅ | 🔒 | 🔒 |
-| Stock / Dispatch | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | ✅ | 🔒 | 🔒 |
-| HR & Legal | 🔒 | ✅ | 🔒 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
-| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 |
+| Role | Home | My Pending Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard | System Health | Data Quality | Marketing Requests |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Admin | ✅ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ | ✅ | ✅ ✏️ |
+| Management | ✅ | ✅ | 👁 | 👁 | 👁 | ⚠️ ✏️ | ⚠️ | 🔒 | 👁 | 👁 | 👁 | ✅ | ✅ | ✅ | ✅ ✏️ |
+| Sales Head | ✅ | ✅ | ⭐ ✏️ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | ✏️ | ✏️ | 👁 | ✅ | 🔒 | 🔒 | ✏️ ⚠️ |
+| RSM | ✅ | ✅ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | 🔒 | 🔒 | ✏️ ⚠️ |
+| Salesperson | ✅ | ✅ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 👁 ⚠️ | 🔒 | 🔒 | ✏️ ⚠️ |
+| Agronomist | ✅ | ✅ | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | ⭐ ⚠️ | 👁 | 👁 | ✏️ | 👁 | ✅ | 🔒 | 🔒 | ✏️ ⚠️ |
+| Research Assistant | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | ⭐ ✏️ ⚠️ | ⭐ ✏️ | 🔒 | 🔒 | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | 🔒 | 🔒 | ✏️ ⚠️ |
+| R&D Head | ✅ | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | ✅ | 🔒 | 🔒 | ✏️ ⚠️ |
+| Marketing Head | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ |
+| Designer | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ |
+| Accounts | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | ✏️ | ✅ | 🔒 | 🔒 | 🔒 |
+| Stock / Dispatch | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | ✅ | 🔒 | 🔒 | 🔒 |
+| HR & Legal | 🔒 | ✅ | 🔒 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
+| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 | 🔒 |
 
 ### Team And Utility Menus
 
@@ -899,6 +900,23 @@ Rules:
 - It does not merge, delete, or modify records.
 - It checks duplicates, missing assignments, dispatch readiness, pilot setup, and marketing workflow completeness.
 
+### System Health Review
+
+```mermaid
+flowchart LR
+  A["Open System Health"] --> B["Review operational risk sections"]
+  B --> C["Open source record"]
+  C --> D["Unblock the process in the source module"]
+  D --> E["Health item clears when the bottleneck is resolved"]
+```
+
+Rules:
+
+- System Health is visible to Admin and Management only.
+- It is read-only and does not change source records.
+- It focuses on process bottlenecks: KPI cache, dispatch aging, installation aging, pilot/visit risk, marketing risk, and deleted-record visibility.
+- It is separate from Data Quality, which focuses on duplicate and incomplete records.
+
 ### Dispatch To Installation
 
 ```mermaid
@@ -989,6 +1007,15 @@ flowchart TD
 | Used by | Admin and Management. |
 | Primary actions | Review warnings, open the source record, and correct through the normal module workflow. |
 | Important rules | Warnings only. No hard constraints, no merge/delete actions, no workflow blocking, and no SQL/RLS changes. |
+
+### System Health
+
+| Item | Detail |
+|---|---|
+| Purpose | Monitor operational risk, process bottlenecks, stale KPI/cache signals, aging handoffs, and deleted-record visibility. |
+| Used by | Admin and Management. |
+| Primary actions | Review health sections, open source records, and unblock work in the source module. |
+| Important rules | Read-only. No cleanup buttons, no workflow blocking, no stored alert table, and no SQL/RLS changes. |
 
 ### Farmer Leads
 
