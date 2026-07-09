@@ -20,7 +20,8 @@ import {
   canApproveLegalDocuments,
   canEditDealerProfile,
   canSoftDeleteDealer,
-  hasRole
+  hasRole,
+  isAdmin
 } from "@/lib/users/permissions";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -307,10 +308,11 @@ export async function updateDealerReviewAction(id: string, formData: FormData) {
   redirect(`/dealers/${id}?review_saved=1`);
 }
 
-export async function deleteDealerAction(id: string) {
+export async function deleteDealerAction(id: string, formData: FormData) {
   const supabase = await createClient();
   const errorPath = `/dealers/${id}`;
   const profile = await getCurrentProfile(supabase, errorPath);
+  const deletionReason = textValue(formData, "deletion_reason");
 
   if (!canSoftDeleteDealer(profile)) {
     redirectWithError(
@@ -319,9 +321,17 @@ export async function deleteDealerAction(id: string) {
     );
   }
 
+  if (!deletionReason) {
+    redirectWithError(errorPath, "Add a delete reason before deleting this dealer.");
+  }
+
   const { error } = await supabase
     .from("dealers")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by_user_id: profile.id,
+      deletion_reason: deletionReason
+    })
     .eq("id", id)
     .is("deleted_at", null);
 
@@ -332,6 +342,34 @@ export async function deleteDealerAction(id: string) {
   revalidatePath("/dealers");
   revalidatePath(`/dealers/${id}`);
   redirect("/dealers?deleted=1");
+}
+
+export async function restoreDealerAction(id: string) {
+  const supabase = await createClient();
+  const errorPath = `/dealers/${id}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (!isAdmin(profile)) {
+    redirectWithError(errorPath, "Only Admin can restore deleted dealer profiles.");
+  }
+
+  const { error } = await supabase
+    .from("dealers")
+    .update({
+      deleted_at: null,
+      restored_at: new Date().toISOString(),
+      restored_by_user_id: profile.id
+    })
+    .eq("id", id)
+    .not("deleted_at", "is", null);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  revalidatePath("/dealers");
+  revalidatePath(`/dealers/${id}`);
+  redirect(`/dealers/${id}?restored=1`);
 }
 
 export async function createDealerInstitutionLinkAction(

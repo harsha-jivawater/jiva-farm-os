@@ -7,9 +7,11 @@ import {
   createVisitReportAction,
   deletePilotAction,
   generatePilotVisitScheduleAction,
+  restorePilotAction,
   updatePlannedPilotVisitAction
 } from "@/app/(app)/pilots/actions";
 import { DeleteRecordButton } from "@/components/delete-record-button";
+import { formatDisplayDateTime } from "@/lib/date-utils";
 import { PageHeader } from "@/components/page-header";
 import { PlannedVisitForm } from "@/components/pilots/planned-visit-form";
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
@@ -48,7 +50,8 @@ import { labelForRole } from "@/lib/users/options";
 import {
   canSoftDeletePilot,
   canWriteModule,
-  hasAnyRole
+  hasAnyRole,
+  isAdmin
 } from "@/lib/users/permissions";
 import { pilotScope } from "@/lib/users/record-scope";
 
@@ -60,6 +63,7 @@ type PilotDetailPageProps = {
     error?: string;
     planned_visit_id?: string;
     pilot_visit_id?: string;
+    restored?: string;
   }>;
 };
 
@@ -217,20 +221,24 @@ export default async function PilotDetailPage({
   const query = await searchParams;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/pilots");
-  const canWrite = canWriteModule(currentUser, "pilots");
-  const canCreateDispatch = canWriteModule(currentUser, "dispatches");
-  const canDelete = canSoftDeletePilot(currentUser);
-  const canManageVisitPlans = hasAnyRole(currentUser, [
+  const canWriteActive = canWriteModule(currentUser, "pilots");
+  const canCreateDispatchActive = canWriteModule(currentUser, "dispatches");
+  const canDeleteActive = canSoftDeletePilot(currentUser);
+  const canManageVisitPlansActive = hasAnyRole(currentUser, [
     "Admin",
     "R&D Head",
     "Agronomist"
   ]);
+  const canViewDeletedRecords = isAdmin(currentUser);
   const scope = await pilotScope(supabase, currentUser);
   let pilotQuery = supabase
     .from("pilots")
     .select("*")
-    .eq("id", id)
-    .is("deleted_at", null);
+    .eq("id", id);
+
+  if (!canViewDeletedRecords) {
+    pilotQuery = pilotQuery.is("deleted_at", null);
+  }
 
   if (scope.noRecords) {
     pilotQuery = pilotQuery.is("id", null);
@@ -247,6 +255,12 @@ export default async function PilotDetailPage({
   }
 
   const pilot = data as Pilot;
+  const isDeleted = Boolean(pilot.deleted_at);
+  const canWrite = canWriteActive && !isDeleted;
+  const canCreateDispatch = canCreateDispatchActive && !isDeleted;
+  const canDelete = canDeleteActive && !isDeleted;
+  const canRestore = canViewDeletedRecords && isDeleted;
+  const canManageVisitPlans = canManageVisitPlansActive && !isDeleted;
   const [
     { data: users },
     { data: institutions },
@@ -345,6 +359,7 @@ export default async function PilotDetailPage({
     )
   );
   const deleteAction = deletePilotAction.bind(null, pilot.id);
+  const restoreAction = restorePilotAction.bind(null, pilot.id);
   const visitPhotoUrls = new Map<string, string | null>(
     await Promise.all(
       visitsList.map(async (visit) => [
@@ -362,6 +377,9 @@ export default async function PilotDetailPage({
     )
   );
   const userMap = new Map(usersList.map((user) => [user.id, user]));
+  const deletedBy = pilot.deleted_by_user_id
+    ? userMap.get(pilot.deleted_by_user_id)
+    : null;
   const institutionMap = new Map(
     institutionsList.map((institution) => [institution.id, institution])
   );
@@ -691,6 +709,33 @@ export default async function PilotDetailPage({
       {query.error ? (
         <div className="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
           {query.error}
+        </div>
+      ) : null}
+
+      {query.restored ? (
+        <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
+          Pilot restored to active records.
+        </div>
+      ) : null}
+
+      {isDeleted ? (
+        <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          <p className="font-semibold">Deleted record</p>
+          <p>
+            This pilot was deleted on {formatDisplayDateTime(pilot.deleted_at)} by{" "}
+            {deletedBy ? userLabel(deletedBy) : display(pilot.deleted_by_user_id)}.
+          </p>
+          {pilot.deletion_reason ? (
+            <p className="mt-1">
+              <span className="font-semibold">Reason:</span>{" "}
+              {pilot.deletion_reason}
+            </p>
+          ) : null}
+          {pilot.restored_at ? (
+            <p className="mt-1 text-xs">
+              Last restored {formatDisplayDateTime(pilot.restored_at)}.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -1663,6 +1708,30 @@ export default async function PilotDetailPage({
           />
         </div>
       </SectionCard>
+
+      {canRestore ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-emerald-950">
+                Restore Pilot
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-emerald-700">
+                Restore this pilot to active records. Visit plans, reports, and
+                linked context remain preserved.
+              </p>
+            </div>
+            <form action={restoreAction}>
+              <button
+                className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 sm:w-auto"
+                type="submit"
+              >
+                Restore Pilot
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {canDelete ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 shadow-sm">

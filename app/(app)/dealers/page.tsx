@@ -47,11 +47,17 @@ import {
   type DealerPerformanceInstallation
 } from "@/lib/dealers/performance";
 import { applyLocationFilter } from "@/lib/filters/location";
+import { formatDisplayDateTime } from "@/lib/date-utils";
 import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canCreateDealer, canWriteModule, hasRole } from "@/lib/users/permissions";
+import {
+  canCreateDealer,
+  canWriteModule,
+  hasRole,
+  isAdmin
+} from "@/lib/users/permissions";
 import { dealerScope } from "@/lib/users/record-scope";
 import {
   DISTRICTS_BY_STATE,
@@ -91,7 +97,9 @@ const listSelectColumns = [
   "monthly_installation_target",
   "next_action_date",
   "next_dealer_review_date",
-  "support_required"
+  "support_required",
+  "deleted_at",
+  "deletion_reason"
 ].join(",");
 
 function paramValue(value: string | string[] | undefined) {
@@ -201,7 +209,7 @@ function ActionButtons({
       >
         <Eye className="h-4 w-4" aria-hidden="true" />
       </Link>
-      {canWrite ? (
+      {canWrite && !dealer.deleted_at ? (
         <Link
           aria-label={`Edit ${dealerPrimaryName(dealer)}`}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -222,6 +230,11 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
   const currentUser = await getCurrentInternalUser(supabase, "/dealers");
   const canWrite = canWriteModule(currentUser, "dealers");
   const canCreate = canCreateDealer(currentUser);
+  const canViewDeletedRecords = isAdmin(currentUser);
+  const recordState =
+    canViewDeletedRecords && paramValue(params.record_state) === "deleted"
+      ? "deleted"
+      : "active";
   const scope = await dealerScope(supabase, currentUser);
   const cleanedSearch = searchValue(filters.q);
   const districtOptions =
@@ -248,9 +261,13 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
   let query = supabase
     .from("dealers")
     .select(listSelectColumns, { count: "exact" })
-    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(50);
+
+  query =
+    recordState === "deleted"
+      ? query.not("deleted_at", "is", null)
+      : query.is("deleted_at", null);
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -428,7 +445,15 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {recordState === "deleted" ? (
+        <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+          Showing deleted dealer records. These records are hidden from active
+          views and can be restored by Admin from the detail page.
+        </div>
+      ) : null}
+
+      {recordState === "active" ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard icon={Store} label="Total Dealers" value={dealerRows.length} />
         <KpiCard
           icon={CheckCircle2}
@@ -461,7 +486,8 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
           label="Issue reported installations"
           value={issueReportedInstallationCount}
         />
-      </div>
+        </div>
+      ) : null}
 
       <LiveFilterForm
         className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
@@ -658,6 +684,22 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
               ))}
             </select>
           </label>
+
+          {canViewDeletedRecords ? (
+            <label>
+              <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                Records
+              </span>
+              <select
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                defaultValue={recordState}
+                name="record_state"
+              >
+                <option value="active">Active records</option>
+                <option value="deleted">Deleted records</option>
+              </select>
+            </label>
+          ) : null}
         </div>
 
         <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -718,6 +760,11 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
                         <p className="mt-1 text-xs text-slate-500">
                           {dealer.contact_number}
                         </p>
+                        {dealer.deleted_at ? (
+                          <p className="mt-1 text-xs font-medium text-amber-700">
+                            Deleted {formatDisplayDateTime(dealer.deleted_at)}
+                          </p>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {labelFor(dealer.dealer_type, dealerTypeOptions)}
@@ -804,6 +851,14 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
                         {dealer.priority}
                       </dd>
                     </div>
+                    {dealer.deleted_at ? (
+                      <div className="col-span-2">
+                        <dt className="text-slate-400">Deleted</dt>
+                        <dd className="mt-1 font-medium text-amber-700">
+                          {formatDisplayDateTime(dealer.deleted_at)}
+                        </dd>
+                      </div>
+                    ) : null}
                   </dl>
                   <div className="mt-4">
                     <ActionButtons canWrite={canWrite} dealer={dealer} />

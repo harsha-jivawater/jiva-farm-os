@@ -18,6 +18,7 @@ import {
 import { InstitutionStatusPill } from "@/components/institutions/institution-status-pill";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PageHeader } from "@/components/page-header";
+import { formatDisplayDateTime } from "@/lib/date-utils";
 import {
   institutionStatusOptions,
   labelFor,
@@ -38,7 +39,11 @@ import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canManageInstitutionProfile, hasRole } from "@/lib/users/permissions";
+import {
+  canManageInstitutionProfile,
+  hasRole,
+  isAdmin
+} from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
 import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
@@ -82,7 +87,9 @@ const listSelectColumns = [
   "rd_head_user_id",
   "priority",
   "next_action_date",
-  "scale_up_status"
+  "scale_up_status",
+  "deleted_at",
+  "deletion_reason"
 ].join(",");
 
 const defaultKpis: InstitutionKpis = {
@@ -236,6 +243,11 @@ export default async function InstitutionalPartnersPage({
     supabase,
     "/institutional-partners"
   );
+  const canViewDeletedRecords = isAdmin(currentUser);
+  const recordState =
+    canViewDeletedRecords && paramValue(params.record_state) === "deleted"
+      ? "deleted"
+      : "active";
   const { canWrite, scope } = await timeAsync(
     "institutional partners role/permission resolution",
     async () => ({
@@ -275,9 +287,13 @@ export default async function InstitutionalPartnersPage({
   let query = supabase
     .from("institutions")
     .select(listSelectColumns, { count: "exact" })
-    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(50);
+
+  query =
+    recordState === "deleted"
+      ? query.not("deleted_at", "is", null)
+      : query.is("deleted_at", null);
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -360,6 +376,15 @@ export default async function InstitutionalPartnersPage({
         </div>
       ) : null}
 
+      {recordState === "deleted" ? (
+        <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+          Showing deleted institutional partner records. These records are
+          hidden from active views and can be restored by Admin from the detail
+          page.
+        </div>
+      ) : null}
+
+      {recordState === "active" ? (
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard icon={Building2} label="Total Institutions" value={kpis.total} />
         <KpiCard
@@ -390,6 +415,7 @@ export default async function InstitutionalPartnersPage({
         />
         <KpiCard icon={XCircle} label="Parked / Lost" value={kpis.parkedLost} />
       </div>
+      ) : null}
 
       <LiveFilterForm
         className="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
@@ -524,6 +550,16 @@ export default async function InstitutionalPartnersPage({
               </option>
             ))}
           </select>
+          {canViewDeletedRecords ? (
+            <select
+              className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+              defaultValue={recordState}
+              name="record_state"
+            >
+              <option value="active">Active records</option>
+              <option value="deleted">Deleted records</option>
+            </select>
+          ) : null}
         </div>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Link
@@ -585,6 +621,11 @@ export default async function InstitutionalPartnersPage({
                       <p className="mt-1 text-xs text-slate-500">
                         {institution.institution_code}
                       </p>
+                      {institution.deleted_at ? (
+                        <p className="mt-1 text-xs font-medium text-amber-700">
+                          Deleted {formatDisplayDateTime(institution.deleted_at)}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-slate-700">
                       {labelFor(
@@ -630,7 +671,7 @@ export default async function InstitutionalPartnersPage({
                     </td>
                     <td className="px-4 py-3">
                       <ActionButtons
-                        canWrite={canWrite}
+                        canWrite={canWrite && !institution.deleted_at}
                         institution={institution}
                       />
                     </td>

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
 import {
   deleteDealerAction,
+  restoreDealerAction,
   updateDealerReviewAction
 } from "@/app/(app)/dealers/actions";
 import { DeleteRecordButton } from "@/components/delete-record-button";
@@ -54,7 +55,8 @@ import {
   canSoftDeleteDealer,
   canViewModule,
   canWriteModule,
-  hasRole
+  hasRole,
+  isAdmin
 } from "@/lib/users/permissions";
 import { dealerScope } from "@/lib/users/record-scope";
 
@@ -63,6 +65,8 @@ type DealerDetailPageProps = {
     id: string;
   }>;
   searchParams: Promise<{
+    error?: string;
+    restored?: string;
     review_error?: string;
     review_saved?: string;
   }>;
@@ -321,20 +325,24 @@ export default async function DealerDetailPage({
   searchParams
 }: DealerDetailPageProps) {
   const { id } = await params;
-  const { review_error: reviewError, review_saved: reviewSaved } =
-    await searchParams;
+  const query = await searchParams;
+  const { review_error: reviewError, review_saved: reviewSaved } = query;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dealers");
-  const canWrite = canWriteModule(currentUser, "dealers");
-  const canDelete = canSoftDeleteDealer(currentUser);
+  const canWriteActive = canWriteModule(currentUser, "dealers");
+  const canDeleteActive = canSoftDeleteDealer(currentUser);
+  const canViewDeletedRecords = isAdmin(currentUser);
   const canViewDispatches = canViewModule(currentUser, "dispatches");
   const canViewInstallations = canViewModule(currentUser, "installations");
   const scope = await dealerScope(supabase, currentUser);
   let dealerQuery = supabase
     .from("dealers")
     .select("*")
-    .eq("id", id)
-    .is("deleted_at", null);
+    .eq("id", id);
+
+  if (!canViewDeletedRecords) {
+    dealerQuery = dealerQuery.is("deleted_at", null);
+  }
 
   if (scope.noRecords) {
     dealerQuery = dealerQuery.is("id", null);
@@ -351,6 +359,10 @@ export default async function DealerDetailPage({
   }
 
   const dealer = data as Dealer;
+  const isDeleted = Boolean(dealer.deleted_at);
+  const canWrite = canWriteActive && !isDeleted;
+  const canDelete = canDeleteActive && !isDeleted;
+  const canRestore = canViewDeletedRecords && isDeleted;
   const dealerPrimaryName = dealer.firm_name || dealer.dealer_name;
   const [agreementUrl, documentsUrl, trainingUrl] = await Promise.all([
     resolveFileUrl(supabase, dealer.agreement_link),
@@ -582,15 +594,21 @@ export default async function DealerDetailPage({
     trainingUrl
   });
   const canManageInstitutionConnections =
-    hasRole(currentUser, "Admin") ||
-    hasRole(currentUser, "Sales Head") ||
-    hasRole(currentUser, "RSM");
+    !isDeleted &&
+    (hasRole(currentUser, "Admin") ||
+      hasRole(currentUser, "Sales Head") ||
+      hasRole(currentUser, "RSM"));
   const canSaveDealerReview =
-    hasRole(currentUser, "Admin") ||
-    hasRole(currentUser, "Sales Head") ||
-    hasRole(currentUser, "RSM");
+    !isDeleted &&
+    (hasRole(currentUser, "Admin") ||
+      hasRole(currentUser, "Sales Head") ||
+      hasRole(currentUser, "RSM"));
   const saveReviewAction = updateDealerReviewAction.bind(null, dealer.id);
   const deleteAction = deleteDealerAction.bind(null, dealer.id);
+  const restoreAction = restoreDealerAction.bind(null, dealer.id);
+  const deletedBy = dealer.deleted_by_user_id
+    ? userMap.get(dealer.deleted_by_user_id)
+    : null;
   const editDealerAction = canWrite ? (
     <Link
       className="font-semibold text-brand-700 hover:text-brand-800"
@@ -645,6 +663,39 @@ export default async function DealerDetailPage({
           ) : null}
         </div>
       </div>
+
+      {query.error ? (
+        <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+          {query.error}
+        </div>
+      ) : null}
+
+      {query.restored ? (
+        <div className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
+          Dealer restored to active records.
+        </div>
+      ) : null}
+
+      {isDeleted ? (
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          <p className="font-semibold">Deleted record</p>
+          <p>
+            This dealer was deleted on {formatDisplayDateTime(dealer.deleted_at)} by{" "}
+            {deletedBy ? reviewerDisplay(deletedBy) : display(dealer.deleted_by_user_id)}.
+          </p>
+          {dealer.deletion_reason ? (
+            <p className="mt-1">
+              <span className="font-semibold">Reason:</span>{" "}
+              {dealer.deletion_reason}
+            </p>
+          ) : null}
+          {dealer.restored_at ? (
+            <p className="mt-1 text-xs">
+              Last restored {formatDisplayDateTime(dealer.restored_at)}.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mb-5 flex items-center gap-3">
         <DealerStatusPill status={dealer.dealer_status} />
@@ -1440,6 +1491,30 @@ export default async function DealerDetailPage({
           </CompactEmpty>
         )}
       </div>
+
+      {canRestore ? (
+        <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-emerald-950">
+                Restore Dealer
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-emerald-700">
+                Restore this dealer to active records. Linked history remains
+                preserved.
+              </p>
+            </div>
+            <form action={restoreAction}>
+              <button
+                className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 sm:w-auto"
+                type="submit"
+              >
+                Restore Dealer
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {canDelete ? (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 shadow-sm">

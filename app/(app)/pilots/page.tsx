@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/page-header";
 import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
+import { formatDisplayDateTime } from "@/lib/date-utils";
 import {
   cropOptions,
   labelFor,
@@ -42,7 +43,7 @@ import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canWriteModule } from "@/lib/users/permissions";
+import { canWriteModule, isAdmin } from "@/lib/users/permissions";
 import { pilotScope } from "@/lib/users/record-scope";
 import {
   DISTRICTS_BY_STATE,
@@ -94,7 +95,9 @@ const listSelectColumns = [
   "state",
   "research_assistant_user_id",
   "next_visit_due_date",
-  "scale_up_recommended"
+  "scale_up_recommended",
+  "deleted_at",
+  "deletion_reason"
 ].join(",");
 
 const defaultKpis: PilotKpis = {
@@ -258,6 +261,11 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   const cleanedSearch = searchValue(filters.q);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/pilots");
+  const canViewDeletedRecords = isAdmin(currentUser);
+  const recordState =
+    canViewDeletedRecords && paramValue(params.record_state) === "deleted"
+      ? "deleted"
+      : "active";
   const { canWrite, scope } = await timeAsync(
     "pilots role/permission resolution",
     async () => ({
@@ -327,9 +335,13 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   let query = supabase
     .from("pilots")
     .select(listSelectColumns, { count: "exact" })
-    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(50);
+
+  query =
+    recordState === "deleted"
+      ? query.not("deleted_at", "is", null)
+      : query.is("deleted_at", null);
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -490,6 +502,14 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
         </div>
       ) : null}
 
+      {recordState === "deleted" ? (
+        <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+          Showing deleted pilot records. These records are hidden from active
+          views and can be restored by Admin from the detail page.
+        </div>
+      ) : null}
+
+      {recordState === "active" ? (
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard icon={Microscope} label="Total Pilots" value={kpis.total} />
         <KpiCard icon={ClipboardList} label="Active Pilots" value={kpis.active} />
@@ -552,6 +572,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
           value={plannedCompletedError ? 0 : (plannedCompletedCount ?? 0)}
         />
       </div>
+      ) : null}
 
       <LiveFilterForm
         className="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
@@ -628,6 +649,16 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
             <option value="true">Scale-up recommended</option>
             <option value="false">Not recommended</option>
           </select>
+          {canViewDeletedRecords ? (
+            <select
+              className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
+              defaultValue={recordState}
+              name="record_state"
+            >
+              <option value="active">Active records</option>
+              <option value="deleted">Deleted records</option>
+            </select>
+          ) : null}
         </div>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Link
@@ -681,6 +712,11 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
                     <p className="mt-1 text-xs text-slate-500">
                       {pilot.pilot_name}
                     </p>
+                    {pilot.deleted_at ? (
+                      <p className="mt-1 text-xs font-medium text-amber-700">
+                        Deleted {formatDisplayDateTime(pilot.deleted_at)}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-slate-700">{pilot.pilot_type}</td>
                   <td className="px-4 py-3">
@@ -727,7 +763,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
                     {pilot.scale_up_recommended ? "Yes" : "No"}
                   </td>
                   <td className="px-4 py-3">
-                    <ActionButtons canWrite={canWrite} pilot={pilot} />
+                    <ActionButtons canWrite={canWrite && !pilot.deleted_at} pilot={pilot} />
                   </td>
                 </tr>
               ))}

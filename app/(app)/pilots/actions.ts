@@ -50,7 +50,7 @@ import type {
 } from "@/lib/pilots/types";
 import { createClient } from "@/lib/supabase/server";
 import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
-import { canSoftDeletePilot, hasAnyRole } from "@/lib/users/permissions";
+import { canSoftDeletePilot, hasAnyRole, isAdmin } from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import type { InternalUser } from "@/lib/users/types";
 
@@ -98,10 +98,16 @@ async function getCurrentProfile(supabase: SupabaseClient, errorPath: string) {
   return requireModuleWriteAccess(supabase, errorPath, "pilots");
 }
 
-export async function deletePilotAction(id: string) {
+function textValue(formData: FormData, key: string) {
+  const value = String(formData.get(key) ?? "").trim();
+  return value || null;
+}
+
+export async function deletePilotAction(id: string, formData: FormData) {
   const supabase = await createClient();
   const errorPath = `/pilots/${id}`;
   const profile = await getCurrentProfile(supabase, errorPath);
+  const deletionReason = textValue(formData, "deletion_reason");
 
   if (!canSoftDeletePilot(profile)) {
     redirectWithError(
@@ -110,9 +116,17 @@ export async function deletePilotAction(id: string) {
     );
   }
 
+  if (!deletionReason) {
+    redirectWithError(errorPath, "Add a delete reason before deleting this pilot.");
+  }
+
   const { error } = await supabase
     .from("pilots")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by_user_id: profile.id,
+      deletion_reason: deletionReason
+    })
     .eq("id", id)
     .is("deleted_at", null);
 
@@ -123,6 +137,34 @@ export async function deletePilotAction(id: string) {
   revalidatePath("/pilots");
   revalidatePath(`/pilots/${id}`);
   redirect("/pilots?deleted=1");
+}
+
+export async function restorePilotAction(id: string) {
+  const supabase = await createClient();
+  const errorPath = `/pilots/${id}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (!isAdmin(profile)) {
+    redirectWithError(errorPath, "Only Admin can restore deleted pilots.");
+  }
+
+  const { error } = await supabase
+    .from("pilots")
+    .update({
+      deleted_at: null,
+      restored_at: new Date().toISOString(),
+      restored_by_user_id: profile.id
+    })
+    .eq("id", id)
+    .not("deleted_at", "is", null);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  revalidatePath("/pilots");
+  revalidatePath(`/pilots/${id}`);
+  redirect(`/pilots/${id}?restored=1`);
 }
 
 async function userHasRole(

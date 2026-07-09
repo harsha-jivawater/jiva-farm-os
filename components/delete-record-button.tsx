@@ -4,10 +4,12 @@ import { useFormStatus } from "react-dom";
 import { Trash2 } from "lucide-react";
 
 type DeleteRecordButtonProps = {
-  action: () => void | Promise<void>;
+  action: (formData: FormData) => void | Promise<void>;
   confirmMessage: string;
   label: string;
   pendingLabel?: string;
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
 };
 
 function SubmitButton({
@@ -32,10 +34,13 @@ export function DeleteRecordButton({
   action,
   confirmMessage,
   label,
-  pendingLabel
+  pendingLabel,
+  reasonLabel = "Delete reason",
+  reasonPlaceholder = "Briefly explain why this record is being deleted"
 }: DeleteRecordButtonProps) {
   return (
     <form
+      className="space-y-3"
       action={action}
       onSubmit={(event) => {
         if (!window.confirm(confirmMessage)) {
@@ -43,6 +48,17 @@ export function DeleteRecordButton({
         }
       }}
     >
+      <label className="block">
+        <span className="mb-1.5 block text-sm font-medium text-red-950">
+          {reasonLabel}
+        </span>
+        <textarea
+          className="min-h-20 w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+          name="deletion_reason"
+          placeholder={reasonPlaceholder}
+          required
+        />
+      </label>
       <SubmitButton label={label} pendingLabel={pendingLabel} />
     </form>
   );

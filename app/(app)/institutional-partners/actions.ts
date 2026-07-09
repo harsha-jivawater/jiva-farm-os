@@ -26,7 +26,8 @@ import {
   canApproveLegalDocuments,
   canManageInstitutionProfile,
   canSoftDeleteInstitution,
-  hasRole
+  hasRole,
+  isAdmin
 } from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 
@@ -355,10 +356,11 @@ export async function updateInstitutionReviewAction(
   redirect(`/institutional-partners/${institutionId}?saved=review`);
 }
 
-export async function deleteInstitutionAction(id: string) {
+export async function deleteInstitutionAction(id: string, formData: FormData) {
   const supabase = await createClient();
   const errorPath = `/institutional-partners/${id}`;
   const profile = await getCurrentProfile(supabase, errorPath);
+  const deletionReason = String(formData.get("deletion_reason") ?? "").trim();
 
   if (!canSoftDeleteInstitution(profile)) {
     redirectWithError(
@@ -367,9 +369,20 @@ export async function deleteInstitutionAction(id: string) {
     );
   }
 
+  if (!deletionReason) {
+    redirectWithError(
+      errorPath,
+      "Add a delete reason before deleting this institutional partner."
+    );
+  }
+
   const { error } = await supabase
     .from("institutions")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by_user_id: profile.id,
+      deletion_reason: deletionReason
+    })
     .eq("id", id)
     .is("deleted_at", null);
 
@@ -380,6 +393,36 @@ export async function deleteInstitutionAction(id: string) {
   revalidatePath("/institutional-partners");
   revalidatePath(`/institutional-partners/${id}`);
   redirect("/institutional-partners?deleted=1");
+}
+
+export async function restoreInstitutionAction(id: string) {
+  const supabase = await createClient();
+  const errorPath = `/institutional-partners/${id}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (!isAdmin(profile)) {
+    redirectWithError(
+      errorPath,
+      "Only Admin can restore deleted institutional partners."
+    );
+  }
+
+  const { error } = await supabase
+    .from("institutions")
+    .update({
+      deleted_at: null,
+      restored_at: new Date().toISOString(),
+      restored_by_user_id: profile.id
+    })
+    .eq("id", id)
+    .not("deleted_at", "is", null);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  await revalidateInstitution(id);
+  redirect(`/institutional-partners/${id}?restored=1`);
 }
 
 export async function createInstitutionContactAction(

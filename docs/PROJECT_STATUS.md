@@ -56,12 +56,13 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.4 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.5 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
 - The v0.3 update adds controlled soft-delete guidance for Dealers, Institutional Partners, and Pilots.
 - The v0.4 update adds paid farmer sale dispatch vs free pilot dispatch routing and device pool guidance.
+- The v0.5 update adds soft-delete audit trail and Admin-only restore guidance for Dealers, Institutional Partners, and Pilots.
 
 ## Role Model
 
@@ -95,10 +96,14 @@ Role notes:
 
 - Dealers, Institutional Partners, and Pilots use soft delete only.
 - Soft delete sets `deleted_at = now()` and removes the record from normal active list/detail views.
+- Soft delete now captures `deleted_by_user_id` and `deletion_reason`.
+- Restore captures `restored_at` and `restored_by_user_id` while preserving the original deletion audit.
 - Soft delete does not hard-delete records and does not cascade-delete linked history.
 - Sales Head can soft-delete Dealers and Institutional Partners.
 - R&D Head can soft-delete Pilots.
 - Admin can soft-delete Dealers, Institutional Partners, and Pilots.
+- Admin can explicitly view deleted Dealers, Institutional Partners, and Pilots through deleted-record filters and restore them from the deleted detail page.
+- Non-admin users do not see deleted records in normal lists/detail pages.
 - Management can soft-delete Pilots because the existing Pilot write/full-access model includes Management.
 - Management is not enabled for Dealer or Institutional Partner soft-delete because the current profile management write model does not treat Management as a Dealer/Institution profile manager.
 

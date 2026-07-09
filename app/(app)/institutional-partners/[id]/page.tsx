@@ -6,9 +6,11 @@ import {
   createInstitutionMeetingAction,
   deleteInstitutionAction,
   deleteInstitutionContactAction,
+  restoreInstitutionAction,
   updateInstitutionReviewAction
 } from "@/app/(app)/institutional-partners/actions";
 import { DeleteRecordButton } from "@/components/delete-record-button";
+import { formatDisplayDateTime } from "@/lib/date-utils";
 import { ContactForm } from "@/components/institutions/contact-form";
 import { InstitutionStatusPill } from "@/components/institutions/institution-status-pill";
 import { MeetingForm } from "@/components/institutions/meeting-form";
@@ -60,7 +62,8 @@ import {
   canApproveLegalDocuments,
   canManageInstitutionProfile,
   canSoftDeleteInstitution,
-  canWriteModule
+  canWriteModule,
+  isAdmin
 } from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
 
@@ -70,6 +73,7 @@ type InstitutionDetailPageProps = {
   }>;
   searchParams: Promise<{
     error?: string;
+    restored?: string;
     saved?: string;
   }>;
 };
@@ -381,17 +385,20 @@ export default async function InstitutionDetailPage({
     supabase,
     "/institutional-partners"
   );
-  const canManageProfile = canManageInstitutionProfile(currentUser);
-  const canCreatePilot = canWriteModule(currentUser, "pilots");
-  const canDelete = canSoftDeleteInstitution(currentUser);
+  const canManageProfileActive = canManageInstitutionProfile(currentUser);
+  const canCreatePilotActive = canWriteModule(currentUser, "pilots");
+  const canDeleteActive = canSoftDeleteInstitution(currentUser);
   const canApproveLegal = canApproveLegalDocuments(currentUser);
-  const canOpenLegalOnly = canApproveLegal && !canManageProfile;
+  const canViewDeletedRecords = isAdmin(currentUser);
   const scope = await institutionScope(supabase, currentUser);
   let institutionQuery = supabase
     .from("institutions")
     .select("*")
-    .eq("id", id)
-    .is("deleted_at", null);
+    .eq("id", id);
+
+  if (!canViewDeletedRecords) {
+    institutionQuery = institutionQuery.is("deleted_at", null);
+  }
 
   if (scope.noRecords) {
     institutionQuery = institutionQuery.is("id", null);
@@ -408,6 +415,12 @@ export default async function InstitutionDetailPage({
   }
 
   const institution = data as Institution;
+  const isDeleted = Boolean(institution.deleted_at);
+  const canManageProfile = canManageProfileActive && !isDeleted;
+  const canCreatePilot = canCreatePilotActive && !isDeleted;
+  const canDelete = canDeleteActive && !isDeleted;
+  const canRestore = canViewDeletedRecords && isDeleted;
+  const canOpenLegalOnly = canApproveLegal && !canManageProfile && !isDeleted;
   const [
     { data: users },
     { data: regions },
@@ -539,6 +552,10 @@ export default async function InstitutionDetailPage({
     institution.id
   );
   const deleteAction = deleteInstitutionAction.bind(null, institution.id);
+  const restoreAction = restoreInstitutionAction.bind(null, institution.id);
+  const deletedBy = institution.deleted_by_user_id
+    ? userMap.get(institution.deleted_by_user_id)
+    : null;
   const showProfileContact =
     hasProfileContact(institution) &&
     !contactsList.some((contact) => contactMatchesProfile(contact, institution));
@@ -615,6 +632,34 @@ export default async function InstitutionDetailPage({
       {query.saved === "review" ? (
         <div className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
           Institution review saved.
+        </div>
+      ) : null}
+
+      {query.restored ? (
+        <div className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
+          Institutional partner restored to active records.
+        </div>
+      ) : null}
+
+      {isDeleted ? (
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          <p className="font-semibold">Deleted record</p>
+          <p>
+            This institutional partner was deleted on{" "}
+            {formatDisplayDateTime(institution.deleted_at)} by{" "}
+            {deletedBy ? userLabel(deletedBy) : display(institution.deleted_by_user_id)}.
+          </p>
+          {institution.deletion_reason ? (
+            <p className="mt-1">
+              <span className="font-semibold">Reason:</span>{" "}
+              {institution.deletion_reason}
+            </p>
+          ) : null}
+          {institution.restored_at ? (
+            <p className="mt-1 text-xs">
+              Last restored {formatDisplayDateTime(institution.restored_at)}.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -1510,6 +1555,30 @@ export default async function InstitutionDetailPage({
           />
         </div>
       </Section>
+
+      {canRestore ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-emerald-950">
+                Restore Institutional Partner
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-emerald-700">
+                Restore this institutional partner to active records. Linked
+                contacts, meetings, pilots, and history remain preserved.
+              </p>
+            </div>
+            <form action={restoreAction}>
+              <button
+                className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 sm:w-auto"
+                type="submit"
+              >
+                Restore Institutional Partner
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {canDelete ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 shadow-sm">
