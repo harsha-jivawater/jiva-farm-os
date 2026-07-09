@@ -49,6 +49,12 @@ Jiva Farm OS is the production operating system for Jiva Water's farmer sales, d
 - Force first-login password change
 - CSV import for Farmer Leads and Devices
 
+## Documentation Updates
+
+- Role-based usage manual draft created at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
+- This update is documentation-only.
+
 ## Role Model
 
 Current roles:
@@ -121,6 +127,81 @@ Default Sales Head fallback routing:
 - Pilot completion returns the device to inventory and moves the linked Farmer Lead to `Pilot Completed - Sales Follow-up`.
 - Follow-up due date after pilot completion is the completion date.
 - A lead is not `Won` unless `payment_confirmed = true`.
+
+## Field Visit Reporting And Mobile UX
+
+Recent field workflow updates are complete for Research Assistants,
+Agronomists, and R&D users working from phones.
+
+Mobile usability improvements:
+
+- My Visits action buttons are full-width and easier to tap on phones.
+- Pilot detail Visit Reports render as stacked mobile cards.
+- Pilot detail Actual Visit History renders as stacked mobile cards.
+- Visit Report form buttons and checkbox rows are more mobile-friendly.
+- Add/Edit Pilot action buttons are easier to tap on mobile.
+- Farmer Lead related follow-up records render as mobile cards.
+
+Visit Report simplification:
+
+- The top Report file upload was removed from Add/Edit Visit Report.
+- Report title is hidden and auto-generated.
+- Eight narrative fields were replaced by one `Visit Report Notes` field:
+  - Report summary
+  - Farmer feedback
+  - Treatment vs control summary
+  - Crop observation summary
+  - Issue details
+  - Recommendation
+  - Next action
+  - Review comments
+- `Visit Report Notes` saves into `visit_reports.report_summary`.
+- Historical old narrative fields are preserved and folded into notes on edit.
+- Planned visit parameter observations remain unchanged.
+- Report photos and Report data sheet remain as evidence uploads.
+- Review/R&D approval helper text appears only where final report review is relevant.
+- Visit Report submission wording now uses `Submit Visit Report`.
+
+My Visits cleanup:
+
+- The `Pending report` card was renamed to `Needs report`.
+- `Needs report` excludes future `Planned` and `Assigned` visits.
+- `Needs report` includes visits with no linked report when:
+  - status is `In Progress`
+  - or planned visit date is today/past
+- `In Progress` visits show `Started · Report pending`.
+- `In Progress` visits use the action label `Continue / Submit report`.
+- My Visits uses the existing local `todayDate()` helper instead of UTC ISO date slicing.
+- Linked pilot context filters out deleted pilots with `deleted_at is null`.
+
+Evidence Uploads:
+
+- `Evidence Uploads, optional` was renamed to `Evidence Uploads`.
+- `Report photos ZIP` was renamed to `Report photos`.
+- New Visit Report photo uploads use the existing image uploader instead of ZIP validation.
+- Historical ZIP/photo links are preserved through `visit_reports.photo_folder_link`.
+- True multiple direct photo upload was not implemented because the current schema has only one text field: `photo_folder_link`.
+- Future multiple-photo support would need schema/storage work, such as a `visit_report_photos` table or a JSON/text-array field.
+
+Partner-sharing approval:
+
+- `Approved for partner sharing` means the report/evidence is approved for external sharing with a farmer, institution, dealer, or partner.
+- It is an internal approval flag, not an actual sharing mechanism.
+- The field is hidden from Research Assistants.
+- The field remains visible for Admin, Management, and R&D Head.
+- Server-side guard is in place:
+  - only Admin, Management, and R&D Head can set or change `approved_for_partner_sharing`
+  - non-allowed roles on create save it as `false`
+  - non-allowed roles on update preserve the existing value
+  - tampered forms are ignored, not rejected
+
+Backend impact:
+
+- No SQL migration was added.
+- No RLS change was made.
+- No schema change was made.
+- No KPI calculation change was made.
+- No Pilot Device Installed authority change was made.
 
 ## Installation Workflow
 
@@ -217,6 +298,13 @@ Legacy crop rules:
   - clear helper text
   - no duplicate state
   - hide actions users cannot perform
+
+Field visit reporting follow-ups to consider:
+
+- Add true multiple-photo support for Visit Reports.
+- Add a partner-facing report/PDF/export workflow if Jiva wants actual external sharing.
+- Add reason capture for Unable to Complete.
+- Decide whether future planned visits may be started early.
 
 ## Documentation Habit
 
