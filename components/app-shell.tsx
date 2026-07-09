@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 import { HelpCircle, KeyRound, LogOut, Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
-import { navigationItems, teamItems } from "@/lib/navigation";
+import { navigationItems, teamItems, teamWorkflowItems } from "@/lib/navigation";
 import { CurrentUserProvider, type CurrentInternalUser } from "@/components/auth/current-user-context";
 import { canViewModule } from "@/lib/users/permissions";
 import { labelForRole } from "@/lib/users/options";
@@ -35,6 +35,9 @@ export function AppShell({
     : teamItems.filter(
         (item) => !("module" in item) || canViewModule(currentUser, item.module)
       );
+  const visibleTeamWorkflowItems = mustChangePassword
+    ? []
+    : teamWorkflowItems.filter((item) => canViewModule(currentUser, item.module));
 
   useEffect(() => {
     if (shouldBlockContent) {
@@ -143,6 +146,37 @@ export function AppShell({
                   })}
                 </div>
               </div>
+
+              {visibleTeamWorkflowItems.length ? (
+                <div>
+                  <p className="px-3 text-xs font-medium uppercase tracking-wide text-slate-400">
+                    Team Workflows
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    {visibleTeamWorkflowItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = pathname === item.href;
+
+                      return (
+                        <Link
+                          className={[
+                            "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition",
+                            isActive
+                              ? "bg-brand-50 text-brand-700"
+                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                          ].join(" ")}
+                          href={item.href}
+                          key={item.label}
+                          onClick={() => setIsOpen(false)}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          <span className="min-w-0 truncate">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </>
           )}
         </nav>
