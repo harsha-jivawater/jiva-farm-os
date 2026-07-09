@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.9
+Version: v0.10
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.10 | 09 Jul 2026 | Draft | Adds in-app Help / SOP role-wise training guide alignment, including daily checklists, main pages, handoffs, avoid lists, and escalation points for each role. |
 | v0.9 | 09 Jul 2026 | Draft | Final launch polish: updates sidebar navigation groups, session/password guidance, Marketing deadline workflow notes, brief document link guidance, and soft-delete/restore training notes. |
 | v0.8 | 09 Jul 2026 | Draft | Adds Admin/Management System Health for KPI cache, dispatch aging, installation aging, pilot visit risk, marketing risk, and deleted-record visibility. |
 | v0.7 | 09 Jul 2026 | Draft | Adds Admin/Management Data Quality warnings for duplicate, incomplete, dispatch-readiness, pilot setup, and marketing workflow review. |
@@ -85,6 +86,19 @@ Notes:
 | Team Workflows | Marketing Requests | Creative request workflow for briefs, deadlines, draft links, comments, and final OneDrive links. |
 | Management | KPI Dashboard; Data Quality; System Health; Regions; Internal Users | Visibility is role-controlled; most items are Admin/Management-only. |
 | Support | Help / SOP; Change Password | Support items are available to signed-in users; Change Password remains available during forced first-login password change. |
+
+### In-App Help / SOP Training Guide
+
+The Help / SOP page is the short in-app training version of this manual. It is organized role-wise and includes:
+
+- role purpose
+- daily checklist
+- main pages to use
+- key handoffs owned
+- what not to do
+- escalation points
+
+The current user's primary and secondary role sections appear first where available. Help / SOP is guidance only; it does not change permissions, RLS, or workflow authority.
 
 ### Operations Menus
 
