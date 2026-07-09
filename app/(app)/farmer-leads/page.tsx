@@ -25,6 +25,7 @@ import {
   type FarmerLead,
   type FarmerLeadFilters
 } from "@/lib/farmer-leads/types";
+import { formatDisplayDate } from "@/lib/date-utils";
 import { applyLocationFilter } from "@/lib/filters/location";
 import {
   funnelStageOptions,
@@ -111,15 +112,7 @@ function searchValue(value: string) {
 }
 
 function formatDate(value: string | null) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
+  return formatDisplayDate(value);
 }
 
 function display(value: string | null | undefined) {

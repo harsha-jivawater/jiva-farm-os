@@ -8,6 +8,7 @@ import { CustomCropFields } from "@/components/crops/custom-crop-fields";
 import { CropSelect } from "@/components/crops/crop-select";
 import { PlannedVisitForm } from "@/components/pilots/planned-visit-form";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
+import { formatDisplayDate } from "@/lib/date-utils";
 import {
   comparisonMethodOptions,
   cropStageOptions,
@@ -989,7 +990,7 @@ export function PilotForm({
                 Pilot Device Installation Date
               </p>
               <p className="min-h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
-                {pilot?.device_installation_date ?? "Not set"}
+                {formatDisplayDate(pilot?.device_installation_date)}
               </p>
               <input
                 name="device_installation_date"

@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/database.types";
+import { formatDisplayDate, formatDisplayDateTime } from "@/lib/date-utils";
 
 export type MarketingRequest =
   Database["public"]["Tables"]["marketing_requests"]["Row"];
@@ -54,26 +55,11 @@ export function display(value: string | number | boolean | null | undefined) {
 }
 
 export function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(`${value}T00:00:00`));
+  return formatDisplayDate(value);
 }
 
 export function formatDateTime(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(value));
+  return formatDisplayDateTime(value);
 }
 
 export function userLabel(user: UserOption | null | undefined) {

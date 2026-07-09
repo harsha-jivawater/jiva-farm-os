@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/database.types";
+import { formatDisplayDate } from "@/lib/date-utils";
 
 export type Institution =
   Database["public"]["Tables"]["institutions"]["Row"];
@@ -70,15 +71,7 @@ export function displayList(value: string[] | null | undefined) {
 }
 
 export function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
+  return formatDisplayDate(value);
 }
 
 export function formatMonth(value: string | null | undefined) {
@@ -92,8 +85,5 @@ export function formatMonth(value: string | null | undefined) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-IN", {
-    month: "short",
-    year: "numeric"
-  }).format(new Date(Number(year), Number(month) - 1, 1));
+  return `01/${month}/${year}`;
 }

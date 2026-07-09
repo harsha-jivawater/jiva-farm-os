@@ -27,6 +27,7 @@ import { PageHeader } from "@/components/page-header";
 import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { deviceStatusOptions, productModelOptions } from "@/lib/devices/options";
+import { formatDisplayDateTime } from "@/lib/date-utils";
 import { primaryCropOptions } from "@/lib/farmer-leads/options";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import type { Database } from "@/lib/supabase/database.types";
@@ -264,11 +265,7 @@ function formatDateTime(value: string | null) {
     return "Not refreshed yet";
   }
 
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Kolkata"
-  }).format(new Date(value));
+  return formatDisplayDateTime(value, "Not refreshed yet");
 }
 
 function formValue(formData: FormData, key: string) {

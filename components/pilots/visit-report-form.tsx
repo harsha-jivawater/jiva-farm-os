@@ -7,6 +7,7 @@ import { Save } from "lucide-react";
 import { CustomCropFields } from "@/components/crops/custom-crop-fields";
 import { CropSelect } from "@/components/crops/crop-select";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
+import { formatDisplayDate } from "@/lib/date-utils";
 import { todayDate } from "@/lib/pilots/form-data";
 import {
   defaultReportStatus,
@@ -448,7 +449,8 @@ export function VisitReportForm({
             <option value="">No linked planned visit</option>
             {plannedVisits.map((visit) => (
               <option key={visit.id} value={visit.id}>
-                Visit {visit.visit_number} · {visit.planned_visit_date} ·{" "}
+                Visit {visit.visit_number} ·{" "}
+                {formatDisplayDate(visit.planned_visit_date)} ·{" "}
                 {visit.visit_type}
               </option>
             ))}
@@ -470,7 +472,7 @@ export function VisitReportForm({
             <option value="">No linked visit</option>
             {visits.map((visit) => (
               <option key={visit.id} value={visit.id}>
-                {visit.visit_code} · {visit.visit_date}
+                {visit.visit_code} · {formatDisplayDate(visit.visit_date)}
               </option>
             ))}
           </select>

@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/database.types";
+import { formatDisplayDateTime } from "@/lib/date-utils";
 
 export type InternalUser = Database["public"]["Tables"]["users"]["Row"];
 export type InternalUserInsert =
@@ -29,12 +30,5 @@ export function display(value: string | number | boolean | null | undefined) {
 }
 
 export function formatDateTime(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(value));
+  return formatDisplayDateTime(value);
 }

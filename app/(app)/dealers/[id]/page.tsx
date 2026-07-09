@@ -6,6 +6,7 @@ import {
   updateDealerReviewAction
 } from "@/app/(app)/dealers/actions";
 import { DeleteRecordButton } from "@/components/delete-record-button";
+import { formatDisplayDateTime } from "@/lib/date-utils";
 import { DealerStatusPill } from "@/components/dealers/dealer-status-pill";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
@@ -293,17 +294,7 @@ function dateInputValue(value: string | null | undefined) {
 }
 
 function formatDateTime(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
+  return formatDisplayDateTime(value);
 }
 
 function reviewerDisplay(

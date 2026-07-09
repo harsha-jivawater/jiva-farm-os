@@ -1,5 +1,6 @@
 import type { Database } from "@/lib/supabase/database.types";
 import { cropDisplayLabel } from "@/lib/crops/crop-library";
+import { formatDisplayDate } from "@/lib/date-utils";
 
 export type Dealer = Database["public"]["Tables"]["dealers"]["Row"];
 export type DealerInsert = Database["public"]["Tables"]["dealers"]["Insert"];
@@ -63,15 +64,7 @@ export function display(value: string | number | null | undefined) {
 }
 
 export function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
+  return formatDisplayDate(value);
 }
 
 export function formatCrops(crops: string[] | null | undefined) {

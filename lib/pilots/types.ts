@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/database.types";
+import { formatDisplayDate } from "@/lib/date-utils";
 
 export type Pilot = Database["public"]["Tables"]["pilots"]["Row"];
 export type PilotInsert = Database["public"]["Tables"]["pilots"]["Insert"];
@@ -133,13 +134,5 @@ export function display(value: string | number | boolean | null | undefined) {
 }
 
 export function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
+  return formatDisplayDate(value);
 }
