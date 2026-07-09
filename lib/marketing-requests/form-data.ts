@@ -1,4 +1,5 @@
 import {
+  marketingDeadlineStatusOptions,
   marketingRequestPriorityOptions,
   marketingRequestStatusOptions,
   marketingRequestTypeOptions,
@@ -62,6 +63,7 @@ export function marketingRequestPayloadFromForm(
         ? textValue(formData, "social_media_platform")
         : null,
     brief: requiredText(formData, "brief"),
+    brief_document_link: textValue(formData, "brief_document_link"),
     target_audience: textValue(formData, "target_audience"),
     key_message: textValue(formData, "key_message"),
     required_size_or_format: textValue(formData, "required_size_or_format"),
@@ -81,6 +83,7 @@ export function validateMarketingRequestPayload(
   payload: Pick<
     MarketingRequestInsert,
     | "brief"
+    | "brief_document_link"
     | "deadline_date"
     | "priority"
     | "reference_link"
@@ -108,6 +111,10 @@ export function validateMarketingRequestPayload(
     return "Brief is required.";
   }
 
+  if (!isUrl(payload.brief_document_link)) {
+    return "Brief document link must be a valid http or https URL.";
+  }
+
   if (!payload.deadline_date) {
     return "Deadline is required.";
   }
@@ -129,6 +136,10 @@ export function marketingWorkflowPayloadFromForm(formData: FormData) {
     marketing_head_user_id: textValue(formData, "marketing_head_user_id"),
     assigned_to_user_id: textValue(formData, "assigned_to_user_id"),
     deadline_date: requiredText(formData, "deadline_date"),
+    deadline_status: requiredText(formData, "deadline_status") || "Pending",
+    accepted_deadline_date: textValue(formData, "accepted_deadline_date"),
+    revised_deadline_date: textValue(formData, "revised_deadline_date"),
+    deadline_revision_note: textValue(formData, "deadline_revision_note"),
     draft_link: textValue(formData, "draft_link"),
     final_onedrive_link: textValue(formData, "final_onedrive_link"),
     internal_notes: textValue(formData, "internal_notes")
@@ -139,6 +150,8 @@ export function validateMarketingWorkflowPayload(
   payload: Pick<
     MarketingRequestUpdate,
     | "deadline_date"
+    | "deadline_status"
+    | "revised_deadline_date"
     | "draft_link"
     | "final_onedrive_link"
     | "marketing_status"
@@ -146,6 +159,17 @@ export function validateMarketingWorkflowPayload(
 ) {
   if (!isOption(marketingRequestStatusOptions, payload.marketing_status)) {
     return "Select a valid marketing status.";
+  }
+
+  if (!isOption(marketingDeadlineStatusOptions, payload.deadline_status)) {
+    return "Select a valid deadline decision.";
+  }
+
+  if (
+    payload.deadline_status === "Revised" &&
+    !payload.revised_deadline_date
+  ) {
+    return "Add a revised deadline date.";
   }
 
   if (!isUrl(payload.draft_link)) {

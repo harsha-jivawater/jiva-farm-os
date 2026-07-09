@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/page-header";
 import { loadMarketingRequestFormOptions } from "@/lib/marketing-requests/load-options";
 import {
   labelFor,
+  marketingDeadlineStatusOptions,
   marketingRequestStatusOptions,
   marketingRequestUpdateTypeOptions
 } from "@/lib/marketing-requests/options";
@@ -120,6 +121,7 @@ function relatedLabel(
 function currentAction(request: MarketingRequest) {
   const today = new Date().toISOString().slice(0, 10);
   const open = !["Delivered", "Cancelled"].includes(request.marketing_status);
+  const deadline = finalWorkingDeadline(request);
 
   if (request.marketing_status === "Delivered") {
     return {
@@ -137,7 +139,7 @@ function currentAction(request: MarketingRequest) {
     } as const;
   }
 
-  if (open && request.deadline_date < today) {
+  if (open && deadline < today) {
     return {
       helper: "Deadline has passed. Marketing owner should update status or delivery link.",
       label: "Overdue",
@@ -166,6 +168,24 @@ function currentAction(request: MarketingRequest) {
     label: "Marketing review",
     tone: "warning"
   } as const;
+}
+
+function finalWorkingDeadline(request: MarketingRequest) {
+  if (
+    request.deadline_status === "Revised" &&
+    request.revised_deadline_date
+  ) {
+    return request.revised_deadline_date;
+  }
+
+  if (
+    request.deadline_status === "Accepted" &&
+    request.accepted_deadline_date
+  ) {
+    return request.accepted_deadline_date;
+  }
+
+  return request.deadline_date;
 }
 
 function LinkValue({
@@ -235,6 +255,7 @@ export default async function MarketingRequestDetailPage({
     options.regions.map((region) => [region.id, region.region_name])
   );
   const action = currentAction(request);
+  const workingDeadline = finalWorkingDeadline(request);
   const canManage = canManageMarketingRequests(currentUser);
   const canWorkflow = canUpdateMarketingWorkflow(currentUser, request);
   const canEditBrief = canEditMarketingRequestBrief(currentUser, request);
@@ -316,9 +337,11 @@ export default async function MarketingRequestDetailPage({
           <p className="mt-2 text-sm text-slate-600">{action.helper}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm font-medium text-slate-500">Deadline</p>
+          <p className="text-sm font-medium text-slate-500">
+            Final working deadline
+          </p>
           <p className="mt-2 text-2xl font-semibold text-slate-950">
-            {formatDate(request.deadline_date)}
+            {formatDate(workingDeadline)}
           </p>
           <div className="mt-3">
             <PriorityPill priority={request.priority} />
@@ -335,6 +358,32 @@ export default async function MarketingRequestDetailPage({
         </div>
       </div>
 
+      <SectionPanel title="Deadline decision">
+        <div>
+          <InfoRow
+            label="Requested deadline"
+            value={formatDate(request.deadline_date)}
+          />
+          <InfoRow
+            label="Deadline decision"
+            value={labelFor(
+              marketingDeadlineStatusOptions,
+              request.deadline_status
+            )}
+          />
+          <InfoRow
+            label="Final working deadline"
+            value={formatDate(workingDeadline)}
+          />
+          {request.deadline_revision_note ? (
+            <InfoRow
+              label="Revision reason"
+              value={request.deadline_revision_note}
+            />
+          ) : null}
+        </div>
+      </SectionPanel>
+
       <SectionPanel title="Brief">
         <div className="space-y-4">
           <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
@@ -350,6 +399,15 @@ export default async function MarketingRequestDetailPage({
             <InfoRow
               label="Campaign / event"
               value={display(request.campaign_or_event_name)}
+            />
+            <InfoRow
+              label="Brief document"
+              value={
+                <LinkValue
+                  href={request.brief_document_link}
+                  label="Open brief document"
+                />
+              }
             />
           </div>
         </div>
@@ -415,13 +473,75 @@ export default async function MarketingRequestDetailPage({
                 </label>
                 <label>
                   <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Deadline
+                    Requested deadline
                   </span>
                   <input
                     className={inputClassName()}
                     defaultValue={request.deadline_date}
-                    name="deadline_date"
+                    disabled
                     type="date"
+                  />
+                </label>
+                <input
+                  name="deadline_date"
+                  type="hidden"
+                  value={request.deadline_date}
+                />
+                <fieldset className="md:col-span-2">
+                  <legend className="mb-2 block text-sm font-medium text-slate-700">
+                    Deadline decision
+                  </legend>
+                  <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 sm:grid-cols-3">
+                    <label className="flex items-center gap-2">
+                      <input
+                        defaultChecked={request.deadline_status === "Pending"}
+                        name="deadline_status"
+                        type="radio"
+                        value="Pending"
+                      />
+                      Keep pending
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        defaultChecked={request.deadline_status === "Accepted"}
+                        name="deadline_status"
+                        type="radio"
+                        value="Accepted"
+                      />
+                      Accept requested deadline
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        defaultChecked={request.deadline_status === "Revised"}
+                        name="deadline_status"
+                        type="radio"
+                        value="Revised"
+                      />
+                      Propose revised deadline
+                    </label>
+                  </div>
+                </fieldset>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Revised deadline date
+                  </span>
+                  <input
+                    className={inputClassName()}
+                    defaultValue={request.revised_deadline_date ?? ""}
+                    name="revised_deadline_date"
+                    type="date"
+                  />
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Revision reason
+                  </span>
+                  <input
+                    className={inputClassName()}
+                    defaultValue={request.deadline_revision_note ?? ""}
+                    name="deadline_revision_note"
+                    placeholder="Optional reason or comment"
+                    type="text"
                   />
                 </label>
               </>
@@ -431,6 +551,11 @@ export default async function MarketingRequestDetailPage({
                   name="deadline_date"
                   type="hidden"
                   value={request.deadline_date}
+                />
+                <input
+                  name="deadline_status"
+                  type="hidden"
+                  value={request.deadline_status}
                 />
                 <input
                   name="marketing_head_user_id"

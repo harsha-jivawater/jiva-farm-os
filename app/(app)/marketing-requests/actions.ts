@@ -69,6 +69,46 @@ async function addHistory(
   } satisfies MarketingRequestHistoryInsert);
 }
 
+function deadlineDecisionUpdate(
+  existing: MarketingRequest,
+  payload: MarketingRequestUpdate,
+  decidedByUserId: string
+): MarketingRequestUpdate {
+  const now = new Date().toISOString();
+  const status = payload.deadline_status ?? existing.deadline_status ?? "Pending";
+
+  if (status === "Accepted") {
+    return {
+      deadline_status: "Accepted",
+      accepted_deadline_date: existing.deadline_date,
+      revised_deadline_date: null,
+      deadline_revision_note: null,
+      deadline_decided_by_user_id: decidedByUserId,
+      deadline_decided_at: now
+    };
+  }
+
+  if (status === "Revised") {
+    return {
+      deadline_status: "Revised",
+      accepted_deadline_date: null,
+      revised_deadline_date: payload.revised_deadline_date,
+      deadline_revision_note: payload.deadline_revision_note,
+      deadline_decided_by_user_id: decidedByUserId,
+      deadline_decided_at: now
+    };
+  }
+
+  return {
+    deadline_status: "Pending",
+    accepted_deadline_date: null,
+    revised_deadline_date: null,
+    deadline_revision_note: null,
+    deadline_decided_by_user_id: null,
+    deadline_decided_at: null
+  };
+}
+
 export async function createMarketingRequestAction(formData: FormData) {
   const supabase = await createClient();
   const errorPath = "/marketing-requests/new";
@@ -178,6 +218,8 @@ export async function updateMarketingWorkflowAction(
   const payload = marketingWorkflowPayloadFromForm(formData);
   const validationError = validateMarketingWorkflowPayload({
     deadline_date: payload.deadline_date ?? existing.deadline_date,
+    deadline_status: payload.deadline_status ?? existing.deadline_status,
+    revised_deadline_date: payload.revised_deadline_date,
     draft_link: payload.draft_link,
     final_onedrive_link: payload.final_onedrive_link,
     marketing_status: payload.marketing_status
@@ -205,6 +247,8 @@ export async function updateMarketingWorkflowAction(
   const updatePayload: MarketingRequestUpdate = canManage
     ? {
         ...payload,
+        deadline_date: existing.deadline_date,
+        ...deadlineDecisionUpdate(existing, payload, profile.id),
         accepted_at:
           payload.marketing_status === "Accepted" && !existing.accepted_at
             ? now
@@ -244,6 +288,21 @@ export async function updateMarketingWorkflowAction(
     payload.assigned_to_user_id !== existing.assigned_to_user_id
   ) {
     await addHistory(existing.id, profile.id, "Status Update", "Assigned owner updated.");
+  }
+
+  if (
+    canManage &&
+    (updatePayload.deadline_status !== existing.deadline_status ||
+      updatePayload.accepted_deadline_date !== existing.accepted_deadline_date ||
+      updatePayload.revised_deadline_date !== existing.revised_deadline_date ||
+      updatePayload.deadline_revision_note !== existing.deadline_revision_note)
+  ) {
+    await addHistory(
+      existing.id,
+      profile.id,
+      "Status Update",
+      "Deadline decision updated."
+    );
   }
 
   if (

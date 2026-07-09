@@ -538,16 +538,17 @@ Review, assign, and control Marketing Requests through draft, correction, final 
 ```mermaid
 flowchart LR
   A["Review new request"] --> B["Accept or ask clarification"]
-  B --> C["Assign Marketing Head / Designer"]
-  C --> D["Share draft link"]
-  D --> E["Handle corrections"]
-  E --> F["Add final OneDrive link"]
-  F --> G["Mark delivered"]
+  B --> C["Accept deadline or propose revised deadline"]
+  C --> D["Assign Marketing Head / Designer"]
+  D --> E["Share draft link"]
+  E --> F["Handle corrections"]
+  F --> G["Add final OneDrive link"]
+  G --> H["Mark delivered"]
 ```
 
 #### Do
 
-- Keep deadline, status, assigned owner, draft link, and final OneDrive link current.
+- Keep deadline decision, status, assigned owner, draft link, and final OneDrive link current.
 - Use comments for clarification, corrections, and delivery notes.
 - Keep heavy design files in local drive / OneDrive, not in the app.
 
@@ -1040,10 +1041,10 @@ Device pool:
 
 | Item | Detail |
 |---|---|
-| Purpose | Track marketing briefs, deadlines, assignment, corrections, draft links, final OneDrive links, and delivery status. |
+| Purpose | Track marketing briefs, brief document links, requested/final deadlines, assignment, corrections, draft links, final OneDrive links, and delivery status. |
 | Used by | Admin, Management, Sales Head, RSM, Salesperson, Agronomist, Research Assistant, R&D Head, Marketing Head, Designer. |
 | Primary actions | Create request, review brief, assign owner, share draft/final links, add comments, mark delivered where allowed. |
-| Important rules | Heavy design files stay outside the app. Only the brief and optional links are stored. OneDrive link is optional until delivery. Accounts, Stock / Dispatch, HR & Legal, and Viewer do not create requests by default. |
+| Important rules | Heavy design files stay outside the app. Only the brief and optional links are stored. Admin, Management, and Marketing Head can accept or revise requested deadlines. OneDrive link is optional until delivery. Accounts, Stock / Dispatch, HR & Legal, and Viewer do not create requests by default. |
 
 ### Regions
 

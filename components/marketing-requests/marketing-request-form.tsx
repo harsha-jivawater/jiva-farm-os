@@ -284,6 +284,15 @@ export function MarketingRequestForm({
               required
             />
           </div>
+          <div className="md:col-span-2">
+            <Field
+              defaultValue={request?.brief_document_link}
+              helper="Paste the OneDrive link to the brief, reference document, or supporting file."
+              label="Brief document link"
+              name="brief_document_link"
+              type="url"
+            />
+          </div>
           <TextAreaField
             defaultValue={request?.target_audience}
             label="Target audience"

@@ -34,6 +34,12 @@ export const marketingRequestStatusOptions = [
   { value: "Cancelled", label: "Cancelled" }
 ] as const;
 
+export const marketingDeadlineStatusOptions = [
+  { value: "Pending", label: "Pending" },
+  { value: "Accepted", label: "Accepted" },
+  { value: "Revised", label: "Revised" }
+] as const;
+
 export const marketingRequestUpdateTypeOptions = [
   { value: "Comment", label: "Comment" },
   { value: "Clarification Requested", label: "Clarification requested" },

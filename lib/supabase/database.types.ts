@@ -2135,6 +2135,7 @@ export type Database = {
           request_type: string;
           social_media_platform: string | null;
           brief: string;
+          brief_document_link: string | null;
           target_audience: string | null;
           key_message: string | null;
           required_size_or_format: string | null;
@@ -2148,6 +2149,12 @@ export type Database = {
           campaign_or_event_name: string | null;
           reference_link: string | null;
           deadline_date: string;
+          deadline_status: string;
+          accepted_deadline_date: string | null;
+          revised_deadline_date: string | null;
+          deadline_revision_note: string | null;
+          deadline_decided_by_user_id: string | null;
+          deadline_decided_at: string | null;
           marketing_status: string;
           marketing_head_user_id: string | null;
           assigned_to_user_id: string | null;
@@ -2167,6 +2174,7 @@ export type Database = {
           request_type: string;
           social_media_platform?: string | null;
           brief: string;
+          brief_document_link?: string | null;
           target_audience?: string | null;
           key_message?: string | null;
           required_size_or_format?: string | null;
@@ -2180,6 +2188,12 @@ export type Database = {
           campaign_or_event_name?: string | null;
           reference_link?: string | null;
           deadline_date: string;
+          deadline_status?: string;
+          accepted_deadline_date?: string | null;
+          revised_deadline_date?: string | null;
+          deadline_revision_note?: string | null;
+          deadline_decided_by_user_id?: string | null;
+          deadline_decided_at?: string | null;
           marketing_status?: string;
           marketing_head_user_id?: string | null;
           assigned_to_user_id?: string | null;
@@ -2199,6 +2213,7 @@ export type Database = {
           request_type?: string;
           social_media_platform?: string | null;
           brief?: string;
+          brief_document_link?: string | null;
           target_audience?: string | null;
           key_message?: string | null;
           required_size_or_format?: string | null;
@@ -2212,6 +2227,12 @@ export type Database = {
           campaign_or_event_name?: string | null;
           reference_link?: string | null;
           deadline_date?: string;
+          deadline_status?: string;
+          accepted_deadline_date?: string | null;
+          revised_deadline_date?: string | null;
+          deadline_revision_note?: string | null;
+          deadline_decided_by_user_id?: string | null;
+          deadline_decided_at?: string | null;
           marketing_status?: string;
           marketing_head_user_id?: string | null;
           assigned_to_user_id?: string | null;

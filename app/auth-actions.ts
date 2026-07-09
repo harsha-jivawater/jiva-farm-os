@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { defaultHomePathForUser } from "@/lib/users/default-route";
+import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   INTERNAL_EMAIL_DOMAIN_MESSAGE,
   isJivawaterEmail
@@ -37,7 +39,8 @@ export async function signInAction(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  const profile = await getCurrentInternalUser(supabase, "/login");
+  redirect(defaultHomePathForUser(profile));
 }
 
 export async function signOutAction() {

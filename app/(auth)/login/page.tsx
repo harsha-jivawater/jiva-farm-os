@@ -4,6 +4,8 @@ import { BrandLogo } from "@/components/brand-logo";
 import { LoginSubmitButton } from "@/components/auth/login-submit-button";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { defaultHomePathForUser } from "@/lib/users/default-route";
+import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   INTERNAL_EMAIL_DOMAIN_MESSAGE,
   isJivawaterEmail
@@ -57,7 +59,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         );
       }
 
-      redirect("/dashboard");
+      const profile = await getCurrentInternalUser(supabase, "/login");
+      redirect(defaultHomePathForUser(profile));
     }
   }
 

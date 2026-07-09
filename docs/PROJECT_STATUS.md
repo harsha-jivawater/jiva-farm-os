@@ -106,7 +106,9 @@ Role notes:
 
 - Marketing Requests lives under the Team Workflows sidebar group.
 - The module tracks creative requests for flyers, standees, brochures, presentations, social media creatives, and other lightweight marketing needs.
-- The app stores request briefs, assignment, deadline, comments/corrections, optional reference links, draft links, and final OneDrive links.
+- Marketing Head and Designer users land on Marketing Requests by default after login/opening the app.
+- The app stores request briefs, optional brief document links, assignment, requested deadlines, deadline decisions, comments/corrections, optional reference links, draft links, and final OneDrive links.
+- Admin, Management, and Marketing Head can accept the requested deadline or propose a revised working deadline.
 - Heavy design files stay outside Jiva Farm OS in local drive / OneDrive.
 - Create access is allowed for Admin, Management, Sales Head, RSM, Salesperson, Agronomist, Research Assistant, R&D Head, Marketing Head, and Designer.
 - Accounts, Stock / Dispatch, HR & Legal, and Viewer do not see/create Marketing Requests by default unless a future secondary-role decision explicitly grants access.

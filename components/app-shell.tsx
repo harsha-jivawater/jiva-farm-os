@@ -9,6 +9,7 @@ import { navigationItems, teamItems, teamWorkflowItems } from "@/lib/navigation"
 import { CurrentUserProvider, type CurrentInternalUser } from "@/components/auth/current-user-context";
 import { canViewModule } from "@/lib/users/permissions";
 import { labelForRole } from "@/lib/users/options";
+import { defaultHomePathForUser } from "@/lib/users/default-route";
 
 type AppShellProps = {
   children: ReactNode;
@@ -27,6 +28,7 @@ export function AppShell({
   const mustChangePassword = currentUser.must_change_password;
   const isPasswordPage = pathname === "/account/password";
   const shouldBlockContent = mustChangePassword && !isPasswordPage;
+  const defaultHomePath = defaultHomePathForUser(currentUser);
   const visibleNavigationItems = mustChangePassword
     ? []
     : navigationItems.filter((item) => canViewModule(currentUser, item.module));
@@ -66,7 +68,7 @@ export function AppShell({
         <div className="relative flex h-16 items-center justify-center border-b border-slate-200 px-4">
           <Link
             className="flex min-w-0 flex-1 items-center justify-center px-8"
-            href={mustChangePassword ? "/account/password" : "/dashboard"}
+            href={mustChangePassword ? "/account/password" : defaultHomePath}
             onClick={() => setIsOpen(false)}
           >
             <BrandLogo className="max-h-14 w-[190px]" priority />
