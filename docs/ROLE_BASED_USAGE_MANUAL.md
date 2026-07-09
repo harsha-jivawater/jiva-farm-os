@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.12
+Version: v0.14
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,8 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.14 | 09 Jul 2026 | Draft | Adds Admin-controlled per-user CSV download permission guidance. CSV export is off by default and still respects module visibility and record scope. |
+| v0.13 | 09 Jul 2026 | Draft | Adds safe CSV export guidance for operational list pages, including role-scoped exports, current-filter exports, row limits, and no raw backend IDs by default. |
 | v0.12 | 09 Jul 2026 | Draft | Adds Activity Timeline guidance for important detail pages using existing follow-ups, reviews, meetings, visits, reports, marketing updates, and delete/restore audit fields. |
 | v0.11 | 09 Jul 2026 | Draft | Adds lightweight Getting Started checklist guidance for account readiness, first actions, and role-specific onboarding inside Help / SOP and Dashboard. |
 | v0.10 | 09 Jul 2026 | Draft | Adds in-app Help / SOP role-wise training guide alignment, including daily checklists, main pages, handoffs, avoid lists, and escalation points for each role. |
@@ -131,6 +133,31 @@ Current timeline sources include:
 - Marketing Request creation, deadline decisions, workflow updates, comments, draft/final links, and delivery timestamps
 
 Activity Timelines do not use a generic audit table yet. They do not change permissions, RLS, schema, or workflows.
+
+### CSV Exports
+
+Key operational list pages include an Export CSV action for offline review and management reporting.
+
+Current export-enabled pages:
+
+- Farmer Leads
+- Dealers
+- Institutional Partners
+- Pilots
+- Marketing Requests
+
+Export rules:
+
+- Admin controls CSV download permission per user from Internal Users.
+- The permission label is `Can download CSV files`.
+- CSV download is off by default for all users until Admin enables it.
+- Exports use the same search/filter values currently applied on the page.
+- Exports include only records visible to the signed-in user's role and record scope.
+- Export routes enforce the CSV permission server-side; hiding the button is not the security boundary.
+- Non-admin users do not export deleted records.
+- CSV files use readable names, statuses, links, and DD/MM/YYYY date display.
+- Heavy reporting formats such as PDF, XLSX, scheduled reports, and email reports are not included in this phase.
+- Data Quality and System Health exports are not added yet because those pages generate live grouped warnings in page-local logic; they should be extracted to shared loaders before adding exports.
 
 ### Operations Menus
 

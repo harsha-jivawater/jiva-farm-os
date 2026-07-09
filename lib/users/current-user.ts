@@ -35,6 +35,7 @@ const currentUserSelectColumns = [
   "can_own_pilots",
   "can_confirm_payment",
   "can_manage_dispatch",
+  "can_download_csv",
   "must_change_password",
   "is_active"
 ].join(",");

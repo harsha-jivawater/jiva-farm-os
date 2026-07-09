@@ -3,6 +3,7 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleDollarSign,
+  Download,
   Eye,
   Pencil,
   Plus,
@@ -16,6 +17,7 @@ import { PageHeader } from "@/components/page-header";
 import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { StatusPill } from "@/components/farmer-leads/status-pill";
+import { exportLink } from "@/lib/export/csv";
 import {
   UserSearchSelect,
   type UserSearchOption
@@ -37,7 +39,11 @@ import {
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { canWriteModule, hasAnyRole } from "@/lib/users/permissions";
+import {
+  canDownloadCsv,
+  canWriteModule,
+  hasAnyRole
+} from "@/lib/users/permissions";
 import { farmerLeadScope } from "@/lib/users/record-scope";
 
 type FarmerLeadsPageProps = {
@@ -268,6 +274,8 @@ export default async function FarmerLeadsPage({
   }
 
   const kpis = readKpis(kpiResult.data);
+  const canExportCsv = canDownloadCsv(currentUser);
+  const csvExportHref = exportLink("/farmer-leads/export", params);
 
   logPerf("farmer leads page total server render", startedAt);
 
@@ -279,8 +287,20 @@ export default async function FarmerLeadsPage({
           title="Farmer Leads"
           description="Capture, search, filter, and manage farmer interest for Jiva Farm device operations."
         />
-        {canWrite ? (
-          <div className="flex flex-col gap-2 sm:flex-row">
+        {canExportCsv || canWrite ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {canExportCsv ? (
+          <Link
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            href={csvExportHref}
+            prefetch={false}
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            Export CSV
+          </Link>
+          ) : null}
+          {canWrite ? (
+            <>
             <Link
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
               href="/farmer-leads/import"
@@ -295,7 +315,9 @@ export default async function FarmerLeadsPage({
               <Plus className="h-4 w-4" aria-hidden="true" />
               Add Farmer Lead
             </Link>
-          </div>
+            </>
+          ) : null}
+        </div>
         ) : null}
       </div>
 
@@ -320,6 +342,10 @@ export default async function FarmerLeadsPage({
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
           Filters
         </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Export CSV downloads the Farmer Leads currently visible to your role
+          using these filters.
+        </p>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="md:col-span-2">

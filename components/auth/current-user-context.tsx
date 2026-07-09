@@ -15,6 +15,7 @@ export type CurrentInternalUser = {
   can_own_pilots: boolean;
   can_confirm_payment: boolean;
   can_manage_dispatch: boolean;
+  can_download_csv: boolean;
   must_change_password: boolean;
   is_active: boolean;
 };

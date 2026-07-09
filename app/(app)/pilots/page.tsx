@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CheckCircle2,
   ClipboardList,
+  Download,
   Eye,
   FileClock,
   FileSearch,
@@ -22,6 +23,7 @@ import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
 import { formatDisplayDateTime } from "@/lib/date-utils";
+import { exportLink } from "@/lib/export/csv";
 import {
   cropOptions,
   labelFor,
@@ -43,7 +45,7 @@ import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canWriteModule, isAdmin } from "@/lib/users/permissions";
+import { canDownloadCsv, canWriteModule, isAdmin } from "@/lib/users/permissions";
 import { pilotScope } from "@/lib/users/record-scope";
 import {
   DISTRICTS_BY_STATE,
@@ -474,6 +476,9 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
     });
   }
 
+  const canExportCsv = canDownloadCsv(currentUser);
+  const csvExportHref = exportLink("/pilots/export", params);
+
   logPerf("pilots page total server render", startedAt);
 
   return (
@@ -484,7 +489,19 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
           title="Pilots"
           description="Plan pilot trials, track visits and collect visit reports."
         />
-        {canWrite ? (
+        {canExportCsv || canWrite ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {canExportCsv ? (
+          <Link
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            href={csvExportHref}
+            prefetch={false}
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            Export CSV
+          </Link>
+          ) : null}
+          {canWrite ? (
           <Link
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
             href="/pilots/new"
@@ -492,6 +509,8 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add pilot
           </Link>
+          ) : null}
+        </div>
         ) : null}
       </div>
 
@@ -581,6 +600,10 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
           Search and filters
         </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Export CSV downloads the Pilots currently visible to your role using
+          these filters.
+        </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="relative md:col-span-2">
             <span className="sr-only">Search pilots</span>

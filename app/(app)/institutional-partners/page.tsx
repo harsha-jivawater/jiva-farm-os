@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   Building2,
   CalendarClock,
+  Download,
   Eye,
   FileText,
   Handshake,
@@ -19,6 +20,7 @@ import { InstitutionStatusPill } from "@/components/institutions/institution-sta
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PageHeader } from "@/components/page-header";
 import { formatDisplayDateTime } from "@/lib/date-utils";
+import { exportLink } from "@/lib/export/csv";
 import {
   institutionStatusOptions,
   labelFor,
@@ -40,6 +42,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import {
+  canDownloadCsv,
   canManageInstitutionProfile,
   hasRole,
   isAdmin
@@ -341,6 +344,8 @@ export default async function InstitutionalPartnersPage({
   }
 
   const kpis = readKpis(kpiResult.data);
+  const canExportCsv = canDownloadCsv(currentUser);
+  const csvExportHref = exportLink("/institutional-partners/export", params);
 
   logPerf("institutional partners page total server render", startedAt);
 
@@ -352,7 +357,19 @@ export default async function InstitutionalPartnersPage({
           title="Institutional Partners"
           description="Track organizations, decision makers, meetings, proposals, and scale-up opportunities."
         />
-        {canWrite ? (
+        {canExportCsv || canWrite ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {canExportCsv ? (
+          <Link
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            href={csvExportHref}
+            prefetch={false}
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            Export CSV
+          </Link>
+          ) : null}
+          {canWrite ? (
           <Link
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
             href="/institutional-partners/new"
@@ -360,6 +377,8 @@ export default async function InstitutionalPartnersPage({
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add institution
           </Link>
+          ) : null}
+        </div>
         ) : null}
       </div>
 
@@ -424,6 +443,10 @@ export default async function InstitutionalPartnersPage({
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
           Search and filters
         </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Export CSV downloads the Institutional Partners currently visible to
+          your role using these filters.
+        </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="relative md:col-span-2">
             <span className="sr-only">Search institutions</span>

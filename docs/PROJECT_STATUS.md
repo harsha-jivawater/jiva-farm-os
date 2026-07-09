@@ -59,7 +59,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.12 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.14 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
@@ -73,6 +73,8 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - The v0.10 update aligns the in-app Help / SOP page with role-wise rollout training: purpose, daily checklist, main pages, handoffs, avoid list, and escalation points.
 - The v0.11 update adds a lightweight Getting Started checklist for account readiness and role-specific first actions.
 - The v0.12 update adds Activity Timeline guidance for important detail pages using existing history records and audit fields.
+- The v0.13 update adds safe CSV export/reporting guidance for role-scoped operational list exports.
+- The v0.14 update adds Admin-controlled per-user CSV download permission guidance.
 
 ## Final Launch Polish
 
@@ -109,6 +111,19 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - Actor names are shown as internal user name and role when the user is already available to the page; raw backend IDs are not shown.
 - Timelines show the latest activity first and limit long histories to the newest items.
 - No generic audit table, SQL migration, schema change, RLS change, permission change, or workflow change was added for this phase.
+
+## CSV Export / Reporting
+
+- Farmer Leads, Dealers, Institutional Partners, Pilots, and Marketing Requests list pages include Export CSV actions.
+- CSV export is controlled by an Admin-managed per-user permission: `Can download CSV files`.
+- The database field is `users.can_download_csv`, defaults to `false`, and must be enabled before any user, including Admin, can download CSV files.
+- CSV exports preserve the current search/filter query where practical and enforce the same role visibility and record-scope rules server-side.
+- CSV export routes check both module access and `can_download_csv`; direct export URLs are blocked when the permission is disabled.
+- Exports are capped at 5,000 rows per request to avoid heavy reporting loads.
+- CSV dates use the app display format, DD/MM/YYYY.
+- CSV files avoid raw backend IDs by default and include readable names, statuses, business fields, and record links.
+- Data Quality and System Health exports are deferred until their page-local warning generation can be safely extracted to shared loaders.
+- A SQL migration adds the `users.can_download_csv` permission flag. No RLS, broad permission, PDF, XLSX, or scheduled-reporting changes were added for this export phase.
 
 ## Role Model
 

@@ -333,6 +333,15 @@ export function canManageDispatch(
   return Boolean(user?.can_manage_dispatch) || hasRole(user, "Stock / Dispatch") || isAdmin(user);
 }
 
+export function canDownloadCsv(
+  user:
+    | (RoleCapableUser & Pick<InternalUser, "can_download_csv">)
+    | null
+    | undefined
+) {
+  return Boolean(user?.can_download_csv);
+}
+
 export function canCreateDealer(
   user: RoleCapableUser | null | undefined
 ) {

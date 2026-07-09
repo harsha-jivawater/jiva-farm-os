@@ -3,6 +3,7 @@ import {
   Award,
   Boxes,
   CheckCircle2,
+  Download,
   Eye,
   FileSignature,
   Pencil,
@@ -18,6 +19,7 @@ import {
 import { DealerStatusPill } from "@/components/dealers/dealer-status-pill";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PageHeader } from "@/components/page-header";
+import { exportLink } from "@/lib/export/csv";
 import {
   dealerAgreementStatusOptions,
   dealerStatusFilterMap,
@@ -54,6 +56,7 @@ import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import {
   canCreateDealer,
+  canDownloadCsv,
   canWriteModule,
   hasRole,
   isAdmin
@@ -419,6 +422,8 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
     (sum, dealer) => sum + dealer.issueReportedInstallations,
     0
   );
+  const canExportCsv = canDownloadCsv(currentUser);
+  const csvExportHref = exportLink("/dealers/export", params);
 
   return (
     <section>
@@ -428,7 +433,19 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
           title="Dealers"
           description="Manage dealer onboarding, territory ownership, stock, and dealer-linked installations."
         />
-        {canCreate ? (
+        {canExportCsv || canCreate ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {canExportCsv ? (
+          <Link
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            href={csvExportHref}
+            prefetch={false}
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            Export CSV
+          </Link>
+          ) : null}
+          {canCreate ? (
           <Link
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
             href="/dealers/new"
@@ -436,6 +453,8 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add dealer
           </Link>
+          ) : null}
+        </div>
         ) : null}
       </div>
 
@@ -496,6 +515,10 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
           Filters
         </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Export CSV downloads the Dealer records currently visible to your role
+          using these filters.
+        </p>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="md:col-span-2">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Clock,
+  Download,
   Eye,
   FileCheck2,
   Megaphone,
@@ -17,6 +18,7 @@ import {
   PriorityPill
 } from "@/components/marketing-requests/marketing-status-pill";
 import { PageHeader } from "@/components/page-header";
+import { exportLink } from "@/lib/export/csv";
 import {
   labelFor,
   marketingRequestPriorityOptions,
@@ -37,6 +39,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   canCreateMarketingRequest,
+  canDownloadCsv,
   canManageMarketingRequests,
   canViewModule
 } from "@/lib/users/permissions";
@@ -246,6 +249,8 @@ export default async function MarketingRequestsPage({
         request.deadline_date < today
     ).length
   };
+  const canExportCsv = canDownloadCsv(currentUser);
+  const csvExportHref = exportLink("/marketing-requests/export", params);
 
   return (
     <section className="space-y-6">
@@ -254,8 +259,19 @@ export default async function MarketingRequestsPage({
         title="Marketing Requests"
         description="Track briefs, assignment, deadlines, draft links, corrections, and final OneDrive delivery links."
       />
-      {canCreate ? (
-        <div className="-mt-3 flex justify-end">
+      {canExportCsv || canCreate ? (
+      <div className="-mt-3 flex flex-col justify-end gap-2 sm:flex-row">
+        {canExportCsv ? (
+        <Link
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+          href={csvExportHref}
+          prefetch={false}
+        >
+          <Download className="h-4 w-4" aria-hidden="true" />
+          Export CSV
+        </Link>
+        ) : null}
+        {canCreate ? (
           <Link
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
             href="/marketing-requests/new"
@@ -263,7 +279,8 @@ export default async function MarketingRequestsPage({
             <Plus className="h-4 w-4" aria-hidden="true" />
             Create Marketing Request
           </Link>
-        </div>
+        ) : null}
+      </div>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -279,6 +296,10 @@ export default async function MarketingRequestsPage({
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <p className="mb-3 text-xs text-slate-500">
+          Export CSV downloads the Marketing Requests currently visible to your
+          role using these filters.
+        </p>
         <LiveFilterForm className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
           <label className="md:col-span-2 xl:col-span-2">
             <span className="mb-1.5 block text-sm font-medium text-slate-700">

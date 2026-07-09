@@ -173,24 +173,53 @@ export function UserForm({
 
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-semibold text-slate-950">Permissions</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            ["can_create_leads", "Can create leads", user?.can_create_leads],
-            ["can_own_pilots", "Can own pilots", user?.can_own_pilots],
-            ["can_confirm_payment", "Can confirm payment", user?.can_confirm_payment],
-            ["can_manage_dispatch", "Can manage dispatch", user?.can_manage_dispatch]
-          ].map(([name, label, checked]) => (
+            {
+              checked: user?.can_create_leads,
+              label: "Can create leads",
+              name: "can_create_leads"
+            },
+            {
+              checked: user?.can_own_pilots,
+              label: "Can own pilots",
+              name: "can_own_pilots"
+            },
+            {
+              checked: user?.can_confirm_payment,
+              label: "Can confirm payment",
+              name: "can_confirm_payment"
+            },
+            {
+              checked: user?.can_manage_dispatch,
+              label: "Can manage dispatch",
+              name: "can_manage_dispatch"
+            },
+            {
+              checked: user?.can_download_csv,
+              helper: "Allows this user to export permitted records as CSV.",
+              label: "Can download CSV files",
+              name: "can_download_csv"
+            }
+          ].map((permission) => (
             <label
-              className="flex min-h-11 items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
-              key={String(name)}
+              className="flex min-h-11 items-start gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
+              key={permission.name}
             >
               <input
-                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                defaultChecked={Boolean(checked)}
-                name={String(name)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                defaultChecked={Boolean(permission.checked)}
+                name={permission.name}
                 type="checkbox"
               />
-              {label}
+              <span>
+                {permission.label}
+                {permission.helper ? (
+                  <span className="mt-1 block text-xs font-normal leading-5 text-slate-500">
+                    {permission.helper}
+                  </span>
+                ) : null}
+              </span>
             </label>
           ))}
         </div>

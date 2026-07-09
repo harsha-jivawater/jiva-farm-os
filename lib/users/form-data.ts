@@ -46,7 +46,8 @@ export function internalUserPayloadFromForm(
     can_create_leads: checkbox(formData, "can_create_leads"),
     can_own_pilots: checkbox(formData, "can_own_pilots"),
     can_confirm_payment: checkbox(formData, "can_confirm_payment"),
-    can_manage_dispatch: checkbox(formData, "can_manage_dispatch")
+    can_manage_dispatch: checkbox(formData, "can_manage_dispatch"),
+    can_download_csv: checkbox(formData, "can_download_csv")
   };
 }
 
