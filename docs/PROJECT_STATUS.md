@@ -46,6 +46,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - Installations
 - Post-installation Follow-ups
 - KPI Dashboard
+- Data Quality
 - Marketing Requests
 - Regions
 - Internal Users
@@ -57,7 +58,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.6 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.7 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
@@ -65,6 +66,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - The v0.4 update adds paid farmer sale dispatch vs free pilot dispatch routing and device pool guidance.
 - The v0.5 update adds soft-delete audit trail and Admin-only restore guidance for Dealers, Institutional Partners, and Pilots.
 - The v0.6 update adds My Pending Work guidance for live role-scoped action lists.
+- The v0.7 update adds Admin/Management Data Quality warning guidance.
 
 ## Role Model
 
@@ -133,6 +135,17 @@ Role notes:
 - It groups pending records into Sales, Dispatch, Pilots & Visits, and Marketing.
 - Normal record visibility is preserved through existing RLS-safe queries and app record-scope helpers.
 - The Home dashboard includes a lightweight My Pending Work card/link without running heavy pending-work count queries.
+
+## Data Quality
+
+- Data Quality is available at `/data-quality`.
+- It is visible only to Admin and Management.
+- It is a live warning/review page built from existing operational records.
+- It is not a stored issue tracker and does not send email notifications.
+- It does not add SQL, schema, hard database constraints, or RLS changes.
+- It does not block user workflows, merge records, delete records, or create cleanup actions.
+- It groups warnings into duplicate farmer leads, duplicate dealers, duplicate institutions, missing assignments, dispatch readiness, pilot setup, and marketing workflow checks.
+- It scans a bounded live set and shows the first 50 warnings per group to protect page performance.
 
 ## Farmer Leads Workflow
 

@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.6
+Version: v0.7
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.7 | 09 Jul 2026 | Draft | Adds Admin/Management Data Quality warnings for duplicate, incomplete, dispatch-readiness, pilot setup, and marketing workflow review. |
 | v0.6 | 09 Jul 2026 | Draft | Adds My Pending Work as a live role-scoped action list for Sales, Dispatch, Pilots & Visits, and Marketing. |
 | v0.5 | 09 Jul 2026 | Draft | Adds soft-delete audit trail, delete reason capture, Admin-only deleted-record views, and restore guidance for Dealers, Institutional Partners, and Pilots. |
 | v0.4 | 09 Jul 2026 | Draft | Adds paid farmer sale dispatch vs free pilot dispatch routing, device pool rules, and dispatch handoff guidance. |
@@ -71,22 +72,22 @@ Notes:
 
 ### Operations Menus
 
-| Role | Home | My Pending Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard | Marketing Requests |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Admin | ✅ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ |
-| Management | ✅ | ✅ | 👁 | 👁 | 👁 | ⚠️ ✏️ | ⚠️ | 🔒 | 👁 | 👁 | 👁 | ✅ | ✅ ✏️ |
-| Sales Head | ✅ | ✅ | ⭐ ✏️ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | ✏️ | ✏️ | 👁 | ✅ | ✏️ ⚠️ |
-| RSM | ✅ | ✅ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | ✏️ ⚠️ |
-| Salesperson | ✅ | ✅ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 👁 ⚠️ | ✏️ ⚠️ |
-| Agronomist | ✅ | ✅ | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | ⭐ ⚠️ | 👁 | 👁 | ✏️ | 👁 | ✅ | ✏️ ⚠️ |
-| Research Assistant | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | ⭐ ✏️ ⚠️ | ⭐ ✏️ | 🔒 | 🔒 | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | ✏️ ⚠️ |
-| R&D Head | ✅ | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | ✅ | ✏️ ⚠️ |
-| Marketing Head | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ |
-| Designer | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ |
-| Accounts | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | ✏️ | ✅ | 🔒 |
-| Stock / Dispatch | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | ✅ | 🔒 |
-| HR & Legal | 🔒 | ✅ | 🔒 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
-| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 |
+| Role | Home | My Pending Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard | Data Quality | Marketing Requests |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Admin | ✅ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ | ✅ ✏️ |
+| Management | ✅ | ✅ | 👁 | 👁 | 👁 | ⚠️ ✏️ | ⚠️ | 🔒 | 👁 | 👁 | 👁 | ✅ | ✅ | ✅ ✏️ |
+| Sales Head | ✅ | ✅ | ⭐ ✏️ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | ✏️ | ✏️ | 👁 | ✅ | 🔒 | ✏️ ⚠️ |
+| RSM | ✅ | ✅ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | 🔒 | ✏️ ⚠️ |
+| Salesperson | ✅ | ✅ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 👁 ⚠️ | 🔒 | ✏️ ⚠️ |
+| Agronomist | ✅ | ✅ | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | ⭐ ⚠️ | 👁 | 👁 | ✏️ | 👁 | ✅ | 🔒 | ✏️ ⚠️ |
+| Research Assistant | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | ⭐ ✏️ ⚠️ | ⭐ ✏️ | 🔒 | 🔒 | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | 🔒 | ✏️ ⚠️ |
+| R&D Head | ✅ | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | ✅ | 🔒 | ✏️ ⚠️ |
+| Marketing Head | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ |
+| Designer | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ |
+| Accounts | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | ✏️ | ✅ | 🔒 | 🔒 |
+| Stock / Dispatch | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | ✅ | 🔒 | 🔒 |
+| HR & Legal | 🔒 | ✅ | 🔒 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
+| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 |
 
 ### Team And Utility Menus
 
@@ -881,6 +882,23 @@ Rules:
 - It groups pending work into Sales, Dispatch, Pilots & Visits, and Marketing.
 - Updating the source record is what clears the pending item.
 
+### Data Quality Review
+
+```mermaid
+flowchart LR
+  A["Open Data Quality"] --> B["Review warnings"]
+  B --> C["Open source record"]
+  C --> D["Correct record through normal workflow"]
+  D --> E["Warning clears when source data is corrected"]
+```
+
+Rules:
+
+- Data Quality is visible to Admin and Management only.
+- It is a live warning page, not a blocking validator.
+- It does not merge, delete, or modify records.
+- It checks duplicates, missing assignments, dispatch readiness, pilot setup, and marketing workflow completeness.
+
 ### Dispatch To Installation
 
 ```mermaid
@@ -962,6 +980,15 @@ flowchart TD
 | Used by | All signed-in roles. |
 | Primary actions | Open pending items and continue work in the source module. |
 | Important rules | This is a live view only. It does not send notifications, store notification rows, or change record permissions. |
+
+### Data Quality
+
+| Item | Detail |
+|---|---|
+| Purpose | Surface duplicate, incomplete, or handoff-risk records before they affect reporting or operations. |
+| Used by | Admin and Management. |
+| Primary actions | Review warnings, open the source record, and correct through the normal module workflow. |
+| Important rules | Warnings only. No hard constraints, no merge/delete actions, no workflow blocking, and no SQL/RLS changes. |
 
 ### Farmer Leads
 

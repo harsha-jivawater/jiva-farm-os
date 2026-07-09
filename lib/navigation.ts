@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Package,
   Palette,
+  ShieldAlert,
   Store,
   Tractor,
   Truck,
@@ -111,6 +112,12 @@ export const teamItems = [
 ] as const;
 
 export const teamWorkflowItems = [
+  {
+    label: "Data Quality",
+    href: "/data-quality",
+    module: "data-quality" satisfies ModuleKey,
+    icon: ShieldAlert
+  },
   {
     label: "Marketing Requests",
     href: "/marketing-requests",
