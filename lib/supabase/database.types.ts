@@ -16,6 +16,7 @@ export type Database = {
           serial_number: string;
           product_model: string;
           device_status: string;
+          inventory_pool: string;
           stock_entry_source: string;
           stock_entered_by_user_id: string;
           created_by_user_id: string;
@@ -60,6 +61,7 @@ export type Database = {
           serial_number: string;
           product_model: string;
           device_status?: string;
+          inventory_pool?: string;
           stock_entry_source?: string;
           stock_entered_by_user_id: string;
           created_by_user_id: string;
@@ -104,6 +106,7 @@ export type Database = {
           serial_number?: string;
           product_model?: string;
           device_status?: string;
+          inventory_pool?: string;
           stock_entry_source?: string;
           stock_entered_by_user_id?: string;
           created_by_user_id?: string;

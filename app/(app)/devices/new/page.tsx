@@ -3,6 +3,8 @@ import { DeviceForm } from "@/components/devices/device-form";
 import { createDeviceAction } from "@/app/(app)/devices/actions";
 import type { Device } from "@/lib/devices/types";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentInternalUser } from "@/lib/users/current-user";
+import { hasAnyRole } from "@/lib/users/permissions";
 
 type NewDevicePageProps = {
   searchParams: Promise<{
@@ -15,6 +17,11 @@ export default async function NewDevicePage({
 }: NewDevicePageProps) {
   const params = await searchParams;
   const supabase = await createClient();
+  const currentUser = await getCurrentInternalUser(supabase, "/devices");
+  const canSetInventoryPool = hasAnyRole(currentUser, [
+    "Admin",
+    "Stock / Dispatch"
+  ]);
   const { data: existingDevices } = await supabase
     .from("devices")
     .select(
@@ -24,6 +31,7 @@ export default async function NewDevicePage({
         "device_code",
         "product_model",
         "device_status",
+        "inventory_pool",
         "stock_entry_source",
         "stock_entry_date",
         "current_holder_type",
@@ -77,6 +85,7 @@ export default async function NewDevicePage({
       <DeviceForm
         action={createDeviceAction}
         cancelHref="/devices"
+        canSetInventoryPool={canSetInventoryPool}
         error={params.error}
         existingDevices={(existingDevices ?? []) as unknown as Device[]}
         mode="create"

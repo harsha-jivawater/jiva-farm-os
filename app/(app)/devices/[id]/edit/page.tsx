@@ -8,7 +8,8 @@ import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   canApproveDeviceReturn,
   canApproveManualDeviceAdjustment,
-  canWriteModule
+  canWriteModule,
+  hasAnyRole
 } from "@/lib/users/permissions";
 import { deviceScope } from "@/lib/users/record-scope";
 
@@ -32,6 +33,10 @@ export default async function EditDevicePage({
   const canEditDevice = canWriteModule(currentUser, "devices");
   const canReviewReturn = canApproveDeviceReturn(currentUser);
   const canReviewManual = canApproveManualDeviceAdjustment(currentUser);
+  const canSetInventoryPool = hasAnyRole(currentUser, [
+    "Admin",
+    "Stock / Dispatch"
+  ]);
 
   if (!canEditDevice && !canReviewReturn && !canReviewManual) {
     notFound();
@@ -73,6 +78,7 @@ export default async function EditDevicePage({
         cancelHref={`/devices/${device.id}`}
         canApproveManualAdjustment={canReviewManual}
         canApproveReturn={canReviewReturn}
+        canSetInventoryPool={canSetInventoryPool}
         device={device}
         error={query.error}
         mode="edit"

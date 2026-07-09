@@ -43,6 +43,15 @@ export const paymentRequirementOptions = [
   { value: "Replacement / No Charge", label: "Replacement / No Charge" }
 ] as const;
 
+export const dispatchRouteOptions = [
+  { value: "Paid Farmer Sale", label: "Paid Farmer Sale" },
+  { value: "Free Pilot", label: "Free Pilot" },
+  {
+    value: "Admin Manual Exception",
+    label: "Manual dispatch — admin exception"
+  }
+] as const;
+
 export const defaultDispatchStatus = "Dispatch Requested";
 export const defaultPaymentRequirementType = "Payment Required";
 

@@ -41,6 +41,11 @@ export const stockEntrySourceOptions = [
   { value: "Manual Adjustment", label: "Manual Adjustment" }
 ] as const;
 
+export const inventoryPoolOptions = [
+  { value: "Fresh Sale", label: "Fresh Sale Device" },
+  { value: "Pilot Stock", label: "Pilot Device" }
+] as const;
+
 export const returnDecisionOptions = [
   { value: "Replace", label: "Replace" },
   { value: "Reject", label: "Reject" }
@@ -55,6 +60,7 @@ export const approvalStatusOptions = [
 
 export const defaultDeviceStatus = "In Warehouse";
 export const defaultHolderType = "Warehouse";
+export const defaultInventoryPool = "Fresh Sale";
 export const defaultStockEntrySource = "Production";
 
 export function labelFor(

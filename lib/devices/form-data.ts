@@ -1,9 +1,11 @@
 import {
   defaultDeviceStatus,
   defaultHolderType,
+  defaultInventoryPool,
   defaultStockEntrySource,
   deviceStatusOptions,
   holderTypeOptions,
+  inventoryPoolOptions,
   productModelOptions,
   returnDecisionOptions,
   stockEntrySourceOptions
@@ -43,6 +45,8 @@ export function devicePayloadFromForm(formData: FormData): DeviceFormPayload {
     product_model: getRequiredText(formData, "product_model"),
     device_status:
       getText(formData, "device_status") ?? defaultDeviceStatus,
+    inventory_pool:
+      getText(formData, "inventory_pool") ?? defaultInventoryPool,
     stock_entry_source:
       getText(formData, "stock_entry_source") ?? defaultStockEntrySource,
     stock_entry_date: getText(formData, "stock_entry_date") ?? todayDate(),
@@ -86,6 +90,10 @@ export function validateDevicePayload(payload: DeviceFormPayload) {
 
   if (!isOptionValue(payload.device_status, deviceStatusOptions)) {
     return "Device status is not valid.";
+  }
+
+  if (!isOptionValue(payload.inventory_pool, inventoryPoolOptions)) {
+    return "Device pool is not valid.";
   }
 
   if (!isOptionValue(payload.current_holder_type, holderTypeOptions)) {
