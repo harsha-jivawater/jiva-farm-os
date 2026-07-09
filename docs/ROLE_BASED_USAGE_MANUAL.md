@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.10
+Version: v0.11
 Status: Draft  
 Last updated: 09 Jul 2026  
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.11 | 09 Jul 2026 | Draft | Adds lightweight Getting Started checklist guidance for account readiness, first actions, and role-specific onboarding inside Help / SOP and Dashboard. |
 | v0.10 | 09 Jul 2026 | Draft | Adds in-app Help / SOP role-wise training guide alignment, including daily checklists, main pages, handoffs, avoid lists, and escalation points for each role. |
 | v0.9 | 09 Jul 2026 | Draft | Final launch polish: updates sidebar navigation groups, session/password guidance, Marketing deadline workflow notes, brief document link guidance, and soft-delete/restore training notes. |
 | v0.8 | 09 Jul 2026 | Draft | Adds Admin/Management System Health for KPI cache, dispatch aging, installation aging, pilot visit risk, marketing risk, and deleted-record visibility. |
@@ -99,6 +100,22 @@ The Help / SOP page is the short in-app training version of this manual. It is o
 - escalation points
 
 The current user's primary and secondary role sections appear first where available. Help / SOP is guidance only; it does not change permissions, RLS, or workflow authority.
+
+### Getting Started Checklist
+
+The Dashboard includes a small Getting Started card that links to Help / SOP. The Help / SOP page includes a dynamic Getting Started Checklist that uses existing profile data only.
+
+It helps users confirm:
+
+- name is present
+- role is present
+- region/state is present where applicable
+- temporary password has been changed where required
+- user has reviewed their role SOP
+- user knows to open My Pending Work
+- user knows to contact Admin for profile/access corrections
+
+The checklist is guidance only. It does not store completed steps, change permissions, or create a new onboarding workflow.
 
 ### Operations Menus
 

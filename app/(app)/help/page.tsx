@@ -15,6 +15,97 @@ type RoleSopSection = {
   escalation: string;
 };
 
+type ChecklistItem = {
+  label: string;
+  status: "ready" | "action" | "review";
+  helper: string;
+};
+
+const rolesRequiringRegionOrState: readonly UserRole[] = [
+  "Sales Head",
+  "RSM",
+  "Salesperson",
+  "Research Assistant"
+];
+
+const firstActionsByRole: Record<UserRole, readonly string[]> = {
+  Admin: [
+    "Review Internal Users.",
+    "Check Data Quality.",
+    "Check System Health.",
+    "Confirm regions and roles are assigned correctly."
+  ],
+  Management: [
+    "Review KPI Dashboard.",
+    "Check Data Quality and System Health.",
+    "Review My Pending Work for operational bottlenecks."
+  ],
+  "Sales Head": [
+    "Check My Pending Work.",
+    "Review Farmer Leads ready for dispatch.",
+    "Review Dealers and Institutional Partners needing action.",
+    "Ensure Sales team users have correct region/state assignments."
+  ],
+  RSM: [
+    "Check My Pending Work.",
+    "Review assigned farmer leads.",
+    "Follow up overdue leads.",
+    "Support Salespersons in assigned region/state."
+  ],
+  Salesperson: [
+    "Check My Pending Work.",
+    "Add or update Farmer Leads.",
+    "Record follow-ups.",
+    "Confirm payment only when proof/process is complete if your role supports it."
+  ],
+  "R&D Head": [
+    "Check Pilots and My Pending Work.",
+    "Review pilots needing device installation or monitoring.",
+    "Review reports needing approval or review."
+  ],
+  Agronomist: [
+    "Check Pilots and My Pending Work.",
+    "Plan and monitor pilot activity.",
+    "Review field observations and reports."
+  ],
+  "Research Assistant": [
+    "Check My Visits.",
+    "Submit Visit Reports.",
+    "Check assigned pilot work.",
+    "Do not mark Pilot Device Installed."
+  ],
+  "Stock / Dispatch": [
+    "Check My Pending Work.",
+    "Create dispatches from paid farmer leads or active pilots only.",
+    "Use the correct device pool.",
+    "Mark dispatch only when a serial-numbered device is assigned."
+  ],
+  Accounts: [
+    "Check payment and dispatch-readiness workflows where visible.",
+    "Support paid farmer sale handoff.",
+    "Do not change field trial data unless explicitly responsible."
+  ],
+  "Marketing Head": [
+    "Open Marketing Requests.",
+    "Review new requests.",
+    "Accept or revise deadlines.",
+    "Assign Designer."
+  ],
+  Designer: [
+    "Open Marketing Requests.",
+    "Check assigned work.",
+    "Add draft/final links and progress updates."
+  ],
+  "HR & Legal": [
+    "Review relevant Dealer or Institutional Partner records where visible.",
+    "Keep access/profile corrections routed through Admin."
+  ],
+  Viewer: [
+    "Use dashboards and permitted pages for read-only visibility.",
+    "Do not expect edit buttons."
+  ]
+};
+
 const roleSopSections: readonly RoleSopSection[] = [
   {
     role: "Admin",
@@ -418,6 +509,64 @@ function slugForRole(role: string) {
   return `role-${role.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 }
 
+function accountReadinessItems(
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>,
+  effectiveRoles: UserRole[]
+): ChecklistItem[] {
+  const needsRegionOrState = effectiveRoles.some((role) =>
+    rolesRequiringRegionOrState.includes(role)
+  );
+  const hasRegionOrState = Boolean(currentUser.region_id || currentUser.state);
+
+  return [
+    {
+      label: "Name present",
+      status: currentUser.full_name ? "ready" : "action",
+      helper: currentUser.full_name
+        ? "Your profile name is set."
+        : "Ask Admin to update your profile."
+    },
+    {
+      label: "Role present",
+      status: currentUser.role ? "ready" : "action",
+      helper: currentUser.role
+        ? `Your role is ${currentUser.role}.`
+        : "Ask Admin to update your profile."
+    },
+    {
+      label: "Region/state present",
+      status: !needsRegionOrState || hasRegionOrState ? "ready" : "action",
+      helper: needsRegionOrState
+        ? hasRegionOrState
+          ? "Your field routing profile has region/state context."
+          : "Ask Admin to update your profile."
+        : "Not required for your current role."
+    },
+    {
+      label: "Password ready",
+      status: currentUser.must_change_password ? "action" : "ready",
+      helper: currentUser.must_change_password
+        ? "Change your temporary password before using the app."
+        : "Your password is ready."
+    },
+    {
+      label: "Read your role SOP",
+      status: "review",
+      helper: "Open your role section below and review the daily checklist."
+    },
+    {
+      label: "Open My Pending Work",
+      status: "review",
+      helper: "Use it as your live action list when your role has pending items."
+    },
+    {
+      label: "Know escalation path",
+      status: "review",
+      helper: "For access or profile corrections, contact Admin."
+    }
+  ];
+}
+
 export default async function HelpPage() {
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/help");
@@ -440,6 +589,72 @@ export default async function HelpPage() {
         records. This guide explains what to do and what to avoid; it does not
         change your permissions.
       </div>
+
+      <section
+        className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+        id="getting-started"
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-brand-700">
+              Getting Started
+            </p>
+            <h2 className="text-xl font-semibold text-slate-950">
+              Account readiness and first steps
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Use this checklist to confirm your profile is ready and know what
+              to open first.
+            </p>
+          </div>
+          <Link
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            href="/my-pending-work"
+          >
+            Open My Pending Work
+          </Link>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-950">
+              Account readiness
+            </h3>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {accountReadinessItems(currentUser, effectiveRoles).map((item) => (
+                <ChecklistStatusCard item={item} key={item.label} />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-slate-950">
+              First actions for your role
+            </h3>
+            <div className="mt-3 space-y-3">
+              {effectiveRoles.map((role) => (
+                <div
+                  className="rounded-md border border-slate-200 bg-slate-50 p-3"
+                  key={role}
+                >
+                  <p className="text-sm font-semibold text-slate-950">{role}</p>
+                  <ul className="mt-2 space-y-2 text-sm leading-6 text-slate-600">
+                    {firstActionsByRole[role].map((action) => (
+                      <li className="flex gap-2" key={action}>
+                        <span
+                          aria-hidden="true"
+                          className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"
+                        />
+                        <span>{action}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <nav
         aria-label="Role SOP quick links"
@@ -547,6 +762,36 @@ function SopList({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function ChecklistStatusCard({ item }: { item: ChecklistItem }) {
+  const statusStyles = {
+    ready: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    action: "border-amber-200 bg-amber-50 text-amber-700",
+    review: "border-slate-200 bg-slate-50 text-slate-700"
+  } satisfies Record<ChecklistItem["status"], string>;
+  const statusLabel = {
+    ready: "Ready",
+    action: "Action needed",
+    review: "Review"
+  } satisfies Record<ChecklistItem["status"], string>;
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="text-sm font-semibold text-slate-950">{item.label}</p>
+        <span
+          className={[
+            "rounded-full border px-2 py-0.5 text-xs font-semibold",
+            statusStyles[item.status]
+          ].join(" ")}
+        >
+          {statusLabel[item.status]}
+        </span>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{item.helper}</p>
     </div>
   );
 }

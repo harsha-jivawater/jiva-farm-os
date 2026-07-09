@@ -59,7 +59,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.10 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.11 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
@@ -71,6 +71,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - The v0.8 update adds Admin/Management System Health guidance for operational risk and process bottlenecks.
 - The v0.9 update adds final launch-polish guidance for sidebar navigation groups, session/password behavior, Marketing deadline workflow, brief document links, and soft-delete/restore training notes.
 - The v0.10 update aligns the in-app Help / SOP page with role-wise rollout training: purpose, daily checklist, main pages, handoffs, avoid list, and escalation points.
+- The v0.11 update adds a lightweight Getting Started checklist for account readiness and role-specific first actions.
 
 ## Final Launch Polish
 
@@ -94,6 +95,10 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - Help / SOP is now a role-wise training guide inside the app.
 - Each role has a compact operating card covering purpose, daily checklist, main pages, key handoffs, what not to do, and escalation points.
 - The signed-in user's primary/secondary role sections are shown first where available.
+- Dashboard includes a lightweight Getting Started card that links to the Help / SOP checklist.
+- Help / SOP includes account readiness checks for name, role, region/state where applicable, and temporary password status.
+- Help / SOP shows first actions for the signed-in user's primary/secondary roles.
+- Getting Started is dynamic guidance only; there is no stored onboarding table or completed-checkbox persistence.
 - The guide is training-only and does not change permissions, RLS, SQL, schema, or business workflow rules.
 
 ## Role Model

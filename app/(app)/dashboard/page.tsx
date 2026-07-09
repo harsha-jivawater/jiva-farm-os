@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Activity,
+  BookOpenCheck,
   CalendarCheck2,
   CalendarClock,
   CircleDollarSign,
@@ -299,6 +300,16 @@ export default async function DashboardPage() {
   const cardsWithToday: CountCard[] = [
     ...(moduleAccess.myPendingWork
       ? [
+          {
+            href: "/help#getting-started",
+            helper: "Check your account readiness and first steps.",
+            icon: BookOpenCheck,
+            includeInToday: false,
+            label: "Getting Started",
+            module: "dashboard" as ModuleKey,
+            value: null,
+            valueLabel: "Open"
+          },
           {
             href: "/my-pending-work",
             helper: "Open a live list of records that need your action.",
