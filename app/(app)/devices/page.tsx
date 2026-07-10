@@ -7,6 +7,7 @@ import {
   Search,
   SlidersHorizontal,
   Store,
+  Truck,
   Upload,
   Warehouse,
   type LucideIcon
@@ -67,7 +68,9 @@ const installedDeviceStatuses = [
   "Installed at Farmer Site",
   "Installed for Pilot"
 ] as const;
-const invalidStockStatuses = ["Damaged", "Lost", "Retired"] as const;
+const warehouseStockDeviceStatuses = ["In Warehouse", "Reserved"] as const;
+const dealerStockDeviceStatus = "With Dealer";
+const inTransitDeviceStatus = "Dispatched";
 const loadErrorMessage = "Unable to load records. Please contact Admin.";
 const queryTimeoutMs = 8_000;
 
@@ -75,6 +78,7 @@ type ProductModel = (typeof productModels)[number];
 type ProductCounts = Record<ProductModel, number>;
 type InventorySummary = {
   dealer: ProductCounts;
+  inTransit: ProductCounts;
   installed: ProductCounts;
   warehouse: ProductCounts;
 };
@@ -140,6 +144,7 @@ function sumProductCounts(counts: ProductCounts) {
 function emptyInventorySummary(): InventorySummary {
   return {
     dealer: emptyProductCounts(),
+    inTransit: emptyProductCounts(),
     installed: emptyProductCounts(),
     warehouse: emptyProductCounts()
   };
@@ -185,14 +190,21 @@ async function loadInventorySummary({
 
     if (
       device.current_holder_type === "Warehouse" &&
-      !invalidStockStatuses.includes(
-        device.device_status as (typeof invalidStockStatuses)[number]
+      warehouseStockDeviceStatuses.includes(
+        device.device_status as (typeof warehouseStockDeviceStatuses)[number]
       )
     ) {
       summary.warehouse[product] += 1;
     }
 
-    if (device.current_holder_type === "Dealer") {
+    if (device.device_status === inTransitDeviceStatus) {
+      summary.inTransit[product] += 1;
+    }
+
+    if (
+      device.current_holder_type === "Dealer" &&
+      device.device_status === dealerStockDeviceStatus
+    ) {
       summary.dealer[product] += 1;
     }
 
@@ -350,7 +362,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
         <PageHeader
           eyebrow="Operations"
           title="Inventory"
-          description="Track warehouse stock, dealer stock, installed devices, and individual device records."
+          description="Track warehouse stock, devices in transit, dealer stock, installed devices, and individual device records."
         />
         {canWrite ? (
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -377,12 +389,18 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
           {loadError}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <InventorySummaryCard
             breakdown={inventorySummary.warehouse}
             icon={Warehouse}
             label="Warehouse Stock"
             value={sumProductCounts(inventorySummary.warehouse)}
+          />
+          <InventorySummaryCard
+            breakdown={inventorySummary.inTransit}
+            icon={Truck}
+            label="In Transit"
+            value={sumProductCounts(inventorySummary.inTransit)}
           />
           <InventorySummaryCard
             breakdown={inventorySummary.dealer}
@@ -412,6 +430,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
                 <tr>
                   <th className="px-4 py-3">Device Model</th>
                   <th className="px-4 py-3 text-right">Warehouse Stock</th>
+                  <th className="px-4 py-3 text-right">In Transit</th>
                   <th className="px-4 py-3 text-right">Dealer Stock</th>
                   <th className="px-4 py-3 text-right">Installed Devices</th>
                 </tr>
@@ -424,6 +443,9 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
                     </td>
                     <td className="px-4 py-3 text-right text-slate-700">
                       {inventorySummary.warehouse[product]}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {inventorySummary.inTransit[product]}
                     </td>
                     <td className="px-4 py-3 text-right text-slate-700">
                       {inventorySummary.dealer[product]}
@@ -442,11 +464,17 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
                 <h3 className="text-base font-semibold text-slate-950">
                   {product}
                 </h3>
-                <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
+                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <dt className="text-slate-400">Warehouse</dt>
                     <dd className="mt-1 font-semibold text-slate-700">
                       {inventorySummary.warehouse[product]}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-400">In Transit</dt>
+                    <dd className="mt-1 font-semibold text-slate-700">
+                      {inventorySummary.inTransit[product]}
                     </dd>
                   </div>
                   <div>

@@ -73,8 +73,7 @@ export const statusRequiresPaymentApproval = [
 
 export const preferredDispatchDeviceStatuses = [
   "In Warehouse",
-  "Reserved",
-  "With Dealer"
+  "Reserved"
 ] as const;
 
 export function labelFor(

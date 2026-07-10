@@ -314,20 +314,27 @@ async function getDevicesForDealerBatchDispatch({
 
 async function ensureNoOpenDispatchForDevices({
   deviceIds,
+  existingDispatchId,
   errorPath,
   supabase
 }: {
   deviceIds: string[];
+  existingDispatchId?: string;
   errorPath: string;
   supabase: SupabaseClient;
 }) {
-  const { data, error } = await supabase
+  let query = supabase
     .from("dispatches")
     .select("id, dispatch_code, device_id")
     .in("device_id", deviceIds)
     .is("deleted_at", null)
-    .neq("dispatch_status", "Cancelled")
-    .limit(1);
+    .neq("dispatch_status", "Cancelled");
+
+  if (existingDispatchId) {
+    query = query.neq("id", existingDispatchId);
+  }
+
+  const { data, error } = await query.limit(1);
 
   if (error) {
     redirectWithError(errorPath, error.message);
@@ -366,6 +373,48 @@ function validateDealerDispatchDeviceEligibility({
     redirectWithError(
       errorPath,
       "Dealer Dispatch devices must still be held in warehouse stock."
+    );
+  }
+}
+
+const warehouseDispatchDeviceStatuses = ["In Warehouse", "Reserved"] as const;
+const movedDispatchStatuses = [
+  "Dispatched",
+  "Delivered",
+  "Installation Pending",
+  "Installed"
+] as const;
+
+function hasMovedDeviceFromWarehouse(status: string | null | undefined) {
+  return (movedDispatchStatuses as readonly string[]).includes(status ?? "");
+}
+
+function validateOutboundDispatchDeviceEligibility({
+  device,
+  errorPath,
+  route
+}: {
+  device: DispatchDeviceOption;
+  errorPath: string;
+  route: string;
+}) {
+  validateDevicePoolForRoute({ device, errorPath, route });
+
+  if (
+    !warehouseDispatchDeviceStatuses.includes(
+      device.device_status as (typeof warehouseDispatchDeviceStatuses)[number]
+    )
+  ) {
+    redirectWithError(
+      errorPath,
+      "Selected device must be in warehouse or reserved stock before dispatch."
+    );
+  }
+
+  if (device.current_holder_type !== "Warehouse") {
+    redirectWithError(
+      errorPath,
+      "Selected device must still be held in warehouse stock before dispatch."
     );
   }
 }
@@ -1006,22 +1055,16 @@ export async function createDispatchAction(formData: FormData) {
     payload.device_id ?? "",
     "/dispatches/new"
   );
-  validateDevicePoolForRoute({
+  validateOutboundDispatchDeviceEligibility({
     device,
     errorPath: "/dispatches/new",
     route: effectiveRoute
   });
-  if (dealerDispatch) {
-    validateDealerDispatchDeviceEligibility({
-      device,
-      errorPath: "/dispatches/new"
-    });
-    await ensureNoOpenDispatchForDevices({
-      deviceIds: [device.id],
-      errorPath: "/dispatches/new",
-      supabase
-    });
-  }
+  await ensureNoOpenDispatchForDevices({
+    deviceIds: [device.id],
+    errorPath: "/dispatches/new",
+    supabase
+  });
   const now = todayDate();
   const shouldMarkApproved = advancedStatus(payload.dispatch_status);
 
@@ -1169,10 +1212,14 @@ export async function updateDispatchAction(id: string, formData: FormData) {
     );
   }
 
-  if (existing.dispatch_status === "Dispatched" && payload.device_id !== existing.device_id) {
+  const existingDispatchMovedDevice = hasMovedDeviceFromWarehouse(
+    existing.dispatch_status
+  );
+
+  if (existingDispatchMovedDevice && payload.device_id !== existing.device_id) {
     redirectWithError(
       `/dispatches/${id}/edit`,
-      "A dispatched record cannot be moved to a different device."
+      "A dispatch that has moved stock cannot be moved to a different device."
     );
   }
 
@@ -1231,11 +1278,19 @@ export async function updateDispatchAction(id: string, formData: FormData) {
     payload.device_id ?? "",
     `/dispatches/${id}/edit`
   );
-  validateDevicePoolForRoute({
-    device,
-    errorPath: `/dispatches/${id}/edit`,
-    route: effectiveRoute
-  });
+  if (!existingDispatchMovedDevice) {
+    validateOutboundDispatchDeviceEligibility({
+      device,
+      errorPath: `/dispatches/${id}/edit`,
+      route: effectiveRoute
+    });
+    await ensureNoOpenDispatchForDevices({
+      deviceIds: [device.id],
+      existingDispatchId: id,
+      errorPath: `/dispatches/${id}/edit`,
+      supabase
+    });
+  }
   const now = todayDate();
   const shouldMarkApproved =
     advancedStatus(payload.dispatch_status) && !existing.approved_by_user_id;
@@ -1305,7 +1360,7 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   }
 
   if (
-    existing.dispatch_status !== "Dispatched" &&
+    !existingDispatchMovedDevice &&
     updatePayload.dispatch_status === "Dispatched"
   ) {
     await applyDispatchedSideEffects({

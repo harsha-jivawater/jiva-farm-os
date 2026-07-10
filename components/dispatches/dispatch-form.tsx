@@ -89,6 +89,13 @@ function dealerLabel(dealer: DispatchDealerOption) {
   return `${dealer.dealer_code} · ${primaryName} · ${dealer.district}, ${dealer.state}`;
 }
 
+function isWarehouseDispatchDevice(device: DispatchDeviceOption) {
+  return (
+    ["In Warehouse", "Reserved"].includes(device.device_status) &&
+    device.current_holder_type === "Warehouse"
+  );
+}
+
 function routeForDispatch(dispatch?: Dispatch) {
   if (dispatch?.dispatch_type === "Farmer Sale Dispatch") {
     return "Paid Farmer Sale";
@@ -280,21 +287,35 @@ export function DispatchForm({
         ? "Dealer"
         : destinationType;
   const filteredDevices = devices.filter((device) => {
+    const isCurrentDispatchDevice =
+      mode === "edit" &&
+      Boolean(dispatch?.device_id) &&
+      device.id === dispatch?.device_id;
+
+    if (isCurrentDispatchDevice) {
+      return true;
+    }
+
     if (isFarmerSaleRoute || isDealerRoute) {
-      return device.inventory_pool === "Fresh Sale";
+      return (
+        device.inventory_pool === "Fresh Sale" &&
+        isWarehouseDispatchDevice(device)
+      );
     }
 
     if (isPilotRoute) {
-      return device.inventory_pool === "Pilot Stock";
+      return (
+        device.inventory_pool === "Pilot Stock" &&
+        isWarehouseDispatchDevice(device)
+      );
     }
 
-    return true;
+    return isWarehouseDispatchDevice(device);
   });
   const dealerDispatchDevices = devices.filter(
     (device) =>
       device.inventory_pool === "Fresh Sale" &&
-      ["In Warehouse", "Reserved"].includes(device.device_status) &&
-      device.current_holder_type === "Warehouse"
+      isWarehouseDispatchDevice(device)
   );
   const visibleDealerDispatchDevices = dealerDispatchDevices.filter((device) => {
     const matchesSearch =

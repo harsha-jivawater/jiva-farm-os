@@ -148,6 +148,7 @@ export default async function EditDispatchPage({
     .select(deviceSelectColumns)
     .is("deleted_at", null)
     .in("device_status", [...preferredDispatchDeviceStatuses])
+    .eq("current_holder_type", "Warehouse")
     .order("serial_number", { ascending: true })
     .limit(200);
   let devices = (preferredDevices ?? []) as unknown as DispatchDeviceOption[];

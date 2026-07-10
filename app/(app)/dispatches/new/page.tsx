@@ -134,6 +134,7 @@ export default async function NewDispatchPage({
     .select(deviceSelectColumns)
     .is("deleted_at", null)
     .in("device_status", [...preferredDispatchDeviceStatuses])
+    .eq("current_holder_type", "Warehouse")
     .order("serial_number", { ascending: true })
     .limit(200);
   const { data: eligibleLeads } = await supabase
