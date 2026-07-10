@@ -563,7 +563,7 @@ export function DispatchForm({
               className="mb-1.5 block text-sm font-medium text-slate-700"
               htmlFor="serial_number_snapshot"
             >
-              Serial number snapshot
+              Serial number
             </label>
             <input
               className={inputClassName()}
