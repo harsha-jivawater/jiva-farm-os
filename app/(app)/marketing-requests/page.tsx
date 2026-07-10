@@ -230,10 +230,13 @@ export default async function MarketingRequestsPage({
     draftShared: requests.filter(
       (request) => request.marketing_status === "Draft Shared"
     ).length,
-    deliveredThisMonth: requests.filter(
+    completedThisMonth: requests.filter(
       (request) =>
-        request.marketing_status === "Delivered" &&
-        Boolean(request.delivered_at && request.delivered_at.slice(0, 10) >= monthStart)
+        request.marketing_status === "Completed" &&
+        Boolean(
+          request.completed_at &&
+            request.completed_at.slice(0, 10) >= monthStart
+        )
     ).length,
     dueSoon: requests.filter(
       (request) =>
@@ -290,8 +293,8 @@ export default async function MarketingRequestsPage({
         <KpiCard icon={Pencil} label="Draft Shared" value={kpis.draftShared} />
         <KpiCard
           icon={FileCheck2}
-          label="Delivered This Month"
-          value={kpis.deliveredThisMonth}
+          label="Completed This Month"
+          value={kpis.completedThisMonth}
         />
       </div>
 

@@ -149,7 +149,7 @@ const inactivePilotStatuses = [
   "Closed - Successful",
   "Parked"
 ];
-const closedMarketingStatuses = ["Cancelled", "Delivered"];
+const closedMarketingStatuses = ["Cancelled", "Completed", "Delivered"];
 const assignedMarketingStatuses = [
   "Accepted",
   "In Progress",

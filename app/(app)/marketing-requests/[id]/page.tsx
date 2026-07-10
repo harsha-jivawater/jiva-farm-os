@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { ArrowUpRight, Pencil } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Pencil } from "lucide-react";
 import {
   addMarketingRequestUpdateAction,
+  markMarketingRequestCompletedAction,
   updateMarketingWorkflowAction
 } from "@/app/(app)/marketing-requests/actions";
 import {
@@ -136,8 +137,18 @@ function relatedLabel(
 
 function currentAction(request: MarketingRequest) {
   const today = new Date().toISOString().slice(0, 10);
-  const open = !["Delivered", "Cancelled"].includes(request.marketing_status);
+  const open = !["Completed", "Delivered", "Cancelled"].includes(
+    request.marketing_status
+  );
   const deadline = finalWorkingDeadline(request);
+
+  if (request.marketing_status === "Completed") {
+    return {
+      helper: "Marketing work is completed and recorded.",
+      label: "Completed",
+      tone: "success"
+    } as const;
+  }
 
   if (request.marketing_status === "Delivered") {
     return {
@@ -205,6 +216,15 @@ function finalWorkingDeadline(request: MarketingRequest) {
 }
 
 function marketingHandoff(request: MarketingRequest, assignedTo: string) {
+  if (request.marketing_status === "Completed") {
+    return {
+      currentStage: "Completed",
+      nextAction: "No active marketing handoff is pending.",
+      nextOwner: "Not assigned",
+      whereNext: "Completion record"
+    };
+  }
+
   if (request.marketing_status === "Delivered") {
     return {
       currentStage: "Delivered",
@@ -333,6 +353,8 @@ export default async function MarketingRequestDetailPage({
   const canWorkflow = canUpdateMarketingWorkflow(currentUser, request);
   const canEditBrief = canEditMarketingRequestBrief(currentUser, request);
   const canComment = canCommentOnMarketingRequest(currentUser, request);
+  const isCompleted =
+    request.marketing_status === "Completed" || Boolean(request.completed_at);
   const marketingUsers = options.users.filter(
     (user) =>
       user.role === "Marketing Head" ||
@@ -347,8 +369,14 @@ export default async function MarketingRequestDetailPage({
   );
   const workflowAction = updateMarketingWorkflowAction.bind(null, request.id);
   const commentAction = addMarketingRequestUpdateAction.bind(null, request.id);
+  const completionAction = markMarketingRequestCompletedAction.bind(
+    null,
+    request.id
+  );
   const workflowStatusOptions = canManage
-    ? marketingRequestStatusOptions
+    ? marketingRequestStatusOptions.filter(
+        (option) => option.value !== "Completed"
+      )
     : marketingRequestStatusOptions.filter((option) =>
         ["In Progress", "Draft Shared", "Corrections Requested"].includes(
           option.value
@@ -420,6 +448,15 @@ export default async function MarketingRequestDetailPage({
           title: "Request delivered"
         }
       : null,
+    request.completed_at
+      ? {
+          actor: actorLabel(userMap, request.completed_by_user_id),
+          category: "Completed",
+          date: request.completed_at,
+          description: "Marketing marked this request completed.",
+          title: "Request completed"
+        }
+      : null,
     ...updates.map((update) => ({
       actor: actorLabel(userMap, update.created_by_user_id),
       category: labelFor(marketingRequestUpdateTypeOptions, update.update_type),
@@ -455,7 +492,9 @@ export default async function MarketingRequestDetailPage({
       ) : null}
       {query.saved ? (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          Marketing Request updated.
+          {query.saved === "completed"
+            ? "Marketing Request marked completed."
+            : "Marketing Request updated."}
         </div>
       ) : null}
       {query.comment_saved ? (
@@ -543,6 +582,38 @@ export default async function MarketingRequestDetailPage({
         </div>
       </SectionPanel>
 
+      <SectionPanel
+        title="Completion tracking"
+        description="Completion is recorded by the system when Marketing marks the work completed."
+      >
+        {isCompleted ? (
+          <div>
+            <InfoRow
+              label="Completed On"
+              value={formatDateTime(request.completed_at)}
+            />
+            <InfoRow
+              label="Completed By"
+              value={userLabel(userMap, request.completed_by_user_id)}
+            />
+          </div>
+        ) : canWorkflow ? (
+          <form action={completionAction}>
+            <button
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+              type="submit"
+            >
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+              Mark as Completed
+            </button>
+          </form>
+        ) : (
+          <p className="text-sm leading-6 text-slate-500">
+            This request is not completed yet.
+          </p>
+        )}
+      </SectionPanel>
+
       <SectionPanel title="Brief">
         <div className="space-y-4">
           <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
@@ -572,7 +643,7 @@ export default async function MarketingRequestDetailPage({
         </div>
       </SectionPanel>
 
-      {canWorkflow ? (
+      {canWorkflow && !isCompleted ? (
         <SectionPanel
           title="Marketing action panel"
           description="Update ownership, status, draft links, final OneDrive link, and delivery progress."

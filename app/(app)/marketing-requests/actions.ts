@@ -240,6 +240,13 @@ export async function updateMarketingWorkflowAction(
     );
   }
 
+  if (existing.marketing_status === "Completed" || existing.completed_at) {
+    redirectWithError(
+      errorPath,
+      "Completed Marketing Requests cannot be changed from the workflow panel."
+    );
+  }
+
   const payload = marketingWorkflowPayloadFromForm(formData);
   const validationError = validateMarketingWorkflowPayload({
     deadline_date: payload.deadline_date ?? existing.deadline_date,
@@ -281,7 +288,16 @@ export async function updateMarketingWorkflowAction(
         delivered_at:
           payload.marketing_status === "Delivered" && !existing.delivered_at
             ? now
-            : existing.delivered_at
+            : existing.delivered_at,
+        completed_at:
+          payload.marketing_status === "Completed" && !existing.completed_at
+            ? now
+            : existing.completed_at,
+        completed_by_user_id:
+          payload.marketing_status === "Completed" &&
+          !existing.completed_by_user_id
+            ? profile.id
+            : existing.completed_by_user_id
       }
     : {
         marketing_status: payload.marketing_status,
@@ -398,6 +414,52 @@ export async function updateMarketingWorkflowAction(
   revalidatePath("/marketing-requests");
   revalidatePath(`/marketing-requests/${existing.id}`);
   redirect(`/marketing-requests/${existing.id}?saved=1`);
+}
+
+export async function markMarketingRequestCompletedAction(id: string) {
+  const errorPath = `/marketing-requests/${id}`;
+  const supabase = await createClient();
+  const profile = await getCurrentInternalUser(supabase, errorPath);
+  const existing = await loadRequestOrRedirect(id, errorPath);
+
+  if (!canUpdateMarketingWorkflow(profile, existing)) {
+    redirectWithError(
+      errorPath,
+      "Your role cannot complete this Marketing Request."
+    );
+  }
+
+  if (existing.marketing_status === "Completed" && existing.completed_at) {
+    redirect(`/marketing-requests/${existing.id}?saved=1`);
+  }
+
+  const now = new Date().toISOString();
+  const updatePayload: MarketingRequestUpdate = {
+    marketing_status: "Completed",
+    completed_at: existing.completed_at ?? now,
+    completed_by_user_id: existing.completed_by_user_id ?? profile.id
+  };
+
+  const { error } = await supabase
+    .from("marketing_requests")
+    .update(updatePayload)
+    .eq("id", existing.id);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  await addHistory(
+    existing.id,
+    profile.id,
+    "Status Update",
+    `Status changed from ${existing.marketing_status} to Completed.`
+  );
+
+  revalidatePath("/marketing-requests");
+  revalidatePath("/my-pending-work");
+  revalidatePath(`/marketing-requests/${existing.id}`);
+  redirect(`/marketing-requests/${existing.id}?saved=completed`);
 }
 
 export async function addMarketingRequestUpdateAction(

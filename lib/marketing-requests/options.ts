@@ -31,6 +31,7 @@ export const marketingRequestStatusOptions = [
   { value: "Draft Shared", label: "Draft shared" },
   { value: "Corrections Requested", label: "Corrections requested" },
   { value: "Delivered", label: "Delivered" },
+  { value: "Completed", label: "Completed" },
   { value: "Cancelled", label: "Cancelled" }
 ] as const;
 

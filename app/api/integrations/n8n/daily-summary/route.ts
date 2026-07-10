@@ -23,7 +23,7 @@ const closedPilotStatuses = new Set([
   "Cancelled"
 ]);
 
-const closedMarketingStatuses = new Set(["Delivered", "Cancelled"]);
+const closedMarketingStatuses = new Set(["Completed", "Delivered", "Cancelled"]);
 
 type HighPriorityItem = {
   category: string;

@@ -2198,6 +2198,8 @@ export type Database = {
           draft_link: string | null;
           final_onedrive_link: string | null;
           delivered_at: string | null;
+          completed_at: string | null;
+          completed_by_user_id: string | null;
           internal_notes: string | null;
           created_at: string;
           updated_at: string;
@@ -2237,6 +2239,8 @@ export type Database = {
           draft_link?: string | null;
           final_onedrive_link?: string | null;
           delivered_at?: string | null;
+          completed_at?: string | null;
+          completed_by_user_id?: string | null;
           internal_notes?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -2276,6 +2280,8 @@ export type Database = {
           draft_link?: string | null;
           final_onedrive_link?: string | null;
           delivered_at?: string | null;
+          completed_at?: string | null;
+          completed_by_user_id?: string | null;
           internal_notes?: string | null;
           created_at?: string;
           updated_at?: string;
