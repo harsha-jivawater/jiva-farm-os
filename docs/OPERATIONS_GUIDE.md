@@ -91,17 +91,18 @@ After Vercel deploys, verify:
 
 Admin smoke test:
 
-- Home opens
+- My Work opens as the home page
 - Sidebar renders correctly
+- Action Center opens Notifications
 - Farmer Leads opens
 - Dealers opens
 - Institutional Partners opens
 - Pilots opens
-- Devices opens
+- Inventory opens
+- Warehouse/In Transit/Dealer/Installed cards load
 - Dispatches opens
 - Installations opens
 - Post-installation Follow-ups opens
-- KPI Dashboard opens
 - Internal Users opens for Admin
 - Regions opens for Admin/Sales Head as permitted
 - Help/SOP opens
@@ -110,8 +111,46 @@ Limited-role smoke tests when permissions are touched:
 
 - Viewer can view permitted pages but cannot create/edit/delete/approve.
 - Accounts can confirm payment but cannot change sales ownership.
-- Customer Service Team can open Devices, Dispatches, Installations, and Farmer Leads as permitted.
-- Agronomist can view all permitted agronomy/operations records and remains view-only for Devices.
+- Customer Service Team can open Inventory, Dispatches, Installations, and Farmer Leads as permitted.
+- Agronomist can view all permitted agronomy/operations records and remains view-only for Inventory/Device Records.
+
+Customer Service / Free Pilot Dispatch smoke tests:
+
+- Eligible Free Pilots appear in Add Dispatch.
+- Existing linked Pilot remains selected on Edit Dispatch.
+- Dispatch Requested → Dispatched saves without reselecting the Pilot.
+- Free Pilot Device holder/location fields update correctly:
+  - holder type: Pilot
+  - holder/link ID: Pilot ID
+  - holder name: Farmer name
+  - location: Village, District, State
+
+Inventory integrity smoke tests:
+
+- A Device with a non-cancelled Dispatch is unavailable for another Dispatch.
+- Warehouse decreases when Device becomes Dispatched.
+- In Transit increases when Device becomes Dispatched.
+- Installed Devices increases when Installation becomes Installed/Verified.
+- Dealer Stock includes only Dealer-held `With Dealer` Devices.
+
+Installation smoke tests:
+
+- Selecting Linked Dispatch auto-populates Device and Farmer Lead.
+- Farmer information changes when Dispatch changes.
+- Mismatched relationships are rejected server-side.
+- Dealer Farmer Installation remains operational.
+
+Marketing smoke tests:
+
+- Marketing user can mark a request Completed.
+- Completed date and completed-by user are displayed.
+- Completed request no longer appears as open work.
+
+CSV import smoke tests:
+
+- Disabled Confirm Import shows the reason.
+- Missing required fields show row-level errors.
+- Valid rows can be imported by authorized roles.
 
 ## CSV Import Notes
 
@@ -144,6 +183,46 @@ Limited-role smoke tests when permissions are touched:
   - `limit 1`
 - If no active Sales Head exists, creation/import must block with a clear error.
 
+## Inventory Operating Rules
+
+Inventory is the user-facing module for physical device stock and serial-numbered device records.
+
+Technical routing:
+
+- `/devices` is the canonical implementation route.
+- `/inventory` redirects to `/devices` for compatibility.
+- Add Device, Edit Device, Device detail, and Device CSV import continue to use the existing device routes.
+
+Current Inventory definitions:
+
+- Warehouse Stock:
+  - `current_holder_type = Warehouse`
+  - `device_status IN (In Warehouse, Reserved)`
+- In Transit:
+  - `device_status = Dispatched`
+- Dealer Stock:
+  - `current_holder_type = Dealer`
+  - `device_status = With Dealer`
+- Installed Devices:
+  - `device_status IN (Installed at Farmer Site, Installed for Pilot)`
+
+All Inventory counts exclude deleted Devices.
+
+Dispatch eligibility:
+
+- Paid Farmer Sale and Dealer Dispatch:
+  - `inventory_pool = Fresh Sale`
+  - `device_status IN (In Warehouse, Reserved)`
+  - `current_holder_type = Warehouse`
+  - no active/non-cancelled Dispatch
+- Free Pilot:
+  - `inventory_pool = Pilot Stock`
+  - `device_status IN (In Warehouse, Reserved)`
+  - `current_holder_type = Warehouse`
+  - no active/non-cancelled Dispatch
+
+The current Dispatch is excluded from duplicate checks on edit, so existing Dispatch records can be saved without falsely blocking themselves.
+
 ## Pilot Operating Rules
 
 - Every pilot requires a Farmer Lead.
@@ -161,6 +240,11 @@ Limited-role smoke tests when permissions are touched:
   - `installation_completed = true`
   - `linked_installation_id`
   - `funnel_stage = "Device Installed"`
+- Add/Edit Installation derives Farmer Lead and Device from the selected Dispatch for Farmer Sale and Pilot installations.
+- Farmer details update when the Linked Dispatch changes.
+- Unrelated Farmer Leads are not shown in dispatch-derived installation flows.
+- Server-side validation rejects mismatched Dispatch, Device, Farmer Lead, or Pilot combinations.
+- Dealer Farmer Installation keeps independent Farmer Lead selection.
 - First post-installation follow-up is created 15 days after installation only if `payment_confirmed = true`.
 - Pilot Installation is excluded from farmer-sale post-installation follow-up creation.
 
@@ -190,12 +274,20 @@ Limited-role smoke tests when permissions are touched:
   - Field / crop photos
   - Supporting farmer document
 
-## KPI And Dashboard Notes
+## My Work And KPI Notes
 
 - Farmer Leads top KPI cards are visible-scope totals, not filtered table totals.
 - Farmer Leads table/list count changes with filters.
 - Crop classification can support future analytics, but current KPI filtering uses crop values.
 - Do not reintroduce full-table KPI fallback queries.
+
+## Applied SQL Deployment Record
+
+These migrations are applied and verified in production:
+
+- `202607100002_marketing_request_completion_tracking.sql`
+- `202607100003_stock_dispatch_pilot_dispatch_lookup.sql`
+- `202607100004_stock_dispatch_pilot_edit_lookup.sql`
 
 ## Future Development Rules
 

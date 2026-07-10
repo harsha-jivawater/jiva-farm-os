@@ -1,6 +1,6 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.15
+Version: v0.17
 Status: Draft  
 Last updated: 10 Jul 2026
 Owner: Jiva Farm OS Admin / Management  
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.17 | 10 Jul 2026 | Draft | Adds My Work as home, Action Center sidebar placement, Inventory lifecycle cards, Dispatch and Free Pilot corrections, Installation auto-linking, Marketing completion tracking, and current operating guidance. |
 | v0.16 | 10 Jul 2026 | Draft | Merges Home/Dashboard into My Work as the primary signed-in landing page while keeping Notifications separate. |
 | v0.15 | 10 Jul 2026 | Draft | Adds Phase 1/2 n8n integration guidance: selected app events can notify n8n, and n8n can pull a secret-protected read-only daily summary. |
 | v0.14 | 09 Jul 2026 | Draft | Adds Admin-controlled per-user CSV download permission guidance. CSV export is off by default and still respects module visibility and record scope. |
@@ -55,7 +56,7 @@ Use it when:
 | Marketing Head | Marketing leadership | Review, assign, progress, and deliver Marketing Requests |
 | Designer | Marketing execution | Work assigned Marketing Requests, share draft/final links, and add comments |
 | Accounts | Finance | Payment confirmation, device/dispatch finance checks |
-| Stock / Dispatch | Customer Service Team | Devices, dispatches, operational installation support |
+| Stock / Dispatch | Customer Service Team | Inventory/device records, dispatches, operational installation support |
 | HR & Legal | Legal / compliance | Dealer and institution legal approval workflows |
 | Viewer | Read-only observer | Read-only visibility across permitted operational modules |
 
@@ -77,6 +78,10 @@ Notes:
 - Help / SOP and Change Password are available to signed-in users.
 - First-login password-change users see only Change Password and Sign out until password is changed.
 - If a user's session expires, they should log in again and return to the page they were using. The app separates expired-session messages from permission-denied messages.
+- My Work is the signed-in landing page for most roles.
+- Dashboard is no longer a separate sidebar item.
+- Action Center sits directly below the logo and opens Notifications.
+- Daily Work contains My Work and My Visits where permitted.
 - Marketing Head and Designer use Marketing Requests as their role home page.
 
 ## 4. Master Role-Menu Access Matrix
@@ -85,12 +90,12 @@ Notes:
 
 | Group | Menus | Training notes |
 |---|---|---|
-| Daily Work | My Work; Notifications; My Visits | Daily action areas. Visit Reports are submitted through My Visits or Pilot detail, not as a standalone sidebar page. |
+| Daily Work | My Work; My Visits | Daily action areas. Notifications open from Action Center. Visit Reports are submitted through My Visits or Pilot detail, not as a standalone sidebar page. |
 | Sales & Partners | Farmer Leads; Dealers; Institutional Partners | Contacts and meetings are managed inside Institutional Partner detail where available. |
 | R&D | Pilots | Pilots stay under R&D only. |
-| Operations | Devices; Dispatches; Installations; Post Installation Follow-ups | Device movement, dispatch, installation, and after-installation work stay under Operations only. |
+| Operations | Inventory; Dispatches; Installations; Post Installation Follow-ups | Inventory/device records, dispatch, installation, and after-installation work stay under Operations only. |
 | Team Workflows | Marketing Requests | Creative request workflow for briefs, deadlines, draft links, comments, and final OneDrive links. |
-| Management | KPI Dashboard; Data Quality; System Health; Regions; Internal Users | Visibility is role-controlled; most items are Admin/Management-only. |
+| Management | Data Quality; System Health; Regions; Internal Users | Visibility is role-controlled; most items are Admin/Management-only. My Work carries role KPI cards and oversight. |
 | Support | Help / SOP; Change Password | Support items are available to signed-in users; Change Password remains available during forced first-login password change. |
 
 ### In-App Help / SOP Training Guide
@@ -183,22 +188,22 @@ Operating rules:
 
 ### Operations Menus
 
-| Role | My Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard | System Health | Data Quality | Marketing Requests |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Admin | ✅ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ | ✅ | ✅ ✏️ |
-| Management | ✅ | ✅ | 👁 | 👁 | 👁 | ⚠️ ✏️ | ⚠️ | 🔒 | 👁 | 👁 | 👁 | ✅ | ✅ | ✅ | ✅ ✏️ |
-| Sales Head | ✅ | ✅ | ⭐ ✏️ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | ✏️ | ✏️ | 👁 | ✅ | 🔒 | 🔒 | ✏️ ⚠️ |
-| RSM | ✅ | ✅ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | 🔒 | 🔒 | ✏️ ⚠️ |
-| Salesperson | ✅ | ✅ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 👁 ⚠️ | 🔒 | 🔒 | ✏️ ⚠️ |
-| Agronomist | ✅ | ✅ | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | ⭐ ⚠️ | 👁 | 👁 | ✏️ | 👁 | ✅ | 🔒 | 🔒 | ✏️ ⚠️ |
-| Research Assistant | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | ⭐ ✏️ ⚠️ | ⭐ ✏️ | 🔒 | 🔒 | ✏️ ⚠️ | 🔒 | ✅ ⚠️ | 🔒 | 🔒 | ✏️ ⚠️ |
-| R&D Head | ✅ | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | ✅ | 🔒 | 🔒 | ✏️ ⚠️ |
-| Marketing Head | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ |
-| Designer | ✅ | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ |
-| Accounts | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | ✏️ | ✅ | 🔒 | 🔒 | 🔒 |
-| Stock / Dispatch | ✅ | ✅ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | ✅ | 🔒 | 🔒 | 🔒 |
-| HR & Legal | 🔒 | ✅ | 🔒 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
-| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 | 🔒 |
+| Role | My Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Inventory | System Health | Data Quality | Marketing Requests |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Admin | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ | ✅ ✏️ |
+| Management | ✅ | ✅ | 👁 | 👁 | 👁 | ⚠️ | 👁 | 👁 | 👁 | 👁 | ✅ | ✅ | ✅ ✏️ |
+| Sales Head | ✅ | ✅ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | ✏️ | 👁 | 🔒 | 🔒 | ✏️ ⚠️ |
+| RSM | ✅ | ✅ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | ✏️ ⚠️ |
+| Salesperson | ✅ | ✅ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | ✏️ ⚠️ |
+| Agronomist | ✅ | 👁 | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | 👁 | 👁 | ✏️ | 👁 | 🔒 | 🔒 | ✏️ ⚠️ |
+| Research Assistant | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 👁 ⚠️ | ⭐ ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ✏️ ⚠️ |
+| R&D Head | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 | ✏️ ⚠️ |
+| Marketing Head | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ |
+| Designer | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ |
+| Accounts | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | 👁 | 🔒 | 🔒 | 🔒 |
+| Stock / Dispatch | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | 🔒 |
+| HR & Legal | 🔒 | 👁 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
+| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 | 🔒 |
 
 ### Team And Utility Menus
 
@@ -234,7 +239,8 @@ Keep the whole operating system clean, correct, and usable.
 | Internal Users | Create users, assign roles, activate/deactivate users | ⭐ ✅ ✏️ |
 | Regions | Maintain region and RSM setup | ⭐ ✅ ✏️ |
 | All operational menus | Review, correct, and unblock workflows | ✅ ✏️ |
-| KPI Dashboard | Refresh cached company KPI dashboard | ✅ |
+| My Work | Review role KPIs, Admin Oversight, and operational bottlenecks | ⭐ ✅ |
+| Data Quality / System Health | Review cleanup warnings and process risk | ⭐ ✅ |
 
 #### Daily workflow map
 
@@ -242,7 +248,7 @@ Keep the whole operating system clean, correct, and usable.
 flowchart LR
   A["System issue"] --> B["Check affected module"]
   B --> C["Correct user / region / workflow data"]
-  C --> D["Refresh KPI Dashboard if needed"]
+  C --> D["Review My Work / System Health"]
   D --> E["Confirm with responsible team"]
 ```
 
@@ -250,7 +256,7 @@ flowchart LR
 
 - Keep roles and secondary roles accurate.
 - Use Regions before assigning RSM-based work.
-- Refresh KPI Dashboard after major data corrections.
+- Review My Work, Data Quality, and System Health after major data corrections.
 - Use Help / SOP to guide users before changing permissions.
 
 #### Don't
@@ -265,7 +271,7 @@ flowchart LR
 |---|---|---|
 | Inactive user | User cannot work in app | Reactivate or replace only after business confirmation |
 | Device Installed | Workflow-controlled stage | Confirm installation record exists |
-| KPI cache stale | Saved KPI dashboard needs refresh | Refresh from KPI Dashboard |
+| KPI/cache stale | Saved or cached operating summary may be stale | Review My Work/System Health and refresh only where the page allows |
 
 #### Escalate to
 
@@ -283,23 +289,23 @@ Review company-wide progress and major pilot/dealer/institution outcomes.
 
 | Menu | What Management does there | Access |
 |---|---|---|
-| Home | Quick operating overview | ✅ |
-| KPI Dashboard | Company KPI review | ✅ |
-| Pilots | Oversight and management-level pilot work | ⚠️ ✏️ |
-| Leads / Dealers / Institutions / Devices / Installations | Review operational state | 👁 |
+| My Work | Company operating overview, KPIs, and Oversight | ⭐ ✅ |
+| Data Quality / System Health | Review cleanup warnings and operational risk | ⭐ ✅ |
+| Pilots | Read-only pilot oversight | 👁 |
+| Leads / Dealers / Institutions / Inventory / Installations | Review operational state | 👁 |
 
 #### Daily workflow map
 
 ```mermaid
 flowchart LR
-  A["Open Home / KPI Dashboard"] --> B["Review sales, pilots, stock, installations"]
+  A["Open My Work"] --> B["Review sales, pilots, stock, installations"]
   B --> C["Open module detail"]
   C --> D["Ask role owner to act"]
 ```
 
 #### Do
 
-- Use KPI Dashboard for company-wide review.
+- Use My Work for company-wide review and oversight.
 - Use details pages to understand blockers.
 - Ask Sales Head, R&D Head, or Admin to update source records.
 
@@ -335,14 +341,14 @@ Own sales pipeline, dealer growth, institution opportunities, regional progress,
 | Farmer Leads | Review and manage pipeline | ⭐ ✏️ |
 | Dealers | Create dealer profiles and track progress | ⭐ ✏️ |
 | Institutional Partners | Create/manage institution opportunities | ⭐ ✏️ |
-| KPI Dashboard | Refresh cached dashboard and review sales KPIs | ⭐ ✅ |
+| My Work | Review sales KPIs, team actions, and dispatch readiness | ⭐ ✅ |
 | Regions | Maintain region setup where allowed | ✏️ |
 
 #### Daily workflow map
 
 ```mermaid
 flowchart LR
-  A["Review KPI Dashboard"] --> B["Check Farmer Leads"]
+  A["Review My Work"] --> B["Check Farmer Leads"]
   B --> C["Check Dealer / Institution pipeline"]
   C --> D["Assign or follow up through RSM"]
   D --> E["Review Dispatch / Installation movement"]
@@ -354,7 +360,7 @@ flowchart LR
 - Use Dealer review and next action to keep dealer progress moving.
 - Use Institutions for partner opportunities and scale-up.
 - Soft-delete Dealers or Institutional Partners only when they should be removed from active views; add a clear delete reason because Admin can audit and restore deleted records later.
-- Refresh KPI Dashboard after data refresh cycles.
+- Use My Work for sales KPIs and team action review.
 
 #### Don't
 
@@ -390,13 +396,13 @@ Manage assigned region/state pipeline, dealer performance, installations, and fo
 | Dealers | Create/manage dealer records in scope | ⭐ ✏️ ⚠️ |
 | Institutional Partners | Manage region-linked institution opportunities | ✏️ ⚠️ |
 | Installations | Track and update region installations | ✏️ ⚠️ |
-| KPI Dashboard | Live scoped RSM KPI view | ⭐ ⚠️ |
+| My Work | Live scoped RSM KPIs and pending work | ⭐ ⚠️ |
 
 #### Daily workflow map
 
 ```mermaid
 flowchart LR
-  A["Open KPI Dashboard"] --> B["Review scoped leads / installations / dealers"]
+  A["Open My Work"] --> B["Review scoped leads / installations / dealers"]
   B --> C["Update Farmer Leads"]
   C --> D["Coordinate Dispatch / Installation"]
   D --> E["Complete follow-up"]
@@ -407,11 +413,11 @@ flowchart LR
 - Keep lead owner, RSM, next action, and follow-up data current.
 - Use Dealer review and next action to drive dealer progress.
 - Use Installations and Follow-ups for field closure.
-- Use live RSM KPI Dashboard for assigned scope.
+- Use My Work for assigned-scope KPIs and pending actions.
 
 #### Don't
 
-- Do not expect company-wide KPI cache behavior; RSM dashboard is live and scoped.
+- Do not expect company-wide visibility; RSM views are live and scoped.
 - Do not update legal approval fields unless the workflow allows it.
 
 #### Common statuses they will see
@@ -441,7 +447,7 @@ Capture and work farmer leads assigned to the salesperson.
 | Farmer Leads | Create and update assigned leads | ⭐ ✏️ ⚠️ |
 | Installations | Work sales-linked installation records | ✏️ ⚠️ |
 | Post Installation Follow-ups | Complete assigned follow-ups | ✏️ ⚠️ |
-| KPI Dashboard | Scoped visibility where available | 👁 ⚠️ |
+| My Work | Scoped visibility and owned actions where available | 👁 ⚠️ |
 
 #### Daily workflow map
 
@@ -491,7 +497,7 @@ Own technical pilot oversight and support Research Assistant field work.
 | Pilots | Create/manage pilots and monitoring plans | ⭐ ✏️ |
 | My Visits | View field visit flow where relevant | ⭐ ⚠️ |
 | Visit Reports through Pilots | Review field notes, evidence, parameters | ⭐ |
-| Farmer Leads / Devices / Installations / Follow-ups | Technical context and follow-up | 👁 / ✏️ where allowed |
+| Farmer Leads / Inventory / Installations / Follow-ups | Technical context and follow-up | 👁 / ✏️ where allowed |
 | Institutional Partners | Manage technical institution profile fields | ✏️ ⚠️ |
 
 #### Daily workflow map
@@ -545,7 +551,7 @@ Complete assigned pilot visits and submit field visit reports.
 | Pilots | Create/update pilot work where allowed | ⭐ ✏️ ⚠️ |
 | Visit Reports through Pilots/My Visits | Enter observations, notes, evidence | ⭐ ✏️ |
 | Farmer Leads | Create/read eligible leads in assigned geography for pilot work | ✏️ ⚠️ |
-| KPI Dashboard | Live user-specific KPI counts | 👁 ⚠️ |
+| My Work | Live user-specific actions and counts | 👁 ⚠️ |
 
 #### Daily workflow map
 
@@ -597,7 +603,7 @@ Review pilot evidence, field reports, technical outcomes, and scale-up readiness
 |---|---|---|
 | Pilots | Review and manage R&D pilot workflows | ⭐ ✏️ |
 | Visit Reports through Pilots | Review reports and evidence | ⭐ |
-| KPI Dashboard | Review R&D and pilot KPIs | ✅ |
+| My Work | Review R&D and pilot KPIs/actions | ✅ |
 | Institutions / Dealers / Farmer Leads | View context | 👁 |
 
 #### Daily workflow map
@@ -613,7 +619,7 @@ flowchart LR
 #### Do
 
 - Review final pilot reports and scale-up evidence.
-- Use KPI Dashboard for R&D/Agronomist/RA performance.
+- Use My Work for R&D/Agronomist/RA performance signals and pending actions.
 - Approve external sharing only when appropriate.
 
 #### Don't
@@ -657,19 +663,20 @@ flowchart LR
   D --> E["Share draft link"]
   E --> F["Handle corrections"]
   F --> G["Add final OneDrive link"]
-  G --> H["Mark delivered"]
+  G --> H["Mark delivered / completed"]
 ```
 
 #### Do
 
 - Keep deadline decision, status, assigned owner, draft link, and final OneDrive link current.
 - Use comments for clarification, corrections, and delivery notes.
+- Mark requests Completed when marketing work is finished; the app records completed date and completed-by user automatically.
 - Keep heavy design files in local drive / OneDrive, not in the app.
 
 #### Don't
 
 - Do not upload large design assets into Jiva Farm OS.
-- Do not mark delivered without a final link when one is expected.
+- Do not mark delivered/completed without a final link when one is expected.
 
 #### Escalate to
 
@@ -697,7 +704,7 @@ flowchart LR
   B --> C["Work outside app"]
   C --> D["Add draft link"]
   D --> E["Handle corrections"]
-  E --> F["Add final OneDrive link"]
+  E --> F["Add final OneDrive link / completion update"]
 ```
 
 #### Do
@@ -705,6 +712,7 @@ flowchart LR
 - Update progress when work moves to In Progress, Draft Shared, or Corrections Requested.
 - Add draft and final links when available.
 - Add comments when clarification is needed.
+- Mark assigned work Completed only when your current permissions allow editing that request and the work is actually finished.
 
 #### Don't
 
@@ -728,9 +736,9 @@ Confirm payment and support finance-controlled dispatch readiness.
 | Menu | What Accounts does there | Access |
 |---|---|---|
 | Dispatches | Review payment-related dispatch readiness | ⭐ ✏️ |
-| Devices | Device/stock visibility where allowed | ✏️ |
+| Inventory | Device/stock visibility where allowed | 👁 |
 | Farmer Leads | View lead payment context | 👁 ⚠️ |
-| KPI Dashboard | Operational KPI visibility | 👁 |
+| My Work | Payment/dispatch readiness and operational KPI visibility | 👁 |
 
 #### Daily workflow map
 
@@ -746,6 +754,8 @@ flowchart LR
 - Confirm payment only when verified.
 - Keep payment evidence and references accurate.
 - Coordinate with Stock / Dispatch after payment confirmation.
+- Confirm Dealer Dispatch payment before Dealer stock dispatch moves forward.
+- Use Inventory for read-only stock visibility where permitted.
 
 #### Don't
 
@@ -776,11 +786,11 @@ Manage device stock, dispatch movement, and installation handoff.
 
 | Menu | What Stock / Dispatch does there | Access |
 |---|---|---|
-| Devices | Maintain device stock and status | ⭐ ✏️ |
+| Inventory | Maintain device stock and status | ⭐ ✏️ |
 | Dispatches | Create/update dispatch movement | ⭐ ✏️ |
 | Installations | Support installation workflow | ⭐ ✏️ |
 | Farmer Leads | Update operational lead workflow where allowed | ✏️ ⚠️ |
-| KPI Dashboard | Stock and dispatch KPI visibility | 👁 |
+| My Work | Stock and dispatch KPI visibility and actions | 👁 |
 
 #### Daily workflow map
 
@@ -801,6 +811,10 @@ flowchart LR
 - Use Fresh Sale devices for paid farmer sale dispatches.
 - Use Fresh Sale devices for Dealer Dispatch.
 - Use Pilot Stock devices for free pilot dispatches.
+- Use eligible Free Pilot lookup from Dispatch; Customer Service Team does not get broad Pilots module access.
+- Confirm existing linked Pilot remains selected on Dispatch Edit.
+- Remember a Device cannot be dispatched twice while an active/non-cancelled Dispatch exists.
+- Status changes to `Dispatched` update Device lifecycle and create one movement record.
 - Use Installations for field installation records.
 
 #### Don't
@@ -809,6 +823,7 @@ flowchart LR
 - Do not mark a Farmer Lead dispatched until dispatch status is `Dispatched`.
 - Do not mark Pilot Device Installed from dispatch creation.
 - Do not change pilot technical results.
+- Do not reassign a moved Dispatch to another Device.
 
 #### Common statuses they will see
 
@@ -883,7 +898,7 @@ Read operational information without changing records.
 | Menu | What Viewer does there | Access |
 |---|---|---|
 | Operational modules | Read records and statuses | 👁 |
-| KPI Dashboard | Read KPI summaries | 👁 |
+| My Work | Read permitted summaries and actions | 👁 |
 | Help / SOP | Learn workflows | ✅ |
 | Change Password | Account security | ✅ |
 
@@ -975,6 +990,7 @@ flowchart LR
   D --> E["Corrections"]
   E --> F["Final OneDrive Link"]
   F --> G["Delivered"]
+  G --> H["Completed"]
 ```
 
 Rules:
@@ -983,6 +999,8 @@ Rules:
 - Admin, Management, and Marketing Head can accept the requested deadline or propose a revised working deadline.
 - Designers work from assigned requests and update draft/final links; they do not control final deadline acceptance unless they also have a management/marketing-head role.
 - Heavy design files stay outside the app; Jiva Farm OS stores the request, links, comments, and status trail.
+- Completed requests record completed date and completed-by user automatically.
+- Completed requests are closed work in My Work, Data Quality, System Health, and n8n daily summary, but remain visible in Marketing Requests.
 
 ### My Work Triage
 
@@ -1066,6 +1084,8 @@ Rules:
 - Farmer destination details come from the selected Farmer Lead.
 - Manual farmer destination entry is not part of the normal paid sale path.
 - `device_dispatched` changes only when dispatch status becomes `Dispatched`.
+- The selected Device must be Fresh Sale, in Warehouse/Reserved, held by Warehouse, and have no active/non-cancelled Dispatch.
+- Dispatch Edit excludes the current Dispatch from duplicate checking.
 
 ### Free Pilot Dispatch
 
@@ -1084,6 +1104,9 @@ Rules:
 - Pilot dispatch does not require payment.
 - Pilot dispatch uses Pilot Stock devices only.
 - Dispatch creation does not mark Pilot Device Installed.
+- Customer Service Team can select eligible Free Pilots for dispatch through narrow lookup access, but does not get Pilots navigation or edit access.
+- Existing linked Pilot remains selected on Dispatch Edit and does not need to be reselected when changing status.
+- When Free Pilot Dispatch becomes `Dispatched`, the Device holder type is Pilot, the linked holder ID is the Pilot ID, the holder name is the Farmer name, and the location is Village, District, State.
 - If a non-cancelled pilot dispatch already exists, create another only after business review.
 
 ### Dealer Dispatch
@@ -1104,6 +1127,7 @@ Rules:
 
 - Dealer Dispatch must be created from a selected Dealer.
 - Dealer Dispatch uses Fresh Sale devices only.
+- The selected Device must be in Warehouse/Reserved, held by Warehouse, and have no active/non-cancelled Dispatch.
 - Dealer Dispatch can select multiple eligible devices in one submission, but each serial-numbered device still gets its own dispatch row and movement history.
 - Dealer Dispatch is a paid sale from Jiva to the Dealer.
 - Accounts/Admin must confirm dealer payment before Stock / Dispatch can mark it Dispatched.
@@ -1130,6 +1154,11 @@ flowchart TD
   C --> C1["Manage pilot and device-installed authority where allowed"]
   D --> D1["Can set Approved for External Sharing"]
 ```
+
+Future/deferred R&D workflow decision:
+
+- The future Agronomist-created Monitoring Plan submission and R&D Head approval workflow is not documented as implemented.
+- Current production behavior remains based on existing Pilot, Monitoring Plan, My Visits, Visit Reports, and R&D review permissions.
 
 ## 7. Menu-By-Menu Guide
 
@@ -1239,14 +1268,14 @@ Dispatch creation routes:
 | Primary actions | Complete follow-up, capture issue, create technical report where allowed. |
 | Important rules | Technical report creation is Admin, Management, R&D Head, Agronomist, or Research Assistant. |
 
-### Devices
+### Inventory and Device Records
 
 | Item | Detail |
 |---|---|
-| Purpose | Manage stock, serial numbers, status, location, and device lifecycle. |
+| Purpose | Manage warehouse stock, in-transit stock, dealer stock, installed devices, serial numbers, status, location, and device lifecycle. |
 | Used by | Admin, Management, Sales Head, Accounts, Stock / Dispatch, Agronomist, R&D Head, Viewer. |
 | Primary actions | Add/update device status, track warehouse/dealer/farmer/pilot/device return. |
-| Important rules | Agronomist is view-only for Devices. Stock / Dispatch owns operational stock movement. |
+| Important rules | `/devices` is the canonical technical route and `/inventory` redirects to it. Agronomist is view-only for Inventory. Stock / Dispatch owns operational stock movement. |
 
 Device pool:
 
@@ -1254,23 +1283,14 @@ Device pool:
 - Pilot Device: used for free pilot dispatches.
 - Admin and Stock / Dispatch can set the device pool on device create/edit.
 
-### KPI Dashboard
-
-| Item | Detail |
-|---|---|
-| Purpose | KPI summary by role and scope. |
-| Used by | All operational roles except HR & Legal. |
-| Primary actions | Review KPIs; Admin/Management/Sales Head can refresh cached dashboard. |
-| Important rules | Admin/Management/Sales Head use cached company dashboard. RSM uses live scoped KPIs. Research Assistant uses live user-specific KPI counts. |
-
 ### Marketing Requests
 
 | Item | Detail |
 |---|---|
 | Purpose | Track marketing briefs, brief document links, requested/final deadlines, assignment, corrections, draft links, final OneDrive links, and delivery status. |
 | Used by | Admin, Management, Sales Head, RSM, Salesperson, Agronomist, Research Assistant, R&D Head, Marketing Head, Designer. |
-| Primary actions | Create request, review brief, assign owner, share draft/final links, add comments, mark delivered where allowed. |
-| Important rules | Heavy design files stay outside the app. The in-app brief is required; the brief document link is optional. Admin, Management, and Marketing Head can accept the requested deadline or propose a revised working deadline. OneDrive link is optional until delivery. Accounts, Stock / Dispatch, HR & Legal, and Viewer do not create requests by default. |
+| Primary actions | Create request, review brief, assign owner, share draft/final links, add comments, mark delivered/completed where allowed. |
+| Important rules | Heavy design files stay outside the app. The in-app brief is required; the brief document link is optional. Admin, Management, and Marketing Head can accept the requested deadline or propose a revised working deadline. OneDrive link is optional until delivery. Completed requests record completed date and completed-by user automatically and are closed work. Accounts, Stock / Dispatch, HR & Legal, and Viewer do not create requests by default. |
 
 ### Regions
 
@@ -1356,7 +1376,7 @@ Device pool:
 |---|---|---|---|
 | Planned | Pilot created but not active | Agronomist / R&D | Pilots |
 | Approved | Pilot approved | Agronomist / RA | Pilots |
-| Device Assigned | Device selected | Stock / Dispatch / Agronomist | Pilots / Devices |
+| Device Assigned | Device selected | Stock / Dispatch / Agronomist | Pilots / Inventory |
 | Device Dispatched | Device sent for pilot | Stock / Dispatch | Dispatches / Pilots |
 | Device Installed | Pilot device installed | Agronomist / R&D / Admin | Pilots |
 | Monitoring Active | Field monitoring is active | RA / Agronomist | My Visits / Pilots |
@@ -1437,21 +1457,21 @@ Device pool:
 
 | Status | Meaning | Who acts next | Menu |
 |---|---|---|---|
-| In Warehouse | Available stock | Stock / Dispatch | Devices |
-| Reserved | Held for workflow | Stock / Dispatch | Devices |
-| Dispatch Approved | Ready for dispatch | Stock / Dispatch | Devices / Dispatches |
+| In Warehouse | Available stock | Stock / Dispatch | Inventory |
+| Reserved | Held for workflow | Stock / Dispatch | Inventory |
+| Dispatch Approved | Ready for dispatch | Stock / Dispatch | Inventory / Dispatches |
 | Dispatched | Sent out | Stock / Dispatch | Dispatches |
-| With Dealer | Dealer holds stock | RSM / Dealer owner | Dealers / Devices |
-| With Farmer | Farmer has device | Installation/follow-up owner | Devices |
+| With Dealer | Dealer holds stock | RSM / Dealer owner | Dealers / Inventory |
+| With Farmer | Farmer has device | Installation/follow-up owner | Inventory |
 | Installed at Farmer Site | Farmer installation complete | Follow-up owner | Installations / Follow-ups |
 | Installed for Pilot | Pilot device installed | Agronomist / R&D | Pilots |
-| Returned | Device returned | Stock / Dispatch | Devices |
-| Replacement | Replacement device | Stock / Dispatch | Devices |
+| Returned | Device returned | Stock / Dispatch | Inventory |
+| Replacement | Replacement device | Stock / Dispatch | Inventory |
 | Reinstalled | Reinstalled device | Installation owner | Installations |
-| Damaged | Damaged stock | Stock / Dispatch / Admin | Devices |
-| Hold | Temporarily blocked | Stock / Dispatch | Devices |
-| Lost | Lost device | Admin / Stock | Devices |
-| Retired | Retired device | Admin / Stock | Devices |
+| Damaged | Damaged stock | Stock / Dispatch / Admin | Inventory |
+| Hold | Temporarily blocked | Stock / Dispatch | Inventory |
+| Lost | Lost device | Admin / Stock | Inventory |
+| Retired | Retired device | Admin / Stock | Inventory |
 
 ## 9. Role-Specific Important Rules
 
@@ -1471,15 +1491,15 @@ Device pool:
 | Evidence Uploads includes Report photos and Report data sheet. | Visit report form. |
 | Approved for External Sharing is hidden from Research Assistant. | Visit report form. |
 | Only Admin, Management, and R&D Head can set/change approved_for_partner_sharing. | Pilot actions server-side guard. |
-| RSM KPI Dashboard uses live scoped KPIs. | KPI Dashboard page. |
-| Research Assistant KPI Dashboard uses live user-specific KPI counts. | KPI Dashboard page. |
-| Admin/Management/Sales Head KPI Dashboard uses cached company dashboard. | KPI Dashboard page/cache RPC path. |
+| My Work shows role-specific KPIs and pending work. | My Work page. |
+| RSM My Work uses live scoped KPI/action data. | My Work page. |
+| Research Assistant My Work uses live user-specific counts and visit actions. | My Work page. |
 
 ## 10. Items To Confirm With Harsha
 
 | Item | Why it needs confirmation |
 |---|---|
 | Management write access in Pilots | Code permits Management in Pilot write roles, but day-to-day ownership appears R&D/Agronomist-led. |
-| Salesperson KPI Dashboard content | Salesperson can view KPI Dashboard, but current visible KPI sections may be limited compared with RSM/RA. |
-| HR & Legal Home access | Code does not include HR & Legal in Home/Dashboard view roles; they still get Help and Change Password. |
+| Salesperson My Work content | Salesperson can view My Work, but visible KPI/action sections may be limited compared with supervisory roles. |
+| HR & Legal home access | Code does not include HR & Legal in the main home view roles; they still get Help and Change Password. |
 | Viewer My Visits usefulness | Viewer can see Pilot module and My Visits menu because My Visits uses Pilot access, but it remains read-only. |

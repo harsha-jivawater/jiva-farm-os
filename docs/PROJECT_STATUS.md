@@ -11,11 +11,13 @@
 - Current production branch: `main`
 - Stack: Next.js App Router, TypeScript, Tailwind CSS, Supabase Auth/Database/Storage, Vercel
 
-Jiva Farm OS is the production operating system for Jiva Water's farmer sales, dealer network, institutional partner, pilot, device, dispatch, installation, follow-up, internal user, regional, and KPI workflows.
+Jiva Farm OS is the production operating system for Jiva Water's farmer sales, dealer network, institutional partner, pilot, inventory, dispatch, installation, follow-up, marketing, internal user, regional, and management workflows.
 
-Marketing Requests has been added as a SQL-dependent Team Workflows module for internal creative requests. Apply the Marketing Requests migration in Supabase before deploying code that uses the module.
+My Work is the primary signed-in home page. The former Dashboard route remains only as a compatibility redirect to My Work.
 
-Dispatch creation now depends on the device inventory pool migration. Apply the device inventory pool migration before deploying code that separates Fresh Sale devices from Pilot Stock devices.
+Inventory is the user-facing module for device stock and serial-numbered device records. `/devices` remains the canonical technical implementation route, and `/inventory` redirects to `/devices` for compatibility.
+
+Action Center is the global notification entry directly below the logo. Daily Work contains My Work and My Visits.
 
 ## Deployment State
 
@@ -40,25 +42,25 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - Pilot Visit Planning
 - My Visits
 - Visit Reports
-- Devices
+- Inventory and Device Records
 - Dispatches
 - Installations
 - Post-installation Follow-ups
-- KPI Dashboard
+- Action Center / Notifications
 - System Health
 - Data Quality
-- Marketing Requests
+- Marketing Requests with completion tracking
 - Regions
 - Internal Users
 - Help/SOP
 - Auth/password routes
 - Password change/reset
 - Force first-login password change
-- CSV import for Farmer Leads and Devices
+- CSV import for Farmer Leads and Devices with validation feedback
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.15 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.17 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
@@ -76,20 +78,93 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - The v0.14 update adds Admin-controlled per-user CSV download permission guidance.
 - The v0.15 update adds Phase 1/2 n8n integration guidance for outbound events and a secret-protected daily summary.
 - The v0.16 update folds Home/Dashboard into My Work as the primary signed-in landing page.
+- The v0.17 update adds My Work as home, Action Center sidebar placement, Inventory lifecycle cards, Dispatch and Free Pilot corrections, Installation auto-linking, Marketing completion tracking, and current operating guidance.
+
+## Current Production Update — 10 July 2026
+
+### My Work and navigation
+
+- My Work is the primary signed-in home page at `/my-pending-work`.
+- `/dashboard` redirects to My Work for compatibility.
+- My Work combines role-specific KPI cards, My Actions, Team Actions, and Admin/Management Oversight.
+- Duplicate business items are deduplicated before display.
+- Action Center sits directly below the logo and opens `/notifications`.
+- Notifications is no longer listed under Daily Work.
+
+### Inventory lifecycle
+
+- Inventory is the user-facing module for device stock and serial-numbered device records.
+- `/devices` is the canonical technical route; `/inventory` redirects to `/devices`.
+- Inventory cards show Warehouse Stock, In Transit, Dealer Stock, and Installed Devices.
+- Product breakdowns cover Vipasa, Dihanga, and Jahnavi.
+- Warehouse and Dealer counts require coherent Device status and holder state.
+- Inventory summary uses scoped counts instead of loading all Device rows into TypeScript.
+
+### Dispatch duplicate protection
+
+- Devices with an active/non-cancelled Dispatch cannot be selected or submitted for another Dispatch.
+- Duplicate protection applies to single-device Dispatch routes.
+- Dispatch Edit excludes the current Dispatch from duplicate checks.
+- Existing moved Dispatches cannot be reassigned to a different Device.
+- The first transition to `Dispatched` creates one Device Movement; later saves do not create duplicate movement rows.
+
+### Free Pilot Customer Service workflow
+
+- Customer Service Team uses DB role `Stock / Dispatch`.
+- Customer Service can select eligible Free Pilots through narrow RLS-backed lookup access.
+- Customer Service does not get Pilots navigation, broad Pilot browsing, or Pilot edit access.
+- Existing linked Pilot stays selected on Dispatch Edit.
+- Status changes can be saved without reselecting the Pilot.
+- Free Pilot Device mapping stores holder type as Pilot, Pilot ID as holder/link, Farmer name as the physical holder name, and Village, District, State as the current location.
+
+### Installation Dispatch/Farmer Lead linking
+
+- Farmer Sale and Pilot Installation Add/Edit derive Farmer Lead and Device from the selected Dispatch.
+- Farmer details update when Linked Dispatch changes.
+- Unrelated Farmer Leads are not shown in dispatch-derived installation flows.
+- Dealer Farmer Installation keeps independent Farmer Lead selection.
+- Server-side validation rejects mismatched Dispatch, Device, Farmer Lead, or Pilot combinations.
+
+### Marketing completion tracking
+
+- Marketing Requests includes a `Completed` status.
+- Completion date and completed-by user are recorded by the system.
+- Completed requests are closed work in My Work, Data Quality, System Health, and n8n daily summary.
+
+### CSV import feedback
+
+- Confirm Import explains why it is disabled.
+- Missing required values show row-level field messages.
+- Invalid rows and missing cells are visually highlighted.
+- Import permissions, RLS, and business rules remain unchanged.
+
+### Mobile validation
+
+- Indian mobile-number normalization and validation is centralized.
+- Farmer Leads, Dealers, Institutions, Pilots, Installations, internal users, CSV import, contact matching, and Data Quality use the shared validation.
+- Stored mobile format remains a normalized 10-digit Indian mobile number.
+
+### Performance optimization
+
+- Inventory summary uses scoped exact counts.
+- My Work loaders are role-gated and failure-isolated.
+- Marketing Requests list uses explicit columns and parallel data loading.
+- Sidebar background prefetch was reduced to avoid unnecessary authenticated page queries.
+- No SQL, schema, RLS, or permission changes were required for the performance pass.
 
 ## Final Launch Polish
 
 - Sidebar navigation is grouped for rollout readiness:
-  - Daily Work: My Work, Notifications, My Visits.
+  - Daily Work: My Work, My Visits.
   - Sales & Partners: Farmer Leads, Dealers, Institutional Partners.
   - R&D: Pilots.
-  - Operations: Devices, Dispatches, Installations, Post Installation Follow-ups.
+  - Operations: Inventory, Dispatches, Installations, Post Installation Follow-ups.
   - Team Workflows: Marketing Requests.
-  - Management: KPI Dashboard, Data Quality, System Health, Regions, Internal Users.
+  - Management: Data Quality, System Health, Regions, Internal Users.
   - Support: Help / SOP, Change Password.
 - Navigation grouping is presentation-only; role visibility continues to use existing module permissions.
 - Pilots stay under R&D only.
-- Devices, Dispatches, Installations, and Post Installation Follow-ups stay under Operations only.
+- Inventory, Dispatches, Installations, and Post Installation Follow-ups stay under Operations only.
 - Launch-facing empty states and action labels were clarified on core list/detail pages.
 - Field-user mobile touch targets were checked, with the Farmer Lead dispatch CTA made full-width on phones.
 - No SQL, schema, RLS, business permission, or workflow-rule changes were made in the launch polish pass.
@@ -192,6 +267,9 @@ Role notes:
 - Accounts, Stock / Dispatch, HR & Legal, and Viewer do not see/create Marketing Requests by default unless a future secondary-role decision explicitly grants access.
 - Admin, Management, and Marketing Head can manage all requests.
 - Designers can work assigned requests and update progress/draft/final links.
+- Marketing users with edit access can mark a request `Completed`.
+- Completed requests capture completion date and completed-by user automatically.
+- Completed requests remain visible in the Marketing module but no longer appear as open work in My Work, Data Quality, System Health, or n8n daily summary.
 - Requesters can edit core brief details only while the request is `Requested` or `Needs Clarification`; after that they add comments/corrections.
 - No seed/demo/test data was added for this module.
 
@@ -291,6 +369,10 @@ Default Sales Head fallback routing:
   - Paid Farmer Sale: selected paid Farmer Lead, Fresh Sale device only.
   - Free Pilot: selected active Pilot, Pilot Stock device only.
   - Dealer Dispatch: selected Dealer, Fresh Sale device only.
+- Devices with an active/non-cancelled Dispatch cannot be selected or submitted for another Dispatch.
+- Dispatch Edit excludes the current Dispatch from duplicate checks so the existing linked Device can remain selected.
+- Existing moved Dispatches cannot be reassigned to a different Device.
+- First transition to `Dispatched` creates one Device Movement. Later saves do not create duplicate Device Movement rows.
 - Dealer Dispatch is a paid sale from Jiva to the Dealer. It does not count as a farmer sale, does not require a paid Farmer Lead or Pilot, and does not mark any Farmer Lead as dispatched.
 - Dealer Dispatch requires Accounts/Admin payment confirmation before Stock / Dispatch can mark it Dispatched.
 - Dealer Dispatch uses existing dispatch payment fields: `payment_requirement_type = Payment Required`, `payment_confirmed`, `payment_confirmed_by_user_id`, and `payment_confirmed_date`.
@@ -306,6 +388,18 @@ Default Sales Head fallback routing:
   - Fresh Sale Device
   - Pilot Device
 - Existing devices default to Fresh Sale when the migration is applied because the earlier schema did not reliably identify pilot-only stock.
+
+Free Pilot dispatch behavior:
+
+- Customer Service Team can select eligible Free Pilots for dispatch through narrow RLS-backed lookup access.
+- Customer Service Team does not get general Pilots navigation or Pilot edit access.
+- Existing linked Pilot remains selected on Dispatch Edit.
+- Pilot does not need to be selected again when changing Dispatch status.
+- When a Free Pilot Dispatch becomes `Dispatched`, the Device holder snapshot represents the physical holder:
+  - `current_holder_type = Pilot`
+  - holder/link ID is the Pilot ID
+  - holder name is the Farmer name
+  - location is Village, District, State
 
 ## Field Visit Reporting And Mobile UX
 
@@ -390,6 +484,10 @@ Backend impact:
   - `farmer_leads.funnel_stage = "Device Installed"`
 - Farmer Sale / Dealer Farmer Installation creates the first post-installation follow-up due 15 days after installation only if `payment_confirmed = true`.
 - Dealer Farmer Installation validates that the selected device came from a Dealer Dispatch to the same dealer and has not already been linked to another active installation.
+- Add/Edit Installation derives Farmer Lead and Device from the selected Dispatch for Farmer Sale and Pilot installations.
+- Farmer details update automatically when Linked Dispatch changes.
+- Unrelated Farmer Leads are not shown in dispatch-derived installation flows.
+- Server-side validation rejects mismatched Dispatch, Device, Farmer Lead, or Pilot combinations.
 - Pilot Installation is excluded from farmer-sale post-installation follow-up creation.
 - Pilot Installation does not count as Farmer Lead `Device Installed`.
 
@@ -427,18 +525,19 @@ Legacy crop rules:
   - Field / crop photos
   - Supporting farmer document
 
-## KPI And Dashboard Notes
+## My Work And KPI Notes
 
 - Farmer Leads top KPI cards are big-picture visible-scope totals.
 - Farmer Leads table/list count changes with filters.
 - Crop classification is available internally for future analytics.
 - Current KPI filtering uses crop values, not classification grouping.
-- KPI Dashboard uses cached/RPC-backed summary patterns for performance; do not reintroduce expensive full-table fallbacks.
+- My Work is the primary user-facing home for role KPI cards and pending work.
+- Legacy KPI cache/RPC patterns remain part of the backend where still used by management views; do not reintroduce expensive full-table fallbacks.
 
 ## Notifications And Action Center
 
-- A SQL migration has been drafted for a first-party `notifications` table with per-recipient RLS.
-- The app shell includes a notification bell and `/notifications` Action Center after the migration is applied.
+- Action Center is the global sidebar entry for notifications and sits directly below the logo.
+- Clicking the Action Center card opens `/notifications`.
 - Current notification triggers cover:
   - Marketing Request assignment
   - Planned Pilot Visit assignment and reassignment
@@ -446,7 +545,6 @@ Legacy crop rules:
 - Mention notifications are intentionally deferred until the UI has a safe user picker or unique mention matching.
 - Marketing deadline due/overdue reminders should be generated by a future scheduled job or n8n workflow using deterministic dedupe keys.
 - n8n remains optional; in-app notifications are the primary user-facing action center.
-- Apply the notifications SQL migration before pushing/deploying notification-dependent app code.
 
 ## RLS And Security Notes
 
@@ -467,6 +565,9 @@ Legacy crop rules:
 - `202607070006_farmer_lead_device_installed_consistency.sql`
 - `202607070007_pilot_farmer_lead_funnel_stages.sql`
 - `202607070008_fix_farmer_leads_pilot_rls_recursion.sql`
+- `202607100002_marketing_request_completion_tracking.sql` — applied and verified.
+- `202607100003_stock_dispatch_pilot_dispatch_lookup.sql` — applied and verified.
+- `202607100004_stock_dispatch_pilot_edit_lookup.sql` — applied and verified.
 
 ## Branding Status
 
