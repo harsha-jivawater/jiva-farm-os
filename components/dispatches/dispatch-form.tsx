@@ -109,13 +109,19 @@ function routeForDispatch(dispatch?: Dispatch) {
   return "Admin Manual Exception";
 }
 
-function SubmitButton({ label }: { label: string }) {
+function SubmitButton({
+  disabled = false,
+  label
+}: {
+  disabled?: boolean;
+  label: string;
+}) {
   const { pending } = useFormStatus();
 
   return (
     <button
       className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-      disabled={pending}
+      disabled={pending || disabled}
       type="submit"
     >
       <Save className="h-4 w-4" aria-hidden="true" />
@@ -258,6 +264,7 @@ export function DispatchForm({
   const isPilotRoute = dispatchRoute === "Free Pilot";
   const isDealerRoute = dispatchRoute === "Dealer Dispatch";
   const isManualRoute = dispatchRoute === "Admin Manual Exception";
+  const submitDisabled = isPilotRoute && Boolean(pilotsLoadError);
   const effectiveDispatchType = isFarmerSaleRoute
     ? "Farmer Sale Dispatch"
     : isPilotRoute
@@ -1270,6 +1277,7 @@ export function DispatchForm({
           Cancel
         </Link>
         <SubmitButton
+          disabled={submitDisabled}
           label={mode === "create" ? "Create dispatch" : "Save dispatch"}
         />
       </div>

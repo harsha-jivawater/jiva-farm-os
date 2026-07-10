@@ -24,6 +24,12 @@ type EditDispatchPageProps = {
   }>;
 };
 
+type DispatchPilotLinkRow = {
+  id?: string | null;
+  linked_pilot_id?: string | null;
+  destination_pilot_id?: string | null;
+};
+
 const deviceSelectColumns = [
   "id",
   "serial_number",
@@ -84,6 +90,27 @@ const dealerSelectColumns = [
   "district",
   "dealer_address"
 ].join(",");
+
+function collectPilotIdsWithOpenDispatch(
+  rows: DispatchPilotLinkRow[] | null,
+  currentDispatchId: string
+) {
+  const ids = new Set<string>();
+
+  for (const row of rows ?? []) {
+    if (row.id === currentDispatchId) {
+      continue;
+    }
+
+    for (const value of [row.linked_pilot_id, row.destination_pilot_id]) {
+      if (value) {
+        ids.add(value);
+      }
+    }
+  }
+
+  return ids;
+}
 
 export default async function EditDispatchPage({
   params,
@@ -171,7 +198,7 @@ export default async function EditDispatchPage({
     }
   }
 
-  const { data: activePilots } = await supabase
+  const { data: activePilots, error: activePilotsError } = await supabase
     .from("pilots")
     .select(pilotSelectColumns)
     .is("deleted_at", null)
@@ -182,9 +209,23 @@ export default async function EditDispatchPage({
     )
     .order("created_at", { ascending: false })
     .limit(200);
-  let pilots = (activePilots ?? []) as unknown as DispatchPilotOption[];
+  const { data: openPilotDispatches, error: openPilotDispatchesError } =
+    await supabase
+      .from("dispatches")
+      .select("id, linked_pilot_id, destination_pilot_id")
+      .is("deleted_at", null)
+      .neq("dispatch_status", "Cancelled")
+      .limit(1000);
+  const pilotsWithOtherOpenDispatch = collectPilotIdsWithOpenDispatch(
+    (openPilotDispatches ?? []) as unknown as DispatchPilotLinkRow[],
+    dispatch.id
+  );
+  let pilots = ((activePilots ?? []) as unknown as DispatchPilotOption[]).filter(
+    (pilot) => !pilotsWithOtherOpenDispatch.has(pilot.id)
+  );
   const selectedPilotId =
     dispatch.destination_pilot_id ?? dispatch.linked_pilot_id;
+  let selectedPilotLoadError: string | null = null;
 
   if (
     selectedPilotId &&
@@ -194,12 +235,20 @@ export default async function EditDispatchPage({
       .from("pilots")
       .select(pilotSelectColumns)
       .eq("id", selectedPilotId)
+      .is("deleted_at", null)
       .single();
 
     if (selectedPilot) {
       pilots = [selectedPilot as unknown as DispatchPilotOption, ...pilots];
+    } else {
+      selectedPilotLoadError = "Unable to load the Pilot linked to this Dispatch.";
     }
   }
+  const pilotsLoadError =
+    selectedPilotLoadError ??
+    (activePilotsError || openPilotDispatchesError
+      ? "Unable to load eligible pilots for dispatch."
+      : null);
 
   const { data: activeDealers } = await supabase
     .from("dealers")
@@ -247,6 +296,7 @@ export default async function EditDispatchPage({
         farmerLeads={farmerLeads}
         mode="edit"
         pilots={pilots}
+        pilotsLoadError={pilotsLoadError}
       />
     </section>
   );
