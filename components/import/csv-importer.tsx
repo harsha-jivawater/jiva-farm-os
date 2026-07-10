@@ -39,6 +39,20 @@ function rowHasRequiredValues(row: CsvRecord, columns: ImportColumn[]) {
   return columns.every((column) => !column.required || row[column.key]);
 }
 
+function missingRequiredColumns(row: CsvRecord, columns: ImportColumn[]) {
+  return columns.filter((column) => column.required && !row[column.key]);
+}
+
+function formatFieldList(columns: ImportColumn[]) {
+  const names = columns.map((column) => column.key);
+
+  if (names.length <= 1) {
+    return names[0] ?? "";
+  }
+
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+}
+
 export function CsvImporter({
   title,
   instructions,
@@ -58,11 +72,32 @@ export function CsvImporter({
   const validPreviewRows = records.filter((row) =>
     rowHasRequiredValues(row, columns)
   );
+  const missingRequiredValueIssues = records
+    .map((row, index) => ({
+      fields: missingRequiredColumns(row, columns),
+      rowNumber: index + 2
+    }))
+    .filter((issue) => issue.fields.length > 0);
   const missingValueCount = records.length - validPreviewRows.length;
   const canImport =
     validPreviewRows.length > 0 &&
     parseErrors.length === 0 &&
     records.length <= MAX_IMPORT_ROWS;
+  const disabledMessages = [
+    records.length > MAX_IMPORT_ROWS
+      ? `Import is limited to ${MAX_IMPORT_ROWS} rows.`
+      : null,
+    parseErrors.length > 0 ? "Fix the CSV errors above before importing." : null,
+    records.length > 0 && validPreviewRows.length === 0
+      ? "Import is disabled because no valid rows are available."
+      : null,
+    records.length > 0 && validPreviewRows.length === 0
+      ? "At least one valid row is required."
+      : null
+  ].filter(Boolean) as string[];
+  const missingIssueByRow = new Map(
+    missingRequiredValueIssues.map((issue) => [issue.rowNumber, issue.fields])
+  );
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -166,6 +201,27 @@ export function CsvImporter({
                 : "No required values are missing."}
             </p>
           </div>
+          {missingRequiredValueIssues.length > 0 ? (
+            <div className="border-b border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              <div className="flex items-center gap-2 font-semibold">
+                <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                Rows missing required values
+              </div>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {missingRequiredValueIssues.slice(0, 20).map((issue) => (
+                  <li key={issue.rowNumber}>
+                    Row {issue.rowNumber}: Missing{" "}
+                    {formatFieldList(issue.fields)}
+                  </li>
+                ))}
+              </ul>
+              {missingRequiredValueIssues.length > 20 ? (
+                <p className="mt-2 text-xs font-medium">
+                  Showing the first 20 missing-value issues.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50">
@@ -185,16 +241,49 @@ export function CsvImporter({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {records.slice(0, 10).map((row, index) => (
-                  <tr key={`${index}-${JSON.stringify(row).slice(0, 24)}`}>
-                    <td className="px-4 py-3 text-slate-500">{index + 2}</td>
-                    {columns.slice(0, 8).map((column) => (
-                      <td className="max-w-56 truncate px-4 py-3 text-slate-700" key={column.key}>
-                        {row[column.key] || "Not set"}
+                {records.slice(0, 10).map((row, index) => {
+                  const rowNumber = index + 2;
+                  const missingFields = missingIssueByRow.get(rowNumber) ?? [];
+
+                  return (
+                    <tr
+                      className={
+                        missingFields.length > 0
+                          ? "bg-amber-50/70"
+                          : undefined
+                      }
+                      key={`${index}-${JSON.stringify(row).slice(0, 24)}`}
+                    >
+                      <td className="px-4 py-3 text-slate-500">
+                        <span>{rowNumber}</span>
+                        {missingFields.length > 0 ? (
+                          <span className="mt-1 block text-xs font-semibold text-amber-700">
+                            Missing {formatFieldList(missingFields)}
+                          </span>
+                        ) : null}
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                      {columns.slice(0, 8).map((column) => {
+                        const isMissing = missingFields.some(
+                          (field) => field.key === column.key
+                        );
+
+                        return (
+                          <td
+                            className={[
+                              "max-w-56 truncate px-4 py-3",
+                              isMissing
+                                ? "font-semibold text-amber-800"
+                                : "text-slate-700"
+                            ].join(" ")}
+                            key={column.key}
+                          >
+                            {row[column.key] || "Not set"}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -208,22 +297,36 @@ export function CsvImporter({
       ) : null}
 
       <form action={handleImport}>
-        <input name="rows_json" type="hidden" value={JSON.stringify(records)} readOnly />
-        <button
-          aria-busy={isPending}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-          disabled={!canImport || isPending}
-          type="submit"
-        >
-          {isPending ? (
-            <>
-              <LoadingSpinner label="Importing" />
-              Importing...
-            </>
-          ) : (
-            "Confirm import"
-          )}
-        </button>
+        <input
+          name="rows_json"
+          readOnly
+          type="hidden"
+          value={JSON.stringify(records)}
+        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <button
+            aria-busy={isPending}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            disabled={!canImport || isPending}
+            type="submit"
+          >
+            {isPending ? (
+              <>
+                <LoadingSpinner label="Importing" />
+                Importing...
+              </>
+            ) : (
+              "Confirm import"
+            )}
+          </button>
+          {!canImport && disabledMessages.length > 0 ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {disabledMessages.map((message) => (
+                <p key={message}>{message}</p>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </form>
 
       {result.status !== "idle" ? (
