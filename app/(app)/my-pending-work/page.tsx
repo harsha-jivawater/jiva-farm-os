@@ -94,6 +94,8 @@ type DispatchPendingRow = {
   destination_name_snapshot: string;
   dispatch_date: string | null;
   expected_delivery_date: string | null;
+  payment_confirmed: boolean;
+  payment_confirmed_date: string | null;
   product_model: string;
 };
 
@@ -589,10 +591,70 @@ async function loadDispatchItems({
   }
 
   const dispatchScopeValue = await dispatchScope(supabase, currentUser);
+
+  if (hasAnyRole(currentUser, ["Admin", "Accounts"])) {
+    let dealerPaymentQuery = supabase
+      .from("dispatches")
+      .select(
+        "id, dispatch_code, dispatch_status, dispatch_type, destination_name_snapshot, dispatch_date, expected_delivery_date, payment_confirmed, payment_confirmed_date, product_model"
+      )
+      .is("deleted_at", null)
+      .eq("dispatch_type", "Dealer Stock Dispatch")
+      .eq("payment_requirement_type", "Payment Required")
+      .eq("payment_confirmed", false)
+      .neq("dispatch_status", "Cancelled")
+      .order("created_at", { ascending: true })
+      .limit(8);
+    dealerPaymentQuery = applyScope(dealerPaymentQuery, dispatchScopeValue);
+    const { data: dealerPaymentRows } = await dealerPaymentQuery;
+
+    items.push(
+      ...((dealerPaymentRows ?? []) as DispatchPendingRow[]).map((dispatch) => ({
+        dueDate: dispatch.expected_delivery_date ?? dispatch.dispatch_date,
+        href: `/dispatches/${dispatch.id}`,
+        id: `dealer-payment-${dispatch.id}`,
+        nextAction: "Confirm dealer payment before Stock / Dispatch sends the device.",
+        status: "Dealer payment pending",
+        subtitle: `${dispatch.dispatch_code} · ${dispatch.product_model}`,
+        title: `Dealer payment to confirm: ${dispatch.destination_name_snapshot}`
+      }))
+    );
+  }
+
+  if (hasAnyRole(currentUser, ["Admin", "Stock / Dispatch"])) {
+    let dealerReadyQuery = supabase
+      .from("dispatches")
+      .select(
+        "id, dispatch_code, dispatch_status, dispatch_type, destination_name_snapshot, dispatch_date, expected_delivery_date, payment_confirmed, payment_confirmed_date, product_model"
+      )
+      .is("deleted_at", null)
+      .eq("dispatch_type", "Dealer Stock Dispatch")
+      .eq("payment_requirement_type", "Payment Required")
+      .eq("payment_confirmed", true)
+      .in("dispatch_status", ["Approved for Dispatch", "Dispatch Requested"])
+      .order("payment_confirmed_date", { ascending: true, nullsFirst: false })
+      .limit(8);
+    dealerReadyQuery = applyScope(dealerReadyQuery, dispatchScopeValue);
+    const { data: dealerReadyRows } = await dealerReadyQuery;
+
+    items.push(
+      ...((dealerReadyRows ?? []) as DispatchPendingRow[]).map((dispatch) => ({
+        dueDate:
+          dispatch.expected_delivery_date ?? dispatch.payment_confirmed_date,
+        href: `/dispatches/${dispatch.id}`,
+        id: `dealer-ready-${dispatch.id}`,
+        nextAction: "Dispatch the paid Dealer Dispatch using Fresh Sale stock.",
+        status: "Payment confirmed · Ready for dispatch",
+        subtitle: `${dispatch.dispatch_code} · ${dispatch.product_model}`,
+        title: `Paid Dealer Dispatch ready: ${dispatch.destination_name_snapshot}`
+      }))
+    );
+  }
+
   let dispatchQuery = supabase
     .from("dispatches")
     .select(
-      "id, dispatch_code, dispatch_status, dispatch_type, destination_name_snapshot, dispatch_date, expected_delivery_date, product_model"
+      "id, dispatch_code, dispatch_status, dispatch_type, destination_name_snapshot, dispatch_date, expected_delivery_date, payment_confirmed, payment_confirmed_date, product_model"
     )
     .is("deleted_at", null)
     .in("dispatch_status", dispatchActionStatuses)
@@ -602,15 +664,17 @@ async function loadDispatchItems({
   const { data: dispatches } = await dispatchQuery;
 
   items.push(
-    ...((dispatches ?? []) as DispatchPendingRow[]).map((dispatch) => ({
-      dueDate: dispatch.expected_delivery_date ?? dispatch.dispatch_date,
-      href: `/dispatches/${dispatch.id}`,
-      id: `dispatch-action-${dispatch.id}`,
-      nextAction: "Review and move this dispatch to the next logistics step.",
-      status: dispatch.dispatch_status,
-      subtitle: `${dispatch.dispatch_code} · ${dispatch.dispatch_type} · ${dispatch.product_model}`,
-      title: `Dispatch needs action: ${dispatch.destination_name_snapshot}`
-    }))
+    ...((dispatches ?? []) as DispatchPendingRow[])
+      .filter((dispatch) => dispatch.dispatch_type !== "Dealer Stock Dispatch")
+      .map((dispatch) => ({
+        dueDate: dispatch.expected_delivery_date ?? dispatch.dispatch_date,
+        href: `/dispatches/${dispatch.id}`,
+        id: `dispatch-action-${dispatch.id}`,
+        nextAction: "Review and move this dispatch to the next logistics step.",
+        status: dispatch.dispatch_status,
+        subtitle: `${dispatch.dispatch_code} · ${dispatch.dispatch_type} · ${dispatch.product_model}`,
+        title: `Dispatch needs action: ${dispatch.destination_name_snapshot}`
+      }))
   );
 
   return items;

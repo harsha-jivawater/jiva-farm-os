@@ -63,6 +63,8 @@ Common payload fields:
 | `marketing_deadline_revised` | Admin, Management, or Marketing Head revises the marketing request deadline. |
 | `paid_lead_ready_for_dispatch` | Farmer Lead payment is confirmed and the lead still has no dispatch. |
 | `pilot_dispatch_requested` | A Free Pilot dispatch is created successfully. |
+| `dealer_payment_confirmed` | Accounts/Admin confirms payment for a Dealer Dispatch. |
+| `dealer_dispatch_ready` | A paid Dealer Dispatch is ready for Stock / Dispatch to send. |
 | `visit_report_submitted` | A Pilot Visit Report is submitted successfully. |
 
 ## In-App Notification Compatibility

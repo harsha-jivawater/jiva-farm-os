@@ -128,7 +128,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## n8n Integration
 
-- Phase 1 outbound n8n events have been added for Marketing Request assignment, marketing deadline revisions, paid Farmer Leads ready for dispatch, Free Pilot dispatch requests, and Visit Report submission.
+- Phase 1 outbound n8n events have been added for Marketing Request assignment, marketing deadline revisions, paid Farmer Leads ready for dispatch, Free Pilot dispatch requests, Dealer Dispatch payment/ready handoff, and Visit Report submission.
 - Phase 2 daily summary API is available at `/api/integrations/n8n/daily-summary`.
 - The daily summary route requires `X-Jiva-N8N-Summary-Secret` and returns `401` when the secret is missing or incorrect.
 - n8n integration is one-way/read-only in this phase. n8n does not write back to Jiva Farm OS and must not update production records.
@@ -289,10 +289,13 @@ Default Sales Head fallback routing:
   - Paid Farmer Sale: selected paid Farmer Lead, Fresh Sale device only.
   - Free Pilot: selected active Pilot, Pilot Stock device only.
   - Dealer Dispatch: selected Dealer, Fresh Sale device only.
-- Dealer Dispatch is stock placement only. It does not count as a farmer sale, does not require a paid Farmer Lead or Pilot, and does not mark any Farmer Lead as dispatched.
+- Dealer Dispatch is a paid sale from Jiva to the Dealer. It does not count as a farmer sale, does not require a paid Farmer Lead or Pilot, and does not mark any Farmer Lead as dispatched.
+- Dealer Dispatch requires Accounts/Admin payment confirmation before Stock / Dispatch can mark it Dispatched.
+- Dealer Dispatch uses existing dispatch payment fields: `payment_requirement_type = Payment Required`, `payment_confirmed`, `payment_confirmed_by_user_id`, and `payment_confirmed_date`.
 - Dealer Dispatch can select multiple eligible Fresh Sale warehouse devices in one submission. The app still creates one dispatch row per serial-numbered device, preserving individual device history.
-- Dealer sale is recorded later through a dealer-linked farmer sale or installation, not when stock is placed with the dealer.
-- Dealer detail now shows Dealer Stock rows from Dealer Dispatches, including the serial-numbered device, dispatch status/date, stock state, linked farmer sale/installation, and a Record farmer sale action for eligible dealer-held stock.
+- Multi-device Dealer Dispatch payment is confirmed per dispatch row because there is no reliable shared batch/payment record yet.
+- Dealer-to-farmer sale is recorded later through a dealer-linked farmer sale or installation, not when stock is sold to the dealer.
+- Dealer detail now shows Dealer Stock rows from Dealer Dispatches, including the serial-numbered device, payment/dispatch stock state, linked farmer sale/installation, and a Record farmer sale action for eligible dealer-held stock.
 - Recording a dealer farmer sale uses the existing Installation workflow with `Dealer Farmer Installation`, the original Dealer Dispatch, the selected Farmer Lead, and the serial-numbered Fresh Sale device. It does not create a new Jiva-to-farmer dispatch.
 - Admin can use `Manual dispatch — admin exception` for unusual stock movement.
 - Normal users should not manually enter farmer destination details for paid farmer-sale dispatches.

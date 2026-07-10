@@ -74,6 +74,11 @@ type DealerDispatchSource = {
   dealer_address: string | null;
 };
 
+type DealerDispatchPaymentState = Pick<
+  Dispatch,
+  "payment_confirmed" | "payment_confirmed_by_user_id" | "payment_confirmed_date"
+>;
+
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
@@ -621,7 +626,8 @@ function applyPilotDispatchSnapshot(
 
 function applyDealerDispatchSnapshot(
   payload: DispatchInsert | DispatchUpdate,
-  dealer: DealerDispatchSource
+  dealer: DealerDispatchSource,
+  paymentState?: DealerDispatchPaymentState
 ) {
   payload.dispatch_type = "Dealer Stock Dispatch";
   payload.destination_type = "Dealer";
@@ -636,10 +642,19 @@ function applyDealerDispatchSnapshot(
   payload.destination_address = dealer.dealer_address;
   payload.destination_state = dealer.state;
   payload.destination_district = dealer.district;
-  payload.payment_requirement_type = "Internal Transfer";
-  payload.payment_confirmed = false;
-  payload.payment_confirmed_by_user_id = null;
-  payload.payment_confirmed_date = null;
+  payload.payment_requirement_type = "Payment Required";
+  payload.payment_confirmed = paymentState?.payment_confirmed ?? false;
+  payload.payment_confirmed_by_user_id =
+    paymentState?.payment_confirmed_by_user_id ?? null;
+  payload.payment_confirmed_date = paymentState?.payment_confirmed_date ?? null;
+}
+
+function isDealerDispatch(dispatch: Pick<Dispatch, "dispatch_type">) {
+  return dispatch.dispatch_type === "Dealer Stock Dispatch";
+}
+
+function dealerPaymentBlockMessage() {
+  return "Accounts must confirm dealer payment before this dispatch can be marked Dispatched.";
 }
 
 function validateDevicePoolForRoute({
@@ -856,6 +871,8 @@ export async function createDispatchAction(formData: FormData) {
 
   if (dealerDispatch) {
     applyDealerDispatchSnapshot(payload, dealerDispatch);
+    payload.dispatch_status = "Dispatch Requested";
+    payload.dispatch_date = null;
   }
 
   const dealerBatchDeviceIds =
@@ -901,7 +918,6 @@ export async function createDispatchAction(formData: FormData) {
       supabase
     });
 
-    const now = todayDate();
     const shouldMarkApproved = advancedStatus(payload.dispatch_status);
     const insertPayloads = devices.map(
       (batchDevice) =>
@@ -918,7 +934,7 @@ export async function createDispatchAction(formData: FormData) {
           payment_confirmed: false,
           payment_confirmed_by_user_id: null,
           payment_confirmed_date: null,
-          dispatch_date: payload.dispatch_date ?? now
+          dispatch_date: null
         }) as DispatchInsert
     );
 
@@ -926,7 +942,7 @@ export async function createDispatchAction(formData: FormData) {
       if (!canMoveToApprovedOrBeyond(insertPayload)) {
         redirectWithError(
           "/dispatches/new",
-          "Payment must be confirmed before this dispatch can be approved or moved forward."
+          dealerPaymentBlockMessage()
         );
       }
     }
@@ -1010,7 +1026,9 @@ export async function createDispatchAction(formData: FormData) {
   if (!canMoveToApprovedOrBeyond(insertPayload)) {
     redirectWithError(
       "/dispatches/new",
-      "Payment must be confirmed before this dispatch can be approved or moved forward."
+      isDealerDispatch(insertPayload)
+        ? dealerPaymentBlockMessage()
+        : "Payment must be confirmed before this dispatch can be approved or moved forward."
     );
   }
 
@@ -1166,7 +1184,7 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   }
 
   if (dealerDispatch) {
-    applyDealerDispatchSnapshot(payload, dealerDispatch);
+    applyDealerDispatchSnapshot(payload, dealerDispatch, existing);
   }
 
   const device = await getDeviceForDispatch(
@@ -1232,7 +1250,9 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   if (!canMoveToApprovedOrBeyond(updatePayload)) {
     redirectWithError(
       `/dispatches/${id}/edit`,
-      "Payment must be confirmed before this dispatch can be approved or moved forward."
+      isDealerDispatch(existing)
+        ? dealerPaymentBlockMessage()
+        : "Payment must be confirmed before this dispatch can be approved or moved forward."
     );
   }
 
@@ -1304,4 +1324,101 @@ export async function updateDispatchAction(id: string, formData: FormData) {
     revalidatePath(`/dealers/${dealerDispatch.id}`);
   }
   redirect(`/dispatches/${id}`);
+}
+
+export async function confirmDealerDispatchPaymentAction(dispatchId: string) {
+  const supabase = await createClient();
+  const errorPath = `/dispatches/${dispatchId}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (!canConfirmPayment(profile)) {
+    redirectWithError(errorPath, "Only Accounts or Admin can confirm dealer payment.");
+  }
+
+  const { data, error } = await supabase
+    .from("dispatches")
+    .select(
+      [
+        "id",
+        "dispatch_code",
+        "dispatch_status",
+        "dispatch_type",
+        "destination_name_snapshot",
+        "payment_confirmed",
+        "expected_delivery_date"
+      ].join(",")
+    )
+    .eq("id", dispatchId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !data) {
+    redirectWithError(errorPath, "Dispatch was not found.");
+  }
+
+  const dispatch = data as unknown as Pick<
+    Dispatch,
+    | "id"
+    | "dispatch_code"
+    | "dispatch_status"
+    | "dispatch_type"
+    | "destination_name_snapshot"
+    | "payment_confirmed"
+    | "expected_delivery_date"
+  >;
+
+  if (!isDealerDispatch(dispatch)) {
+    redirectWithError(errorPath, "Dealer payment can be confirmed only for Dealer Dispatches.");
+  }
+
+  if (dispatch.payment_confirmed) {
+    redirect(errorPath);
+  }
+
+  const paymentDate = todayDate();
+  const nextStatus = ["Dispatch Requested", "Pending Payment Confirmation"].includes(
+    dispatch.dispatch_status
+  )
+    ? "Approved for Dispatch"
+    : dispatch.dispatch_status;
+
+  const { error: updateError } = await supabase
+    .from("dispatches")
+    .update({
+      dispatch_status: nextStatus,
+      payment_confirmed: true,
+      payment_confirmed_by_user_id: profile.id,
+      payment_confirmed_date: paymentDate
+    })
+    .eq("id", dispatchId);
+
+  if (updateError) {
+    redirectWithError(errorPath, updateError.message);
+  }
+
+  await sendN8nEvent("dealer_payment_confirmed", {
+    dueDate: dispatch.expected_delivery_date,
+    nextAction: "Stock / Dispatch can prepare this Dealer Dispatch.",
+    recordCode: dispatch.dispatch_code,
+    recordType: "Dispatch",
+    status: "Payment confirmed",
+    title: dispatch.destination_name_snapshot,
+    url: appSearchUrl("/dispatches", dispatch.dispatch_code)
+  });
+
+  await sendN8nEvent("dealer_dispatch_ready", {
+    dueDate: dispatch.expected_delivery_date,
+    nextAction: "Mark the Dealer Dispatch as Dispatched after the device is sent.",
+    recordCode: dispatch.dispatch_code,
+    recordType: "Dispatch",
+    status: nextStatus,
+    title: dispatch.destination_name_snapshot,
+    url: appSearchUrl("/dispatches", dispatch.dispatch_code)
+  });
+
+  revalidatePath("/dispatches");
+  revalidatePath(errorPath);
+  revalidatePath("/my-pending-work");
+  revalidatePath("/system-health");
+  redirect(errorPath);
 }

@@ -470,7 +470,7 @@ export function DispatchForm({
                 : isPilotRoute
                   ? "Free pilots use pilot-dedicated devices only."
                   : isDealerRoute
-                    ? "Use this when sending Jiva stock to a dealer. This records dealer stock placement, not a farmer sale."
+                    ? "Dealer Dispatch is a sale to the dealer. Accounts must confirm payment before dispatch."
                     : "Manual dispatch is an Admin exception for unusual stock movement."}
             </p>
           </div>
@@ -889,7 +889,7 @@ export function DispatchForm({
               </select>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 Use this when sending Jiva stock to a dealer. This records dealer
-                stock placement, not a farmer sale.
+                stock sold to the dealer, not a farmer sale.
               </p>
             </div>
           ) : (
@@ -1087,7 +1087,7 @@ export function DispatchForm({
                     isPilotRoute
                       ? "Unpaid Pilot"
                       : isDealerRoute
-                        ? "Internal Transfer"
+                        ? "Payment Required"
                         : "Payment Required"
                   }
                 />
@@ -1099,7 +1099,7 @@ export function DispatchForm({
                     isPilotRoute
                       ? "Unpaid Pilot"
                       : isDealerRoute
-                        ? "Internal Transfer"
+                        ? "Payment Required"
                         : "Payment Required"
                   }
                 />

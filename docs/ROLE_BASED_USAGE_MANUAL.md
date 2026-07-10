@@ -796,7 +796,7 @@ flowchart LR
 
 - Keep serial number and device status accurate.
 - Use Dispatches for device movement.
-- Use Paid Farmer Sale for paid farmer leads, Free Pilot for free pilot movement, and Dealer Dispatch for dealer stock placement.
+- Use Paid Farmer Sale for paid farmer leads, Free Pilot for free pilot movement, and Dealer Dispatch for paid dealer stock sales.
 - Use Fresh Sale devices for paid farmer sale dispatches.
 - Use Fresh Sale devices for Dealer Dispatch.
 - Use Pilot Stock devices for free pilot dispatches.
@@ -1086,12 +1086,13 @@ Rules:
 
 ```mermaid
 flowchart LR
-  A["Dealer stock placement needed"] --> B["Stock / Dispatch creates Dealer Dispatch"]
+  A["Dealer stock sale needed"] --> B["Stock / Dispatch creates Dealer Dispatch"]
   B --> C["Fresh Sale Device selected"]
   C --> D["Dispatch Requested"]
-  D --> E["Dispatched / Delivered"]
-  E --> F["Dealer stock available for later farmer sales"]
-  F --> G["Record farmer sale from Dealer detail"]
+  D --> E["Accounts confirms dealer payment"]
+  E --> F["Dispatched / Delivered"]
+  F --> I["Dealer stock available for later farmer sales"]
+  I --> G["Record farmer sale from Dealer detail"]
   G --> H["Dealer Farmer Installation"]
 ```
 
@@ -1100,12 +1101,14 @@ Rules:
 - Dealer Dispatch must be created from a selected Dealer.
 - Dealer Dispatch uses Fresh Sale devices only.
 - Dealer Dispatch can select multiple eligible devices in one submission, but each serial-numbered device still gets its own dispatch row and movement history.
-- Dealer Dispatch is stock placement only.
+- Dealer Dispatch is a paid sale from Jiva to the Dealer.
+- Accounts/Admin must confirm dealer payment before Stock / Dispatch can mark it Dispatched.
+- Multi-device Dealer Dispatch payment is confirmed per dispatch row because the current schema has no shared dealer dispatch batch/payment record.
 - Dealer Dispatch does not require a paid Farmer Lead.
 - Dealer Dispatch does not require a Pilot.
 - Dealer Dispatch does not mark a Farmer Lead as dispatched.
-- Dealer Dispatch does not count as a farmer sale. Dealer sale is recorded later through a dealer-linked farmer sale or installation.
-- Dealer detail shows dealer-stock serial numbers and stock state: In dealer stock, Sold to farmer, or Installed.
+- Dealer Dispatch does not count as a farmer sale. Dealer-to-farmer sale is recorded later through a dealer-linked farmer sale or installation.
+- Dealer detail shows dealer-stock serial numbers and stock state: Payment pending, Paid / ready for dispatch, In dealer stock, Sold to farmer, or Installed.
 - Use Record farmer sale only when a serial-numbered dealer-stock device is sold to a farmer.
 - Record farmer sale opens the Installation workflow as Dealer Farmer Installation, linked to the original Dealer Dispatch and selected Farmer Lead. If the farmer is not yet in the system, create the Farmer Lead first.
 - Dealer farmer sale conversion must not create a second Jiva-to-farmer dispatch and must not auto-confirm payment.
@@ -1220,7 +1223,7 @@ Dispatch creation routes:
 
 - Paid Farmer Sale: selected paid Farmer Lead, Fresh Sale device only.
 - Free Pilot: selected active Pilot, Pilot Stock device only.
-- Dealer Dispatch: selected Dealer, Fresh Sale device only; stock placement, not farmer sale.
+- Dealer Dispatch: selected Dealer, Fresh Sale device only; paid dealer sale, not farmer sale.
 - Manual dispatch — admin exception: Admin-only for unusual movement.
 
 ### Installations

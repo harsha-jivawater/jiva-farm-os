@@ -62,6 +62,8 @@ type DispatchRow = {
   dispatch_date: string | null;
   expected_delivery_date: string | null;
   delivered_date: string | null;
+  payment_confirmed: boolean;
+  payment_confirmed_date: string | null;
   linked_farmer_lead_id: string | null;
   linked_pilot_id: string | null;
   linked_installation_id: string | null;
@@ -405,7 +407,7 @@ export default async function SystemHealthPage() {
     supabase
       .from("dispatches")
       .select(
-        "id, dispatch_code, dispatch_status, dispatch_type, destination_name_snapshot, dispatch_date, expected_delivery_date, delivered_date, linked_farmer_lead_id, linked_pilot_id, linked_installation_id, created_at"
+        "id, dispatch_code, dispatch_status, dispatch_type, destination_name_snapshot, dispatch_date, expected_delivery_date, delivered_date, payment_confirmed, payment_confirmed_date, linked_farmer_lead_id, linked_pilot_id, linked_installation_id, created_at"
       )
       .is("deleted_at", null)
       .limit(SCAN_LIMIT),
@@ -563,6 +565,7 @@ export default async function SystemHealthPage() {
   const installationAgingIssues = dispatches
     .filter(
       (dispatch) =>
+        dispatch.dispatch_type !== "Dealer Stock Dispatch" &&
         movedDispatchStatuses.includes(dispatch.dispatch_status) &&
         !dispatch.linked_installation_id
     )
@@ -596,7 +599,81 @@ export default async function SystemHealthPage() {
 
   const dispatchSection = limitIssues([
     ...openDispatchIssues,
-    ...installationAgingIssues
+    ...installationAgingIssues,
+    ...dispatches
+      .filter(
+        (dispatch) =>
+          dispatch.dispatch_type === "Dealer Stock Dispatch" &&
+          !dispatch.payment_confirmed &&
+          dispatch.dispatch_status !== "Cancelled"
+      )
+      .flatMap((dispatch) => {
+        const ageDays = daysBetween(dispatch.created_at, today);
+
+        if (ageDays === null || ageDays <= 2) {
+          return [];
+        }
+
+        return [
+          {
+            ageDays,
+            details: [
+              `${dispatch.dispatch_code} · ${dispatch.dispatch_status}`,
+              "Dealer payment is still pending.",
+              `Created/requested: ${formatDisplayDate(dispatch.created_at)}`
+            ],
+            href: `/dispatches/${dispatch.id}`,
+            id: `dealer-payment-pending-${dispatch.id}`,
+            recordName: dispatch.destination_name_snapshot,
+            severity: ageDays > 7 ? ("Critical" as const) : ("Warning" as const),
+            suggestedAction:
+              "Accounts should confirm dealer payment or resolve the payment blocker.",
+            title:
+              ageDays > 7
+                ? "Dealer Dispatch payment pending over 7 days"
+                : "Dealer Dispatch payment pending over 2 days"
+          }
+        ];
+      }),
+    ...dispatches
+      .filter(
+        (dispatch) =>
+          dispatch.dispatch_type === "Dealer Stock Dispatch" &&
+          dispatch.payment_confirmed &&
+          !["Dispatched", "Delivered", "Cancelled"].includes(
+            dispatch.dispatch_status
+          )
+      )
+      .flatMap((dispatch) => {
+        const ageDays = daysBetween(dispatch.payment_confirmed_date, today);
+
+        if (ageDays === null || ageDays <= 2) {
+          return [];
+        }
+
+        return [
+          {
+            ageDays,
+            details: [
+              `${dispatch.dispatch_code} · ${dispatch.dispatch_status}`,
+              `Payment confirmed: ${formatDisplayDate(
+                dispatch.payment_confirmed_date
+              )}`,
+              "Dealer Dispatch is paid but not yet dispatched."
+            ],
+            href: `/dispatches/${dispatch.id}`,
+            id: `dealer-paid-not-dispatched-${dispatch.id}`,
+            recordName: dispatch.destination_name_snapshot,
+            severity: ageDays > 7 ? ("Critical" as const) : ("Warning" as const),
+            suggestedAction:
+              "Stock / Dispatch should send the device or update the dispatch blocker.",
+            title:
+              ageDays > 7
+                ? "Paid Dealer Dispatch not dispatched over 7 days"
+                : "Paid Dealer Dispatch not dispatched over 2 days"
+          }
+        ];
+      })
   ]);
 
   const activePilots = pilots.filter(

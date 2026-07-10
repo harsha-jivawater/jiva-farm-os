@@ -459,6 +459,8 @@ export default async function DealerDetailPage({
           "dispatch_status",
           "dispatch_type",
           "device_id",
+          "payment_confirmed",
+          "payment_confirmed_date",
           "serial_number_snapshot",
           "product_model",
           "linked_farmer_lead_id",
@@ -576,6 +578,8 @@ export default async function DealerDetailPage({
     | "dispatch_status"
     | "dispatch_type"
     | "device_id"
+    | "payment_confirmed"
+    | "payment_confirmed_date"
     | "serial_number_snapshot"
     | "product_model"
     | "linked_farmer_lead_id"
@@ -693,6 +697,12 @@ export default async function DealerDetailPage({
           item.dispatch_id === dispatch.id ||
           item.id === dispatch.linked_installation_id
       );
+    const isPaymentPending = !dispatch.payment_confirmed;
+    const isPaidNotDispatched =
+      dispatch.payment_confirmed &&
+      !["Dispatched", "Delivered", "Installation Pending", "Installed"].includes(
+        dispatch.dispatch_status
+      );
     const isInstalled = installation
       ? ["Installed", "Verified", "Closed"].includes(
           installation.installation_status
@@ -702,13 +712,19 @@ export default async function DealerDetailPage({
       !installation &&
       device?.current_holder_type === "Dealer" &&
       device.current_holder_id === dealer.id;
-    const stockState = isInstalled
-      ? "Installed"
-      : isInDealerStock
-        ? "In dealer stock"
-        : installation
-          ? "Sold to farmer"
-          : "In dealer stock";
+    let stockState = "In dealer stock";
+
+    if (isPaymentPending) {
+      stockState = "Payment pending";
+    } else if (isPaidNotDispatched) {
+      stockState = "Paid / ready for dispatch";
+    } else if (isInstalled) {
+      stockState = "Installed";
+    } else if (installation) {
+      stockState = "Sold to farmer";
+    } else if (isInDealerStock) {
+      stockState = "In dealer stock";
+    }
 
     return {
       device,
@@ -1564,7 +1580,9 @@ export default async function DealerDetailPage({
                             ? "bg-emerald-50 text-emerald-700"
                             : stockState === "Sold to farmer"
                               ? "bg-sky-50 text-sky-700"
-                              : "bg-amber-50 text-amber-700"
+                              : stockState === "Payment pending"
+                                ? "bg-red-50 text-red-700"
+                                : "bg-amber-50 text-amber-700"
                         }`}
                       >
                         {stockState}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Pencil } from "lucide-react";
+import { confirmDealerDispatchPaymentAction } from "@/app/(app)/dispatches/actions";
 import { DispatchStatusPill } from "@/components/dispatches/dispatch-status-pill";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -18,7 +19,8 @@ import {
 import { productModelOptions } from "@/lib/devices/options";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { canWriteModule } from "@/lib/users/permissions";
+import { labelForRole } from "@/lib/users/options";
+import { canConfirmPayment, canWriteModule } from "@/lib/users/permissions";
 import { dispatchScope } from "@/lib/users/record-scope";
 
 type DispatchDetailPageProps = {
@@ -169,11 +171,22 @@ function dispatchHandoff(
   canCreateInstallation: boolean
 ) {
   if (dispatchRoute(dispatch) === "Dealer Dispatch") {
+    if (!dispatch.payment_confirmed) {
+      return {
+        currentStage: "Dealer payment pending",
+        nextAction:
+          "Accounts must confirm dealer payment before this dispatch can be marked Dispatched.",
+        nextHref: undefined,
+        nextLinkLabel: undefined,
+        nextOwner: "Accounts"
+      };
+    }
+
     if (["Dispatched", "Delivered"].includes(dispatch.dispatch_status)) {
       return {
-        currentStage: "Dealer stock placement",
+        currentStage: "Dealer stock sold and dispatched",
         nextAction:
-          "Confirm dealer stock availability. Farmer sale is recorded later through a dealer-linked farmer sale or installation.",
+          "Confirm dealer stock availability. Dealer-to-farmer sale is recorded later through a dealer-linked farmer sale or installation.",
         nextHref: undefined,
         nextLinkLabel: undefined,
         nextOwner: "Stock / Dispatch"
@@ -181,9 +194,9 @@ function dispatchHandoff(
     }
 
     return {
-      currentStage: "Dealer dispatch in progress",
+      currentStage: "Dealer payment confirmed",
       nextAction:
-        "Dispatch the Fresh Sale device to the dealer. This is stock placement, not a farmer sale.",
+        "Dispatch the Fresh Sale device to the dealer. This is a paid dealer sale, not a farmer sale.",
       nextHref: `/dispatches/${dispatch.id}/edit`,
       nextLinkLabel: "Update dispatch",
       nextOwner: "Stock / Dispatch"
@@ -234,6 +247,7 @@ export default async function DispatchDetailPage({
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
   const canWrite = canWriteModule(currentUser, "dispatches");
+  const canConfirmDealerPayment = canConfirmPayment(currentUser);
   const canCreateInstallation = canWriteModule(currentUser, "installations");
   const scope = await dispatchScope(supabase, currentUser);
   let dispatchQuery = supabase
@@ -259,6 +273,23 @@ export default async function DispatchDetailPage({
   const dispatch = data as Dispatch;
   const source = dispatchSourceLink(dispatch);
   const handoff = dispatchHandoff(dispatch, canCreateInstallation);
+  const isDealerRoute = dispatchRoute(dispatch) === "Dealer Dispatch";
+  const showConfirmDealerPayment =
+    isDealerRoute && !dispatch.payment_confirmed && canConfirmDealerPayment;
+  const confirmDealerPaymentAction =
+    confirmDealerDispatchPaymentAction.bind(null, dispatch.id);
+  let paymentConfirmedBy = null as
+    | { full_name: string; role: string }
+    | null;
+
+  if (dispatch.payment_confirmed_by_user_id) {
+    const { data: paymentUser } = await supabase
+      .from("users")
+      .select("full_name, role")
+      .eq("id", dispatch.payment_confirmed_by_user_id)
+      .maybeSingle();
+    paymentConfirmedBy = paymentUser;
+  }
 
   return (
     <section>
@@ -287,6 +318,17 @@ export default async function DispatchDetailPage({
               <Pencil className="h-4 w-4" aria-hidden="true" />
               Edit
             </Link>
+          ) : null}
+          {showConfirmDealerPayment ? (
+            <form action={confirmDealerPaymentAction}>
+              <button
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 sm:w-auto"
+                type="submit"
+              >
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                Confirm dealer payment
+              </button>
+            </form>
           ) : null}
         </div>
       </div>
@@ -377,11 +419,25 @@ export default async function DispatchDetailPage({
           )}
         />
         <DetailItem
-          label="Payment confirmed"
-          value={dispatch.payment_confirmed ? "Yes" : "No"}
+          label={isDealerRoute ? "Dealer payment" : "Payment confirmed"}
+          value={
+            dispatch.payment_confirmed
+              ? "Payment confirmed"
+              : "Pending confirmation"
+          }
         />
         <DetailItem
-          label="Payment confirmed date"
+          label="Confirmed by"
+          value={
+            paymentConfirmedBy
+              ? `${paymentConfirmedBy.full_name} · ${labelForRole(
+                  paymentConfirmedBy.role
+                )}`
+              : "Not set"
+          }
+        />
+        <DetailItem
+          label="Confirmed on"
           value={formatDate(dispatch.payment_confirmed_date)}
         />
         <DetailItem
