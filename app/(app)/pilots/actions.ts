@@ -31,6 +31,7 @@ import {
   sendN8nEvent,
   userDisplayName
 } from "@/lib/integrations/n8n";
+import { notifyPlannedVisitAssignment } from "@/lib/notifications/create";
 import { suggestedPilotNameFromContext } from "@/lib/pilots/name-suggestions";
 import { plannedVisitTypeToActualVisitType } from "@/lib/pilots/visit-planning";
 import type {
@@ -77,6 +78,22 @@ const finalPilotReportApproverRoles = ["R&D Head", "Admin"];
 const visitPlanManagerRoles = ["Agronomist", "R&D Head", "Admin"];
 const pilotDeviceInstallRoles = ["Admin", "R&D Head", "Agronomist"];
 const pilotCompletionRoles = ["Admin", "Management", "R&D Head", "Agronomist"];
+
+function plannedVisitNotificationDetails(visit: {
+  planned_visit_date?: string | null;
+  visit_number?: number | null;
+  visit_type?: string | null;
+}) {
+  if (!visit.planned_visit_date || !visit.visit_number || !visit.visit_type) {
+    return null;
+  }
+
+  return {
+    plannedVisitDate: visit.planned_visit_date,
+    visitNumber: visit.visit_number,
+    visitType: visit.visit_type
+  };
+}
 const pilotCompletionStatuses = [
   "Closed - Successful",
   "Closed - Failed",
@@ -1083,15 +1100,16 @@ export async function createPilotAction(formData: FormData) {
   }
 
   if (initialPlannedVisits.length > 0) {
-    const visitRows = initialPlannedVisits.map(
-      (visit) =>
-        ({
-          ...visit,
-          id: crypto.randomUUID(),
-          pilot_id: data.id,
-          created_by_user_id: profile.id
-        }) as PlannedPilotVisitInsert
-    );
+    const visitRows: Array<PlannedPilotVisitInsert & { id: string }> =
+      initialPlannedVisits.map(
+        (visit) =>
+          ({
+            ...visit,
+            id: crypto.randomUUID(),
+            pilot_id: data.id,
+            created_by_user_id: profile.id
+          }) as PlannedPilotVisitInsert & { id: string }
+      );
     const { error: visitError } = await supabase
       .from("planned_pilot_visits")
       .insert(visitRows);
@@ -1099,6 +1117,27 @@ export async function createPilotAction(formData: FormData) {
     if (visitError) {
       redirectWithError(`/pilots/${data.id}`, visitError.message);
     }
+
+    await Promise.all(
+      visitRows.map((visit) => {
+        const details = plannedVisitNotificationDetails(visit);
+
+        if (!details) {
+          return null;
+        }
+
+        return notifyPlannedVisitAssignment({
+          actorUserId: profile.id,
+          assignedUserId: visit.assigned_user_id,
+          pilotId: data.id,
+          plannedVisitDate: details.plannedVisitDate,
+          plannedVisitId: visit.id,
+          supabase,
+          visitNumber: details.visitNumber,
+          visitType: details.visitType
+        });
+      })
+    );
 
     await supabase
       .from("pilots")
@@ -1319,12 +1358,12 @@ export async function createPlannedPilotVisitAction(
     };
   }
 
-  const insertPayload: PlannedPilotVisitInsert = {
+  const insertPayload: PlannedPilotVisitInsert & { id: string } = {
     ...payload,
     id: crypto.randomUUID(),
     pilot_id: pilotId,
     created_by_user_id: profile.id
-  } as PlannedPilotVisitInsert;
+  } as PlannedPilotVisitInsert & { id: string };
 
   const { error } = await supabase
     .from("planned_pilot_visits")
@@ -1332,6 +1371,22 @@ export async function createPlannedPilotVisitAction(
 
   if (error) {
     return { status: "error", message: error.message };
+  }
+
+  const insertNotificationDetails =
+    plannedVisitNotificationDetails(insertPayload);
+
+  if (insertNotificationDetails) {
+    await notifyPlannedVisitAssignment({
+      actorUserId: profile.id,
+      assignedUserId: insertPayload.assigned_user_id,
+      pilotId,
+      plannedVisitDate: insertNotificationDetails.plannedVisitDate,
+      plannedVisitId: insertPayload.id,
+      supabase,
+      visitNumber: insertNotificationDetails.visitNumber,
+      visitType: insertNotificationDetails.visitType
+    });
   }
 
   const { error: pilotUpdateError } = await supabase
@@ -1376,6 +1431,13 @@ export async function updatePlannedPilotVisitAction(
     };
   }
 
+  const { data: existingVisit } = await supabase
+    .from("planned_pilot_visits")
+    .select("assigned_user_id")
+    .eq("id", plannedVisitId)
+    .eq("pilot_id", pilotId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("planned_pilot_visits")
     .update(payload as PlannedPilotVisitUpdate)
@@ -1384,6 +1446,26 @@ export async function updatePlannedPilotVisitAction(
 
   if (error) {
     return { status: "error", message: error.message };
+  }
+
+  if (
+    existingVisit?.assigned_user_id &&
+    existingVisit.assigned_user_id !== payload.assigned_user_id
+  ) {
+    const updateNotificationDetails = plannedVisitNotificationDetails(payload);
+
+    if (updateNotificationDetails) {
+      await notifyPlannedVisitAssignment({
+        actorUserId: profile.id,
+        assignedUserId: payload.assigned_user_id,
+        pilotId,
+        plannedVisitDate: updateNotificationDetails.plannedVisitDate,
+        plannedVisitId,
+        supabase,
+        visitNumber: updateNotificationDetails.visitNumber,
+        visitType: updateNotificationDetails.visitType
+      });
+    }
   }
 
   const { error: pilotUpdateError } = await supabase

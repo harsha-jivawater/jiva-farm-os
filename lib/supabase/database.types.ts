@@ -2310,6 +2310,69 @@ export type Database = {
         };
         Relationships: [];
       };
+      notifications: {
+        Row: {
+          id: string;
+          recipient_user_id: string;
+          actor_user_id: string | null;
+          notification_type: string;
+          category: string;
+          title: string;
+          message: string | null;
+          record_type: string | null;
+          record_id: string | null;
+          record_code: string | null;
+          record_path: string | null;
+          due_date: string | null;
+          severity: string | null;
+          is_read: boolean;
+          read_at: string | null;
+          created_at: string;
+          source_event_key: string | null;
+          dedupe_key: string | null;
+        };
+        Insert: {
+          id?: string;
+          recipient_user_id: string;
+          actor_user_id?: string | null;
+          notification_type: string;
+          category: string;
+          title: string;
+          message?: string | null;
+          record_type?: string | null;
+          record_id?: string | null;
+          record_code?: string | null;
+          record_path?: string | null;
+          due_date?: string | null;
+          severity?: string | null;
+          is_read?: boolean;
+          read_at?: string | null;
+          created_at?: string;
+          source_event_key?: string | null;
+          dedupe_key?: string | null;
+        };
+        Update: {
+          id?: string;
+          recipient_user_id?: string;
+          actor_user_id?: string | null;
+          notification_type?: string;
+          category?: string;
+          title?: string;
+          message?: string | null;
+          record_type?: string | null;
+          record_id?: string | null;
+          record_code?: string | null;
+          record_path?: string | null;
+          due_date?: string | null;
+          severity?: string | null;
+          is_read?: boolean;
+          read_at?: string | null;
+          created_at?: string;
+          source_event_key?: string | null;
+          dedupe_key?: string | null;
+        };
+        Relationships: [];
+      };
       institution_contacts: {
         Row: {
           id: string;

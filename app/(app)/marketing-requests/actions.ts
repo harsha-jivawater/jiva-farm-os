@@ -26,6 +26,7 @@ import {
   sendN8nEvent,
   userDisplayName
 } from "@/lib/integrations/n8n";
+import { notifyMarketingAssignment } from "@/lib/notifications/create";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
@@ -346,6 +347,19 @@ export async function updateMarketingWorkflowAction(
   }
 
   if (assignedOwnerChanged) {
+    await notifyMarketingAssignment({
+      actorUserId: profile.id,
+      assigneeUserId: payload.assigned_to_user_id,
+      dueDate:
+        updatePayload.revised_deadline_date ??
+        updatePayload.accepted_deadline_date ??
+        existing.deadline_date,
+      requestCode: existing.request_code,
+      requestId: existing.id,
+      supabase,
+      title: existing.title
+    });
+
     await sendN8nEvent("marketing_request_assigned", {
       assigneeName: await loadInternalUserDisplay(
         supabase,

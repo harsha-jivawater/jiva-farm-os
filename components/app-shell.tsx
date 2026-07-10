@@ -5,7 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 import { KeyRound, LogOut, Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { navigationGroups } from "@/lib/navigation";
+import type { NotificationSummary } from "@/lib/notifications/types";
 import { CurrentUserProvider, type CurrentInternalUser } from "@/components/auth/current-user-context";
 import { canViewModule } from "@/lib/users/permissions";
 import { labelForRole } from "@/lib/users/options";
@@ -14,12 +16,14 @@ import { defaultHomePathForUser } from "@/lib/users/default-route";
 type AppShellProps = {
   children: ReactNode;
   currentUser: CurrentInternalUser;
+  notificationSummary: NotificationSummary;
   signOutAction: () => Promise<void>;
 };
 
 export function AppShell({
   children,
   currentUser,
+  notificationSummary,
   signOutAction
 }: AppShellProps) {
   const pathname = usePathname();
@@ -138,6 +142,22 @@ export function AppShell({
                 : ""}
             </p>
           </div>
+          {!mustChangePassword ? (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2">
+              <div>
+                <p className="text-xs font-medium text-slate-500">
+                  Action Center
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {notificationSummary.unreadCount} unread
+                </p>
+              </div>
+              <NotificationBell
+                latest={notificationSummary.latest}
+                unreadCount={notificationSummary.unreadCount}
+              />
+            </div>
+          ) : null}
           {mustChangePassword ? (
             <Link
               className={[
@@ -178,7 +198,14 @@ export function AppShell({
           <div className="flex min-w-0 justify-center">
             <BrandLogo className="max-h-12 w-[170px]" priority />
           </div>
-          <div aria-hidden="true" />
+          {!mustChangePassword ? (
+            <NotificationBell
+              latest={notificationSummary.latest}
+              unreadCount={notificationSummary.unreadCount}
+            />
+          ) : (
+            <div aria-hidden="true" />
+          )}
         </header>
 
         <main className="min-h-screen min-w-0">

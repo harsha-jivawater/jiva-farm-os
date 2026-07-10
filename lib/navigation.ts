@@ -9,6 +9,7 @@ import {
   Handshake,
   KeyRound,
   LayoutDashboard,
+  Bell,
   Package,
   Palette,
   ShieldAlert,
@@ -49,6 +50,11 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/my-pending-work",
         module: "my-pending-work",
         icon: ClipboardList
+      },
+      {
+        label: "Notifications",
+        href: "/notifications",
+        icon: Bell
       },
       {
         label: "My Visits",

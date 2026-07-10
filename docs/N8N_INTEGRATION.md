@@ -58,11 +58,20 @@ Common payload fields:
 
 | Event | Trigger |
 |---|---|
+| `user_assigned` | A user is assigned to a Marketing Request or Planned Pilot Visit. This mirrors the in-app notification trigger and remains outbound-only. |
 | `marketing_request_assigned` | Marketing Request assigned to a Designer/owner by Admin, Management, or Marketing Head. |
 | `marketing_deadline_revised` | Admin, Management, or Marketing Head revises the marketing request deadline. |
 | `paid_lead_ready_for_dispatch` | Farmer Lead payment is confirmed and the lead still has no dispatch. |
 | `pilot_dispatch_requested` | A Free Pilot dispatch is created successfully. |
 | `visit_report_submitted` | A Pilot Visit Report is submitted successfully. |
+
+## In-App Notification Compatibility
+
+- In-app notifications are stored in the app database after the notifications migration is applied.
+- n8n remains optional and does not control notification delivery inside Jiva Farm OS.
+- Assignment events create in-app notifications first, then send compact outbound `user_assigned` payloads when n8n is enabled.
+- Future due/overdue reminder automation should use deterministic dedupe keys so the same reminder is not created repeatedly.
+- Mention notifications are deferred until mentions can be selected or matched to a unique internal user safely.
 
 ## Daily Summary API
 
@@ -117,7 +126,6 @@ Read limits:
 ## Phase Limits
 
 - No n8n write-back.
-- No stored notification table.
 - No email/SMS sending inside Jiva Farm OS.
 - No heavy file transfer to n8n.
 - No private upload URLs in payloads.

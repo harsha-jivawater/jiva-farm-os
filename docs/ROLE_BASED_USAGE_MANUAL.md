@@ -1459,6 +1459,9 @@ Device pool:
 
 | Rule | Confirmed source |
 |---|---|
+| Notifications / Action Center shows assignments, reminders, mentions, and workflow updates for the signed-in user only. | Notifications table RLS and app shell bell. |
+| Marketing Request assignment and Planned Pilot Visit assignment create in-app notifications for the assigned user. | Marketing and Pilot server actions. |
+| Mention notifications are deferred until user mentions can be matched safely and uniquely. | Notifications rollout note. |
 | Sales Head can create Dealer profiles. | `canCreateDealer` includes Admin, Sales Head, RSM. |
 | Dealer statuses are Prospect, Onboarding, Active, Dormant, Dropped. | Dealer options. |
 | Dealer sales performance counts dealer-linked Dealer Farmer Installations only. | Dealer performance logic and project status notes. |
