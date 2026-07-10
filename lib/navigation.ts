@@ -102,6 +102,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
     label: "Operations",
     items: [
       {
+        label: "Inventory",
+        href: "/devices",
+        module: "inventory",
+        icon: Warehouse
+      },
+      {
         label: "Dispatches",
         href: "/dispatches",
         module: "dispatches",
@@ -112,12 +118,6 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/installations",
         module: "installations",
         icon: Wrench
-      },
-      {
-        label: "Inventory",
-        href: "/devices",
-        module: "inventory",
-        icon: Warehouse
       },
       {
         label: "Post Installation Follow-ups",
