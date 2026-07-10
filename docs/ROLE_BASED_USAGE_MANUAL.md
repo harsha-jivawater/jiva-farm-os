@@ -796,8 +796,9 @@ flowchart LR
 
 - Keep serial number and device status accurate.
 - Use Dispatches for device movement.
-- Use Paid Farmer Sale for paid farmer leads and Free Pilot for free pilot movement.
+- Use Paid Farmer Sale for paid farmer leads, Free Pilot for free pilot movement, and Dealer Dispatch for dealer stock placement.
 - Use Fresh Sale devices for paid farmer sale dispatches.
+- Use Fresh Sale devices for Dealer Dispatch.
 - Use Pilot Stock devices for free pilot dispatches.
 - Use Installations for field installation records.
 
@@ -1081,6 +1082,27 @@ Rules:
 - Dispatch creation does not mark Pilot Device Installed.
 - If a non-cancelled pilot dispatch already exists, create another only after business review.
 
+### Dealer Dispatch
+
+```mermaid
+flowchart LR
+  A["Dealer stock placement needed"] --> B["Stock / Dispatch creates Dealer Dispatch"]
+  B --> C["Fresh Sale Device selected"]
+  C --> D["Dispatch Requested"]
+  D --> E["Dispatched / Delivered"]
+  E --> F["Dealer stock available for later farmer sales"]
+```
+
+Rules:
+
+- Dealer Dispatch must be created from a selected Dealer.
+- Dealer Dispatch uses Fresh Sale devices only.
+- Dealer Dispatch is stock placement only.
+- Dealer Dispatch does not require a paid Farmer Lead.
+- Dealer Dispatch does not require a Pilot.
+- Dealer Dispatch does not mark a Farmer Lead as dispatched.
+- Dealer Dispatch does not count as a farmer sale. Dealer sale is recorded later through a dealer-linked farmer sale or installation.
+
 ### Pilot Authority Map
 
 ```mermaid
@@ -1191,6 +1213,7 @@ Dispatch creation routes:
 
 - Paid Farmer Sale: selected paid Farmer Lead, Fresh Sale device only.
 - Free Pilot: selected active Pilot, Pilot Stock device only.
+- Dealer Dispatch: selected Dealer, Fresh Sale device only; stock placement, not farmer sale.
 - Manual dispatch — admin exception: Admin-only for unusual movement.
 
 ### Installations

@@ -20,6 +20,7 @@ import {
 } from "@/lib/devices/options";
 import type {
   Dispatch,
+  DispatchDealerOption,
   DispatchDeviceOption,
   DispatchFarmerLeadOption,
   DispatchPilotOption
@@ -28,6 +29,7 @@ import type {
 type DispatchFormProps = {
   action: (formData: FormData) => void | Promise<void>;
   cancelHref: string;
+  dealers?: DispatchDealerOption[];
   dispatch?: Dispatch;
   devices: DispatchDeviceOption[];
   error?: string | null;
@@ -65,6 +67,11 @@ function pilotLabel(pilot: DispatchPilotOption) {
   return `${pilot.pilot_code} · ${pilot.pilot_name} · ${pilot.farmer_name_snapshot}, ${pilot.district}`;
 }
 
+function dealerLabel(dealer: DispatchDealerOption) {
+  const primaryName = dealer.firm_name || dealer.dealer_name;
+  return `${dealer.dealer_code} · ${primaryName} · ${dealer.district}, ${dealer.state}`;
+}
+
 function routeForDispatch(dispatch?: Dispatch) {
   if (dispatch?.dispatch_type === "Farmer Sale Dispatch") {
     return "Paid Farmer Sale";
@@ -72,6 +79,14 @@ function routeForDispatch(dispatch?: Dispatch) {
 
   if (dispatch?.dispatch_type === "Pilot Dispatch") {
     return "Free Pilot";
+  }
+
+  if (
+    dispatch?.dispatch_type === "Dealer Stock Dispatch" ||
+    dispatch?.destination_dealer_id ||
+    dispatch?.linked_dealer_id
+  ) {
+    return "Dealer Dispatch";
   }
 
   return "Admin Manual Exception";
@@ -95,6 +110,7 @@ function SubmitButton({ label }: { label: string }) {
 export function DispatchForm({
   action,
   cancelHref,
+  dealers = [],
   dispatch,
   devices,
   error,
@@ -116,6 +132,10 @@ export function DispatchForm({
     (pilot) =>
       pilot.id ===
       (initialPilotId ?? dispatch?.destination_pilot_id ?? dispatch?.linked_pilot_id)
+  );
+  const initialDealer = dealers.find(
+    (dealer) =>
+      dealer.id === (dispatch?.destination_dealer_id ?? dispatch?.linked_dealer_id)
   );
   const initialDevice = useMemo(
     () =>
@@ -147,7 +167,13 @@ export function DispatchForm({
           : "Paid Farmer Sale"
   );
   const [destinationType, setDestinationType] = useState(
-    initialLead ? "Farmer" : initialPilot ? "Pilot" : dispatch?.destination_type ?? ""
+    initialLead
+      ? "Farmer"
+      : initialPilot
+        ? "Pilot"
+        : initialDealer
+          ? "Dealer"
+          : dispatch?.destination_type ?? ""
   );
   const [selectedLeadId, setSelectedLeadId] = useState(
     initialFarmerLeadId ??
@@ -161,21 +187,28 @@ export function DispatchForm({
       dispatch?.linked_pilot_id ??
       ""
   );
+  const [selectedDealerId, setSelectedDealerId] = useState(
+    dispatch?.destination_dealer_id ?? dispatch?.linked_dealer_id ?? ""
+  );
   const [destinationName, setDestinationName] = useState(
     initialLead?.farmer_name ??
       initialPilot?.pilot_name ??
+      initialDealer?.firm_name ??
+      initialDealer?.dealer_name ??
       dispatch?.destination_name_snapshot ??
       ""
   );
   const [destinationContact, setDestinationContact] = useState(
     initialLead?.mobile_number ??
       initialPilot?.farmer_mobile_snapshot ??
+      initialDealer?.contact_number ??
       dispatch?.destination_contact_snapshot ??
       ""
   );
   const [destinationAddress, setDestinationAddress] = useState(
     initialLead?.village ??
       initialPilot?.village ??
+      initialDealer?.dealer_address ??
       dispatch?.destination_address ??
       ""
   );
@@ -183,29 +216,39 @@ export function DispatchForm({
     initialLead?.payment_confirmed ?? dispatch?.payment_confirmed ?? false
   );
   const [stateValue, setStateValue] = useState(
-    initialLead?.state ?? initialPilot?.state ?? dispatch?.destination_state ?? ""
+    initialLead?.state ??
+      initialPilot?.state ??
+      initialDealer?.state ??
+      dispatch?.destination_state ??
+      ""
   );
   const [districtValue, setDistrictValue] = useState(
     initialLead?.district ??
       initialPilot?.district ??
+      initialDealer?.district ??
       dispatch?.destination_district ??
       ""
   );
   const isFarmerSaleRoute = dispatchRoute === "Paid Farmer Sale";
   const isPilotRoute = dispatchRoute === "Free Pilot";
+  const isDealerRoute = dispatchRoute === "Dealer Dispatch";
   const isManualRoute = dispatchRoute === "Admin Manual Exception";
   const effectiveDispatchType = isFarmerSaleRoute
     ? "Farmer Sale Dispatch"
     : isPilotRoute
       ? "Pilot Dispatch"
-      : dispatchType;
+      : isDealerRoute
+        ? "Dealer Stock Dispatch"
+        : dispatchType;
   const effectiveDestinationType = isFarmerSaleRoute
     ? "Farmer"
     : isPilotRoute
       ? "Pilot"
-      : destinationType;
+      : isDealerRoute
+        ? "Dealer"
+        : destinationType;
   const filteredDevices = devices.filter((device) => {
-    if (isFarmerSaleRoute) {
+    if (isFarmerSaleRoute || isDealerRoute) {
       return device.inventory_pool === "Fresh Sale";
     }
 
@@ -262,6 +305,29 @@ export function DispatchForm({
     setPaymentConfirmed(false);
   }
 
+  function applyDealer(dealerId: string) {
+    setSelectedDealerId(dealerId);
+    const dealer = dealers.find((option) => option.id === dealerId);
+
+    if (!dealer) {
+      setDestinationName("");
+      setDestinationContact("");
+      setStateValue("");
+      setDistrictValue("");
+      setDestinationAddress("");
+      setPaymentConfirmed(false);
+      return;
+    }
+
+    setDestinationType("Dealer");
+    setDestinationName(dealer.firm_name || dealer.dealer_name);
+    setDestinationContact(dealer.contact_number);
+    setStateValue(dealer.state);
+    setDistrictValue(dealer.district);
+    setDestinationAddress(dealer.dealer_address ?? "");
+    setPaymentConfirmed(false);
+  }
+
   function changeRoute(nextRoute: string) {
     setDispatchRoute(nextRoute);
     setSelectedDeviceId("");
@@ -269,6 +335,7 @@ export function DispatchForm({
     setProductModel("");
     setSelectedLeadId("");
     setSelectedPilotId("");
+    setSelectedDealerId("");
 
     if (nextRoute === "Paid Farmer Sale") {
       setDispatchType("Farmer Sale Dispatch");
@@ -280,6 +347,13 @@ export function DispatchForm({
     if (nextRoute === "Free Pilot") {
       setDispatchType("Pilot Dispatch");
       setDestinationType("Pilot");
+      setPaymentConfirmed(false);
+      return;
+    }
+
+    if (nextRoute === "Dealer Dispatch") {
+      setDispatchType("Dealer Stock Dispatch");
+      setDestinationType("Dealer");
       setPaymentConfirmed(false);
       return;
     }
@@ -346,7 +420,9 @@ export function DispatchForm({
                 ? "Paid farmer dispatches use fresh sale devices only."
                 : isPilotRoute
                   ? "Free pilots use pilot-dedicated devices only."
-                  : "Manual dispatch is an Admin exception for unusual stock movement."}
+                  : isDealerRoute
+                    ? "Use this when sending Jiva stock to a dealer. This records dealer stock placement, not a farmer sale."
+                    : "Manual dispatch is an Admin exception for unusual stock movement."}
             </p>
           </div>
 
@@ -589,6 +665,38 @@ export function DispatchForm({
             <input name="destination_pilot_id" type="hidden" value="" />
           )}
 
+          {isDealerRoute ? (
+            <div className="md:col-span-2">
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="destination_dealer_id"
+              >
+                Dealer for stock placement
+              </label>
+              <select
+                className={inputClassName()}
+                id="destination_dealer_id"
+                name="destination_dealer_id"
+                onChange={(event) => applyDealer(event.target.value)}
+                required
+                value={selectedDealerId}
+              >
+                <option value="">Select dealer</option>
+                {dealers.map((dealer) => (
+                  <option key={dealer.id} value={dealer.id}>
+                    {dealerLabel(dealer)}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Use this when sending Jiva stock to a dealer. This records dealer
+                stock placement, not a farmer sale.
+              </p>
+            </div>
+          ) : (
+            <input name="destination_dealer_id" type="hidden" value="" />
+          )}
+
           {!isManualRoute ? (
             <>
               <input
@@ -653,6 +761,7 @@ export function DispatchForm({
           ) : (
             <>
               <input name="destination_pilot_id" type="hidden" value="" />
+              <input name="destination_dealer_id" type="hidden" value="" />
               <div>
                 <label
                   className="mb-1.5 block text-sm font-medium text-slate-700"
@@ -775,13 +884,25 @@ export function DispatchForm({
                 <input
                   name="payment_requirement_type"
                   type="hidden"
-                  value={isPilotRoute ? "Unpaid Pilot" : "Payment Required"}
+                  value={
+                    isPilotRoute
+                      ? "Unpaid Pilot"
+                      : isDealerRoute
+                        ? "Internal Transfer"
+                        : "Payment Required"
+                  }
                 />
                 <input
                   className={inputClassName()}
                   readOnly
                   type="text"
-                  value={isPilotRoute ? "Unpaid Pilot" : "Payment Required"}
+                  value={
+                    isPilotRoute
+                      ? "Unpaid Pilot"
+                      : isDealerRoute
+                        ? "Internal Transfer"
+                        : "Payment Required"
+                  }
                 />
               </>
             )}
@@ -791,7 +912,7 @@ export function DispatchForm({
             <input
               className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
               checked={paymentConfirmed}
-              disabled={isFarmerSaleRoute || isPilotRoute}
+              disabled={isFarmerSaleRoute || isPilotRoute || isDealerRoute}
               name="payment_confirmed"
               onChange={(event) => setPaymentConfirmed(event.target.checked)}
               type="checkbox"

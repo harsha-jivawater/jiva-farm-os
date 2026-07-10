@@ -98,6 +98,14 @@ function dispatchRoute(dispatch: Dispatch) {
     return "Free Pilot";
   }
 
+  if (
+    dispatch.dispatch_type === "Dealer Stock Dispatch" ||
+    dispatch.linked_dealer_id ||
+    dispatch.destination_dealer_id
+  ) {
+    return "Dealer Dispatch";
+  }
+
   return "Manual admin exception";
 }
 
@@ -112,6 +120,10 @@ function dispatchDevicePool(dispatch: Dispatch) {
     return "Pilot Stock";
   }
 
+  if (route === "Dealer Dispatch") {
+    return "Fresh Sale";
+  }
+
   return "Selected device pool";
 }
 
@@ -119,6 +131,7 @@ function dispatchSourceLink(dispatch: Dispatch) {
   const farmerLeadId =
     dispatch.linked_farmer_lead_id ?? dispatch.destination_farmer_lead_id;
   const pilotId = dispatch.linked_pilot_id ?? dispatch.destination_pilot_id;
+  const dealerId = dispatch.linked_dealer_id ?? dispatch.destination_dealer_id;
 
   if (farmerLeadId) {
     return {
@@ -136,6 +149,14 @@ function dispatchSourceLink(dispatch: Dispatch) {
     };
   }
 
+  if (dealerId) {
+    return {
+      href: `/dealers/${dealerId}`,
+      label: "Go to dealer",
+      value: "Dealer"
+    };
+  }
+
   return {
     href: undefined,
     label: undefined,
@@ -147,6 +168,28 @@ function dispatchHandoff(
   dispatch: Dispatch,
   canCreateInstallation: boolean
 ) {
+  if (dispatchRoute(dispatch) === "Dealer Dispatch") {
+    if (["Dispatched", "Delivered"].includes(dispatch.dispatch_status)) {
+      return {
+        currentStage: "Dealer stock placement",
+        nextAction:
+          "Confirm dealer stock availability. Farmer sale is recorded later through a dealer-linked farmer sale or installation.",
+        nextHref: undefined,
+        nextLinkLabel: undefined,
+        nextOwner: "Stock / Dispatch"
+      };
+    }
+
+    return {
+      currentStage: "Dealer dispatch in progress",
+      nextAction:
+        "Dispatch the Fresh Sale device to the dealer. This is stock placement, not a farmer sale.",
+      nextHref: `/dispatches/${dispatch.id}/edit`,
+      nextLinkLabel: "Update dispatch",
+      nextOwner: "Stock / Dispatch"
+    };
+  }
+
   if (dispatch.dispatch_status === "Installed" || dispatch.linked_installation_id) {
     return {
       currentStage: "Installation linked",

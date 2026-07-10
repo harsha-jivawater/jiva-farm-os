@@ -285,9 +285,12 @@ Default Sales Head fallback routing:
 
 ## Dispatch And Device Pool Workflow
 
-- Dispatch creation has two normal routes:
+- Dispatch creation has three normal routes:
   - Paid Farmer Sale: selected paid Farmer Lead, Fresh Sale device only.
   - Free Pilot: selected active Pilot, Pilot Stock device only.
+  - Dealer Dispatch: selected Dealer, Fresh Sale device only.
+- Dealer Dispatch is stock placement only. It does not count as a farmer sale, does not require a paid Farmer Lead or Pilot, and does not mark any Farmer Lead as dispatched.
+- Dealer sale is recorded later through a dealer-linked farmer sale or installation, not when stock is placed with the dealer.
 - Admin can use `Manual dispatch — admin exception` for unusual stock movement.
 - Normal users should not manually enter farmer destination details for paid farmer-sale dispatches.
 - Sales and R&D roles can see readiness messages on Farmer Lead/Pilot detail pages, but device assignment remains with Admin, Accounts, and Stock / Dispatch.

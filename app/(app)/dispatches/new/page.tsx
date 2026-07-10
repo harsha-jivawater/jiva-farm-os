@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { createDispatchAction } from "@/app/(app)/dispatches/actions";
 import { preferredDispatchDeviceStatuses } from "@/lib/dispatches/options";
 import type {
+  DispatchDealerOption,
   DispatchDeviceOption,
   DispatchFarmerLeadOption,
   DispatchPilotOption
@@ -76,6 +77,17 @@ const pilotSelectColumns = [
   "dispatch_id"
 ].join(",");
 
+const dealerSelectColumns = [
+  "id",
+  "dealer_code",
+  "dealer_name",
+  "firm_name",
+  "contact_number",
+  "state",
+  "district",
+  "dealer_address"
+].join(",");
+
 function collectLinkedIds(rows: DispatchLinkRow[] | null, key: "farmerLead" | "pilot") {
   const ids = new Set<string>();
 
@@ -126,6 +138,13 @@ export default async function NewDispatchPage({
     .not("pilot_status", "in", "(Cancelled,Closed - Successful,Closed - Failed,Closed - Inconclusive)")
     .order("created_at", { ascending: false })
     .limit(200);
+  const { data: dealers } = await supabase
+    .from("dealers")
+    .select(dealerSelectColumns)
+    .is("deleted_at", null)
+    .order("firm_name", { ascending: true, nullsFirst: false })
+    .order("dealer_name", { ascending: true })
+    .limit(200);
   const { data: openDispatches } = await supabase
     .from("dispatches")
     .select(
@@ -165,6 +184,7 @@ export default async function NewDispatchPage({
         action={createDispatchAction}
         cancelHref="/dispatches"
         canUseManualException={canUseManualException}
+        dealers={(dealers ?? []) as unknown as DispatchDealerOption[]}
         devices={(data ?? []) as unknown as DispatchDeviceOption[]}
         error={params.error}
         farmerLeads={eligibleFarmerLeads}

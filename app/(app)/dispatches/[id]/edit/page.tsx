@@ -5,6 +5,7 @@ import { updateDispatchAction } from "@/app/(app)/dispatches/actions";
 import { preferredDispatchDeviceStatuses } from "@/lib/dispatches/options";
 import type {
   Dispatch,
+  DispatchDealerOption,
   DispatchDeviceOption,
   DispatchFarmerLeadOption,
   DispatchPilotOption
@@ -71,6 +72,17 @@ const farmerLeadSelectColumns = [
   "owner_user_id",
   "rsm_user_id",
   "region_id"
+].join(",");
+
+const dealerSelectColumns = [
+  "id",
+  "dealer_code",
+  "dealer_name",
+  "firm_name",
+  "contact_number",
+  "state",
+  "district",
+  "dealer_address"
 ].join(",");
 
 export default async function EditDispatchPage({
@@ -189,6 +201,32 @@ export default async function EditDispatchPage({
     }
   }
 
+  const { data: activeDealers } = await supabase
+    .from("dealers")
+    .select(dealerSelectColumns)
+    .is("deleted_at", null)
+    .order("firm_name", { ascending: true, nullsFirst: false })
+    .order("dealer_name", { ascending: true })
+    .limit(200);
+  let dealers = (activeDealers ?? []) as unknown as DispatchDealerOption[];
+  const selectedDealerId =
+    dispatch.destination_dealer_id ?? dispatch.linked_dealer_id;
+
+  if (
+    selectedDealerId &&
+    !dealers.some((dealer) => dealer.id === selectedDealerId)
+  ) {
+    const { data: selectedDealer } = await supabase
+      .from("dealers")
+      .select(dealerSelectColumns)
+      .eq("id", selectedDealerId)
+      .single();
+
+    if (selectedDealer) {
+      dealers = [selectedDealer as unknown as DispatchDealerOption, ...dealers];
+    }
+  }
+
   const updateAction = updateDispatchAction.bind(null, dispatch.id);
 
   return (
@@ -202,6 +240,7 @@ export default async function EditDispatchPage({
         action={updateAction}
         cancelHref={`/dispatches/${dispatch.id}`}
         canUseManualException={canUseManualException}
+        dealers={dealers}
         devices={devices}
         dispatch={dispatch}
         error={query.error}

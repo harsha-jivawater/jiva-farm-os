@@ -46,6 +46,7 @@ export const paymentRequirementOptions = [
 export const dispatchRouteOptions = [
   { value: "Paid Farmer Sale", label: "Paid Farmer Sale" },
   { value: "Free Pilot", label: "Free Pilot" },
+  { value: "Dealer Dispatch", label: "Dealer Dispatch" },
   {
     value: "Admin Manual Exception",
     label: "Manual dispatch — admin exception"

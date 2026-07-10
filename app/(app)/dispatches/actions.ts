@@ -63,6 +63,17 @@ type PilotDispatchSource = {
   dispatch_id: string | null;
 };
 
+type DealerDispatchSource = {
+  id: string;
+  dealer_code: string;
+  dealer_name: string;
+  firm_name: string | null;
+  contact_number: string;
+  state: string;
+  district: string;
+  dealer_address: string | null;
+};
+
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
@@ -73,6 +84,7 @@ function getDispatchRoute(formData: FormData) {
   if (
     route === "Paid Farmer Sale" ||
     route === "Free Pilot" ||
+    route === "Dealer Dispatch" ||
     route === "Admin Manual Exception"
   ) {
     return route;
@@ -83,7 +95,10 @@ function getDispatchRoute(formData: FormData) {
 
 function routeFromPayloadFallback(
   route: string,
-  payload: Pick<DispatchInsert | DispatchUpdate, "dispatch_type">
+  payload: Pick<
+    DispatchInsert | DispatchUpdate,
+    "dispatch_type" | "destination_dealer_id" | "linked_dealer_id"
+  >
 ) {
   if (route) {
     return route;
@@ -95,6 +110,14 @@ function routeFromPayloadFallback(
 
   if (payload.dispatch_type === "Pilot Dispatch") {
     return "Free Pilot";
+  }
+
+  if (
+    payload.dispatch_type === "Dealer Stock Dispatch" ||
+    payload.destination_dealer_id ||
+    payload.linked_dealer_id
+  ) {
+    return "Dealer Dispatch";
   }
 
   return "Admin Manual Exception";
@@ -398,6 +421,40 @@ async function getPilotForDispatch(
   return pilot;
 }
 
+async function getDealerForDispatch(
+  supabase: SupabaseClient,
+  dealerId: string | null | undefined,
+  errorPath: string
+) {
+  if (!dealerId) {
+    redirectWithError(errorPath, "Select a dealer before creating a Dealer Dispatch.");
+  }
+
+  const { data, error } = await supabase
+    .from("dealers")
+    .select(
+      [
+        "id",
+        "dealer_code",
+        "dealer_name",
+        "firm_name",
+        "contact_number",
+        "state",
+        "district",
+        "dealer_address"
+      ].join(",")
+    )
+    .eq("id", dealerId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !data) {
+    redirectWithError(errorPath, "Selected dealer was not found.");
+  }
+
+  return data as unknown as DealerDispatchSource;
+}
+
 function applyPilotDispatchSnapshot(
   payload: DispatchInsert | DispatchUpdate,
   pilot: PilotDispatchSource
@@ -413,6 +470,29 @@ function applyPilotDispatchSnapshot(
   payload.destination_state = pilot.state;
   payload.destination_district = pilot.district;
   payload.payment_requirement_type = "Unpaid Pilot";
+  payload.payment_confirmed = false;
+  payload.payment_confirmed_by_user_id = null;
+  payload.payment_confirmed_date = null;
+}
+
+function applyDealerDispatchSnapshot(
+  payload: DispatchInsert | DispatchUpdate,
+  dealer: DealerDispatchSource
+) {
+  payload.dispatch_type = "Dealer Stock Dispatch";
+  payload.destination_type = "Dealer";
+  payload.destination_dealer_id = dealer.id;
+  payload.linked_dealer_id = dealer.id;
+  payload.destination_farmer_lead_id = null;
+  payload.linked_farmer_lead_id = null;
+  payload.destination_pilot_id = null;
+  payload.linked_pilot_id = null;
+  payload.destination_name_snapshot = dealer.firm_name || dealer.dealer_name;
+  payload.destination_contact_snapshot = dealer.contact_number;
+  payload.destination_address = dealer.dealer_address;
+  payload.destination_state = dealer.state;
+  payload.destination_district = dealer.district;
+  payload.payment_requirement_type = "Internal Transfer";
   payload.payment_confirmed = false;
   payload.payment_confirmed_by_user_id = null;
   payload.payment_confirmed_date = null;
@@ -438,6 +518,13 @@ function validateDevicePoolForRoute({
     redirectWithError(
       errorPath,
       "Pilot dispatches can use Pilot Stock devices only."
+    );
+  }
+
+  if (route === "Dealer Dispatch" && device.inventory_pool !== "Fresh Sale") {
+    redirectWithError(
+      errorPath,
+      "Dealer Dispatches can use Fresh Sale devices only."
     );
   }
 }
@@ -494,6 +581,10 @@ async function applyDispatchedSideEffects({
 }) {
   const movementDate = payload.dispatch_date ?? todayDate();
   const toHolderType = destinationToHolderType(payload.destination_type);
+  const toHolderId =
+    payload.destination_type === "Dealer"
+      ? (payload.destination_dealer_id ?? payload.linked_dealer_id ?? null)
+      : null;
   const toLocationText = locationText(payload);
   const devicePayload: DeviceUpdate = {
     device_status: "Dispatched",
@@ -501,12 +592,17 @@ async function applyDispatchedSideEffects({
     dispatch_date: movementDate,
     last_movement_date: movementDate,
     current_holder_type: toHolderType,
-    current_holder_id: null,
+    current_holder_id: toHolderId,
     current_holder_name_snapshot: payload.destination_name_snapshot ?? null,
     current_state: payload.destination_state ?? null,
     current_district: payload.destination_district ?? null,
     current_location_text: toLocationText
   };
+
+  if (payload.destination_type === "Dealer") {
+    devicePayload.linked_dealer_id =
+      payload.destination_dealer_id ?? payload.linked_dealer_id ?? null;
+  }
 
   const { error: deviceError } = await supabase
     .from("devices")
@@ -533,7 +629,7 @@ async function applyDispatchedSideEffects({
     from_holder_name_snapshot: device.current_holder_name_snapshot,
     from_location_text: device.current_location_text,
     to_holder_type: toHolderType,
-    to_holder_id: null,
+    to_holder_id: toHolderId,
     to_holder_name_snapshot: payload.destination_name_snapshot ?? "Not set",
     to_location_text: toLocationText,
     dispatch_id: dispatchId,
@@ -587,6 +683,14 @@ export async function createDispatchAction(formData: FormData) {
           "/dispatches/new"
         )
       : null;
+  const dealerDispatch =
+    effectiveRoute === "Dealer Dispatch"
+      ? await getDealerForDispatch(
+          supabase,
+          payload.destination_dealer_id,
+          "/dispatches/new"
+        )
+      : null;
 
   if (farmerSaleLead) {
     await ensureNoOpenDispatchForFarmerLead({
@@ -604,6 +708,10 @@ export async function createDispatchAction(formData: FormData) {
       errorPath: "/dispatches/new"
     });
     applyPilotDispatchSnapshot(payload, pilotDispatch);
+  }
+
+  if (dealerDispatch) {
+    applyDealerDispatchSnapshot(payload, dealerDispatch);
   }
 
   const device = await getDeviceForDispatch(
@@ -718,6 +826,10 @@ export async function createDispatchAction(formData: FormData) {
     revalidatePath("/pilots");
     revalidatePath(`/pilots/${pilotDispatch.id}`);
   }
+  if (dealerDispatch) {
+    revalidatePath("/dealers");
+    revalidatePath(`/dealers/${dealerDispatch.id}`);
+  }
   redirect(`/dispatches/${data.id}`);
 }
 
@@ -780,6 +892,14 @@ export async function updateDispatchAction(id: string, formData: FormData) {
           `/dispatches/${id}/edit`
         )
       : null;
+  const dealerDispatch =
+    effectiveRoute === "Dealer Dispatch"
+      ? await getDealerForDispatch(
+          supabase,
+          payload.destination_dealer_id,
+          `/dispatches/${id}/edit`
+        )
+      : null;
 
   if (farmerSaleLead) {
     await ensureNoOpenDispatchForFarmerLead({
@@ -799,6 +919,10 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       existingDispatchId: id
     });
     applyPilotDispatchSnapshot(payload, pilotDispatch);
+  }
+
+  if (dealerDispatch) {
+    applyDealerDispatchSnapshot(payload, dealerDispatch);
   }
 
   const device = await getDeviceForDispatch(
@@ -930,6 +1054,10 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   if (pilotDispatch) {
     revalidatePath("/pilots");
     revalidatePath(`/pilots/${pilotDispatch.id}`);
+  }
+  if (dealerDispatch) {
+    revalidatePath("/dealers");
+    revalidatePath(`/dealers/${dealerDispatch.id}`);
   }
   redirect(`/dispatches/${id}`);
 }

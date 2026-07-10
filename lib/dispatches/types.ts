@@ -64,6 +64,17 @@ export type DispatchPilotOption = {
   dispatch_id: string | null;
 };
 
+export type DispatchDealerOption = {
+  id: string;
+  dealer_code: string;
+  dealer_name: string;
+  firm_name: string | null;
+  contact_number: string;
+  state: string;
+  district: string;
+  dealer_address: string | null;
+};
+
 export type DispatchFilters = {
   q: string;
   dispatch_status: string;
