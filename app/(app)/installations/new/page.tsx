@@ -59,6 +59,13 @@ const dispatchColumns = [
   "device_id",
   "serial_number_snapshot",
   "product_model",
+  "destination_farmer_lead_id",
+  "linked_farmer_lead_id",
+  "destination_name_snapshot",
+  "destination_contact_snapshot",
+  "destination_address",
+  "destination_state",
+  "destination_district",
   "destination_dealer_id",
   "destination_institution_id",
   "destination_pilot_id",
@@ -66,6 +73,19 @@ const dispatchColumns = [
   "linked_institution_id",
   "linked_pilot_id"
 ].join(",");
+
+function unique(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.filter(Boolean) as string[]));
+}
+
+function dispatchFarmerLeadIds(dispatches: InstallationDispatchOption[]) {
+  return unique(
+    dispatches.flatMap((dispatch) => [
+      dispatch.destination_farmer_lead_id,
+      dispatch.linked_farmer_lead_id
+    ])
+  );
+}
 
 export default async function NewInstallationPage({
   searchParams
@@ -93,6 +113,27 @@ export default async function NewInstallationPage({
         .order("created_at", { ascending: false })
         .limit(150)
     ]);
+  let farmerLeadOptions =
+    (farmerLeads ?? []) as unknown as InstallationFarmerLeadOption[];
+  const dispatchOptions =
+    (dispatches ?? []) as unknown as InstallationDispatchOption[];
+  const loadedFarmerLeadIds = new Set(farmerLeadOptions.map((lead) => lead.id));
+  const missingDispatchFarmerLeadIds = dispatchFarmerLeadIds(
+    dispatchOptions
+  ).filter((leadId) => !loadedFarmerLeadIds.has(leadId));
+
+  if (missingDispatchFarmerLeadIds.length) {
+    const { data: dispatchFarmerLeads } = await supabase
+      .from("farmer_leads")
+      .select(farmerLeadColumns)
+      .in("id", missingDispatchFarmerLeadIds)
+      .is("deleted_at", null);
+
+    farmerLeadOptions = [
+      ...((dispatchFarmerLeads ?? []) as unknown as InstallationFarmerLeadOption[]),
+      ...farmerLeadOptions
+    ];
+  }
 
   return (
     <section>
@@ -105,13 +146,9 @@ export default async function NewInstallationPage({
         action={createInstallationAction}
         cancelHref="/installations"
         devices={(devices ?? []) as unknown as InstallationDeviceOption[]}
-        dispatches={
-          (dispatches ?? []) as unknown as InstallationDispatchOption[]
-        }
+        dispatches={dispatchOptions}
         error={params.error}
-        farmerLeads={
-          (farmerLeads ?? []) as unknown as InstallationFarmerLeadOption[]
-        }
+        farmerLeads={farmerLeadOptions}
         initialDealerId={params.dealer_id}
         initialDeviceId={params.device_id}
         initialDispatchId={params.dispatch_id}

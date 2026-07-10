@@ -67,6 +67,12 @@ function deviceLabel(device: InstallationDeviceOption) {
   return `${device.serial_number}${code} · ${device.product_model} · ${device.device_status}`;
 }
 
+function dispatchFarmerLeadId(
+  dispatch: InstallationDispatchOption | null | undefined
+) {
+  return dispatch?.destination_farmer_lead_id ?? dispatch?.linked_farmer_lead_id ?? "";
+}
+
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
 
@@ -109,9 +115,17 @@ export function InstallationForm({
     () =>
       farmerLeads.find(
         (lead) =>
-          lead.id === (installation?.farmer_lead_id ?? initialFarmerLeadId)
+          lead.id ===
+          (installation?.farmer_lead_id ??
+            initialFarmerLeadId ??
+            dispatchFarmerLeadId(initialDispatch))
       ),
-    [farmerLeads, initialFarmerLeadId, installation?.farmer_lead_id]
+    [
+      farmerLeads,
+      initialDispatch,
+      initialFarmerLeadId,
+      installation?.farmer_lead_id
+    ]
   );
   const initialDevice = useMemo(
     () =>
@@ -207,10 +221,37 @@ export function InstallationForm({
   const [followupDueDate, setFollowupDueDate] = useState(
     dateValue(installation?.followup_due_date) || addDays(initialDate, 15)
   );
+  const [selectedInstallationType, setSelectedInstallationType] = useState(
+    installation?.installation_type ?? initialInstallationType ?? ""
+  );
+  const selectedDispatch = dispatches.find(
+    (dispatch) => dispatch.id === selectedDispatchId
+  );
+  const selectedDispatchFarmerLeadId = dispatchFarmerLeadId(selectedDispatch);
+  const isDealerFarmerInstallation =
+    selectedInstallationType === "Dealer Farmer Installation";
+  const isDispatchDerivedInstallation =
+    selectedInstallationType === "Farmer Sale Installation" ||
+    selectedInstallationType === "Pilot Installation";
+  const visibleFarmerLeads = isDealerFarmerInstallation
+    ? farmerLeads
+    : selectedDispatchFarmerLeadId
+      ? farmerLeads.filter((lead) => lead.id === selectedDispatchFarmerLeadId)
+      : selectedFarmerLeadId && mode === "edit"
+        ? farmerLeads.filter((lead) => lead.id === selectedFarmerLeadId)
+        : [];
+  const farmerLeadSelectDisabled =
+    !isDealerFarmerInstallation &&
+    (isDispatchDerivedInstallation || Boolean(selectedDispatchId));
 
-  function applyFarmerLead(value: string) {
+  function applyFarmerLead(
+    value: string,
+    dispatchOverride?: InstallationDispatchOption
+  ) {
     const farmerLead = farmerLeads.find((lead) => lead.id === value);
-    const dispatch = dispatches.find((option) => option.id === selectedDispatchId);
+    const dispatch =
+      dispatchOverride ??
+      dispatches.find((option) => option.id === selectedDispatchId);
     setSelectedFarmerLeadId(value);
     setFarmerName(farmerLead?.farmer_name ?? "");
     setFarmerMobile(farmerLead?.mobile_number ?? "");
@@ -257,6 +298,9 @@ export function InstallationForm({
     setSelectedDispatchId(value);
 
     if (!dispatch) {
+      if (!isDealerFarmerInstallation) {
+        applyFarmerLead("");
+      }
       return;
     }
 
@@ -274,6 +318,13 @@ export function InstallationForm({
     setPilotId(
       dispatch.linked_pilot_id ?? dispatch.destination_pilot_id ?? pilotId
     );
+    const linkedFarmerLeadId = dispatchFarmerLeadId(dispatch);
+
+    if (linkedFarmerLeadId) {
+      applyFarmerLead(linkedFarmerLeadId, dispatch);
+    } else if (!isDealerFarmerInstallation) {
+      applyFarmerLead("", dispatch);
+    }
   }
 
   return (
@@ -374,12 +425,25 @@ export function InstallationForm({
             </label>
             <select
               className={inputClassName()}
-              defaultValue={
-                installation?.installation_type ?? initialInstallationType ?? ""
-              }
               id="installation_type"
               name="installation_type"
+              onChange={(event) => {
+                const nextType = event.target.value;
+                setSelectedInstallationType(nextType);
+
+                if (
+                  nextType !== "Dealer Farmer Installation" &&
+                  selectedDispatch
+                ) {
+                  const linkedFarmerLeadId = dispatchFarmerLeadId(selectedDispatch);
+
+                  if (linkedFarmerLeadId) {
+                    applyFarmerLead(linkedFarmerLeadId, selectedDispatch);
+                  }
+                }
+              }}
               required
+              value={selectedInstallationType}
             >
               <option value="">Select installation type</option>
               {installationTypeOptions.map((option) => (
@@ -456,19 +520,31 @@ export function InstallationForm({
             </label>
             <select
               className={inputClassName()}
+              disabled={farmerLeadSelectDisabled}
               id="farmer_lead_id"
               name="farmer_lead_id"
               onChange={(event) => applyFarmerLead(event.target.value)}
               required
               value={selectedFarmerLeadId}
             >
-              <option value="">Select farmer lead</option>
-              {farmerLeads.map((farmerLead) => (
+              <option value="">
+                {isDealerFarmerInstallation
+                  ? "Select farmer lead"
+                  : "Select a linked dispatch first"}
+              </option>
+              {visibleFarmerLeads.map((farmerLead) => (
                 <option key={farmerLead.id} value={farmerLead.id}>
                   {farmerLabel(farmerLead)}
                 </option>
               ))}
             </select>
+            {farmerLeadSelectDisabled && selectedFarmerLeadId ? (
+              <input
+                name="farmer_lead_id"
+                type="hidden"
+                value={selectedFarmerLeadId}
+              />
+            ) : null}
             {initialInstallationType === "Dealer Farmer Installation" ? (
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 Select an existing Farmer Lead. If this farmer is not yet in the
@@ -480,6 +556,14 @@ export function InstallationForm({
                   create the Farmer Lead first
                 </Link>
                 , then return to this dealer stock record.
+              </p>
+            ) : farmerLeadSelectDisabled && selectedFarmerLeadId ? (
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Farmer Lead is derived from the selected dispatch.
+              </p>
+            ) : !isDealerFarmerInstallation ? (
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Select a linked dispatch to populate the Farmer Lead.
               </p>
             ) : null}
           </div>

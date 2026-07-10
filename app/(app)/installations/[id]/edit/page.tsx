@@ -57,6 +57,13 @@ const dispatchColumns = [
   "device_id",
   "serial_number_snapshot",
   "product_model",
+  "destination_farmer_lead_id",
+  "linked_farmer_lead_id",
+  "destination_name_snapshot",
+  "destination_contact_snapshot",
+  "destination_address",
+  "destination_state",
+  "destination_district",
   "destination_dealer_id",
   "destination_institution_id",
   "destination_pilot_id",
@@ -64,6 +71,19 @@ const dispatchColumns = [
   "linked_institution_id",
   "linked_pilot_id"
 ].join(",");
+
+function unique(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.filter(Boolean) as string[]));
+}
+
+function dispatchFarmerLeadIds(dispatches: InstallationDispatchOption[]) {
+  return unique(
+    dispatches.flatMap((dispatch) => [
+      dispatch.destination_farmer_lead_id,
+      dispatch.linked_farmer_lead_id
+    ])
+  );
+}
 
 export default async function EditInstallationPage({
   params,
@@ -173,6 +193,24 @@ export default async function EditInstallationPage({
     dispatchOptions = [
       selectedDispatch as unknown as InstallationDispatchOption,
       ...dispatchOptions
+    ];
+  }
+
+  const loadedFarmerLeadIds = new Set(farmerLeadOptions.map((lead) => lead.id));
+  const missingDispatchFarmerLeadIds = dispatchFarmerLeadIds(
+    dispatchOptions
+  ).filter((leadId) => !loadedFarmerLeadIds.has(leadId));
+
+  if (missingDispatchFarmerLeadIds.length) {
+    const { data: dispatchFarmerLeads } = await supabase
+      .from("farmer_leads")
+      .select(farmerLeadColumns)
+      .in("id", missingDispatchFarmerLeadIds)
+      .is("deleted_at", null);
+
+    farmerLeadOptions = [
+      ...((dispatchFarmerLeads ?? []) as unknown as InstallationFarmerLeadOption[]),
+      ...farmerLeadOptions
     ];
   }
 

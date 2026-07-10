@@ -177,6 +177,13 @@ async function getDispatchForInstallation(
         "device_id",
         "serial_number_snapshot",
         "product_model",
+        "destination_farmer_lead_id",
+        "linked_farmer_lead_id",
+        "destination_name_snapshot",
+        "destination_contact_snapshot",
+        "destination_address",
+        "destination_state",
+        "destination_district",
         "destination_dealer_id",
         "destination_institution_id",
         "destination_pilot_id",
@@ -291,6 +298,95 @@ async function validateDealerFarmerInstallation({
     redirectWithError(
       errorPath,
       "This dealer-stock device is already linked to another installation."
+    );
+  }
+}
+
+function dispatchFarmerLeadId(dispatch: InstallationDispatchOption | null) {
+  return dispatch?.destination_farmer_lead_id ?? dispatch?.linked_farmer_lead_id ?? null;
+}
+
+function validateDispatchInstallationConsistency({
+  dispatch,
+  errorPath,
+  payload
+}: {
+  dispatch: InstallationDispatchOption | null;
+  errorPath: string;
+  payload: InstallationFormPayload;
+}) {
+  if (
+    payload.installation_type === "Farmer Sale Installation" ||
+    payload.installation_type === "Pilot Installation"
+  ) {
+    if (!dispatch) {
+      redirectWithError(
+        errorPath,
+        `${payload.installation_type} requires a linked dispatch.`
+      );
+    }
+  }
+
+  if (!dispatch) {
+    return;
+  }
+
+  if (dispatch.device_id !== payload.device_id) {
+    redirectWithError(
+      errorPath,
+      "Selected device does not match the linked dispatch."
+    );
+  }
+
+  const linkedFarmerLeadId = dispatchFarmerLeadId(dispatch);
+
+  if (
+    payload.installation_type === "Farmer Sale Installation" &&
+    dispatch.dispatch_type !== "Farmer Sale Dispatch"
+  ) {
+    redirectWithError(
+      errorPath,
+      "Farmer Sale Installation must use a Farmer Sale Dispatch."
+    );
+  }
+
+  if (
+    payload.installation_type === "Pilot Installation" &&
+    dispatch.dispatch_type !== "Pilot Dispatch"
+  ) {
+    redirectWithError(
+      errorPath,
+      "Pilot Installation must use a Pilot Dispatch."
+    );
+  }
+
+  if (
+    payload.installation_type === "Farmer Sale Installation" ||
+    payload.installation_type === "Pilot Installation"
+  ) {
+    if (!linkedFarmerLeadId) {
+      redirectWithError(
+        errorPath,
+        "The linked dispatch does not have a Farmer Lead."
+      );
+    }
+
+    if (payload.farmer_lead_id !== linkedFarmerLeadId) {
+      redirectWithError(
+        errorPath,
+        "Selected Farmer Lead does not match the linked dispatch."
+      );
+    }
+  }
+
+  if (
+    payload.installation_type === "Pilot Installation" &&
+    (dispatch.linked_pilot_id ?? dispatch.destination_pilot_id) !==
+      payload.pilot_id
+  ) {
+    redirectWithError(
+      errorPath,
+      "Selected Pilot does not match the linked dispatch."
     );
   }
 }
@@ -598,6 +694,11 @@ export async function createInstallationAction(formData: FormData) {
     payload,
     supabase
   });
+  validateDispatchInstallationConsistency({
+    dispatch,
+    errorPath,
+    payload
+  });
 
   const now = todayDate();
   const insertPayload = {
@@ -720,6 +821,11 @@ export async function updateInstallationAction(id: string, formData: FormData) {
     existingInstallationId: id,
     payload,
     supabase
+  });
+  validateDispatchInstallationConsistency({
+    dispatch,
+    errorPath,
+    payload
   });
 
   const now = todayDate();
