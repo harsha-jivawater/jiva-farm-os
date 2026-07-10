@@ -176,6 +176,7 @@ export default async function DispatchesPage({
   const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
+  const createdCount = Number(paramValue(params.created_count));
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
   const { canWrite, scope } = await timeAsync(
@@ -333,6 +334,13 @@ export default async function DispatchesPage({
           />
         </div>
       )}
+
+      {Number.isFinite(createdCount) && createdCount > 0 ? (
+        <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
+          Dealer Dispatch created for {createdCount}{" "}
+          {createdCount === 1 ? "device" : "devices"}.
+        </div>
+      ) : null}
 
       <LiveFilterForm
         className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"

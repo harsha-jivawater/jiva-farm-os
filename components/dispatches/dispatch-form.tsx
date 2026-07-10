@@ -59,6 +59,21 @@ function deviceLabel(device: DispatchDeviceOption) {
   return `${device.serial_number}${code} · ${device.product_model} · ${pool} · ${device.device_status}`;
 }
 
+function deviceSearchText(device: DispatchDeviceOption) {
+  return [
+    device.serial_number,
+    device.device_code,
+    device.product_model,
+    device.device_status,
+    device.current_holder_name_snapshot,
+    device.current_location_text,
+    device.inventory_pool
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 function leadLabel(lead: DispatchFarmerLeadOption) {
   return `${lead.lead_code} · ${lead.farmer_name} · ${lead.village}, ${lead.district}`;
 }
@@ -148,6 +163,11 @@ export function DispatchForm({
   const [selectedDeviceId, setSelectedDeviceId] = useState(
     dispatch?.device_id ?? initialDevice?.id ?? ""
   );
+  const [selectedDealerDeviceIds, setSelectedDealerDeviceIds] = useState<
+    string[]
+  >([]);
+  const [dealerDeviceSearch, setDealerDeviceSearch] = useState("");
+  const [dealerProductModelFilter, setDealerProductModelFilter] = useState("");
   const [serialNumber, setSerialNumber] = useState(
     dispatch?.serial_number_snapshot ?? initialDevice?.serial_number ?? ""
   );
@@ -258,6 +278,32 @@ export function DispatchForm({
 
     return true;
   });
+  const dealerDispatchDevices = devices.filter(
+    (device) =>
+      device.inventory_pool === "Fresh Sale" &&
+      ["In Warehouse", "Reserved"].includes(device.device_status) &&
+      device.current_holder_type === "Warehouse"
+  );
+  const visibleDealerDispatchDevices = dealerDispatchDevices.filter((device) => {
+    const matchesSearch =
+      !dealerDeviceSearch.trim() ||
+      deviceSearchText(device).includes(dealerDeviceSearch.trim().toLowerCase());
+    const matchesProductModel =
+      !dealerProductModelFilter ||
+      device.product_model === dealerProductModelFilter;
+
+    return matchesSearch && matchesProductModel;
+  });
+  const selectedDealerDeviceSet = new Set(selectedDealerDeviceIds);
+  const firstSelectedDealerDevice = dealerDispatchDevices.find(
+    (device) => device.id === selectedDealerDeviceIds[0]
+  );
+  const visibleDealerDeviceIds = visibleDealerDispatchDevices.map(
+    (device) => device.id
+  );
+  const allVisibleDealerDevicesSelected =
+    visibleDealerDeviceIds.length > 0 &&
+    visibleDealerDeviceIds.every((id) => selectedDealerDeviceSet.has(id));
 
   function applyLead(leadId: string) {
     setSelectedLeadId(leadId);
@@ -336,6 +382,9 @@ export function DispatchForm({
     setSelectedLeadId("");
     setSelectedPilotId("");
     setSelectedDealerId("");
+    setSelectedDealerDeviceIds([]);
+    setDealerDeviceSearch("");
+    setDealerProductModelFilter("");
 
     if (nextRoute === "Paid Farmer Sale") {
       setDispatchType("Farmer Sale Dispatch");
@@ -518,82 +567,232 @@ export function DispatchForm({
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-slate-950">
-          Device for dispatch
+          {isDealerRoute && mode === "create"
+            ? "Devices for dispatch"
+            : "Device for dispatch"}
         </h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="device_id"
-            >
-              Device
-            </label>
-            <select
-              className={inputClassName()}
-              id="device_id"
+        {isDealerRoute && mode === "create" ? (
+          <div className="mt-4 space-y-4">
+            {selectedDealerDeviceIds.map((deviceId) => (
+              <input key={deviceId} name="device_ids" type="hidden" value={deviceId} />
+            ))}
+            <input
               name="device_id"
-              onChange={(event) => {
-                const device = devices.find(
-                  (option) => option.id === event.target.value
-                );
-                setSelectedDeviceId(event.target.value);
-                setSerialNumber(device?.serial_number ?? "");
-                setProductModel(device?.product_model ?? "");
-              }}
-              required
-              value={selectedDeviceId}
-            >
-              <option value="">Select serial-numbered device</option>
-              {filteredDevices.map((device) => (
-                <option key={device.id} value={device.id}>
-                  {deviceLabel(device)}
-                </option>
-              ))}
-            </select>
-            {filteredDevices.length === 0 ? (
-              <p className="mt-1 text-xs leading-5 text-amber-700">
-                No eligible devices found for this route. Check device pool and
-                warehouse status.
-              </p>
-            ) : null}
-          </div>
-
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="serial_number_snapshot"
-            >
-              Serial number
-            </label>
+              type="hidden"
+              value={firstSelectedDealerDevice?.id ?? ""}
+            />
             <input
-              className={inputClassName()}
-              id="serial_number_snapshot"
               name="serial_number_snapshot"
-              readOnly
-              required
-              type="text"
-              value={serialNumber}
+              type="hidden"
+              value={firstSelectedDealerDevice?.serial_number ?? ""}
             />
-          </div>
-
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="product_model"
-            >
-              Product model
-            </label>
             <input
-              className={inputClassName()}
-              id="product_model"
               name="product_model"
-              readOnly
-              required
-              type="text"
-              value={productModel}
+              type="hidden"
+              value={firstSelectedDealerDevice?.product_model ?? ""}
             />
+
+            <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+              <label>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Search
+                </span>
+                <input
+                  className={inputClassName()}
+                  onChange={(event) => setDealerDeviceSearch(event.target.value)}
+                  placeholder="Search by serial number or product model"
+                  type="search"
+                  value={dealerDeviceSearch}
+                />
+              </label>
+              <label>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Product model
+                </span>
+                <select
+                  className={inputClassName()}
+                  onChange={(event) =>
+                    setDealerProductModelFilter(event.target.value)
+                  }
+                  value={dealerProductModelFilter}
+                >
+                  <option value="">All models</option>
+                  {Array.from(
+                    new Set(dealerDispatchDevices.map((device) => device.product_model))
+                  ).map((productModelOption) => (
+                    <option key={productModelOption} value={productModelOption}>
+                      {productModelOption}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold text-slate-700">
+                {selectedDealerDeviceIds.length} devices selected
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={visibleDealerDeviceIds.length === 0}
+                  onClick={() => {
+                    setSelectedDealerDeviceIds((current) => {
+                      const merged = new Set(current);
+                      for (const id of visibleDealerDeviceIds) {
+                        merged.add(id);
+                      }
+                      return Array.from(merged);
+                    });
+                  }}
+                  type="button"
+                >
+                  {allVisibleDealerDevicesSelected
+                    ? "All visible selected"
+                    : "Select all visible"}
+                </button>
+                <button
+                  className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={selectedDealerDeviceIds.length === 0}
+                  onClick={() => setSelectedDealerDeviceIds([])}
+                  type="button"
+                >
+                  Clear selection
+                </button>
+              </div>
+            </div>
+
+            {dealerDispatchDevices.length === 0 ? (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
+                No eligible Fresh Sale devices are available. Check device pool
+                and warehouse status.
+              </p>
+            ) : (
+              <div className="max-h-80 overflow-y-auto rounded-md border border-slate-200">
+                {visibleDealerDispatchDevices.length ? (
+                  <div className="divide-y divide-slate-200">
+                    {visibleDealerDispatchDevices.map((device) => (
+                      <label
+                        className="flex cursor-pointer gap-3 bg-white px-3 py-3 text-sm hover:bg-slate-50"
+                        key={device.id}
+                      >
+                        <input
+                          checked={selectedDealerDeviceSet.has(device.id)}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                          onChange={(event) => {
+                            setSelectedDealerDeviceIds((current) =>
+                              event.target.checked
+                                ? [...current, device.id]
+                                : current.filter((id) => id !== device.id)
+                            );
+                          }}
+                          type="checkbox"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-semibold text-slate-950">
+                            {device.serial_number}
+                            {device.device_code ? ` · ${device.device_code}` : ""}
+                          </span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">
+                            {device.product_model} · {device.device_status} ·{" "}
+                            {labelForDeviceOption(
+                              device.inventory_pool,
+                              inventoryPoolOptions
+                            )}{" "}
+                            · {device.current_location_text || "Warehouse"}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="bg-white px-3 py-4 text-sm text-slate-500">
+                    No devices match the current search/filter.
+                  </p>
+                )}
+              </div>
+            )}
+            <p className="text-xs leading-5 text-slate-500">
+              The app creates one dispatch row per selected serial-numbered
+              device so each device remains traceable.
+            </p>
           </div>
-        </div>
+        ) : (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="device_id"
+              >
+                Device
+              </label>
+              <select
+                className={inputClassName()}
+                id="device_id"
+                name="device_id"
+                onChange={(event) => {
+                  const device = devices.find(
+                    (option) => option.id === event.target.value
+                  );
+                  setSelectedDeviceId(event.target.value);
+                  setSerialNumber(device?.serial_number ?? "");
+                  setProductModel(device?.product_model ?? "");
+                }}
+                required
+                value={selectedDeviceId}
+              >
+                <option value="">Select serial-numbered device</option>
+                {filteredDevices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {deviceLabel(device)}
+                  </option>
+                ))}
+              </select>
+              {filteredDevices.length === 0 ? (
+                <p className="mt-1 text-xs leading-5 text-amber-700">
+                  No eligible devices found for this route. Check device pool and
+                  warehouse status.
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="serial_number_snapshot"
+              >
+                Serial number
+              </label>
+              <input
+                className={inputClassName()}
+                id="serial_number_snapshot"
+                name="serial_number_snapshot"
+                readOnly
+                required
+                type="text"
+                value={serialNumber}
+              />
+            </div>
+
+            <div>
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="product_model"
+              >
+                Product model
+              </label>
+              <input
+                className={inputClassName()}
+                id="product_model"
+                name="product_model"
+                readOnly
+                required
+                type="text"
+                value={productModel}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">

@@ -127,6 +127,26 @@ function todayDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values));
+}
+
+function dealerBatchDeviceIdsFromForm(formData: FormData) {
+  const deviceIds = formData
+    .getAll("device_ids")
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+
+  if (uniqueValues(deviceIds).length !== deviceIds.length) {
+    redirectWithError(
+      "/dispatches/new",
+      "A device was selected more than once. Clear selection and try again."
+    );
+  }
+
+  return deviceIds;
+}
+
 function destinationToHolderType(destinationType: string | null | undefined) {
   if (destinationType === "Farmer") {
     return "Farmer";
@@ -209,6 +229,130 @@ async function getDeviceForDispatch(
   }
 
   return data as unknown as DispatchDeviceOption;
+}
+
+async function getDevicesForDealerBatchDispatch({
+  deviceIds,
+  errorPath,
+  supabase
+}: {
+  deviceIds: string[];
+  errorPath: string;
+  supabase: SupabaseClient;
+}) {
+  if (!deviceIds.length) {
+    redirectWithError(
+      errorPath,
+      "Select at least one Fresh Sale device for Dealer Dispatch."
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("devices")
+    .select(
+      [
+        "id",
+        "serial_number",
+        "device_code",
+        "product_model",
+        "inventory_pool",
+        "device_status",
+        "current_holder_type",
+        "current_holder_id",
+        "current_holder_name_snapshot",
+        "current_location_text",
+        "current_state",
+        "current_district"
+      ].join(",")
+    )
+    .in("id", deviceIds)
+    .is("deleted_at", null);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  const devices = (data ?? []) as unknown as DispatchDeviceOption[];
+  const foundIds = new Set(devices.map((device) => device.id));
+  const missingIds = deviceIds.filter((deviceId) => !foundIds.has(deviceId));
+
+  if (missingIds.length) {
+    redirectWithError(
+      errorPath,
+      "One or more selected devices were not found. Refresh and try again."
+    );
+  }
+
+  return deviceIds.map((deviceId) => {
+    const device = devices.find((item) => item.id === deviceId);
+
+    if (!device) {
+      redirectWithError(
+        errorPath,
+        "One or more selected devices were not found. Refresh and try again."
+      );
+    }
+
+    return device;
+  });
+}
+
+async function ensureNoOpenDispatchForDevices({
+  deviceIds,
+  errorPath,
+  supabase
+}: {
+  deviceIds: string[];
+  errorPath: string;
+  supabase: SupabaseClient;
+}) {
+  const { data, error } = await supabase
+    .from("dispatches")
+    .select("id, dispatch_code, device_id")
+    .in("device_id", deviceIds)
+    .is("deleted_at", null)
+    .neq("dispatch_status", "Cancelled")
+    .limit(1);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  if (data?.length) {
+    redirectWithError(
+      errorPath,
+      `Device already has an active dispatch (${data[0].dispatch_code}).`
+    );
+  }
+}
+
+function validateDealerDispatchDeviceEligibility({
+  device,
+  errorPath
+}: {
+  device: DispatchDeviceOption;
+  errorPath: string;
+}) {
+  if (device.inventory_pool !== "Fresh Sale") {
+    redirectWithError(
+      errorPath,
+      "Dealer Dispatches can use Fresh Sale devices only."
+    );
+  }
+
+  if (!["In Warehouse", "Reserved"].includes(device.device_status)) {
+    redirectWithError(
+      errorPath,
+      "Dealer Dispatch devices must be available in warehouse or reserved stock."
+    );
+  }
+
+  if (device.current_holder_type !== "Warehouse") {
+    redirectWithError(
+      errorPath,
+      "Dealer Dispatch devices must still be held in warehouse stock."
+    );
+  }
 }
 
 async function ensureNoOpenDispatchForFarmerLead({
@@ -714,6 +858,95 @@ export async function createDispatchAction(formData: FormData) {
     applyDealerDispatchSnapshot(payload, dealerDispatch);
   }
 
+  const dealerBatchDeviceIds =
+    effectiveRoute === "Dealer Dispatch"
+      ? dealerBatchDeviceIdsFromForm(formData)
+      : [];
+
+  if (dealerDispatch && dealerBatchDeviceIds.length > 1) {
+    if (payload.dispatch_code) {
+      redirectWithError(
+        "/dispatches/new",
+        "Leave Dispatch code blank when creating a multi-device Dealer Dispatch. Each device will receive its own dispatch code."
+      );
+    }
+
+    if (
+      ["Dispatched", "Delivered", "Installation Pending", "Installed"].includes(
+        payload.dispatch_status ?? ""
+      )
+    ) {
+      redirectWithError(
+        "/dispatches/new",
+        "Create multi-device Dealer Dispatches before marking devices as Dispatched. Update each dispatch row when the serial-numbered device is actually sent."
+      );
+    }
+
+    const devices = await getDevicesForDealerBatchDispatch({
+      deviceIds: dealerBatchDeviceIds,
+      errorPath: "/dispatches/new",
+      supabase
+    });
+
+    for (const batchDevice of devices) {
+      validateDealerDispatchDeviceEligibility({
+        device: batchDevice,
+        errorPath: "/dispatches/new"
+      });
+    }
+
+    await ensureNoOpenDispatchForDevices({
+      deviceIds: dealerBatchDeviceIds,
+      errorPath: "/dispatches/new",
+      supabase
+    });
+
+    const now = todayDate();
+    const shouldMarkApproved = advancedStatus(payload.dispatch_status);
+    const insertPayloads = devices.map(
+      (batchDevice) =>
+        ({
+          ...payload,
+          dispatch_code: undefined,
+          device_id: batchDevice.id,
+          serial_number_snapshot: batchDevice.serial_number,
+          product_model: batchDevice.product_model,
+          quantity: 1,
+          created_by_user_id: profile.id,
+          approved_by_user_id: shouldMarkApproved ? profile.id : null,
+          dispatched_by_user_id: null,
+          payment_confirmed: false,
+          payment_confirmed_by_user_id: null,
+          payment_confirmed_date: null,
+          dispatch_date: payload.dispatch_date ?? now
+        }) as DispatchInsert
+    );
+
+    for (const insertPayload of insertPayloads) {
+      if (!canMoveToApprovedOrBeyond(insertPayload)) {
+        redirectWithError(
+          "/dispatches/new",
+          "Payment must be confirmed before this dispatch can be approved or moved forward."
+        );
+      }
+    }
+
+    const { error } = await supabase.from("dispatches").insert(insertPayloads);
+
+    if (error) {
+      redirectWithError("/dispatches/new", error.message);
+    }
+
+    revalidatePath("/dispatches");
+    revalidatePath("/dealers");
+    revalidatePath(`/dealers/${dealerDispatch.id}`);
+    redirect(
+      `/dispatches?dispatch_type=Dealer%20Stock%20Dispatch&destination_type=Dealer&q=${encodeURIComponent(
+        dealerDispatch.firm_name || dealerDispatch.dealer_name
+      )}&created_count=${devices.length}`
+    );
+  }
+
   const device = await getDeviceForDispatch(
     supabase,
     payload.device_id ?? "",
@@ -724,6 +957,17 @@ export async function createDispatchAction(formData: FormData) {
     errorPath: "/dispatches/new",
     route: effectiveRoute
   });
+  if (dealerDispatch) {
+    validateDealerDispatchDeviceEligibility({
+      device,
+      errorPath: "/dispatches/new"
+    });
+    await ensureNoOpenDispatchForDevices({
+      deviceIds: [device.id],
+      errorPath: "/dispatches/new",
+      supabase
+    });
+  }
   const now = todayDate();
   const shouldMarkApproved = advancedStatus(payload.dispatch_status);
 

@@ -1099,6 +1099,7 @@ Rules:
 
 - Dealer Dispatch must be created from a selected Dealer.
 - Dealer Dispatch uses Fresh Sale devices only.
+- Dealer Dispatch can select multiple eligible devices in one submission, but each serial-numbered device still gets its own dispatch row and movement history.
 - Dealer Dispatch is stock placement only.
 - Dealer Dispatch does not require a paid Farmer Lead.
 - Dealer Dispatch does not require a Pilot.

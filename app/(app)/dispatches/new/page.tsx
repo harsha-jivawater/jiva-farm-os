@@ -21,6 +21,7 @@ type NewDispatchPageProps = {
 };
 
 type DispatchLinkRow = {
+  device_id?: string | null;
   linked_farmer_lead_id?: string | null;
   destination_farmer_lead_id?: string | null;
   linked_pilot_id?: string | null;
@@ -107,6 +108,18 @@ function collectLinkedIds(rows: DispatchLinkRow[] | null, key: "farmerLead" | "p
   return ids;
 }
 
+function collectDeviceIds(rows: DispatchLinkRow[] | null) {
+  const ids = new Set<string>();
+
+  for (const row of rows ?? []) {
+    if (row.device_id) {
+      ids.add(row.device_id);
+    }
+  }
+
+  return ids;
+}
+
 export default async function NewDispatchPage({
   searchParams
 }: NewDispatchPageProps) {
@@ -152,7 +165,8 @@ export default async function NewDispatchPage({
         "linked_farmer_lead_id",
         "destination_farmer_lead_id",
         "linked_pilot_id",
-        "destination_pilot_id"
+        "destination_pilot_id",
+        "device_id"
       ].join(",")
     )
     .is("deleted_at", null)
@@ -166,12 +180,18 @@ export default async function NewDispatchPage({
     (openDispatches ?? []) as unknown as DispatchLinkRow[],
     "pilot"
   );
+  const devicesWithOpenDispatch = collectDeviceIds(
+    (openDispatches ?? []) as unknown as DispatchLinkRow[]
+  );
   const eligibleFarmerLeads = (
     (eligibleLeads ?? []) as unknown as DispatchFarmerLeadOption[]
   ).filter((lead) => !farmerLeadsWithOpenDispatch.has(lead.id));
   const eligiblePilots = (
     (activePilots ?? []) as unknown as DispatchPilotOption[]
   ).filter((pilot) => !pilotsWithOpenDispatch.has(pilot.id));
+  const eligibleDevices = ((data ?? []) as unknown as DispatchDeviceOption[]).filter(
+    (device) => !devicesWithOpenDispatch.has(device.id)
+  );
 
   return (
     <section>
@@ -185,7 +205,7 @@ export default async function NewDispatchPage({
         cancelHref="/dispatches"
         canUseManualException={canUseManualException}
         dealers={(dealers ?? []) as unknown as DispatchDealerOption[]}
-        devices={(data ?? []) as unknown as DispatchDeviceOption[]}
+        devices={eligibleDevices}
         error={params.error}
         farmerLeads={eligibleFarmerLeads}
         initialFarmerLeadId={params.farmer_lead_id}

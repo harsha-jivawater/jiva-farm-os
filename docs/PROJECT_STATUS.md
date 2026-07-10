@@ -290,6 +290,7 @@ Default Sales Head fallback routing:
   - Free Pilot: selected active Pilot, Pilot Stock device only.
   - Dealer Dispatch: selected Dealer, Fresh Sale device only.
 - Dealer Dispatch is stock placement only. It does not count as a farmer sale, does not require a paid Farmer Lead or Pilot, and does not mark any Farmer Lead as dispatched.
+- Dealer Dispatch can select multiple eligible Fresh Sale warehouse devices in one submission. The app still creates one dispatch row per serial-numbered device, preserving individual device history.
 - Dealer sale is recorded later through a dealer-linked farmer sale or installation, not when stock is placed with the dealer.
 - Dealer detail now shows Dealer Stock rows from Dealer Dispatches, including the serial-numbered device, dispatch status/date, stock state, linked farmer sale/installation, and a Record farmer sale action for eligible dealer-held stock.
 - Recording a dealer farmer sale uses the existing Installation workflow with `Dealer Farmer Installation`, the original Dealer Dispatch, the selected Farmer Lead, and the serial-numbered Fresh Sale device. It does not create a new Jiva-to-farmer dispatch.
