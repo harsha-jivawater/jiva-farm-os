@@ -41,7 +41,7 @@ import {
   type UserOption
 } from "@/lib/pilots/types";
 import { applyLocationFilter } from "@/lib/filters/location";
-import { logPerf, perfStart, timeAsync } from "@/lib/perf";
+import { logPerf, logSupabaseError, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
@@ -173,17 +173,6 @@ function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function addDays(date: string, days: number) {
-  const [year, month, day] = date.split("-").map(Number);
-  const nextDate = new Date(year, month - 1, day);
-  nextDate.setDate(nextDate.getDate() + days);
-
-  return `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(nextDate.getDate()).padStart(2, "0")}`;
-}
-
 function readKpis(value: unknown): PilotKpis {
   if (!value || typeof value !== "object") {
     return defaultKpis;
@@ -210,7 +199,7 @@ function KpiCard({
 }: {
   icon: LucideIcon;
   label: string;
-  value: number;
+  value: number | null;
 }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -220,7 +209,9 @@ function KpiCard({
           <Icon className="h-4 w-4" aria-hidden="true" />
         </span>
       </div>
-      <p className="mt-3 text-2xl font-semibold text-slate-950">{value}</p>
+      <p className="mt-3 text-2xl font-semibold text-slate-950">
+        {value === null ? "Unavailable" : value}
+      </p>
     </div>
   );
 }
@@ -401,79 +392,22 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
 
   const kpis = readKpis(kpiResult.data);
   const today = new Date().toISOString().slice(0, 10);
-  const weekEnd = addDays(today, 7);
-  const activePlannedVisitStatuses = [
-    "Planned",
-    "Assigned",
-    "Due",
-    "In Progress",
-    "Rescheduled"
-  ];
-  const [
-    { count: plannedTotalCount, error: plannedTotalError },
-    { count: plannedUpcomingCount, error: plannedUpcomingError },
-    { count: plannedDueWeekCount, error: plannedDueWeekError },
-    { count: plannedDueCount, error: plannedDueError },
-    { count: plannedReportPendingCount, error: plannedReportPendingError },
-    { count: plannedCompletedCount, error: plannedCompletedError }
-  ] = await timeAsync("pilots planned visit kpi counts", () =>
-    Promise.all([
-      supabase
-        .from("planned_pilot_visits")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null),
-      supabase
-        .from("planned_pilot_visits")
-        .select("id", { count: "exact", head: true })
-        .gt("planned_visit_date", today)
-        .in("planned_visit_status", activePlannedVisitStatuses)
-        .is("linked_visit_report_id", null)
-        .is("deleted_at", null),
-      supabase
-        .from("planned_pilot_visits")
-        .select("id", { count: "exact", head: true })
-        .gte("planned_visit_date", today)
-        .lte("planned_visit_date", weekEnd)
-        .in("planned_visit_status", activePlannedVisitStatuses)
-        .is("linked_visit_report_id", null)
-        .is("deleted_at", null),
-      supabase
-        .from("planned_pilot_visits")
-        .select("id", { count: "exact", head: true })
-        .lt("planned_visit_date", today)
-        .in("planned_visit_status", activePlannedVisitStatuses)
-        .is("linked_visit_report_id", null)
-        .is("deleted_at", null),
-      supabase
-        .from("planned_pilot_visits")
-        .select("id", { count: "exact", head: true })
-        .in("planned_visit_status", activePlannedVisitStatuses)
-        .is("linked_visit_report_id", null)
-        .is("deleted_at", null),
-      supabase
-        .from("planned_pilot_visits")
-        .select("id", { count: "exact", head: true })
-        .eq("planned_visit_status", "Completed")
-        .is("deleted_at", null)
-    ])
-  );
+  const { data: plannedVisitSummaryData, error: plannedVisitSummaryError } =
+    await timeAsync("pilots planned visit summary rpc", () =>
+      supabase.rpc("get_visible_planned_visit_counts", { p_today: today })
+    );
+  const plannedVisitSummary = plannedVisitSummaryData as Record<
+    string,
+    unknown
+  > | null;
+  const plannedVisitCount = (key: string) =>
+    plannedVisitSummaryError ? null : numberValue(plannedVisitSummary?.[key]);
 
-  if (
-    plannedTotalError ||
-    plannedUpcomingError ||
-    plannedDueWeekError ||
-    plannedDueError ||
-    plannedReportPendingError ||
-    plannedCompletedError
-  ) {
-    console.error("[Pilots] Planned visit KPI counts unavailable", {
-      plannedTotalError,
-      plannedUpcomingError,
-      plannedDueWeekError,
-      plannedDueError,
-      plannedReportPendingError,
-      plannedCompletedError
-    });
+  if (plannedVisitSummaryError) {
+    logSupabaseError(
+      "Pilots planned visit summary unavailable",
+      plannedVisitSummaryError
+    );
   }
 
   const canExportCsv = canDownloadCsv(currentUser);
@@ -561,34 +495,32 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
         <KpiCard
           icon={CalendarCheck2}
           label="Total Planned Visits"
-          value={plannedTotalError ? 0 : (plannedTotalCount ?? 0)}
+          value={plannedVisitCount("total")}
         />
         <KpiCard
           icon={CalendarClock}
           label="Upcoming Visits"
-          value={plannedUpcomingError ? 0 : (plannedUpcomingCount ?? 0)}
+          value={plannedVisitCount("upcoming")}
         />
         <KpiCard
           icon={CalendarCheck2}
           label="Visits Due This Week"
-          value={plannedDueWeekError ? 0 : (plannedDueWeekCount ?? 0)}
+          value={plannedVisitCount("dueWeek")}
         />
         <KpiCard
           icon={AlertTriangle}
           label="Overdue Visits"
-          value={plannedDueError ? 0 : (plannedDueCount ?? 0)}
+          value={plannedVisitCount("overdue")}
         />
         <KpiCard
           icon={FileClock}
           label="Planned Visit Reports Pending"
-          value={
-            plannedReportPendingError ? 0 : (plannedReportPendingCount ?? 0)
-          }
+          value={plannedVisitCount("pendingReport")}
         />
         <KpiCard
           icon={CheckCircle2}
           label="Planned Visits Completed"
-          value={plannedCompletedError ? 0 : (plannedCompletedCount ?? 0)}
+          value={plannedVisitCount("completed")}
         />
       </div>
       ) : null}

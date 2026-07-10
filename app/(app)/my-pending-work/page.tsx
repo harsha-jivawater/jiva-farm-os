@@ -91,6 +91,15 @@ type DashboardCounts = {
   plannedPilotVisitsDue: number | null;
 };
 
+type DashboardModuleAccess = {
+  dispatches: boolean;
+  farmerLeads: boolean;
+  followUps: boolean;
+  installations: boolean;
+  inventory: boolean;
+  pilots: boolean;
+};
+
 type ScopedQuery<T> = T & {
   is: (column: string, value: null) => T;
   or: (filters: string) => T;
@@ -446,11 +455,10 @@ function splitGroupsForCurrentUser(
   return { myGroups, teamGroups };
 }
 
-function pickKpiCardsForRole(
-  cards: CountCard[],
+function preferredKpiLabels(
   currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
 ) {
-  const preferredLabels = hasAnyRole(currentUser, ["Research Assistant"])
+  return hasAnyRole(currentUser, ["Research Assistant"])
     ? ["Pilot Visits Due", "Pilot Visit Reports Pending", "Active Pilots"]
     : hasAnyRole(currentUser, ["R&D Head", "Agronomist"])
     ? ["Active Pilots", "Pilot Visits Due", "Pilot Visit Reports Pending"]
@@ -469,14 +477,66 @@ function pickKpiCardsForRole(
         "Approved Dispatches Waiting",
         "Installations Planned"
       ];
-  const preferredCards = preferredLabels
-    .map((label) => cards.find((card) => card.label === label))
-    .filter(Boolean) as CountCard[];
-  const fallbackCards = cards.filter(
-    (card) => !preferredCards.some((preferred) => preferred.label === card.label)
+}
+
+function selectKpiLabels(
+  availableLabels: readonly string[],
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  const availableLabelSet = new Set(availableLabels);
+  const preferredLabels = preferredKpiLabels(currentUser).filter((label) =>
+    availableLabelSet.has(label)
+  );
+  const fallbackLabels = availableLabels.filter(
+    (label) => !preferredLabels.includes(label)
   );
 
-  return [...preferredCards, ...fallbackCards].slice(0, 4);
+  return [...preferredLabels, ...fallbackLabels].slice(0, 4);
+}
+
+function pickKpiCardsForRole(
+  cards: CountCard[],
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  const cardByLabel = new Map(cards.map((card) => [card.label, card]));
+
+  return selectKpiLabels(
+    cards.map((card) => card.label),
+    currentUser
+  )
+    .map((label) => cardByLabel.get(label))
+    .filter((card): card is CountCard => Boolean(card));
+}
+
+function selectedDashboardKpiLabels(
+  moduleAccess: DashboardModuleAccess,
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  const labels = [
+    "Getting Started",
+    ...(moduleAccess.farmerLeads ? ["Leads Needing Follow-up"] : []),
+    ...(moduleAccess.dispatches
+      ? [
+          "Pending Payment Confirmation",
+          "Approved Dispatches Waiting"
+        ]
+      : []),
+    ...(moduleAccess.installations ? ["Installations Planned"] : []),
+    ...(moduleAccess.inventory ? ["Warehouse Stock"] : []),
+    ...(moduleAccess.followUps
+      ? ["Overdue Post Installation Follow-ups"]
+      : []),
+    ...(moduleAccess.pilots
+      ? [
+          "Active Pilots",
+          "Pilot Visits Due",
+          "Pilot Visit Reports Pending"
+        ]
+      : []),
+    "My Work"
+  ];
+
+  return new Set(selectKpiLabels(labels, currentUser));
 }
 
 function DailyActionCard({ card }: { card: CountCard }) {
@@ -653,7 +713,7 @@ async function loadDashboardCards({
   supabase: Awaited<ReturnType<typeof createClient>>;
   today: string;
 }) {
-  const moduleAccess = {
+  const moduleAccess: DashboardModuleAccess = {
     dispatches: canViewModule(currentUser, "dispatches"),
     farmerLeads: canViewModule(currentUser, "farmer-leads"),
     followUps: canViewModule(currentUser, "follow-ups"),
@@ -661,38 +721,72 @@ async function loadDashboardCards({
     inventory: canViewModule(currentUser, "inventory"),
     pilots: canViewModule(currentUser, "pilots")
   };
-  const { data, error } = await supabase.rpc("get_dashboard_home_counts", {
-    p_include_dispatches: moduleAccess.dispatches,
-    p_include_devices: moduleAccess.inventory,
-    p_include_farmer_leads: moduleAccess.farmerLeads,
-    p_include_followups: moduleAccess.followUps,
-    p_include_installations: moduleAccess.installations,
-    p_include_pilots: moduleAccess.pilots
-  });
-  const counts = error ? { ...unavailableCounts } : readDashboardCounts(data);
+  const selectedLabels = selectedDashboardKpiLabels(moduleAccess, currentUser);
+  const includeFarmerLeads = selectedLabels.has("Leads Needing Follow-up");
+  const includeDispatches =
+    selectedLabels.has("Pending Payment Confirmation") ||
+    selectedLabels.has("Approved Dispatches Waiting");
+  const includeInstallations = selectedLabels.has("Installations Planned");
+  const includeDevices = selectedLabels.has("Warehouse Stock");
+  const includeFollowUps = selectedLabels.has(
+    "Overdue Post Installation Follow-ups"
+  );
+  const includePilots = selectedLabels.has("Active Pilots");
+  const includePlannedVisits =
+    selectedLabels.has("Pilot Visits Due") ||
+    selectedLabels.has("Pilot Visit Reports Pending");
+  const needsDashboardCounts =
+    includeFarmerLeads ||
+    includeDispatches ||
+    includeInstallations ||
+    includeDevices ||
+    includeFollowUps ||
+    includePilots;
 
-  if (error) {
-    console.error("[My Work] Home counts RPC unavailable", error);
+  const [dashboardCountsResult, plannedVisitCountsResult] = await Promise.all([
+    needsDashboardCounts
+      ? timeAsync("my work role KPI counts rpc", () =>
+          supabase.rpc("get_dashboard_home_counts", {
+            p_include_dispatches: includeDispatches,
+            p_include_devices: includeDevices,
+            p_include_farmer_leads: includeFarmerLeads,
+            p_include_followups: includeFollowUps,
+            p_include_installations: includeInstallations,
+            p_include_pilots: includePilots
+          })
+        )
+      : Promise.resolve({ data: null, error: null }),
+    includePlannedVisits
+      ? timeAsync("my work planned visit summary rpc", () =>
+          supabase.rpc("get_visible_planned_visit_counts", { p_today: today })
+        )
+      : Promise.resolve({ data: null, error: null })
+  ]);
+  const counts = dashboardCountsResult.error
+    ? { ...unavailableCounts }
+    : readDashboardCounts(dashboardCountsResult.data);
+
+  if (dashboardCountsResult.error) {
+    logSupabaseError(
+      "My Work role KPI counts unavailable",
+      dashboardCountsResult.error
+    );
   }
 
-  if (moduleAccess.pilots) {
-    const { data: plannedVisitCounts, error: plannedVisitCountsError } =
-      await timeAsync("my work planned visit counts rpc", () =>
-        supabase.rpc("get_visible_planned_visit_counts", { p_today: today })
-      );
-
-    if (plannedVisitCountsError) {
-      logSupabaseError(
-        "My Work planned visit counts unavailable",
-        plannedVisitCountsError
-      );
-    } else {
-      const plannedCounts = plannedVisitCounts as Record<string, unknown> | null;
-      counts.plannedPilotVisitReportsPending = numberValue(
-        plannedCounts?.pendingReport
-      );
-      counts.plannedPilotVisitsDue = numberValue(plannedCounts?.due);
-    }
+  if (plannedVisitCountsResult.error) {
+    logSupabaseError(
+      "My Work planned visit summary unavailable",
+      plannedVisitCountsResult.error
+    );
+  } else if (includePlannedVisits) {
+    const plannedCounts = plannedVisitCountsResult.data as Record<
+      string,
+      unknown
+    > | null;
+    counts.plannedPilotVisitReportsPending = numberValue(
+      plannedCounts?.pendingReport
+    );
+    counts.plannedPilotVisitsDue = numberValue(plannedCounts?.due);
   }
 
   const cards: CountCard[] = [
