@@ -34,11 +34,13 @@ type DispatchFormProps = {
   devices: DispatchDeviceOption[];
   error?: string | null;
   farmerLeads?: DispatchFarmerLeadOption[];
+  initialDispatchRoute?: string;
   initialFarmerLeadId?: string;
   initialPilotId?: string;
   canUseManualException?: boolean;
   mode: "create" | "edit";
   pilots?: DispatchPilotOption[];
+  pilotsLoadError?: string | null;
 };
 
 function inputClassName() {
@@ -130,11 +132,13 @@ export function DispatchForm({
   devices,
   error,
   farmerLeads = [],
+  initialDispatchRoute,
   initialFarmerLeadId,
   initialPilotId,
   canUseManualException = false,
   mode,
-  pilots = []
+  pilots = [],
+  pilotsLoadError
 }: DispatchFormProps) {
   const initialLead = farmerLeads.find(
     (lead) =>
@@ -178,13 +182,14 @@ export function DispatchForm({
     dispatch?.dispatch_type ?? ""
   );
   const [dispatchRoute, setDispatchRoute] = useState(
-    initialPilotId
+    initialDispatchRoute ??
+      (initialPilotId
       ? "Free Pilot"
       : initialFarmerLeadId
         ? "Paid Farmer Sale"
         : mode === "edit"
           ? routeForDispatch(dispatch)
-          : "Paid Farmer Sale"
+          : "Paid Farmer Sale")
   );
   const [destinationType, setDestinationType] = useState(
     initialLead
@@ -842,6 +847,7 @@ export function DispatchForm({
               </label>
               <select
                 className={inputClassName()}
+                disabled={Boolean(pilotsLoadError)}
                 id="destination_pilot_id"
                 name="destination_pilot_id"
                 onChange={(event) => applyPilot(event.target.value)}
@@ -855,10 +861,20 @@ export function DispatchForm({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                Pilot Dispatches do not require payment and use pilot-dedicated
-                devices only.
-              </p>
+              {pilotsLoadError ? (
+                <p className="mt-1 text-xs leading-5 text-red-700">
+                  {pilotsLoadError}
+                </p>
+              ) : pilots.length === 0 ? (
+                <p className="mt-1 text-xs leading-5 text-amber-700">
+                  No pilots are currently eligible for dispatch.
+                </p>
+              ) : (
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Pilot Dispatches do not require payment and use
+                  pilot-dedicated devices only.
+                </p>
+              )}
             </div>
           ) : (
             <input name="destination_pilot_id" type="hidden" value="" />

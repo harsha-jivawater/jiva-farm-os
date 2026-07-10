@@ -17,6 +17,7 @@ type NewDispatchPageProps = {
     error?: string;
     farmer_lead_id?: string;
     pilot_id?: string;
+    route?: string;
   }>;
 };
 
@@ -124,6 +125,7 @@ export default async function NewDispatchPage({
   searchParams
 }: NewDispatchPageProps) {
   const params = await searchParams;
+  const initialDispatchRoute = params.route === "pilot" ? "Free Pilot" : undefined;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
   const canUseManualException = hasAnyRole(currentUser, ["Admin"]);
@@ -144,7 +146,7 @@ export default async function NewDispatchPage({
     .eq("device_dispatched", false)
     .order("created_at", { ascending: false })
     .limit(200);
-  const { data: activePilots } = await supabase
+  const { data: activePilots, error: activePilotsError } = await supabase
     .from("pilots")
     .select(pilotSelectColumns)
     .is("deleted_at", null)
@@ -158,7 +160,7 @@ export default async function NewDispatchPage({
     .order("firm_name", { ascending: true, nullsFirst: false })
     .order("dealer_name", { ascending: true })
     .limit(200);
-  const { data: openDispatches } = await supabase
+  const { data: openDispatches, error: openDispatchesError } = await supabase
     .from("dispatches")
     .select(
       [
@@ -189,6 +191,10 @@ export default async function NewDispatchPage({
   const eligiblePilots = (
     (activePilots ?? []) as unknown as DispatchPilotOption[]
   ).filter((pilot) => !pilotsWithOpenDispatch.has(pilot.id));
+  const pilotsLoadError =
+    activePilotsError || openDispatchesError
+      ? "Unable to load eligible pilots for dispatch."
+      : null;
   const eligibleDevices = ((data ?? []) as unknown as DispatchDeviceOption[]).filter(
     (device) => !devicesWithOpenDispatch.has(device.id)
   );
@@ -208,10 +214,12 @@ export default async function NewDispatchPage({
         devices={eligibleDevices}
         error={params.error}
         farmerLeads={eligibleFarmerLeads}
+        initialDispatchRoute={initialDispatchRoute}
         initialFarmerLeadId={params.farmer_lead_id}
         initialPilotId={params.pilot_id}
         mode="create"
         pilots={eligiblePilots}
+        pilotsLoadError={pilotsLoadError}
       />
     </section>
   );
