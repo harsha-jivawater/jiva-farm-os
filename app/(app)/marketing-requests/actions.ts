@@ -21,12 +21,19 @@ import type {
   MarketingRequestInsert,
   MarketingRequestUpdate
 } from "@/lib/marketing-requests/types";
+import {
+  appSearchUrl,
+  sendN8nEvent,
+  userDisplayName
+} from "@/lib/integrations/n8n";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   canCreateMarketingRequest,
   canManageMarketingRequests
 } from "@/lib/users/permissions";
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -67,6 +74,23 @@ async function addHistory(
     note,
     created_by_user_id: createdByUserId
   } satisfies MarketingRequestHistoryInsert);
+}
+
+async function loadInternalUserDisplay(
+  supabase: SupabaseClient,
+  userId: string | null | undefined
+) {
+  if (!userId) {
+    return null;
+  }
+
+  const { data } = await supabase
+    .from("users")
+    .select("full_name, role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return userDisplayName(data);
 }
 
 function deadlineDecisionUpdate(
@@ -274,6 +298,18 @@ export async function updateMarketingWorkflowAction(
     redirectWithError(errorPath, error.message);
   }
 
+  const assignedOwnerChanged =
+    canManage &&
+    Boolean(payload.assigned_to_user_id) &&
+    payload.assigned_to_user_id !== existing.assigned_to_user_id;
+  const deadlineRevised =
+    canManage &&
+    updatePayload.deadline_status === "Revised" &&
+    (updatePayload.deadline_status !== existing.deadline_status ||
+      updatePayload.revised_deadline_date !== existing.revised_deadline_date ||
+      updatePayload.deadline_revision_note !==
+        existing.deadline_revision_note);
+
   if (payload.marketing_status !== existing.marketing_status) {
     await addHistory(
       existing.id,
@@ -283,10 +319,7 @@ export async function updateMarketingWorkflowAction(
     );
   }
 
-  if (
-    canManage &&
-    payload.assigned_to_user_id !== existing.assigned_to_user_id
-  ) {
+  if (canManage && payload.assigned_to_user_id !== existing.assigned_to_user_id) {
     await addHistory(existing.id, profile.id, "Status Update", "Assigned owner updated.");
   }
 
@@ -310,6 +343,42 @@ export async function updateMarketingWorkflowAction(
     payload.final_onedrive_link !== existing.final_onedrive_link
   ) {
     await addHistory(existing.id, profile.id, "Link Shared", "Marketing links updated.");
+  }
+
+  if (assignedOwnerChanged) {
+    await sendN8nEvent("marketing_request_assigned", {
+      assigneeName: await loadInternalUserDisplay(
+        supabase,
+        payload.assigned_to_user_id
+      ),
+      dueDate:
+        updatePayload.revised_deadline_date ??
+        updatePayload.accepted_deadline_date ??
+        existing.deadline_date,
+      nextAction: "Designer to review the request and start work.",
+      recordCode: existing.request_code,
+      recordType: "Marketing Request",
+      status: updatePayload.marketing_status ?? existing.marketing_status,
+      title: existing.title,
+      url: appSearchUrl("/marketing-requests", existing.request_code)
+    });
+  }
+
+  if (deadlineRevised) {
+    await sendN8nEvent("marketing_deadline_revised", {
+      assigneeName: await loadInternalUserDisplay(
+        supabase,
+        updatePayload.assigned_to_user_id ?? existing.assigned_to_user_id
+      ),
+      dueDate: updatePayload.revised_deadline_date ?? existing.deadline_date,
+      nextAction: "Requester to review the revised marketing deadline.",
+      ownerName: userDisplayName(profile),
+      recordCode: existing.request_code,
+      recordType: "Marketing Request",
+      status: updatePayload.marketing_status ?? existing.marketing_status,
+      title: existing.title,
+      url: appSearchUrl("/marketing-requests", existing.request_code)
+    });
   }
 
   revalidatePath("/marketing-requests");

@@ -16,6 +16,7 @@ import type {
   DispatchUpdate
 } from "@/lib/dispatches/types";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
+import { appSearchUrl, sendN8nEvent } from "@/lib/integrations/n8n";
 import { createClient } from "@/lib/supabase/server";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import {
@@ -664,7 +665,7 @@ export async function createDispatchAction(formData: FormData) {
   const { data, error } = await supabase
     .from("dispatches")
     .insert(insertPayload)
-    .select("id")
+    .select("id, dispatch_code")
     .single();
 
   if (error || !data) {
@@ -693,6 +694,18 @@ export async function createDispatchAction(formData: FormData) {
         errorPath: `/dispatches/${data.id}/edit`
       });
     }
+  }
+
+  if (pilotDispatch) {
+    await sendN8nEvent("pilot_dispatch_requested", {
+      dueDate: insertPayload.dispatch_date ?? insertPayload.expected_delivery_date,
+      nextAction: "Customer Service Team to process the Pilot Stock dispatch.",
+      recordCode: data.dispatch_code ?? pilotDispatch.pilot_code,
+      recordType: "Dispatch",
+      status: insertPayload.dispatch_status,
+      title: `${pilotDispatch.pilot_code} · ${pilotDispatch.pilot_name}`,
+      url: appSearchUrl("/dispatches", data.dispatch_code ?? pilotDispatch.pilot_code)
+    });
   }
 
   revalidatePath("/dispatches");

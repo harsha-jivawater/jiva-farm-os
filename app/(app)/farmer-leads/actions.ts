@@ -13,6 +13,7 @@ import type {
   FarmerLeadUpdate
 } from "@/lib/farmer-leads/types";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
+import { appSearchUrl, sendN8nEvent } from "@/lib/integrations/n8n";
 import { createClient } from "@/lib/supabase/server";
 import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -55,6 +56,15 @@ function canFillRegionalLeadAssignment(
 
 const deviceInstalledWorkflowMessage =
   "Device Installed is set automatically after a farmer-sale installation is completed.";
+
+type PaidLeadReadyForDispatch = {
+  id: string;
+  lead_code?: string | null;
+  farmer_name?: string | null;
+  lead_status?: string | null;
+  funnel_stage?: string | null;
+  payment_confirmed_date?: string | null;
+};
 
 type FarmerLeadMobileDuplicate = {
   id: string;
@@ -110,6 +120,20 @@ function isFarmerLeadMobileUniqueError(error: SupabaseErrorLike | null | undefin
     (text.includes("farmer_leads_active_mobile_number_unique_idx") ||
       text.includes("mobile_number"))
   );
+}
+
+async function sendPaidLeadReadyForDispatchEvent(
+  lead: PaidLeadReadyForDispatch
+) {
+  await sendN8nEvent("paid_lead_ready_for_dispatch", {
+    dueDate: lead.payment_confirmed_date ?? null,
+    nextAction: "Create or request a Farmer Sale Dispatch.",
+    recordCode: lead.lead_code ?? null,
+    recordType: "Farmer Lead",
+    status: [lead.lead_status, lead.funnel_stage].filter(Boolean).join(" · "),
+    title: lead.farmer_name ?? "Farmer lead",
+    url: appSearchUrl("/farmer-leads", lead.lead_code)
+  });
 }
 
 export async function createFarmerLeadAction(formData: FormData) {
@@ -318,6 +342,17 @@ export async function createFarmerLeadAction(formData: FormData) {
     );
   }
 
+  if (payload.payment_confirmed && !payload.device_dispatched) {
+    await sendPaidLeadReadyForDispatchEvent({
+      id: data.id,
+      lead_code: payload.lead_code,
+      farmer_name: payload.farmer_name,
+      lead_status: payload.lead_status,
+      funnel_stage: payload.funnel_stage,
+      payment_confirmed_date: payload.payment_confirmed_date
+    });
+  }
+
   revalidatePath("/farmer-leads");
   redirect(`/farmer-leads/${data.id}`);
 }
@@ -365,6 +400,10 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
         "payment_confirmed",
         "payment_confirmed_by_user_id",
         "payment_confirmed_date",
+        "lead_code",
+        "farmer_name",
+        "lead_status",
+        "funnel_stage",
         "device_dispatched",
         "linked_dispatch_id",
         "installation_completed",
@@ -385,6 +424,10 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
     | "payment_confirmed"
     | "payment_confirmed_by_user_id"
     | "payment_confirmed_date"
+    | "lead_code"
+    | "farmer_name"
+    | "lead_status"
+    | "funnel_stage"
     | "device_dispatched"
     | "linked_dispatch_id"
     | "installation_completed"
@@ -494,6 +537,22 @@ export async function updateFarmerLeadAction(id: string, formData: FormData) {
         ? "Another Farmer Lead with this mobile number already exists."
         : error.message
     );
+  }
+
+  if (
+    payload.payment_confirmed &&
+    payload.payment_confirmed !== existing.payment_confirmed &&
+    !existing.device_dispatched &&
+    !existing.linked_dispatch_id
+  ) {
+    await sendPaidLeadReadyForDispatchEvent({
+      id,
+      lead_code: existing.lead_code,
+      farmer_name: payload.farmer_name ?? existing.farmer_name,
+      lead_status: payload.lead_status ?? existing.lead_status,
+      funnel_stage: payload.funnel_stage ?? existing.funnel_stage,
+      payment_confirmed_date: payload.payment_confirmed_date
+    });
   }
 
   revalidatePath("/farmer-leads");
@@ -615,7 +674,9 @@ export async function confirmFarmerLeadPaymentAction(id: string) {
 
   const { data: lead, error: leadError } = await supabase
     .from("farmer_leads")
-    .select("id, funnel_stage")
+    .select(
+      "id, lead_code, farmer_name, lead_status, funnel_stage, payment_confirmed_date, device_dispatched, linked_dispatch_id"
+    )
     .eq("id", id)
     .is("deleted_at", null)
     .single();
@@ -640,6 +701,20 @@ export async function confirmFarmerLeadPaymentAction(id: string) {
 
   if (error) {
     redirectWithError(`/farmer-leads/${id}`, error.message);
+  }
+
+  if (!lead.device_dispatched && !lead.linked_dispatch_id) {
+    await sendPaidLeadReadyForDispatchEvent({
+      id,
+      lead_code: lead.lead_code,
+      farmer_name: lead.farmer_name,
+      lead_status: deriveLeadStatus({
+        funnelStage: lead.funnel_stage,
+        paymentConfirmed: true
+      }),
+      funnel_stage: lead.funnel_stage,
+      payment_confirmed_date: todayDate()
+    });
   }
 
   revalidatePath("/farmer-leads");

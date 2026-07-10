@@ -26,6 +26,11 @@ import {
   isPilotEligibleFarmerLead,
   pilotFarmerLeadOptionColumns
 } from "@/lib/pilots/farmer-lead-options";
+import {
+  appSearchUrl,
+  sendN8nEvent,
+  userDisplayName
+} from "@/lib/integrations/n8n";
 import { suggestedPilotNameFromContext } from "@/lib/pilots/name-suggestions";
 import { plannedVisitTypeToActualVisitType } from "@/lib/pilots/visit-planning";
 import type {
@@ -1706,7 +1711,7 @@ export async function createVisitReportAction(
   const { data, error } = await supabase
     .from("visit_reports")
     .insert(insertPayload)
-    .select("id")
+    .select("id, visit_report_code")
     .single();
 
   if (error || !data) {
@@ -1735,6 +1740,39 @@ export async function createVisitReportAction(
   }
 
   await updatePilotFromReport(supabase, pilotId, payload, formData);
+
+  const { data: pilotSummary } = await supabase
+    .from("pilots")
+    .select("pilot_code, pilot_name, pilot_status")
+    .eq("id", pilotId)
+    .maybeSingle();
+
+  await sendN8nEvent("visit_report_submitted", {
+    dueDate: insertPayload.report_date ?? null,
+    nextAction:
+      insertPayload.report_type === "Final Pilot Report"
+        ? "R&D Head to review the final pilot report."
+        : "Review field observations and follow up if needed.",
+    ownerName: userDisplayName(profile),
+    recordCode: data.visit_report_code ?? insertPayload.visit_report_code,
+    recordType: "Visit Report",
+    status: insertPayload.report_status ?? "Submitted",
+    title:
+      insertPayload.report_title ??
+      pilotSummary?.pilot_name ??
+      "Visit report",
+    url: appSearchUrl(
+      "/pilots",
+      pilotSummary?.pilot_code ?? pilotSummary?.pilot_name
+    ),
+    context: {
+      pilot: pilotSummary
+        ? `${pilotSummary.pilot_code} · ${pilotSummary.pilot_name}`
+        : null,
+      reportType: insertPayload.report_type
+    }
+  });
+
   revalidatePilot(pilotId);
   redirect(errorPath);
 }

@@ -59,7 +59,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.14 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Role-based usage manual updated to v0.15 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
@@ -75,6 +75,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - The v0.12 update adds Activity Timeline guidance for important detail pages using existing history records and audit fields.
 - The v0.13 update adds safe CSV export/reporting guidance for role-scoped operational list exports.
 - The v0.14 update adds Admin-controlled per-user CSV download permission guidance.
+- The v0.15 update adds Phase 1/2 n8n integration guidance for outbound events and a secret-protected daily summary.
 
 ## Final Launch Polish
 
@@ -124,6 +125,17 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - CSV files avoid raw backend IDs by default and include readable names, statuses, business fields, and record links.
 - Data Quality and System Health exports are deferred until their page-local warning generation can be safely extracted to shared loaders.
 - A SQL migration adds the `users.can_download_csv` permission flag. No RLS, broad permission, PDF, XLSX, or scheduled-reporting changes were added for this export phase.
+
+## n8n Integration
+
+- Phase 1 outbound n8n events have been added for Marketing Request assignment, marketing deadline revisions, paid Farmer Leads ready for dispatch, Free Pilot dispatch requests, and Visit Report submission.
+- Phase 2 daily summary API is available at `/api/integrations/n8n/daily-summary`.
+- The daily summary route requires `X-Jiva-N8N-Summary-Secret` and returns `401` when the secret is missing or incorrect.
+- n8n integration is one-way/read-only in this phase. n8n does not write back to Jiva Farm OS and must not update production records.
+- Webhook failures are logged safely by event name only and do not block user save flows.
+- Daily summary source reads are capped at 1,000 rows per source and high-priority items are capped at 20.
+- Required environment variables are documented in `docs/N8N_INTEGRATION.md`.
+- No SQL migration, RLS change, schema change, stored notification table, or email automation was added for this phase.
 
 ## Role Model
 

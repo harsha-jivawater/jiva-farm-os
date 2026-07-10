@@ -1,8 +1,8 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.14
+Version: v0.15
 Status: Draft  
-Last updated: 09 Jul 2026  
+Last updated: 10 Jul 2026
 Owner: Jiva Farm OS Admin / Management  
 Audience: Internal Jiva Farm OS users  
 
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.15 | 10 Jul 2026 | Draft | Adds Phase 1/2 n8n integration guidance: selected app events can notify n8n, and n8n can pull a secret-protected read-only daily summary. |
 | v0.14 | 09 Jul 2026 | Draft | Adds Admin-controlled per-user CSV download permission guidance. CSV export is off by default and still respects module visibility and record scope. |
 | v0.13 | 09 Jul 2026 | Draft | Adds safe CSV export guidance for operational list pages, including role-scoped exports, current-filter exports, row limits, and no raw backend IDs by default. |
 | v0.12 | 09 Jul 2026 | Draft | Adds Activity Timeline guidance for important detail pages using existing follow-ups, reviews, meetings, visits, reports, marketing updates, and delete/restore audit fields. |
@@ -158,6 +159,26 @@ Export rules:
 - CSV files use readable names, statuses, links, and DD/MM/YYYY date display.
 - Heavy reporting formats such as PDF, XLSX, scheduled reports, and email reports are not included in this phase.
 - Data Quality and System Health exports are not added yet because those pages generate live grouped warnings in page-local logic; they should be extracted to shared loaders before adding exports.
+
+### n8n Integration
+
+Jiva Farm OS can notify n8n about selected operational events and can provide a secret-protected daily summary for automation or reporting workflows.
+
+Current one-way events:
+
+- Marketing Request assigned
+- Marketing deadline revised
+- Paid Farmer Lead ready for dispatch
+- Free Pilot dispatch requested
+- Visit Report submitted
+
+Operating rules:
+
+- n8n does not write back to Jiva Farm OS in this phase.
+- n8n must not update production records.
+- The daily summary is read-only and requires a shared secret.
+- Payloads are compact and avoid raw backend IDs, emails, full notes, comments, private upload links, and secrets.
+- Users should continue using Jiva Farm OS as the source of truth for record updates.
 
 ### Operations Menus
 
