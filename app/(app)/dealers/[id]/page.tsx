@@ -343,6 +343,7 @@ export default async function DealerDetailPage({
   const canViewDeletedRecords = isAdmin(currentUser);
   const canViewDispatches = canViewModule(currentUser, "dispatches");
   const canViewInstallations = canViewModule(currentUser, "installations");
+  const canRecordDealerFarmerSale = canWriteModule(currentUser, "installations");
   const scope = await dealerScope(supabase, currentUser);
   let dealerQuery = supabase
     .from("dealers")
@@ -386,7 +387,9 @@ export default async function DealerDetailPage({
     { data: users },
     { data: regions },
     { data: devices },
+    { data: dealerStockDeviceRows },
     { data: dispatchesThisMonth },
+    { data: dealerStockDispatchRows },
     { data: farmerLeads },
     { data: installations },
     { data: relatedPilots },
@@ -414,6 +417,28 @@ export default async function DealerDetailPage({
       .is("deleted_at", null)
       .order("serial_number", { ascending: true }),
     supabase
+      .from("devices")
+      .select(
+        [
+          "id",
+          "serial_number",
+          "device_code",
+          "product_model",
+          "inventory_pool",
+          "device_status",
+          "current_holder_type",
+          "current_holder_id",
+          "dispatch_date",
+          "linked_dispatch_id",
+          "linked_farmer_lead_id",
+          "linked_installation_id"
+        ].join(",")
+      )
+      .eq("linked_dealer_id", dealer.id)
+      .is("deleted_at", null)
+      .order("serial_number", { ascending: true })
+      .limit(200),
+    supabase
       .from("dispatches")
       .select(
         "id, created_at, dispatch_code, dispatch_date, dispatch_status, serial_number_snapshot, linked_installation_id"
@@ -423,6 +448,32 @@ export default async function DealerDetailPage({
       .gte("dispatch_date", monthStartDate)
       .is("deleted_at", null)
       .order("dispatch_date", { ascending: false }),
+    supabase
+      .from("dispatches")
+      .select(
+        [
+          "id",
+          "created_at",
+          "dispatch_code",
+          "dispatch_date",
+          "dispatch_status",
+          "dispatch_type",
+          "device_id",
+          "serial_number_snapshot",
+          "product_model",
+          "linked_farmer_lead_id",
+          "linked_dealer_id",
+          "linked_installation_id",
+          "destination_dealer_id"
+        ].join(",")
+      )
+      .eq("destination_type", "Dealer")
+      .eq("destination_dealer_id", dealer.id)
+      .eq("dispatch_type", "Dealer Stock Dispatch")
+      .is("deleted_at", null)
+      .order("dispatch_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(200),
     supabase
       .from("farmer_leads")
       .select(
@@ -435,7 +486,7 @@ export default async function DealerDetailPage({
     supabase
       .from("installations")
       .select(
-        "id, installation_code, installation_date, farmer_name_snapshot, serial_number_snapshot, product_model, installation_status, installation_type, dealer_id"
+        "id, installation_code, installation_date, farmer_lead_id, device_id, dispatch_id, farmer_name_snapshot, serial_number_snapshot, product_model, installation_status, installation_type, dealer_id"
       )
       .eq("dealer_id", dealer.id)
       .is("deleted_at", null)
@@ -491,6 +542,21 @@ export default async function DealerDetailPage({
     | "dispatch_date"
     | "linked_dispatch_id"
   >[];
+  const dealerStockDevices = (dealerStockDeviceRows ?? []) as unknown as Pick<
+    Device,
+    | "id"
+    | "serial_number"
+    | "device_code"
+    | "product_model"
+    | "inventory_pool"
+    | "device_status"
+    | "current_holder_type"
+    | "current_holder_id"
+    | "dispatch_date"
+    | "linked_dispatch_id"
+    | "linked_farmer_lead_id"
+    | "linked_installation_id"
+  >[];
   const dealerDispatches = (dispatchesThisMonth ?? []) as Pick<
     Dispatch,
     | "id"
@@ -500,6 +566,22 @@ export default async function DealerDetailPage({
     | "dispatch_status"
     | "serial_number_snapshot"
     | "linked_installation_id"
+  >[];
+  const dealerStockDispatches = (dealerStockDispatchRows ?? []) as unknown as Pick<
+    Dispatch,
+    | "id"
+    | "created_at"
+    | "dispatch_code"
+    | "dispatch_date"
+    | "dispatch_status"
+    | "dispatch_type"
+    | "device_id"
+    | "serial_number_snapshot"
+    | "product_model"
+    | "linked_farmer_lead_id"
+    | "linked_dealer_id"
+    | "linked_installation_id"
+    | "destination_dealer_id"
   >[];
   const linkedLeads = (farmerLeads ?? []) as Pick<
     FarmerLead,
@@ -517,6 +599,9 @@ export default async function DealerDetailPage({
     | "id"
     | "installation_code"
     | "installation_date"
+    | "farmer_lead_id"
+    | "device_id"
+    | "dispatch_id"
     | "farmer_name_snapshot"
     | "serial_number_snapshot"
     | "product_model"
@@ -584,6 +669,54 @@ export default async function DealerDetailPage({
   const pendingInstallationDispatchCount = dealerDispatches.filter(
     (dispatch) => !dispatch.linked_installation_id
   ).length;
+  const dealerStockDeviceByDispatchId = new Map(
+    dealerStockDevices
+      .filter((device) => device.linked_dispatch_id)
+      .map((device) => [device.linked_dispatch_id as string, device])
+  );
+  const dealerStockDeviceById = new Map(
+    dealerStockDevices.map((device) => [device.id, device])
+  );
+  const dealerInstallationByDeviceId = new Map(
+    dealerInstallations
+      .filter((installation) => installation.device_id)
+      .map((installation) => [installation.device_id as string, installation])
+  );
+  const dealerStockRows = dealerStockDispatches.map((dispatch) => {
+    const device =
+      dealerStockDeviceByDispatchId.get(dispatch.id) ??
+      dealerStockDeviceById.get(dispatch.device_id);
+    const installation =
+      (device?.id ? dealerInstallationByDeviceId.get(device.id) : undefined) ??
+      dealerInstallations.find(
+        (item) =>
+          item.dispatch_id === dispatch.id ||
+          item.id === dispatch.linked_installation_id
+      );
+    const isInstalled = installation
+      ? ["Installed", "Verified", "Closed"].includes(
+          installation.installation_status
+        )
+      : false;
+    const isInDealerStock =
+      !installation &&
+      device?.current_holder_type === "Dealer" &&
+      device.current_holder_id === dealer.id;
+    const stockState = isInstalled
+      ? "Installed"
+      : isInDealerStock
+        ? "In dealer stock"
+        : installation
+          ? "Sold to farmer"
+          : "In dealer stock";
+
+    return {
+      device,
+      dispatch,
+      installation,
+      stockState
+    };
+  });
   const nextReviewDate =
     dealer.next_dealer_review_date ?? dealer.next_action_date;
   const nextActionOverdue = isOverdueDate(dealer.next_action_date);
@@ -1359,50 +1492,144 @@ export default async function DealerDetailPage({
               Dealer stock
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              {dealerDevices.length} devices with dealer ·{" "}
-              {dealerDispatches.length} dispatched this month
+              Devices sent to this dealer as stock. Record farmer sale only
+              when one of these serial-numbered devices is sold onward to a
+              farmer.
             </p>
           </div>
         </div>
-        {dealerDevices.length ? (
+        {dealerStockRows.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[44rem] text-left text-sm">
+            <table className="w-full min-w-[68rem] text-left text-sm">
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Serial number</th>
-                  <th className="px-4 py-3">Product model</th>
-                  <th className="px-4 py-3">Dispatch date</th>
                   <th className="px-4 py-3">Device</th>
+                  <th className="px-4 py-3">Dealer Dispatch</th>
+                  <th className="px-4 py-3">Dispatch date</th>
+                  <th className="px-4 py-3">Dispatch status</th>
+                  <th className="px-4 py-3">Stock state</th>
+                  <th className="px-4 py-3">Linked farmer sale</th>
+                  <th className="px-4 py-3">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {dealerDevices.map((device) => (
-                  <tr key={device.id}>
+                {dealerStockRows.map(({ device, dispatch, installation, stockState }) => {
+                  const canRecordSale =
+                    canRecordDealerFarmerSale &&
+                    stockState === "In dealer stock" &&
+                    device?.current_holder_type === "Dealer" &&
+                    device.current_holder_id === dealer.id;
+                  const recordSaleHref = device
+                    ? `/installations/new?dispatch_id=${encodeURIComponent(
+                        dispatch.id
+                      )}&device_id=${encodeURIComponent(
+                        device.id
+                      )}&dealer_id=${encodeURIComponent(
+                        dealer.id
+                      )}&installation_type=${encodeURIComponent(
+                        "Dealer Farmer Installation"
+                      )}`
+                    : null;
+
+                  return (
+                  <tr key={dispatch.id}>
                     <td className="px-4 py-3 font-semibold text-slate-950">
-                      {device.serial_number}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {labelFor(device.product_model, productModelOptions)}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {formatDate(device.dispatch_date)}
+                      <p>{device?.serial_number ?? dispatch.serial_number_snapshot}</p>
+                      <p className="mt-1 text-xs font-normal text-slate-500">
+                        {device?.device_code ?? "Device code not set"} ·{" "}
+                        {labelFor(
+                          device?.product_model ?? dispatch.product_model,
+                          productModelOptions
+                        )}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       <Link
-                        className="text-brand-700 hover:text-brand-800"
-                        href={`/devices/${device.id}`}
+                        className="font-semibold text-brand-700 hover:text-brand-800"
+                        href={`/dispatches/${dispatch.id}`}
                       >
-                        Open device
+                        {dispatch.dispatch_code}
                       </Link>
                     </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {formatDate(dispatch.dispatch_date)}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {dispatch.dispatch_status}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          stockState === "Installed"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : stockState === "Sold to farmer"
+                              ? "bg-sky-50 text-sky-700"
+                              : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {stockState}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {installation ? (
+                        <div>
+                          {installation.farmer_lead_id ? (
+                            <Link
+                              className="font-semibold text-brand-700 hover:text-brand-800"
+                              href={`/farmer-leads/${installation.farmer_lead_id}`}
+                            >
+                              {installation.farmer_name_snapshot}
+                            </Link>
+                          ) : (
+                            <span>{installation.farmer_name_snapshot}</span>
+                          )}
+                          <p className="mt-1 text-xs text-slate-500">
+                            <Link
+                              className="text-brand-700 hover:text-brand-800"
+                              href={`/installations/${installation.id}`}
+                            >
+                              {installation.installation_code}
+                            </Link>{" "}
+                            · {installation.installation_status}
+                          </p>
+                        </div>
+                      ) : (
+                        "Not sold yet"
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {canRecordSale && recordSaleHref ? (
+                        <Link
+                          className="inline-flex min-h-9 items-center justify-center rounded-md bg-brand-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-700"
+                          href={recordSaleHref}
+                        >
+                          Record farmer sale
+                        </Link>
+                      ) : device ? (
+                        <Link
+                          className="text-sm font-semibold text-brand-700 hover:text-brand-800"
+                          href={`/devices/${device.id}`}
+                        >
+                          Open device
+                        </Link>
+                      ) : (
+                        <span className="text-slate-400">No action</span>
+                      )}
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
+            <p className="px-4 py-3 text-xs leading-5 text-slate-500">
+              If the farmer is not yet in the system, create the Farmer Lead
+              first, then return here to record the farmer sale from dealer
+              stock.
+            </p>
           </div>
         ) : (
           <CompactEmpty>
-            No devices are currently held by this dealer.
+            No dealer stock dispatches are linked to this dealer yet.
           </CompactEmpty>
         )}
       </div>

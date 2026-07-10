@@ -46,6 +46,7 @@ export type InstallationDeviceOption = Pick<
   | "serial_number"
   | "device_code"
   | "product_model"
+  | "inventory_pool"
   | "device_status"
   | "current_holder_type"
   | "current_holder_id"
@@ -57,6 +58,9 @@ export type InstallationDispatchOption = Pick<
   Dispatch,
   | "id"
   | "dispatch_code"
+  | "dispatch_type"
+  | "destination_type"
+  | "dispatch_status"
   | "device_id"
   | "serial_number_snapshot"
   | "product_model"

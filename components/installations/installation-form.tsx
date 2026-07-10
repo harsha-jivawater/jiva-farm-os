@@ -33,6 +33,11 @@ type InstallationFormProps = {
   dispatches: InstallationDispatchOption[];
   error?: string | null;
   farmerLeads: InstallationFarmerLeadOption[];
+  initialDealerId?: string | null;
+  initialDeviceId?: string | null;
+  initialDispatchId?: string | null;
+  initialFarmerLeadId?: string | null;
+  initialInstallationType?: string | null;
   installation?: Installation;
   mode: "create" | "edit";
 };
@@ -84,17 +89,38 @@ export function InstallationForm({
   dispatches,
   error,
   farmerLeads,
+  initialDealerId,
+  initialDeviceId,
+  initialDispatchId,
+  initialFarmerLeadId,
+  initialInstallationType,
   installation,
   mode
 }: InstallationFormProps) {
+  const initialDispatch = useMemo(
+    () =>
+      dispatches.find(
+        (dispatch) =>
+          dispatch.id === (installation?.dispatch_id ?? initialDispatchId)
+      ),
+    [dispatches, initialDispatchId, installation?.dispatch_id]
+  );
   const initialFarmer = useMemo(
     () =>
-      farmerLeads.find((lead) => lead.id === installation?.farmer_lead_id),
-    [farmerLeads, installation?.farmer_lead_id]
+      farmerLeads.find(
+        (lead) =>
+          lead.id === (installation?.farmer_lead_id ?? initialFarmerLeadId)
+      ),
+    [farmerLeads, initialFarmerLeadId, installation?.farmer_lead_id]
   );
   const initialDevice = useMemo(
-    () => devices.find((device) => device.id === installation?.device_id),
-    [devices, installation?.device_id]
+    () =>
+      devices.find(
+        (device) =>
+          device.id ===
+          (installation?.device_id ?? initialDeviceId ?? initialDispatch?.device_id)
+      ),
+    [devices, initialDeviceId, initialDispatch?.device_id, installation?.device_id]
   );
   const initialDate = dateValue(installation?.installation_date) || todayDate();
   const [selectedFarmerLeadId, setSelectedFarmerLeadId] = useState(
@@ -104,7 +130,7 @@ export function InstallationForm({
     installation?.device_id ?? initialDevice?.id ?? ""
   );
   const [selectedDispatchId, setSelectedDispatchId] = useState(
-    installation?.dispatch_id ?? ""
+    installation?.dispatch_id ?? initialDispatch?.id ?? ""
   );
   const [farmerName, setFarmerName] = useState(
     installation?.farmer_name_snapshot ?? initialFarmer?.farmer_name ?? ""
@@ -137,13 +163,26 @@ export function InstallationForm({
     installation?.followup_owner_user_id ?? initialFarmer?.owner_user_id ?? ""
   );
   const [dealerId, setDealerId] = useState(
-    installation?.dealer_id ?? initialFarmer?.linked_dealer_id ?? ""
+    installation?.dealer_id ??
+      initialDealerId ??
+      initialDispatch?.linked_dealer_id ??
+      initialDispatch?.destination_dealer_id ??
+      initialFarmer?.linked_dealer_id ??
+      ""
   );
   const [institutionId, setInstitutionId] = useState(
-    installation?.institution_id ?? initialFarmer?.linked_institution_id ?? ""
+    installation?.institution_id ??
+      initialDispatch?.linked_institution_id ??
+      initialDispatch?.destination_institution_id ??
+      initialFarmer?.linked_institution_id ??
+      ""
   );
   const [pilotId, setPilotId] = useState(
-    installation?.pilot_id ?? initialFarmer?.linked_pilot_id ?? ""
+    installation?.pilot_id ??
+      initialDispatch?.linked_pilot_id ??
+      initialDispatch?.destination_pilot_id ??
+      initialFarmer?.linked_pilot_id ??
+      ""
   );
   const [serialNumber, setSerialNumber] = useState(
     installation?.serial_number_snapshot ?? initialDevice?.serial_number ?? ""
@@ -171,6 +210,7 @@ export function InstallationForm({
 
   function applyFarmerLead(value: string) {
     const farmerLead = farmerLeads.find((lead) => lead.id === value);
+    const dispatch = dispatches.find((option) => option.id === selectedDispatchId);
     setSelectedFarmerLeadId(value);
     setFarmerName(farmerLead?.farmer_name ?? "");
     setFarmerMobile(farmerLead?.mobile_number ?? "");
@@ -182,9 +222,24 @@ export function InstallationForm({
     setRsmUserId(farmerLead?.rsm_user_id ?? "");
     setRegionId(farmerLead?.region_id ?? "");
     setFollowupOwnerUserId(farmerLead?.owner_user_id ?? "");
-    setDealerId(farmerLead?.linked_dealer_id ?? "");
-    setInstitutionId(farmerLead?.linked_institution_id ?? "");
-    setPilotId(farmerLead?.linked_pilot_id ?? "");
+    setDealerId(
+      farmerLead?.linked_dealer_id ??
+        dispatch?.linked_dealer_id ??
+        dispatch?.destination_dealer_id ??
+        ""
+    );
+    setInstitutionId(
+      farmerLead?.linked_institution_id ??
+        dispatch?.linked_institution_id ??
+        dispatch?.destination_institution_id ??
+        ""
+    );
+    setPilotId(
+      farmerLead?.linked_pilot_id ??
+        dispatch?.linked_pilot_id ??
+        dispatch?.destination_pilot_id ??
+        ""
+    );
   }
 
   function applyDevice(value: string) {
@@ -319,7 +374,9 @@ export function InstallationForm({
             </label>
             <select
               className={inputClassName()}
-              defaultValue={installation?.installation_type ?? ""}
+              defaultValue={
+                installation?.installation_type ?? initialInstallationType ?? ""
+              }
               id="installation_type"
               name="installation_type"
               required
@@ -331,6 +388,13 @@ export function InstallationForm({
                 </option>
               ))}
             </select>
+            {initialInstallationType === "Dealer Farmer Installation" ? (
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                This records a farmer sale from dealer stock. It uses the
+                original Dealer Dispatch and does not create a new Jiva to
+                farmer dispatch.
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -405,6 +469,19 @@ export function InstallationForm({
                 </option>
               ))}
             </select>
+            {initialInstallationType === "Dealer Farmer Installation" ? (
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Select an existing Farmer Lead. If this farmer is not yet in the
+                system,{" "}
+                <Link
+                  className="font-semibold text-brand-700 hover:text-brand-800"
+                  href="/farmer-leads/new"
+                >
+                  create the Farmer Lead first
+                </Link>
+                , then return to this dealer stock record.
+              </p>
+            ) : null}
           </div>
 
           <div>

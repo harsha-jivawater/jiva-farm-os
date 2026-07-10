@@ -137,6 +137,7 @@ async function getDeviceForInstallation(
         "serial_number",
         "device_code",
         "product_model",
+        "inventory_pool",
         "device_status",
         "current_holder_type",
         "current_holder_id",
@@ -170,6 +171,9 @@ async function getDispatchForInstallation(
       [
         "id",
         "dispatch_code",
+        "dispatch_type",
+        "destination_type",
+        "dispatch_status",
         "device_id",
         "serial_number_snapshot",
         "product_model",
@@ -190,6 +194,105 @@ async function getDispatchForInstallation(
   }
 
   return data as unknown as InstallationDispatchOption;
+}
+
+async function validateDealerFarmerInstallation({
+  device,
+  dispatch,
+  errorPath,
+  existingInstallationId,
+  payload,
+  supabase
+}: {
+  device: InstallationDeviceOption;
+  dispatch: InstallationDispatchOption | null;
+  errorPath: string;
+  existingInstallationId?: string;
+  payload: InstallationFormPayload;
+  supabase: SupabaseClient;
+}) {
+  if (payload.installation_type !== "Dealer Farmer Installation") {
+    return;
+  }
+
+  if (!dispatch) {
+    redirectWithError(
+      errorPath,
+      "Dealer Farmer Installation requires the original Dealer Dispatch."
+    );
+  }
+
+  if (
+    dispatch.dispatch_type !== "Dealer Stock Dispatch" ||
+    dispatch.destination_type !== "Dealer"
+  ) {
+    redirectWithError(
+      errorPath,
+      "Dealer Farmer Installation must use a Dealer Dispatch."
+    );
+  }
+
+  const dealerId = dispatch.linked_dealer_id ?? dispatch.destination_dealer_id;
+
+  if (!dealerId || payload.dealer_id !== dealerId) {
+    redirectWithError(
+      errorPath,
+      "Selected dealer does not match the Dealer Dispatch."
+    );
+  }
+
+  if (dispatch.device_id !== device.id || payload.device_id !== device.id) {
+    redirectWithError(
+      errorPath,
+      "Selected device does not match the Dealer Dispatch."
+    );
+  }
+
+  if (device.inventory_pool !== "Fresh Sale") {
+    redirectWithError(
+      errorPath,
+      "Dealer farmer sales must use Fresh Sale devices from dealer stock."
+    );
+  }
+
+  if (
+    !existingInstallationId &&
+    (device.current_holder_type !== "Dealer" ||
+      device.current_holder_id !== dealerId)
+  ) {
+    redirectWithError(
+      errorPath,
+      "This device is no longer available in this dealer's stock."
+    );
+  }
+
+  let existingInstallationsQuery = supabase
+    .from("installations")
+    .select("id")
+    .eq("device_id", device.id)
+    .is("deleted_at", null)
+    .neq("installation_status", "Cancelled")
+    .limit(1);
+
+  if (existingInstallationId) {
+    existingInstallationsQuery = existingInstallationsQuery.neq(
+      "id",
+      existingInstallationId
+    );
+  }
+
+  const { data, error } = await existingInstallationsQuery;
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  if (data?.length) {
+    redirectWithError(
+      errorPath,
+      "This dealer-stock device is already linked to another installation."
+    );
+  }
 }
 
 function hydrateInstallationPayload({
@@ -488,6 +591,14 @@ export async function createInstallationAction(formData: FormData) {
     redirectWithError(errorPath, validationError);
   }
 
+  await validateDealerFarmerInstallation({
+    device,
+    dispatch,
+    errorPath,
+    payload,
+    supabase
+  });
+
   const now = todayDate();
   const insertPayload = {
     ...payload,
@@ -601,6 +712,15 @@ export async function updateInstallationAction(id: string, formData: FormData) {
   if (validationError) {
     redirectWithError(errorPath, validationError);
   }
+
+  await validateDealerFarmerInstallation({
+    device,
+    dispatch,
+    errorPath,
+    existingInstallationId: id,
+    payload,
+    supabase
+  });
 
   const now = todayDate();
   const updatePayload = {

@@ -1091,6 +1091,8 @@ flowchart LR
   C --> D["Dispatch Requested"]
   D --> E["Dispatched / Delivered"]
   E --> F["Dealer stock available for later farmer sales"]
+  F --> G["Record farmer sale from Dealer detail"]
+  G --> H["Dealer Farmer Installation"]
 ```
 
 Rules:
@@ -1102,6 +1104,10 @@ Rules:
 - Dealer Dispatch does not require a Pilot.
 - Dealer Dispatch does not mark a Farmer Lead as dispatched.
 - Dealer Dispatch does not count as a farmer sale. Dealer sale is recorded later through a dealer-linked farmer sale or installation.
+- Dealer detail shows dealer-stock serial numbers and stock state: In dealer stock, Sold to farmer, or Installed.
+- Use Record farmer sale only when a serial-numbered dealer-stock device is sold to a farmer.
+- Record farmer sale opens the Installation workflow as Dealer Farmer Installation, linked to the original Dealer Dispatch and selected Farmer Lead. If the farmer is not yet in the system, create the Farmer Lead first.
+- Dealer farmer sale conversion must not create a second Jiva-to-farmer dispatch and must not auto-confirm payment.
 
 ### Pilot Authority Map
 

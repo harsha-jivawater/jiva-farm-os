@@ -10,7 +10,12 @@ import { createClient } from "@/lib/supabase/server";
 
 type NewInstallationPageProps = {
   searchParams: Promise<{
+    dealer_id?: string;
+    device_id?: string;
+    dispatch_id?: string;
     error?: string;
+    farmer_lead_id?: string;
+    installation_type?: string;
   }>;
 };
 
@@ -37,6 +42,7 @@ const deviceColumns = [
   "serial_number",
   "device_code",
   "product_model",
+  "inventory_pool",
   "device_status",
   "current_holder_type",
   "current_holder_id",
@@ -47,6 +53,9 @@ const deviceColumns = [
 const dispatchColumns = [
   "id",
   "dispatch_code",
+  "dispatch_type",
+  "destination_type",
+  "dispatch_status",
   "device_id",
   "serial_number_snapshot",
   "product_model",
@@ -103,6 +112,11 @@ export default async function NewInstallationPage({
         farmerLeads={
           (farmerLeads ?? []) as unknown as InstallationFarmerLeadOption[]
         }
+        initialDealerId={params.dealer_id}
+        initialDeviceId={params.device_id}
+        initialDispatchId={params.dispatch_id}
+        initialFarmerLeadId={params.farmer_lead_id}
+        initialInstallationType={params.installation_type}
         mode="create"
       />
     </section>

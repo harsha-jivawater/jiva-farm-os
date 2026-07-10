@@ -291,6 +291,8 @@ Default Sales Head fallback routing:
   - Dealer Dispatch: selected Dealer, Fresh Sale device only.
 - Dealer Dispatch is stock placement only. It does not count as a farmer sale, does not require a paid Farmer Lead or Pilot, and does not mark any Farmer Lead as dispatched.
 - Dealer sale is recorded later through a dealer-linked farmer sale or installation, not when stock is placed with the dealer.
+- Dealer detail now shows Dealer Stock rows from Dealer Dispatches, including the serial-numbered device, dispatch status/date, stock state, linked farmer sale/installation, and a Record farmer sale action for eligible dealer-held stock.
+- Recording a dealer farmer sale uses the existing Installation workflow with `Dealer Farmer Installation`, the original Dealer Dispatch, the selected Farmer Lead, and the serial-numbered Fresh Sale device. It does not create a new Jiva-to-farmer dispatch.
 - Admin can use `Manual dispatch — admin exception` for unusual stock movement.
 - Normal users should not manually enter farmer destination details for paid farmer-sale dispatches.
 - Sales and R&D roles can see readiness messages on Farmer Lead/Pilot detail pages, but device assignment remains with Admin, Accounts, and Stock / Dispatch.
@@ -381,6 +383,7 @@ Backend impact:
   - `farmer_leads.linked_installation_id`
   - `farmer_leads.funnel_stage = "Device Installed"`
 - Farmer Sale / Dealer Farmer Installation creates the first post-installation follow-up due 15 days after installation only if `payment_confirmed = true`.
+- Dealer Farmer Installation validates that the selected device came from a Dealer Dispatch to the same dealer and has not already been linked to another active installation.
 - Pilot Installation is excluded from farmer-sale post-installation follow-up creation.
 - Pilot Installation does not count as Farmer Lead `Device Installed`.
 
