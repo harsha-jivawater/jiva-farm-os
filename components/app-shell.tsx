@@ -74,6 +74,7 @@ export function AppShell({
             className="flex min-w-0 flex-1 items-center justify-center px-8"
             href={mustChangePassword ? "/account/password" : defaultHomePath}
             onClick={() => setIsOpen(false)}
+            prefetch={false}
           >
             <BrandLogo className="max-h-14 w-[190px]" priority />
           </Link>
@@ -160,6 +161,7 @@ export function AppShell({
                           href={item.href}
                           key={item.href}
                           onClick={() => setIsOpen(false)}
+                          prefetch={false}
                         >
                           <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                           <span className="min-w-0 truncate">{item.label}</span>
@@ -198,6 +200,7 @@ export function AppShell({
               ].join(" ")}
               href="/account/password"
               onClick={() => setIsOpen(false)}
+              prefetch={false}
             >
               <KeyRound className="h-4 w-4" aria-hidden="true" />
               Change Password

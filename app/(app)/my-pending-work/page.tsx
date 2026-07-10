@@ -197,7 +197,7 @@ type PilotSummary = {
 };
 
 const closedLeadStatuses = ["Won", "Lost", "Parked"];
-const closedFunnelStages = ["Won", "Dropped", "Lost", "Parked"];
+const closedFunnelStages = ["Won", "Lost", "Parked"];
 const dispatchActionStatuses = [
   "Dispatch Requested",
   "Pending Payment Confirmation",
