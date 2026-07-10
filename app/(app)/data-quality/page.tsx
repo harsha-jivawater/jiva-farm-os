@@ -16,6 +16,7 @@ import { formatDisplayDate } from "@/lib/date-utils";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canViewModule } from "@/lib/users/permissions";
+import { normalizeIndianMobileNumber } from "@/lib/validation/mobile-number";
 
 const SCAN_LIMIT = 1000;
 const ISSUE_LIMIT = 50;
@@ -157,12 +158,7 @@ const assignedMarketingStatuses = [
 ];
 
 function normalizePhone(value: string | null | undefined) {
-  const digits = (value ?? "").replace(/\D/g, "");
-  if (digits.length < 6) {
-    return "";
-  }
-
-  return digits.length > 10 ? digits.slice(-10) : digits;
+  return normalizeIndianMobileNumber(value) ?? "";
 }
 
 function normalizeText(value: string | null | undefined) {

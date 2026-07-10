@@ -20,6 +20,10 @@ import {
   primaryCropOptions
 } from "@/lib/farmer-leads/options";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
+import {
+  normalizeIndianMobileNumber,
+  validateIndianMobileNumber
+} from "@/lib/validation/mobile-number";
 
 function getText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -89,7 +93,9 @@ export function farmerLeadPayloadFromForm(
   const payload: FarmerLeadInsert | FarmerLeadUpdate = {
     lead_code: leadCode ?? generateLeadCode(),
     farmer_name: getRequiredText(formData, "farmer_name"),
-    mobile_number: getRequiredText(formData, "mobile_number"),
+    mobile_number:
+      normalizeIndianMobileNumber(getRequiredText(formData, "mobile_number")) ??
+      "",
     village: getRequiredText(formData, "village"),
     state: getRequiredText(formData, "state"),
     district: getRequiredText(formData, "district"),
@@ -126,6 +132,12 @@ export function validateFarmerLeadPayload(payload: FarmerLeadInsert | FarmerLead
 
   if (!payload.mobile_number) {
     return "Mobile number is required.";
+  }
+
+  const mobileValidation = validateIndianMobileNumber(payload.mobile_number);
+
+  if (!mobileValidation.valid) {
+    return mobileValidation.error;
   }
 
   if (!payload.state || !payload.district || !payload.village) {

@@ -45,6 +45,10 @@ import type {
   PlannedPilotVisitFormPayload,
   VisitReportFormPayload
 } from "@/lib/pilots/types";
+import {
+  normalizeOptionalIndianMobileNumber,
+  validateIndianMobileNumber
+} from "@/lib/validation/mobile-number";
 
 function getText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -215,7 +219,9 @@ export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
     dispatch_id: getText(formData, "dispatch_id"),
     farmer_name_snapshot: getText(formData, "farmer_name_snapshot") ?? "",
     farmer_mobile_snapshot:
-      getText(formData, "farmer_mobile_snapshot") ?? "",
+      normalizeOptionalIndianMobileNumber(
+        getText(formData, "farmer_mobile_snapshot")
+      ) ?? "",
     state: getText(formData, "state") ?? "",
     district: getText(formData, "district") ?? "",
     taluk: getText(formData, "taluk"),
@@ -351,6 +357,15 @@ export function validatePilotPayload(payload: PilotFormPayload) {
   if (!payload.pilot_owner_user_id) return "Select a pilot owner.";
   if (!payload.farmer_name_snapshot) return "Farmer name is required.";
   if (!payload.farmer_mobile_snapshot) return "Farmer mobile is required.";
+  const farmerMobileValidation = validateIndianMobileNumber(
+    payload.farmer_mobile_snapshot,
+    "Farmer mobile"
+  );
+
+  if (!farmerMobileValidation.valid) {
+    return farmerMobileValidation.error;
+  }
+
   if (!payload.state) return "State is required.";
   if (!payload.district) return "District is required.";
   if (!payload.village) return "Village is required.";

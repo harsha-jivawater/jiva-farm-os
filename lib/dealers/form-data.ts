@@ -14,6 +14,10 @@ import {
   trainingStatusOptions
 } from "@/lib/dealers/options";
 import type { DealerFormPayload } from "@/lib/dealers/types";
+import {
+  normalizeIndianMobileNumber,
+  validateIndianMobileNumber
+} from "@/lib/validation/mobile-number";
 
 function getText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -87,7 +91,8 @@ export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
   return {
     dealer_name: getText(formData, "dealer_name") ?? "",
     firm_name: getText(formData, "firm_name"),
-    contact_number: getText(formData, "contact_number") ?? "",
+    contact_number:
+      normalizeIndianMobileNumber(getText(formData, "contact_number")) ?? "",
     email: getText(formData, "email"),
     dealer_type: getText(formData, "dealer_type") ?? "",
     dealer_status: getText(formData, "dealer_status") ?? "",
@@ -156,6 +161,15 @@ export function validateDealerPayload(payload: DealerFormPayload) {
 
   if (!payload.contact_number) {
     return "Contact number is required.";
+  }
+
+  const contactValidation = validateIndianMobileNumber(
+    payload.contact_number,
+    "Contact number"
+  );
+
+  if (!contactValidation.valid) {
+    return contactValidation.error;
   }
 
   if (

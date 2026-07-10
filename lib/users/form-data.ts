@@ -14,6 +14,10 @@ import {
 } from "@/lib/users/options";
 import { hasAnyRole } from "@/lib/users/permissions";
 import type { InternalUser } from "@/lib/users/types";
+import {
+  normalizeOptionalIndianMobileNumber,
+  validateIndianMobileNumber
+} from "@/lib/validation/mobile-number";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -37,7 +41,7 @@ export function internalUserPayloadFromForm(
   return {
     full_name: text(formData, "full_name"),
     email: normalizeInternalEmail(text(formData, "email")),
-    phone: nullableText(formData, "phone"),
+    phone: normalizeOptionalIndianMobileNumber(nullableText(formData, "phone")),
     role,
     secondary_role: secondaryRole,
     region_id: nullableText(formData, "region_id"),
@@ -70,6 +74,14 @@ export function validateInternalUserPayload(
 
   if (emailError) {
     return emailError;
+  }
+
+  if (payload.phone) {
+    const phoneValidation = validateIndianMobileNumber(payload.phone, "Phone");
+
+    if (!phoneValidation.valid) {
+      return phoneValidation.error;
+    }
   }
 
   if (

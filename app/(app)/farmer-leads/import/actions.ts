@@ -27,6 +27,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import { hasAnyRole, hasRole } from "@/lib/users/permissions";
+import { normalizeIndianMobileNumber } from "@/lib/validation/mobile-number";
 
 type ImportProfile = {
   id: string;
@@ -113,7 +114,8 @@ function rowToPayload(row: CsvRecord): FarmerLeadInsert {
   return {
     lead_code: clean(row.lead_code) ?? generateImportCode("JFD"),
     farmer_name: String(row.farmer_name ?? "").trim(),
-    mobile_number: String(row.mobile_number ?? "").trim(),
+    mobile_number:
+      normalizeIndianMobileNumber(String(row.mobile_number ?? "").trim()) ?? "",
     village: String(row.village ?? "").trim(),
     state: String(row.state ?? "").trim(),
     district: String(row.district ?? "").trim(),
@@ -217,8 +219,8 @@ export async function importFarmerLeadsAction(
       new Set(rows.map((row) => clean(row.state)).filter(Boolean))
     ) as string[];
     const mobiles = rows
-      .map((row) => String(row.mobile_number ?? "").trim())
-      .filter(Boolean);
+      .map((row) => normalizeIndianMobileNumber(String(row.mobile_number ?? "")))
+      .filter((mobile): mobile is string => Boolean(mobile));
     const mobileCounts = new Map<string, number>();
 
     mobiles.forEach((mobile) => {

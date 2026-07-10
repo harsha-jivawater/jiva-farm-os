@@ -39,6 +39,10 @@ import type {
   InstitutionFormPayload,
   MeetingFormPayload
 } from "@/lib/institutions/types";
+import {
+  normalizeOptionalIndianMobileNumber,
+  validateIndianMobileNumber
+} from "@/lib/validation/mobile-number";
 
 function getText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -129,7 +133,10 @@ export function institutionPayloadFromForm(
       formData,
       "main_contact_designation"
     ),
-    main_contact_number: getText(formData, "main_contact_number") ?? "",
+    main_contact_number:
+      normalizeOptionalIndianMobileNumber(
+        getText(formData, "main_contact_number")
+      ) ?? "",
     main_contact_email: getText(formData, "main_contact_email"),
     account_owner_user_id:
       getText(formData, "account_owner_user_id") ?? "",
@@ -248,6 +255,15 @@ export function validateInstitutionPayload(payload: InstitutionFormPayload) {
     return "Main contact number is required.";
   }
 
+  const mainContactValidation = validateIndianMobileNumber(
+    payload.main_contact_number,
+    "Main contact number"
+  );
+
+  if (!mainContactValidation.valid) {
+    return mainContactValidation.error;
+  }
+
   if (!payload.account_owner_user_id) {
     return "Select an account owner.";
   }
@@ -362,7 +378,7 @@ export function contactPayloadFromForm(formData: FormData): ContactFormPayload {
     contact_name: getText(formData, "contact_name") ?? "",
     designation: getText(formData, "designation"),
     department: getText(formData, "department"),
-    phone: getText(formData, "phone"),
+    phone: normalizeOptionalIndianMobileNumber(getText(formData, "phone")),
     email: getText(formData, "email"),
     is_primary_contact: getBoolean(formData, "is_primary_contact"),
     influence_level: getText(formData, "influence_level"),
@@ -374,6 +390,14 @@ export function contactPayloadFromForm(formData: FormData): ContactFormPayload {
 export function validateContactPayload(payload: ContactFormPayload) {
   if (!payload.contact_name) {
     return "Contact name is required.";
+  }
+
+  if (payload.phone) {
+    const phoneValidation = validateIndianMobileNumber(payload.phone, "Phone");
+
+    if (!phoneValidation.valid) {
+      return phoneValidation.error;
+    }
   }
 
   if (!isOptionValue(payload.department, departmentOptions)) {

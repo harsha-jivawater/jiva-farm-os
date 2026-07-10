@@ -70,6 +70,7 @@ import {
   isAdmin
 } from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
+import { normalizeIndianMobileNumber } from "@/lib/validation/mobile-number";
 
 type InstitutionDetailPageProps = {
   params: Promise<{
@@ -349,7 +350,7 @@ function normalizeContactValue(value: string | null | undefined) {
 }
 
 function normalizePhone(value: string | null | undefined) {
-  return value?.replace(/\D/g, "") ?? "";
+  return normalizeIndianMobileNumber(value) ?? "";
 }
 
 function contactMatchesProfile(

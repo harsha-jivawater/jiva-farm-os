@@ -11,6 +11,10 @@ import {
 } from "@/lib/installations/options";
 import { holderTypeOptions, productModelOptions } from "@/lib/devices/options";
 import type { InstallationFormPayload } from "@/lib/installations/types";
+import {
+  normalizeIndianMobileNumber,
+  validateIndianMobileNumber
+} from "@/lib/validation/mobile-number";
 
 function getText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -74,7 +78,10 @@ export function installationPayloadFromForm(
     rsm_user_id: getRequiredText(formData, "rsm_user_id"),
     region_id: getRequiredText(formData, "region_id"),
     farmer_name_snapshot: getRequiredText(formData, "farmer_name_snapshot"),
-    farmer_mobile_snapshot: getRequiredText(formData, "farmer_mobile_snapshot"),
+    farmer_mobile_snapshot:
+      normalizeIndianMobileNumber(
+        getRequiredText(formData, "farmer_mobile_snapshot")
+      ) ?? "",
     state: getRequiredText(formData, "state"),
     district: getRequiredText(formData, "district"),
     taluk: getText(formData, "taluk"),
@@ -142,6 +149,15 @@ export function validateInstallationPayload(
 
   if (!payload.farmer_name_snapshot || !payload.farmer_mobile_snapshot) {
     return "Farmer name and mobile are required.";
+  }
+
+  const farmerMobileValidation = validateIndianMobileNumber(
+    payload.farmer_mobile_snapshot,
+    "Farmer mobile"
+  );
+
+  if (!farmerMobileValidation.valid) {
+    return farmerMobileValidation.error;
   }
 
   if (!payload.state || !payload.district || !payload.village) {
