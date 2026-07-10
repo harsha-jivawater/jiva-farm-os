@@ -79,6 +79,12 @@ type DealerDispatchPaymentState = Pick<
   "payment_confirmed" | "payment_confirmed_by_user_id" | "payment_confirmed_date"
 >;
 
+type DispatchedDestinationSnapshot = {
+  holderId?: string | null;
+  holderName?: string | null;
+  locationText?: string | null;
+};
+
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
@@ -186,6 +192,10 @@ function locationText(payload: Pick<
   ].filter(Boolean);
 
   return payload.destination_address || locationParts.join(", ") || null;
+}
+
+function compactLocation(...parts: Array<string | null | undefined>) {
+  return parts.filter(Boolean).join(", ") || null;
 }
 
 function advancedStatus(status: string | null | undefined) {
@@ -728,7 +738,8 @@ async function applyDispatchedSideEffects({
   payload,
   device,
   createMovement,
-  errorPath
+  errorPath,
+  destinationSnapshot
 }: {
   supabase: SupabaseClient;
   profileId: string;
@@ -737,14 +748,22 @@ async function applyDispatchedSideEffects({
   device: DispatchDeviceOption;
   createMovement: boolean;
   errorPath: string;
+  destinationSnapshot?: DispatchedDestinationSnapshot;
 }) {
   const movementDate = payload.dispatch_date ?? todayDate();
   const toHolderType = destinationToHolderType(payload.destination_type);
   const toHolderId =
-    payload.destination_type === "Dealer"
+    destinationSnapshot?.holderId !== undefined
+      ? destinationSnapshot.holderId
+      : payload.destination_type === "Dealer"
       ? (payload.destination_dealer_id ?? payload.linked_dealer_id ?? null)
       : null;
-  const toLocationText = locationText(payload);
+  const toHolderName =
+    destinationSnapshot?.holderName ?? payload.destination_name_snapshot ?? null;
+  const toLocationText =
+    destinationSnapshot?.locationText !== undefined
+      ? destinationSnapshot.locationText
+      : locationText(payload);
   const devicePayload: DeviceUpdate = {
     device_status: "Dispatched",
     linked_dispatch_id: dispatchId,
@@ -752,7 +771,7 @@ async function applyDispatchedSideEffects({
     last_movement_date: movementDate,
     current_holder_type: toHolderType,
     current_holder_id: toHolderId,
-    current_holder_name_snapshot: payload.destination_name_snapshot ?? null,
+    current_holder_name_snapshot: toHolderName,
     current_state: payload.destination_state ?? null,
     current_district: payload.destination_district ?? null,
     current_location_text: toLocationText
@@ -761,6 +780,11 @@ async function applyDispatchedSideEffects({
   if (payload.destination_type === "Dealer") {
     devicePayload.linked_dealer_id =
       payload.destination_dealer_id ?? payload.linked_dealer_id ?? null;
+  }
+
+  if (payload.destination_type === "Pilot") {
+    devicePayload.linked_pilot_id =
+      payload.destination_pilot_id ?? payload.linked_pilot_id ?? null;
   }
 
   const { error: deviceError } = await supabase
@@ -789,7 +813,7 @@ async function applyDispatchedSideEffects({
     from_location_text: device.current_location_text,
     to_holder_type: toHolderType,
     to_holder_id: toHolderId,
-    to_holder_name_snapshot: payload.destination_name_snapshot ?? "Not set",
+    to_holder_name_snapshot: toHolderName ?? "Not set",
     to_location_text: toLocationText,
     dispatch_id: dispatchId,
     remarks: "Created from dispatch status change."
@@ -802,6 +826,20 @@ async function applyDispatchedSideEffects({
   if (movementError) {
     redirectWithError(errorPath, movementError.message);
   }
+}
+
+function pilotDeviceDestinationSnapshot(
+  pilot: PilotDispatchSource | null
+): DispatchedDestinationSnapshot | undefined {
+  if (!pilot) {
+    return undefined;
+  }
+
+  return {
+    holderId: pilot.id,
+    holderName: pilot.farmer_name_snapshot,
+    locationText: compactLocation(pilot.village, pilot.district, pilot.state)
+  };
 }
 
 export async function createDispatchAction(formData: FormData) {
@@ -1053,6 +1091,7 @@ export async function createDispatchAction(formData: FormData) {
       payload: insertPayload,
       device,
       createMovement: true,
+      destinationSnapshot: pilotDeviceDestinationSnapshot(pilotDispatch),
       errorPath: `/dispatches/${data.id}/edit`
     });
 
@@ -1276,6 +1315,7 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       payload: updatePayload,
       device,
       createMovement: true,
+      destinationSnapshot: pilotDeviceDestinationSnapshot(pilotDispatch),
       errorPath: `/dispatches/${id}/edit`
     });
 
@@ -1295,6 +1335,7 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       payload: updatePayload,
       device,
       createMovement: false,
+      destinationSnapshot: pilotDeviceDestinationSnapshot(pilotDispatch),
       errorPath: `/dispatches/${id}/edit`
     });
 
