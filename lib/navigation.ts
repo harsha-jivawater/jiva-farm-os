@@ -10,7 +10,6 @@ import {
   KeyRound,
   LayoutDashboard,
   Bell,
-  Package,
   Palette,
   ShieldAlert,
   Stethoscope,
@@ -19,6 +18,7 @@ import {
   Truck,
   type LucideIcon,
   UsersRound,
+  Warehouse,
   Wrench
 } from "lucide-react";
 import type { ModuleKey } from "@/lib/users/permissions";
@@ -102,12 +102,6 @@ export const navigationGroups: readonly NavigationGroup[] = [
     label: "Operations",
     items: [
       {
-        label: "Devices",
-        href: "/devices",
-        module: "devices",
-        icon: Package
-      },
-      {
         label: "Dispatches",
         href: "/dispatches",
         module: "dispatches",
@@ -118,6 +112,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/installations",
         module: "installations",
         icon: Wrench
+      },
+      {
+        label: "Inventory",
+        href: "/devices",
+        module: "inventory",
+        icon: Warehouse
       },
       {
         label: "Post Installation Follow-ups",

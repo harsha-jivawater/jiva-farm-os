@@ -23,6 +23,7 @@ export type ModuleKey =
   | "system-health"
   | "farmer-leads"
   | "devices"
+  | "inventory"
   | "dispatches"
   | "dealers"
   | "institutional-partners"
@@ -90,6 +91,7 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "R&D Head",
     "Viewer"
   ],
+  inventory: ["Admin", "Management", "Sales Head", "Accounts", "Stock / Dispatch"],
   dispatches: [
     "Admin",
     "Accounts",
@@ -207,6 +209,7 @@ const moduleWriteRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Stock / Dispatch"
   ],
   devices: ["Admin", "Accounts", "Stock / Dispatch"],
+  inventory: [],
   dispatches: ["Admin", "Accounts", "Stock / Dispatch"],
   dealers: ["Admin", "Sales Head", "RSM", "HR & Legal"],
   "institutional-partners": [

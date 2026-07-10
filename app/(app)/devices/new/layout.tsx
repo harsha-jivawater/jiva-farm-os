@@ -6,7 +6,7 @@ export default function DevicesNewLayout({
   children: React.ReactNode;
 }) {
   return (
-    <WriteAccessLayout label="Devices" module="devices">
+    <WriteAccessLayout label="Inventory" module="devices">
       {children}
     </WriteAccessLayout>
   );

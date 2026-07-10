@@ -26,7 +26,7 @@ export default async function DeviceImportPage() {
 
   if (!canWriteModule(currentUser, "devices")) {
     return (
-      <AccessDenied message="Access denied. Your role can view devices, but cannot import device records." />
+      <AccessDenied message="Access denied. Your role can view Inventory, but cannot import device records." />
     );
   }
 

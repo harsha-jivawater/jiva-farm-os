@@ -92,7 +92,7 @@ export default async function DeviceDetailPage({
     <section>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
-          eyebrow="Device"
+          eyebrow="Inventory"
           title={device.serial_number}
           description={`${display(device.device_code)} · ${labelFor(
             device.product_model,

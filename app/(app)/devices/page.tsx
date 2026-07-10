@@ -1,16 +1,12 @@
 import Link from "next/link";
 import {
-  AlertTriangle,
   Eye,
-  Gauge,
-  Package,
+  PackageCheck,
   Pencil,
   Plus,
-  RotateCcw,
   Search,
   SlidersHorizontal,
   Store,
-  Tractor,
   Upload,
   Warehouse,
   type LucideIcon
@@ -66,8 +62,22 @@ const listSelectColumns = [
   "stock_entry_date"
 ].join(",");
 
+const productModels = ["Vipasa", "Dihanga", "Jahnavi"] as const;
+const installedDeviceStatuses = [
+  "Installed at Farmer Site",
+  "Installed for Pilot"
+] as const;
+const invalidStockStatuses = ["Damaged", "Lost", "Retired"] as const;
 const loadErrorMessage = "Unable to load records. Please contact Admin.";
 const queryTimeoutMs = 8_000;
+
+type ProductModel = (typeof productModels)[number];
+type ProductCounts = Record<ProductModel, number>;
+type InventorySummary = {
+  dealer: ProductCounts;
+  installed: ProductCounts;
+  warehouse: ProductCounts;
+};
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -111,6 +121,102 @@ function logLoadError(error: unknown) {
   console.error("[Devices] Unable to load records", error);
 }
 
+function emptyProductCounts(): ProductCounts {
+  return {
+    Vipasa: 0,
+    Dihanga: 0,
+    Jahnavi: 0
+  };
+}
+
+function sumProductCounts(counts: ProductCounts) {
+  return productModels.reduce((total, product) => total + counts[product], 0);
+}
+
+function emptyInventorySummary(): InventorySummary {
+  return {
+    dealer: emptyProductCounts(),
+    installed: emptyProductCounts(),
+    warehouse: emptyProductCounts()
+  };
+}
+
+async function countDevicesByProduct({
+  label,
+  product,
+  scope,
+  supabase,
+  type
+}: {
+  label: string;
+  product: ProductModel;
+  scope: Awaited<ReturnType<typeof deviceScope>>;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  type: keyof InventorySummary;
+}) {
+  if (scope.noRecords) {
+    return 0;
+  }
+
+  let query = supabase
+    .from("devices")
+    .select("id", { count: "exact", head: true })
+    .is("deleted_at", null)
+    .eq("product_model", product);
+
+  if (scope.orFilter) {
+    query = query.or(scope.orFilter);
+  }
+
+  if (type === "warehouse") {
+    query = query
+      .eq("current_holder_type", "Warehouse")
+      .not("device_status", "in", `(${invalidStockStatuses.join(",")})`);
+  }
+
+  if (type === "dealer") {
+    query = query.eq("current_holder_type", "Dealer");
+  }
+
+  if (type === "installed") {
+    query = query.in("device_status", [...installedDeviceStatuses]);
+  }
+
+  const { count, error } = await withQueryTimeout(query, label);
+
+  if (error) {
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
+async function loadInventorySummary({
+  scope,
+  supabase
+}: {
+  scope: Awaited<ReturnType<typeof deviceScope>>;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}) {
+  const summary = emptyInventorySummary();
+
+  await Promise.all(
+    productModels.flatMap((product) =>
+      (["warehouse", "dealer", "installed"] as const).map(async (type) => {
+        summary[type][product] = await countDevicesByProduct({
+          label: `inventory ${type} ${product} count`,
+          product,
+          scope,
+          supabase,
+          type
+        });
+      })
+    )
+  );
+
+  return summary;
+}
+
 function readFilters(
   searchParams: Record<string, string | string[] | undefined>
 ): DeviceFilters {
@@ -137,11 +243,13 @@ function readFilters(
   };
 }
 
-function KpiCard({
+function InventorySummaryCard({
+  breakdown,
   icon: Icon,
   label,
   value
 }: {
+  breakdown: ProductCounts;
   icon: LucideIcon;
   label: string;
   value: number;
@@ -155,6 +263,11 @@ function KpiCard({
         </span>
       </div>
       <p className="mt-3 text-2xl font-semibold text-slate-950">{value}</p>
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        {productModels
+          .map((product) => `${product}: ${breakdown[product]}`)
+          .join(" · ")}
+      </p>
     </div>
   );
 }
@@ -176,13 +289,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
   let loadError: string | null = null;
   let devices: Device[] = [];
   let resultCount = 0;
-  let totalDevices = 0;
-  let inWarehouse = 0;
-  let withDealer = 0;
-  let installedAtFarmerSite = 0;
-  let installedForPilot = 0;
-  let returned = 0;
-  let damagedHold = 0;
+  let inventorySummary = emptyInventorySummary();
 
   let query = supabase
     .from("devices")
@@ -223,9 +330,14 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
   );
 
   try {
-    const { data, error } = await timeAsync("devices list query", () =>
-      withQueryTimeout(query, "devices list")
-    );
+    const [{ data, error }, summary] = await Promise.all([
+      timeAsync("devices list query", () =>
+        withQueryTimeout(query, "devices list")
+      ),
+      timeAsync("inventory summary counts", () =>
+        loadInventorySummary({ scope, supabase })
+      )
+    ]);
 
     if (error) {
       throw error;
@@ -233,25 +345,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
 
     devices = (data ?? []) as unknown as Device[];
     resultCount = devices.length;
-    totalDevices = devices.length;
-    inWarehouse = devices.filter(
-      (device) => device.device_status === "In Warehouse"
-    ).length;
-    withDealer = devices.filter(
-      (device) => device.device_status === "With Dealer"
-    ).length;
-    installedAtFarmerSite = devices.filter(
-      (device) => device.device_status === "Installed at Farmer Site"
-    ).length;
-    installedForPilot = devices.filter(
-      (device) => device.device_status === "Installed for Pilot"
-    ).length;
-    returned = devices.filter(
-      (device) => device.device_status === "Returned"
-    ).length;
-    damagedHold = devices.filter((device) =>
-      ["Damaged", "Hold"].includes(device.device_status)
-    ).length;
+    inventorySummary = summary;
   } catch (error) {
     logLoadError(error);
     loadError = loadErrorMessage;
@@ -263,9 +357,9 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
     <section>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
-          eyebrow="Inventory"
-          title="Devices"
-          description="Track production stock, current holders, and device inventory status."
+          eyebrow="Operations"
+          title="Inventory"
+          description="Track warehouse stock, dealer stock, installed devices, and individual device records."
         />
         {canWrite ? (
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -292,28 +386,96 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
           {loadError}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          <KpiCard icon={Package} label="Total Devices" value={totalDevices} />
-          <KpiCard icon={Warehouse} label="In Warehouse" value={inWarehouse} />
-          <KpiCard icon={Store} label="With Dealer" value={withDealer} />
-          <KpiCard
-            icon={Tractor}
-            label="Installed at Farmer Site"
-            value={installedAtFarmerSite}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <InventorySummaryCard
+            breakdown={inventorySummary.warehouse}
+            icon={Warehouse}
+            label="Warehouse Stock"
+            value={sumProductCounts(inventorySummary.warehouse)}
           />
-          <KpiCard
-            icon={Gauge}
-            label="Installed for Pilot"
-            value={installedForPilot}
+          <InventorySummaryCard
+            breakdown={inventorySummary.dealer}
+            icon={Store}
+            label="Dealer Stock"
+            value={sumProductCounts(inventorySummary.dealer)}
           />
-          <KpiCard icon={RotateCcw} label="Returned" value={returned} />
-          <KpiCard
-            icon={AlertTriangle}
-            label="Damaged / Hold"
-            value={damagedHold}
+          <InventorySummaryCard
+            breakdown={inventorySummary.installed}
+            icon={PackageCheck}
+            label="Installed Devices"
+            value={sumProductCounts(inventorySummary.installed)}
           />
         </div>
       )}
+
+      {!loadError ? (
+        <section className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <h2 className="text-base font-semibold text-slate-950">
+              Product summary
+            </h2>
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[42rem] text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Device Model</th>
+                  <th className="px-4 py-3 text-right">Warehouse Stock</th>
+                  <th className="px-4 py-3 text-right">Dealer Stock</th>
+                  <th className="px-4 py-3 text-right">Installed Devices</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {productModels.map((product) => (
+                  <tr key={product}>
+                    <td className="px-4 py-3 font-semibold text-slate-950">
+                      {product}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {inventorySummary.warehouse[product]}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {inventorySummary.dealer[product]}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {inventorySummary.installed[product]}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="divide-y divide-slate-200 md:hidden">
+            {productModels.map((product) => (
+              <article className="p-4" key={product}>
+                <h3 className="text-base font-semibold text-slate-950">
+                  {product}
+                </h3>
+                <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <dt className="text-slate-400">Warehouse</dt>
+                    <dd className="mt-1 font-semibold text-slate-700">
+                      {inventorySummary.warehouse[product]}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-400">Dealer</dt>
+                    <dd className="mt-1 font-semibold text-slate-700">
+                      {inventorySummary.dealer[product]}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-400">Installed</dt>
+                    <dd className="mt-1 font-semibold text-slate-700">
+                      {inventorySummary.installed[product]}
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <LiveFilterForm
         className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"

@@ -123,7 +123,7 @@ export default async function DashboardPage() {
       myPendingWork: canViewModule(currentUser, "my-pending-work"),
       dispatches: canViewModule(currentUser, "dispatches"),
       installations: canViewModule(currentUser, "installations"),
-      devices: canViewModule(currentUser, "devices"),
+      inventory: canViewModule(currentUser, "inventory"),
       followUps: canViewModule(currentUser, "follow-ups"),
       pilots: canViewModule(currentUser, "pilots")
     })
@@ -135,7 +135,7 @@ export default async function DashboardPage() {
         p_include_farmer_leads: moduleAccess.farmerLeads,
         p_include_dispatches: moduleAccess.dispatches,
         p_include_installations: moduleAccess.installations,
-        p_include_devices: moduleAccess.devices,
+        p_include_devices: moduleAccess.inventory,
         p_include_followups: moduleAccess.followUps,
         p_include_pilots: moduleAccess.pilots
       })
@@ -238,14 +238,14 @@ export default async function DashboardPage() {
     });
   }
 
-  if (moduleAccess.devices) {
+  if (moduleAccess.inventory) {
     visibleCards.push({
       href: "/devices",
       helper: "Available warehouse stock for future dispatches.",
       icon: Warehouse,
       includeInToday: false,
-      label: "Devices in Warehouse",
-      module: "devices",
+      label: "Warehouse Stock",
+      module: "inventory",
       value: counts.devicesInWarehouse
     });
   }

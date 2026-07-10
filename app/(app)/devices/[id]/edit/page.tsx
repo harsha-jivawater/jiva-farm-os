@@ -69,7 +69,7 @@ export default async function EditDevicePage({
   return (
     <section>
       <PageHeader
-        eyebrow="Device inventory"
+        eyebrow="Inventory"
         title="Edit Device"
         description={device.serial_number}
       />

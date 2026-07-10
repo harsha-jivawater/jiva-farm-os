@@ -78,7 +78,7 @@ export default async function NewDevicePage({
   return (
     <section>
       <PageHeader
-        eyebrow="Device inventory"
+        eyebrow="Inventory"
         title="Add New Device"
         description="Register production stock in the warehouse with the required device details."
       />
