@@ -35,6 +35,7 @@ import {
   type MarketingRequestFilters,
   type UserOption
 } from "@/lib/marketing-requests/types";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
@@ -47,6 +48,20 @@ import {
 type MarketingRequestsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+const listSelectColumns = [
+  "id",
+  "request_code",
+  "title",
+  "request_type",
+  "requested_by_user_id",
+  "deadline_date",
+  "assigned_to_user_id",
+  "marketing_status",
+  "priority",
+  "final_onedrive_link",
+  "completed_at"
+].join(",");
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -128,6 +143,7 @@ function userLabel(
 export default async function MarketingRequestsPage({
   searchParams
 }: MarketingRequestsPageProps) {
+  const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
   const supabase = await createClient();
@@ -146,17 +162,9 @@ export default async function MarketingRequestsPage({
   const canManage = canManageMarketingRequests(currentUser);
   const cleanedSearch = cleanSearch(filters.q);
 
-  const { data: users } = await supabase
-    .from("users")
-    .select("id, full_name, email, role, secondary_role")
-    .eq("is_active", true)
-    .order("full_name", { ascending: true });
-
-  const userOptions = (users ?? []) as UserOption[];
-  const userMap = new Map(userOptions.map((user) => [user.id, user]));
   let query = supabase
     .from("marketing_requests")
-    .select("*", { count: "exact" })
+    .select(listSelectColumns, { count: "exact" })
     .is("deleted_at", null)
     .order("deadline_date", { ascending: true })
     .order("created_at", { ascending: false })
@@ -211,8 +219,20 @@ export default async function MarketingRequestsPage({
     query = query.lte("deadline_date", filters.deadline_to);
   }
 
-  const { data, count, error } = await query;
-  const requests = (data ?? []) as MarketingRequest[];
+  const [usersResult, listResult] = await Promise.all([
+    timeAsync("marketing requests users filter query", () =>
+      supabase
+        .from("users")
+        .select("id, full_name, email, role, secondary_role")
+        .eq("is_active", true)
+        .order("full_name", { ascending: true })
+    ),
+    timeAsync("marketing requests list query", () => query)
+  ]);
+  const userOptions = (usersResult.data ?? []) as UserOption[];
+  const userMap = new Map(userOptions.map((user) => [user.id, user]));
+  const { data, count, error } = listResult;
+  const requests = (data ?? []) as unknown as MarketingRequest[];
   const today = new Date().toISOString().slice(0, 10);
   const monthStart = today.slice(0, 8) + "01";
   const soon = new Date();
@@ -254,6 +274,8 @@ export default async function MarketingRequestsPage({
   };
   const canExportCsv = canDownloadCsv(currentUser);
   const csvExportHref = exportLink("/marketing-requests/export", params);
+
+  logPerf("marketing requests page total server render", startedAt);
 
   return (
     <section className="space-y-6">

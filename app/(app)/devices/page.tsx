@@ -82,10 +82,11 @@ type InventorySummary = {
   installed: ProductCounts;
   warehouse: ProductCounts;
 };
-type InventorySummaryDevice = Pick<
-  Device,
-  "current_holder_type" | "device_status" | "product_model"
->;
+
+type ScopedDeviceQuery<T> = T & {
+  is: (column: string, value: null) => T;
+  or: (filters: string) => T;
+};
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -150,6 +151,64 @@ function emptyInventorySummary(): InventorySummary {
   };
 }
 
+function applyDeviceScope<T>(
+  query: ScopedDeviceQuery<T>,
+  scope: Awaited<ReturnType<typeof deviceScope>>
+) {
+  if (scope.noRecords) {
+    return query.is("id", null);
+  }
+
+  if (scope.orFilter) {
+    return query.or(scope.orFilter);
+  }
+
+  return query;
+}
+
+async function countDevicesForSummary({
+  bucket,
+  product,
+  scope,
+  supabase
+}: {
+  bucket: keyof InventorySummary;
+  product: ProductModel;
+  scope: Awaited<ReturnType<typeof deviceScope>>;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}) {
+  let query = supabase
+    .from("devices")
+    .select("id", { count: "exact", head: true })
+    .eq("product_model", product)
+    .is("deleted_at", null);
+
+  if (bucket === "warehouse") {
+    query = query
+      .eq("current_holder_type", "Warehouse")
+      .in("device_status", [...warehouseStockDeviceStatuses]);
+  } else if (bucket === "inTransit") {
+    query = query.eq("device_status", inTransitDeviceStatus);
+  } else if (bucket === "dealer") {
+    query = query
+      .eq("current_holder_type", "Dealer")
+      .eq("device_status", dealerStockDeviceStatus);
+  } else {
+    query = query.in("device_status", [...installedDeviceStatuses]);
+  }
+
+  const { count, error } = await withQueryTimeout(
+    applyDeviceScope(query, scope),
+    `inventory ${bucket} ${product} count`
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
 async function loadInventorySummary({
   scope,
   supabase
@@ -163,58 +222,24 @@ async function loadInventorySummary({
     return summary;
   }
 
-  let query = supabase
-    .from("devices")
-    .select("product_model,device_status,current_holder_type")
-    .is("deleted_at", null);
-
-  if (scope.orFilter) {
-    query = query.or(scope.orFilter);
-  }
-
-  const { data, error } = await withQueryTimeout(
-    query,
-    "inventory summary devices"
+  const buckets = Object.keys(summary) as Array<keyof InventorySummary>;
+  const counts = await Promise.all(
+    buckets.flatMap((bucket) =>
+      productModels.map(async (product) => ({
+        bucket,
+        count: await countDevicesForSummary({
+          bucket,
+          product,
+          scope,
+          supabase
+        }),
+        product
+      }))
+    )
   );
 
-  if (error) {
-    throw error;
-  }
-
-  for (const device of (data ?? []) as InventorySummaryDevice[]) {
-    if (!productModels.includes(device.product_model as ProductModel)) {
-      continue;
-    }
-
-    const product = device.product_model as ProductModel;
-
-    if (
-      device.current_holder_type === "Warehouse" &&
-      warehouseStockDeviceStatuses.includes(
-        device.device_status as (typeof warehouseStockDeviceStatuses)[number]
-      )
-    ) {
-      summary.warehouse[product] += 1;
-    }
-
-    if (device.device_status === inTransitDeviceStatus) {
-      summary.inTransit[product] += 1;
-    }
-
-    if (
-      device.current_holder_type === "Dealer" &&
-      device.device_status === dealerStockDeviceStatus
-    ) {
-      summary.dealer[product] += 1;
-    }
-
-    if (
-      installedDeviceStatuses.includes(
-        device.device_status as (typeof installedDeviceStatuses)[number]
-      )
-    ) {
-      summary.installed[product] += 1;
-    }
+  for (const { bucket, count, product } of counts) {
+    summary[bucket][product] = count;
   }
 
   return summary;

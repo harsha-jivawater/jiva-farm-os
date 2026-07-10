@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { formatDisplayDate } from "@/lib/date-utils";
+import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { todayDate } from "@/lib/pilots/form-data";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -305,6 +306,77 @@ function isOversightUser(
   currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
 ) {
   return hasAnyRole(currentUser, ["Admin", "Management"]);
+}
+
+function shouldLoadSalesWork(
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  return (
+    hasAnyRole(currentUser, [
+      "Admin",
+      "Management",
+      "Sales Head",
+      "RSM",
+      "Salesperson"
+    ]) && canViewModule(currentUser, "farmer-leads")
+  );
+}
+
+function shouldLoadDispatchWork(
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  return (
+    hasAnyRole(currentUser, [
+      "Admin",
+      "Management",
+      "Stock / Dispatch",
+      "Accounts"
+    ]) && canViewModule(currentUser, "dispatches")
+  );
+}
+
+function shouldLoadPilotWork(
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  return (
+    hasAnyRole(currentUser, [
+      "Admin",
+      "Management",
+      "R&D Head",
+      "Agronomist",
+      "Research Assistant"
+    ]) && canViewModule(currentUser, "pilots")
+  );
+}
+
+function shouldLoadMarketingWork(
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  return (
+    hasAnyRole(currentUser, [
+      "Admin",
+      "Management",
+      "Marketing Head",
+      "Designer"
+    ]) && canViewModule(currentUser, "marketing-requests")
+  );
+}
+
+async function safeLoadMyWorkSection<T>({
+  fallback,
+  label,
+  task
+}: {
+  fallback: T;
+  label: string;
+  task: () => Promise<T>;
+}) {
+  try {
+    return await timeAsync(label, task);
+  } catch (error) {
+    console.error(`[My Work] ${label} unavailable`, error);
+    return fallback;
+  }
 }
 
 function isPersonalItem(
@@ -1435,17 +1507,46 @@ async function loadMarketingItems({
 }
 
 export default async function MyPendingWorkPage() {
+  const startedAt = perfStart();
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/my-pending-work");
   const today = todayDate();
 
   const [kpiCards, salesItems, dispatchItems, pilotItems, marketingItems] =
     await Promise.all([
-      loadDashboardCards({ currentUser, supabase, today }),
-      loadSalesItems({ currentUser, supabase, today }),
-      loadDispatchItems({ currentUser, supabase }),
-      loadPilotItems({ currentUser, supabase, today }),
-      loadMarketingItems({ currentUser, supabase, today })
+      safeLoadMyWorkSection({
+        fallback: [],
+        label: "my work KPI cards",
+        task: () => loadDashboardCards({ currentUser, supabase, today })
+      }),
+      shouldLoadSalesWork(currentUser)
+        ? safeLoadMyWorkSection({
+            fallback: [],
+            label: "my work sales items",
+            task: () => loadSalesItems({ currentUser, supabase, today })
+          })
+        : Promise.resolve([]),
+      shouldLoadDispatchWork(currentUser)
+        ? safeLoadMyWorkSection({
+            fallback: [],
+            label: "my work dispatch items",
+            task: () => loadDispatchItems({ currentUser, supabase })
+          })
+        : Promise.resolve([]),
+      shouldLoadPilotWork(currentUser)
+        ? safeLoadMyWorkSection({
+            fallback: [],
+            label: "my work pilot and visit items",
+            task: () => loadPilotItems({ currentUser, supabase, today })
+          })
+        : Promise.resolve([]),
+      shouldLoadMarketingWork(currentUser)
+        ? safeLoadMyWorkSection({
+            fallback: [],
+            label: "my work marketing items",
+            task: () => loadMarketingItems({ currentUser, supabase, today })
+          })
+        : Promise.resolve([])
     ]);
 
   const groups = dedupeGroups([
@@ -1491,6 +1592,8 @@ export default async function MyPendingWorkPage() {
   const teamSectionDescription = isOversightUser(currentUser)
     ? "Broad operational items and workflow exceptions visible to your role."
     : "Team records visible through your existing supervisory scope.";
+
+  logPerf("my work page total server render", startedAt);
 
   return (
     <section>
