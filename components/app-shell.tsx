@@ -87,6 +87,51 @@ export function AppShell({
           </button>
         </div>
 
+        {!mustChangePassword ? (
+          <div className="border-b border-slate-200 px-3 py-3">
+            <div
+              aria-label="Open Action Center notifications"
+              className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 transition hover:bg-slate-50"
+              onClick={(event) => {
+                if (
+                  (event.target as HTMLElement).closest(
+                    "[data-action-center-bell]"
+                  )
+                ) {
+                  return;
+                }
+
+                setIsOpen(false);
+                router.push("/notifications");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setIsOpen(false);
+                  router.push("/notifications");
+                }
+              }}
+              role="link"
+              tabIndex={0}
+            >
+              <div>
+                <p className="text-xs font-medium text-slate-500">
+                  Action Center
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {notificationSummary.unreadCount} unread
+                </p>
+              </div>
+              <div data-action-center-bell>
+                <NotificationBell
+                  latest={notificationSummary.latest}
+                  unreadCount={notificationSummary.unreadCount}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
           {mustChangePassword ? (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-6 text-amber-800">
@@ -143,22 +188,6 @@ export function AppShell({
                 : ""}
             </p>
           </div>
-          {!mustChangePassword ? (
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2">
-              <div>
-                <p className="text-xs font-medium text-slate-500">
-                  Action Center
-                </p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {notificationSummary.unreadCount} unread
-                </p>
-              </div>
-              <NotificationBell
-                latest={notificationSummary.latest}
-                unreadCount={notificationSummary.unreadCount}
-              />
-            </div>
-          ) : null}
           {mustChangePassword ? (
             <Link
               className={[

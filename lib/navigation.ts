@@ -8,7 +8,6 @@ import {
   Gauge,
   Handshake,
   KeyRound,
-  Bell,
   Palette,
   ShieldAlert,
   Stethoscope,
@@ -43,11 +42,6 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/my-pending-work",
         module: "my-pending-work",
         icon: ClipboardList
-      },
-      {
-        label: "Notifications",
-        href: "/notifications",
-        icon: Bell
       },
       {
         label: "My Visits",
