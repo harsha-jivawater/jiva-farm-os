@@ -2703,6 +2703,19 @@ export type Database = {
         };
         Returns: Json;
       };
+      get_my_visits_summary_counts: {
+        Args: {
+          p_assigned_user_id: string;
+          p_today: string;
+        };
+        Returns: Json;
+      };
+      get_visible_planned_visit_counts: {
+        Args: {
+          p_today: string;
+        };
+        Returns: Json;
+      };
       get_installations_page_kpis: {
         Args: {
           p_q?: string | null;

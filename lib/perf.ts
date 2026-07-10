@@ -28,3 +28,24 @@ export async function timeAsync<T>(
     console.log(`[perf] ${label} took ${Date.now() - startedAt}ms`);
   }
 }
+
+type SupabaseErrorDetails = {
+  code?: unknown;
+  details?: unknown;
+  hint?: unknown;
+  message?: unknown;
+};
+
+/** Logs the safe diagnostic fields returned by Supabase without logging row data. */
+export function logSupabaseError(label: string, error: SupabaseErrorDetails | null) {
+  if (!error) {
+    return;
+  }
+
+  console.error(`[${label}]`, {
+    code: typeof error.code === "string" ? error.code : null,
+    details: typeof error.details === "string" ? error.details : null,
+    hint: typeof error.hint === "string" ? error.hint : null,
+    message: typeof error.message === "string" ? error.message : null
+  });
+}

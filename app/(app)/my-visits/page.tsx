@@ -13,11 +13,75 @@ import {
   plannedVisitStatusOptions
 } from "@/lib/pilots/visit-planning";
 import { display, formatDate, type Pilot, type PlannedPilotVisit } from "@/lib/pilots/types";
+import {
+  logPerf,
+  logSupabaseError,
+  perfStart,
+  timeAsync
+} from "@/lib/perf";
 
 type PilotSummary = Pick<
   Pilot,
   "id" | "pilot_code" | "pilot_name" | "farmer_name_snapshot" | "village" | "district"
 >;
+
+const activeVisitStatuses = [
+  "Planned",
+  "Assigned",
+  "Due",
+  "In Progress",
+  "Rescheduled"
+];
+
+const visitSelectColumns = [
+  "id",
+  "pilot_id",
+  "assigned_user_id",
+  "planned_visit_date",
+  "planned_visit_status",
+  "linked_visit_report_id",
+  "visit_number",
+  "visit_type",
+  "visit_purpose",
+  "parameters_to_collect",
+  "special_instructions"
+].join(",");
+
+type MyVisitsSummaryCounts = {
+  completed: number;
+  dueToday: number;
+  needsReport: number;
+  overdue: number;
+  upcoming: number;
+};
+
+const emptyMyVisitsSummary: MyVisitsSummaryCounts = {
+  completed: 0,
+  dueToday: 0,
+  needsReport: 0,
+  overdue: 0,
+  upcoming: 0
+};
+
+function readMyVisitsSummary(value: unknown): MyVisitsSummaryCounts {
+  if (!value || typeof value !== "object") {
+    return emptyMyVisitsSummary;
+  }
+
+  const counts = value as Record<string, unknown>;
+  const numberValue = (key: keyof MyVisitsSummaryCounts) =>
+    typeof counts[key] === "number" && Number.isFinite(counts[key])
+      ? counts[key]
+      : 0;
+
+  return {
+    completed: numberValue("completed"),
+    dueToday: numberValue("dueToday"),
+    needsReport: numberValue("needsReport"),
+    overdue: numberValue("overdue"),
+    upcoming: numberValue("upcoming")
+  };
+}
 
 function statusLabel(value: string) {
   return (
@@ -64,6 +128,7 @@ export default async function MyVisitsPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  const startedAt = perfStart();
   const query = await searchParams;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/my-pending-work");
@@ -73,48 +138,73 @@ export default async function MyVisitsPage({
   }
 
   const today = todayDate();
-  const { data } = await supabase
+  const activeVisitQuery = supabase
     .from("planned_pilot_visits")
-    .select("*")
+    .select(visitSelectColumns)
     .eq("assigned_user_id", currentUser.id)
     .is("deleted_at", null)
+    .is("linked_visit_report_id", null)
+    .in("planned_visit_status", activeVisitStatuses)
     .order("planned_visit_date", { ascending: true })
-    .limit(100);
+    .limit(40);
+  const recentCompletedVisitQuery = supabase
+    .from("planned_pilot_visits")
+    .select(visitSelectColumns)
+    .eq("assigned_user_id", currentUser.id)
+    .is("deleted_at", null)
+    .not("linked_visit_report_id", "is", null)
+    .order("planned_visit_date", { ascending: false })
+    .limit(20);
 
-  const visits = (data ?? []) as PlannedPilotVisit[];
+  const [activeVisitResult, recentCompletedVisitResult, summaryResult] =
+    await Promise.all([
+    timeAsync("my visits active visits query", () => activeVisitQuery),
+    timeAsync("my visits recent completed visits query", () =>
+      recentCompletedVisitQuery
+    ),
+    timeAsync("my visits summary counts rpc", () =>
+      supabase
+        .rpc("get_my_visits_summary_counts", {
+          p_assigned_user_id: currentUser.id,
+          p_today: today
+        })
+    )
+  ]);
+
+  logSupabaseError("My Visits active visit query unavailable", activeVisitResult.error);
+  logSupabaseError(
+    "My Visits recent completed visit query unavailable",
+    recentCompletedVisitResult.error
+  );
+  logSupabaseError("My Visits summary counts unavailable", summaryResult.error);
+  const summaryCounts = readMyVisitsSummary(summaryResult.data);
+
+  const visits = [
+    ...((activeVisitResult.data ?? []) as unknown as PlannedPilotVisit[]),
+    ...((recentCompletedVisitResult.data ?? []) as unknown as PlannedPilotVisit[])
+  ].sort((left, right) =>
+    left.planned_visit_date.localeCompare(right.planned_visit_date)
+  );
   const pilotIds = Array.from(new Set(visits.map((visit) => visit.pilot_id)));
-  const { data: pilotData } = pilotIds.length
-    ? await supabase
-        .from("pilots")
-        .select("id, pilot_code, pilot_name, farmer_name_snapshot, village, district")
-        .in("id", pilotIds)
-        .is("deleted_at", null)
-    : { data: [] };
+  const { data: pilotData, error: pilotError } = pilotIds.length
+    ? await timeAsync("my visits pilot context query", () =>
+        supabase
+          .from("pilots")
+          .select("id, pilot_code, pilot_name, farmer_name_snapshot, village, district")
+          .in("id", pilotIds)
+          .is("deleted_at", null)
+      )
+    : { data: [], error: null };
+  logSupabaseError("My Visits pilot context query unavailable", pilotError);
   const pilotMap = new Map(
     ((pilotData ?? []) as PilotSummary[]).map((pilot) => [pilot.id, pilot])
   );
-  const pendingVisits = visits.filter(
-    (visit) =>
-      !visit.linked_visit_report_id &&
-      !["Cancelled", "Unable to Complete", "Completed"].includes(
-        visit.planned_visit_status
-      )
-  );
-  const todayVisits = pendingVisits.filter(
-    (visit) => visit.planned_visit_date === today
-  );
-  const upcomingVisits = pendingVisits.filter(
-    (visit) => visit.planned_visit_date > today
-  );
-  const overdueVisits = pendingVisits.filter(
-    (visit) => visit.planned_visit_date < today
-  );
-  const needsReportVisits = pendingVisits.filter(
-    (visit) =>
-      visit.planned_visit_status === "In Progress" ||
-      visit.planned_visit_date <= today
-  );
-  const completedVisits = visits.filter((visit) => visit.linked_visit_report_id);
+  const pageLoadError =
+    activeVisitResult.error && recentCompletedVisitResult.error
+      ? "Unable to load your visits right now. Please try again."
+      : null;
+
+  logPerf("my visits page total server render", startedAt);
 
   return (
     <section>
@@ -130,26 +220,32 @@ export default async function MyVisitsPage({
         </div>
       ) : null}
 
+      {pageLoadError ? (
+        <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+          {pageLoadError}
+        </div>
+      ) : null}
+
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Due today</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{todayVisits.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{summaryCounts.dueToday}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Upcoming</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{upcomingVisits.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{summaryCounts.upcoming}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Overdue</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{overdueVisits.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{summaryCounts.overdue}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Needs report</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{needsReportVisits.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{summaryCounts.needsReport}</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Completed</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{completedVisits.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{summaryCounts.completed}</p>
         </div>
       </div>
 

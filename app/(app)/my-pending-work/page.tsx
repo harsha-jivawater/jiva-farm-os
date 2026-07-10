@@ -20,7 +20,12 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { formatDisplayDate } from "@/lib/date-utils";
-import { logPerf, perfStart, timeAsync } from "@/lib/perf";
+import {
+  logPerf,
+  logSupabaseError,
+  perfStart,
+  timeAsync
+} from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { todayDate } from "@/lib/pilots/form-data";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -671,33 +676,22 @@ async function loadDashboardCards({
   }
 
   if (moduleAccess.pilots) {
-    const [
-      { count: dueCount, error: dueError },
-      { count: pendingReportCount, error: pendingReportError }
-    ] = await Promise.all([
-      supabase
-        .from("planned_pilot_visits")
-        .select("id", { count: "exact", head: true })
-        .lte("planned_visit_date", today)
-        .in("planned_visit_status", activePlannedVisitStatuses)
-        .is("linked_visit_report_id", null)
-        .is("deleted_at", null),
-      supabase
-        .from("planned_pilot_visits")
-        .select("id", { count: "exact", head: true })
-        .in("planned_visit_status", activePlannedVisitStatuses)
-        .is("linked_visit_report_id", null)
-        .is("deleted_at", null)
-    ]);
+    const { data: plannedVisitCounts, error: plannedVisitCountsError } =
+      await timeAsync("my work planned visit counts rpc", () =>
+        supabase.rpc("get_visible_planned_visit_counts", { p_today: today })
+      );
 
-    if (dueError || pendingReportError) {
-      console.error("[My Work] Planned visit counts unavailable", {
-        dueError,
-        pendingReportError
-      });
+    if (plannedVisitCountsError) {
+      logSupabaseError(
+        "My Work planned visit counts unavailable",
+        plannedVisitCountsError
+      );
     } else {
-      counts.plannedPilotVisitReportsPending = pendingReportCount ?? 0;
-      counts.plannedPilotVisitsDue = dueCount ?? 0;
+      const plannedCounts = plannedVisitCounts as Record<string, unknown> | null;
+      counts.plannedPilotVisitReportsPending = numberValue(
+        plannedCounts?.pendingReport
+      );
+      counts.plannedPilotVisitsDue = numberValue(plannedCounts?.due);
     }
   }
 
@@ -1516,34 +1510,34 @@ export default async function MyPendingWorkPage() {
     await Promise.all([
       safeLoadMyWorkSection({
         fallback: [],
-        label: "my work KPI cards",
+        label: "my work KPI loader",
         task: () => loadDashboardCards({ currentUser, supabase, today })
       }),
       shouldLoadSalesWork(currentUser)
         ? safeLoadMyWorkSection({
             fallback: [],
-            label: "my work sales items",
+            label: "my work sales loader",
             task: () => loadSalesItems({ currentUser, supabase, today })
           })
         : Promise.resolve([]),
       shouldLoadDispatchWork(currentUser)
         ? safeLoadMyWorkSection({
             fallback: [],
-            label: "my work dispatch items",
+            label: "my work dispatch loader",
             task: () => loadDispatchItems({ currentUser, supabase })
           })
         : Promise.resolve([]),
       shouldLoadPilotWork(currentUser)
         ? safeLoadMyWorkSection({
             fallback: [],
-            label: "my work pilot and visit items",
+            label: "my work pilot loader",
             task: () => loadPilotItems({ currentUser, supabase, today })
           })
         : Promise.resolve([]),
       shouldLoadMarketingWork(currentUser)
         ? safeLoadMyWorkSection({
             fallback: [],
-            label: "my work marketing items",
+            label: "my work marketing loader",
             task: () => loadMarketingItems({ currentUser, supabase, today })
           })
         : Promise.resolve([])

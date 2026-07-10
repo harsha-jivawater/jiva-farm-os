@@ -36,7 +36,12 @@ import {
   leadStatusOptions,
   primaryCropOptions
 } from "@/lib/farmer-leads/options";
-import { logPerf, perfStart, timeAsync } from "@/lib/perf";
+import {
+  logPerf,
+  logSupabaseError,
+  perfStart,
+  timeAsync
+} from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
@@ -93,6 +98,17 @@ const defaultKpis: FarmerLeadKpis = {
   paymentConfirmed: 0,
   deviceInstalled: 0
 };
+
+const leadFilterRoles = ["Sales Head", "RSM", "Salesperson", "Admin"];
+
+function userRoleFilter(roles: string[]) {
+  return roles
+    .flatMap((role) => [
+      `role.eq.${role}`,
+      `secondary_role.eq.${role}`
+    ])
+    .join(",");
+}
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -206,6 +222,7 @@ export default async function FarmerLeadsPage({
     .from("farmer_leads")
     .select(listSelectColumns, { count: "exact" })
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(50);
 
   if (scope.noRecords) {
@@ -256,6 +273,7 @@ export default async function FarmerLeadsPage({
         .from("users")
         .select("id, full_name, email, role, secondary_role")
         .eq("is_active", true)
+        .or(userRoleFilter(leadFilterRoles))
         .order("full_name", { ascending: true })
     )
   ]);
@@ -270,7 +288,15 @@ export default async function FarmerLeadsPage({
   );
 
   if (kpiResult.error) {
-    console.error("[Farmer Leads] KPI summary RPC unavailable", kpiResult.error);
+    logSupabaseError("Farmer Leads KPI summary RPC unavailable", kpiResult.error);
+  }
+
+  if (error) {
+    logSupabaseError("Farmer Leads list query unavailable", error);
+  }
+
+  if (usersResult.error) {
+    logSupabaseError("Farmer Leads user filter query unavailable", usersResult.error);
   }
 
   const kpis = readKpis(kpiResult.data);

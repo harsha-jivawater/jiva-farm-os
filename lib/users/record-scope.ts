@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { createClient } from "@/lib/supabase/server";
 import type { InternalUser } from "@/lib/users/types";
 import {
@@ -162,11 +163,12 @@ export function hasFullRecordAccess(user: InternalUser, module: ModuleKey) {
   return hasAnyRole(user, fullRecordAccessRoles[module]);
 }
 
-export async function loadDirectReportIds(
+const loadDirectReportIdsForRequest = cache(async (
   supabase: SupabaseClient,
   managerId: string,
-  roles: string[] = []
-) {
+  rolesKey: string
+) => {
+  const roles = rolesKey ? rolesKey.split(",") : [];
   const { data } = await supabase
     .from("users")
     .select("id, role, secondary_role")
@@ -182,6 +184,18 @@ export async function loadDirectReportIds(
           roles.includes(user.secondary_role ?? "")
       )
       .map((user) => user.id)
+  );
+});
+
+export async function loadDirectReportIds(
+  supabase: SupabaseClient,
+  managerId: string,
+  roles: string[] = []
+) {
+  return loadDirectReportIdsForRequest(
+    supabase,
+    managerId,
+    [...roles].sort().join(",")
   );
 }
 
@@ -238,11 +252,15 @@ async function leadIdsForScope(
   return unique(filters);
 }
 
-export async function loadManagedPilotIds(
+const loadManagedPilotIdsForRequest = cache(async (
   supabase: SupabaseClient,
   user: InternalUser,
-  directReportIds: string[] = []
-) {
+  directReportIdsKey: string
+) => {
+  const directReportIds = directReportIdsKey
+    ? directReportIdsKey.split(",")
+    : [];
+
   if (hasFullRecordAccess(user, "pilots")) {
     return [];
   }
@@ -282,6 +300,18 @@ export async function loadManagedPilotIds(
   }
 
   return unique(filters);
+});
+
+export async function loadManagedPilotIds(
+  supabase: SupabaseClient,
+  user: InternalUser,
+  directReportIds: string[] = []
+) {
+  return loadManagedPilotIdsForRequest(
+    supabase,
+    user,
+    [...directReportIds].sort().join(",")
+  );
 }
 
 export async function farmerLeadScope(
