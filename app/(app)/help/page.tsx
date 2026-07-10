@@ -38,33 +38,33 @@ const firstActionsByRole: Record<UserRole, readonly string[]> = {
   Management: [
     "Review KPI Dashboard.",
     "Check Data Quality and System Health.",
-    "Review My Pending Work for operational bottlenecks."
+    "Review My Work for operational bottlenecks."
   ],
   "Sales Head": [
-    "Check My Pending Work.",
+    "Check My Work.",
     "Review Farmer Leads ready for dispatch.",
     "Review Dealers and Institutional Partners needing action.",
     "Ensure Sales team users have correct region/state assignments."
   ],
   RSM: [
-    "Check My Pending Work.",
+    "Check My Work.",
     "Review assigned farmer leads.",
     "Follow up overdue leads.",
     "Support Salespersons in assigned region/state."
   ],
   Salesperson: [
-    "Check My Pending Work.",
+    "Check My Work.",
     "Add or update Farmer Leads.",
     "Record follow-ups.",
     "Confirm payment only when proof/process is complete if your role supports it."
   ],
   "R&D Head": [
-    "Check Pilots and My Pending Work.",
+    "Check Pilots and My Work.",
     "Review pilots needing device installation or monitoring.",
     "Review reports needing approval or review."
   ],
   Agronomist: [
-    "Check Pilots and My Pending Work.",
+    "Check Pilots and My Work.",
     "Plan and monitor pilot activity.",
     "Review field observations and reports."
   ],
@@ -75,7 +75,7 @@ const firstActionsByRole: Record<UserRole, readonly string[]> = {
     "Do not mark Pilot Device Installed."
   ],
   "Stock / Dispatch": [
-    "Check My Pending Work.",
+    "Check My Work.",
     "Create dispatches from paid farmer leads or active pilots only.",
     "Use the correct device pool.",
     "Mark dispatch only when a serial-numbered device is assigned."
@@ -112,13 +112,13 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "Admin",
     purpose: "Keep users, regions, access, data hygiene, and operational recovery under control.",
     dailyChecklist: [
-      "Check Dashboard, KPI Dashboard, Data Quality, and System Health.",
+      "Check My Work, KPI Dashboard, Data Quality, and System Health.",
       "Review user, role, region, and access requests.",
       "Restore deleted Dealers, Institutional Partners, or Pilots only after business confirmation.",
       "Use Help / SOP to train users before changing access."
     ],
     mainPages: [
-      "Dashboard",
+      "My Work",
       "KPI Dashboard",
       "Data Quality",
       "System Health",
@@ -142,14 +142,14 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "Management",
     purpose: "Review company progress, bottlenecks, data quality, and KPI health.",
     dailyChecklist: [
-      "Open Dashboard and KPI Dashboard for company-level review.",
-      "Check My Pending Work for leadership actions.",
+      "Open My Work and KPI Dashboard for company-level review.",
+      "Check My Work for leadership actions.",
       "Review Data Quality and System Health for risks.",
       "Open source records before asking the team to correct them."
     ],
     mainPages: [
-      "Dashboard",
-      "My Pending Work",
+      "My Work",
+      "My Work",
       "KPI Dashboard",
       "Data Quality",
       "System Health"
@@ -171,13 +171,13 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "Sales Head",
     purpose: "Lead sales pipeline, dealer progress, institutional opportunities, and sales KPI review.",
     dailyChecklist: [
-      "Check My Pending Work and KPI Dashboard.",
+      "Check My Work and KPI Dashboard.",
       "Review Farmer Leads, Dealers, and Institutional Partners.",
       "Make sure paid leads are ready for dispatch handoff.",
       "Keep dealer/institution next actions current."
     ],
     mainPages: [
-      "My Pending Work",
+      "My Work",
       "Farmer Leads",
       "Dealers",
       "Institutional Partners",
@@ -200,13 +200,13 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "RSM",
     purpose: "Own regional sales execution, dealer progress, installations, and follow-ups.",
     dailyChecklist: [
-      "Check My Pending Work first.",
+      "Check My Work first.",
       "Update Farmer Leads and follow-ups after calls or visits.",
       "Review Dealer review dates and institution opportunities.",
       "Track dispatch and installation movement for your region."
     ],
     mainPages: [
-      "My Pending Work",
+      "My Work",
       "Farmer Leads",
       "Dealers",
       "Institutional Partners",
@@ -230,13 +230,13 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "Salesperson",
     purpose: "Capture farmer opportunities, keep follow-ups current, and move sales records forward.",
     dailyChecklist: [
-      "Check My Pending Work.",
+      "Check My Work.",
       "Add or update Farmer Leads immediately after field activity.",
       "Record every follow-up with the next follow-up date.",
       "Confirm payment only when the app and your role allow it and proof is available."
     ],
     mainPages: [
-      "My Pending Work",
+      "My Work",
       "Farmer Leads",
       "Installations",
       "Post Installation Follow-ups"
@@ -258,13 +258,13 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "R&D Head",
     purpose: "Oversee pilots, monitoring quality, visit reports, and final pilot decisions.",
     dailyChecklist: [
-      "Check My Pending Work for reports or pilot review items.",
+      "Check My Work for reports or pilot review items.",
       "Review active Pilots and overdue Monitoring Plan items.",
       "Review Visit Reports and final pilot outcomes.",
       "Coordinate with Agronomist and Research Assistants on missing evidence."
     ],
     mainPages: [
-      "My Pending Work",
+      "My Work",
       "Pilots",
       "My Visits",
       "KPI Dashboard"
@@ -286,13 +286,13 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "Agronomist",
     purpose: "Guide agronomy work, pilots, installations, technical follow-ups, and field reporting quality.",
     dailyChecklist: [
-      "Check My Pending Work and Pilots.",
+      "Check My Work and Pilots.",
       "Review planned visits, visit reports, and technical observations.",
       "Support installation and post-installation technical issues.",
       "Guide Research Assistants on parameters and field evidence."
     ],
     mainPages: [
-      "My Pending Work",
+      "My Work",
       "Pilots",
       "My Visits",
       "Installations",
@@ -315,14 +315,14 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "Research Assistant",
     purpose: "Complete assigned field visits and submit accurate Visit Reports with observations.",
     dailyChecklist: [
-      "Check My Visits and My Pending Work.",
+      "Check My Visits and My Work.",
       "Start or continue assigned visits from My Visits.",
       "Submit Visit Report after the field visit.",
       "Add parameter observations, notes, photos, and data sheets where available."
     ],
     mainPages: [
       "My Visits",
-      "My Pending Work",
+      "My Work",
       "Pilots",
       "Post Installation Follow-ups"
     ],
@@ -343,13 +343,13 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "Stock / Dispatch",
     purpose: "Manage devices, dispatch movement, installation handoff, and stock accuracy.",
     dailyChecklist: [
-      "Check My Pending Work and Dispatches.",
+      "Check My Work and Dispatches.",
       "Create farmer sale dispatches only from paid Farmer Leads.",
       "Create pilot dispatches only from active Pilots.",
       "Assign serial-numbered devices before marking dispatch progress."
     ],
     mainPages: [
-      "My Pending Work",
+      "My Work",
       "Devices",
       "Dispatches",
       "Installations"
@@ -371,13 +371,13 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "Accounts",
     purpose: "Verify payment context and support dispatch readiness without changing sales ownership.",
     dailyChecklist: [
-      "Check My Pending Work for payment or dispatch-readiness items.",
+      "Check My Work for payment or dispatch-readiness items.",
       "Review relevant Farmer Leads and Dispatches.",
       "Confirm payment only when proof is verified.",
       "Coordinate payment holds with Sales Head/RSM."
     ],
     mainPages: [
-      "My Pending Work",
+      "My Work",
       "Farmer Leads",
       "Dispatches",
       "Devices",
@@ -400,14 +400,14 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "Marketing Head",
     purpose: "Review, assign, control deadlines, and deliver Marketing Requests.",
     dailyChecklist: [
-      "Open Marketing Requests and My Pending Work.",
+      "Open Marketing Requests and My Work.",
       "Review new requests and brief document links.",
       "Accept the requested deadline or propose a revised working deadline.",
       "Assign Designer and review draft/final OneDrive links."
     ],
     mainPages: [
       "Marketing Requests",
-      "My Pending Work"
+      "My Work"
     ],
     handoffs: [
       "Assigned design work to Designer.",
@@ -426,14 +426,14 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "Designer",
     purpose: "Work assigned Marketing Requests and keep draft/final links and progress comments updated.",
     dailyChecklist: [
-      "Check Marketing Requests and My Pending Work.",
+      "Check Marketing Requests and My Work.",
       "Work only on own or assigned requests.",
       "Add draft links, final links, and progress comments.",
       "Respond to corrections requested by Marketing Head/requester."
     ],
     mainPages: [
       "Marketing Requests",
-      "My Pending Work"
+      "My Work"
     ],
     handoffs: [
       "Draft links to Marketing Head/requester for review.",
@@ -452,13 +452,13 @@ const roleSopSections: readonly RoleSopSection[] = [
     title: "HR & Legal",
     purpose: "Review and update legal approval checkpoints for Dealers and Institutional Partners.",
     dailyChecklist: [
-      "Check My Pending Work when legal review is needed.",
+      "Check My Work when legal review is needed.",
       "Open Dealer or Institutional Partner records assigned for legal review.",
       "Review agreement/MOU context and update legal approval fields.",
       "Add clear comments when revisions are needed."
     ],
     mainPages: [
-      "My Pending Work",
+      "My Work",
       "Dealers",
       "Institutional Partners",
       "Help / SOP"
@@ -486,8 +486,8 @@ const roleSopSections: readonly RoleSopSection[] = [
       "Keep account password secure."
     ],
     mainPages: [
-      "Dashboard",
-      "My Pending Work",
+      "My Work",
+      "My Work",
       "Permitted operational modules",
       "Help / SOP"
     ],
@@ -555,7 +555,7 @@ function accountReadinessItems(
       helper: "Open your role section below and review the daily checklist."
     },
     {
-      label: "Open My Pending Work",
+      label: "Open My Work",
       status: "review",
       helper: "Use it as your live action list when your role has pending items."
     },
@@ -611,7 +611,7 @@ export default async function HelpPage() {
             className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
             href="/my-pending-work"
           >
-            Open My Pending Work
+            Open My Work
           </Link>
         </div>
 

@@ -1,11 +1,20 @@
 import Link from "next/link";
 import {
+  Activity,
   ArrowRight,
+  BookOpenCheck,
+  CalendarCheck2,
+  CalendarClock,
   CheckCircle2,
+  CircleDollarSign,
+  ClipboardCheck,
   ClipboardList,
   Megaphone,
+  Package,
+  Send,
   Tractor,
   Truck,
+  Warehouse,
   Wrench,
   type LucideIcon
 } from "lucide-react";
@@ -18,7 +27,8 @@ import {
   canManageMarketingRequests,
   canViewModule,
   hasAnyRole,
-  hasRole
+  hasRole,
+  type ModuleKey
 } from "@/lib/users/permissions";
 import {
   dispatchScope,
@@ -33,10 +43,13 @@ import {
 } from "@/lib/users/record-scope";
 
 type PendingWorkItem = {
+  assignmentUserIds?: string[];
+  businessKey?: string;
   dueDate?: string | null;
   href: string;
   id: string;
   nextAction: string;
+  ownerUserId?: string | null;
   status: string;
   subtitle?: string | null;
   title: string;
@@ -49,6 +62,29 @@ type PendingWorkGroup = {
   title: string;
 };
 
+type CountCard = {
+  href: string;
+  helper: string;
+  icon: LucideIcon;
+  includeInToday: boolean;
+  label: string;
+  module: ModuleKey;
+  value: number | null;
+  valueLabel?: string;
+};
+
+type DashboardCounts = {
+  activePilots: number | null;
+  approvedDispatchesWaiting: number | null;
+  devicesInWarehouse: number | null;
+  installationsPlanned: number | null;
+  leadsNeedingFollowup: number | null;
+  overduePostInstallationFollowups: number | null;
+  pendingPaymentConfirmation: number | null;
+  plannedPilotVisitReportsPending: number | null;
+  plannedPilotVisitsDue: number | null;
+};
+
 type ScopedQuery<T> = T & {
   is: (column: string, value: null) => T;
   or: (filters: string) => T;
@@ -57,6 +93,7 @@ type ScopedQuery<T> = T & {
 type FarmerLeadPendingRow = {
   id: string;
   lead_code: string | null;
+  created_by_user_id: string;
   farmer_name: string;
   village: string;
   district: string;
@@ -64,26 +101,33 @@ type FarmerLeadPendingRow = {
   funnel_stage: string;
   next_action_date: string;
   followup_due_date: string | null;
+  owner_user_id: string | null;
   payment_confirmed: boolean;
   payment_confirmed_date: string | null;
+  rsm_user_id: string | null;
 };
 
 type DealerPendingRow = {
   id: string;
   dealer_code: string;
   dealer_name: string;
+  dealer_owner_user_id: string;
   firm_name: string | null;
   dealer_status: string;
   next_action_date: string;
   next_dealer_review_date: string | null;
+  rsm_user_id: string;
 };
 
 type InstitutionPendingRow = {
   id: string;
+  account_owner_user_id: string;
   institution_code: string;
   organization_name: string;
   institution_status: string;
   next_action_date: string;
+  rsm_user_id: string | null;
+  technical_owner_user_id: string | null;
 };
 
 type DispatchPendingRow = {
@@ -106,6 +150,7 @@ type PilotPendingRow = {
   pilot_status: string;
   farmer_name_snapshot: string;
   dispatch_id: string | null;
+  pilot_owner_user_id: string;
   product_model: string;
   next_visit_due_date: string | null;
 };
@@ -175,6 +220,26 @@ const openMarketingStatuses = [
   "Draft Shared",
   "Corrections Requested"
 ];
+const unavailableCounts: DashboardCounts = {
+  activePilots: null,
+  approvedDispatchesWaiting: null,
+  devicesInWarehouse: null,
+  installationsPlanned: null,
+  leadsNeedingFollowup: null,
+  overduePostInstallationFollowups: null,
+  pendingPaymentConfirmation: null,
+  plannedPilotVisitReportsPending: null,
+  plannedPilotVisitsDue: null
+};
+const supervisoryRoles = [
+  "Admin",
+  "Management",
+  "Sales Head",
+  "RSM",
+  "R&D Head",
+  "Agronomist",
+  "Marketing Head"
+];
 
 function applyScope<T>(query: ScopedQuery<T>, scope: RecordScope) {
   if (scope.noRecords) {
@@ -188,6 +253,36 @@ function applyScope<T>(query: ScopedQuery<T>, scope: RecordScope) {
   return query;
 }
 
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function readDashboardCounts(value: unknown): DashboardCounts {
+  if (!value || typeof value !== "object") {
+    return unavailableCounts;
+  }
+
+  const row = value as Record<string, unknown>;
+
+  return {
+    activePilots: numberValue(row.activePilots),
+    approvedDispatchesWaiting: numberValue(row.approvedDispatchesWaiting),
+    devicesInWarehouse: numberValue(row.devicesInWarehouse),
+    installationsPlanned: numberValue(row.installationsPlanned),
+    leadsNeedingFollowup: numberValue(row.leadsNeedingFollowup),
+    overduePostInstallationFollowups: numberValue(
+      row.overduePostInstallationFollowups
+    ),
+    pendingPaymentConfirmation: numberValue(row.pendingPaymentConfirmation),
+    plannedPilotVisitReportsPending: null,
+    plannedPilotVisitsDue: null
+  };
+}
+
+function formatCount(value: number | null) {
+  return value === null ? "Unavailable" : value.toLocaleString("en-IN");
+}
+
 function itemCount(groups: PendingWorkGroup[]) {
   return groups.reduce((sum, group) => sum + group.items.length, 0);
 }
@@ -198,6 +293,138 @@ function displayDate(value: string | null | undefined) {
 
 function compactLocation(...parts: Array<string | null | undefined>) {
   return parts.filter(Boolean).join(", ");
+}
+
+function isSupervisoryUser(
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  return hasAnyRole(currentUser, supervisoryRoles);
+}
+
+function isOversightUser(
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  return hasAnyRole(currentUser, ["Admin", "Management"]);
+}
+
+function isPersonalItem(
+  item: PendingWorkItem,
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  const assignedToCurrentUser =
+    item.ownerUserId === currentUser.id ||
+    item.assignmentUserIds?.includes(currentUser.id);
+
+  if (assignedToCurrentUser) {
+    return true;
+  }
+
+  return !isSupervisoryUser(currentUser) && !item.ownerUserId;
+}
+
+function dedupeGroups(groups: PendingWorkGroup[]) {
+  const seen = new Set<string>();
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        const key = item.businessKey ?? item.id;
+
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      })
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+function splitGroupsForCurrentUser(
+  groups: PendingWorkGroup[],
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  const myGroups: PendingWorkGroup[] = [];
+  const teamGroups: PendingWorkGroup[] = [];
+
+  for (const group of groups) {
+    const myItems = group.items.filter((item) =>
+      isPersonalItem(item, currentUser)
+    );
+    const teamItems = group.items.filter(
+      (item) => !isPersonalItem(item, currentUser)
+    );
+
+    if (myItems.length) {
+      myGroups.push({ ...group, items: myItems });
+    }
+
+    if (teamItems.length && isSupervisoryUser(currentUser)) {
+      teamGroups.push({ ...group, items: teamItems });
+    }
+  }
+
+  return { myGroups, teamGroups };
+}
+
+function pickKpiCardsForRole(
+  cards: CountCard[],
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  const preferredLabels = hasAnyRole(currentUser, ["Research Assistant"])
+    ? ["Pilot Visits Due", "Pilot Visit Reports Pending", "Active Pilots"]
+    : hasAnyRole(currentUser, ["R&D Head", "Agronomist"])
+    ? ["Active Pilots", "Pilot Visits Due", "Pilot Visit Reports Pending"]
+    : hasAnyRole(currentUser, ["Stock / Dispatch", "Accounts"])
+    ? [
+        "Pending Payment Confirmation",
+        "Approved Dispatches Waiting",
+        "Installations Planned",
+        "Warehouse Stock"
+      ]
+    : hasAnyRole(currentUser, ["Marketing Head", "Designer"])
+    ? ["My Work"]
+    : [
+        "Leads Needing Follow-up",
+        "Pending Payment Confirmation",
+        "Approved Dispatches Waiting",
+        "Installations Planned"
+      ];
+  const preferredCards = preferredLabels
+    .map((label) => cards.find((card) => card.label === label))
+    .filter(Boolean) as CountCard[];
+  const fallbackCards = cards.filter(
+    (card) => !preferredCards.some((preferred) => preferred.label === card.label)
+  );
+
+  return [...preferredCards, ...fallbackCards].slice(0, 4);
+}
+
+function DailyActionCard({ card }: { card: CountCard }) {
+  const Icon = card.icon;
+
+  return (
+    <Link
+      className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand-200 hover:bg-brand-50/40"
+      href={card.href}
+      prefetch={false}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-slate-500">{card.label}</p>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600 transition group-hover:bg-brand-100 group-hover:text-brand-700">
+          <Icon className="h-4 w-4" aria-hidden="true" />
+        </span>
+      </div>
+      <p className="mt-3 text-2xl font-semibold text-slate-950">
+        {card.valueLabel ?? formatCount(card.value)}
+      </p>
+      <p className="mt-1 min-h-5 text-xs leading-5 text-slate-500">
+        {card.helper}
+      </p>
+    </Link>
+  );
 }
 
 function DetailLine({
@@ -340,6 +567,198 @@ async function loadPilotMap(
   );
 }
 
+async function loadDashboardCards({
+  currentUser,
+  supabase,
+  today
+}: {
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  today: string;
+}) {
+  const moduleAccess = {
+    dispatches: canViewModule(currentUser, "dispatches"),
+    farmerLeads: canViewModule(currentUser, "farmer-leads"),
+    followUps: canViewModule(currentUser, "follow-ups"),
+    installations: canViewModule(currentUser, "installations"),
+    inventory: canViewModule(currentUser, "inventory"),
+    pilots: canViewModule(currentUser, "pilots")
+  };
+  const { data, error } = await supabase.rpc("get_dashboard_home_counts", {
+    p_include_dispatches: moduleAccess.dispatches,
+    p_include_devices: moduleAccess.inventory,
+    p_include_farmer_leads: moduleAccess.farmerLeads,
+    p_include_followups: moduleAccess.followUps,
+    p_include_installations: moduleAccess.installations,
+    p_include_pilots: moduleAccess.pilots
+  });
+  const counts = error ? { ...unavailableCounts } : readDashboardCounts(data);
+
+  if (error) {
+    console.error("[My Work] Home counts RPC unavailable", error);
+  }
+
+  if (moduleAccess.pilots) {
+    const [
+      { count: dueCount, error: dueError },
+      { count: pendingReportCount, error: pendingReportError }
+    ] = await Promise.all([
+      supabase
+        .from("planned_pilot_visits")
+        .select("id", { count: "exact", head: true })
+        .lte("planned_visit_date", today)
+        .in("planned_visit_status", activePlannedVisitStatuses)
+        .is("linked_visit_report_id", null)
+        .is("deleted_at", null),
+      supabase
+        .from("planned_pilot_visits")
+        .select("id", { count: "exact", head: true })
+        .in("planned_visit_status", activePlannedVisitStatuses)
+        .is("linked_visit_report_id", null)
+        .is("deleted_at", null)
+    ]);
+
+    if (dueError || pendingReportError) {
+      console.error("[My Work] Planned visit counts unavailable", {
+        dueError,
+        pendingReportError
+      });
+    } else {
+      counts.plannedPilotVisitReportsPending = pendingReportCount ?? 0;
+      counts.plannedPilotVisitsDue = dueCount ?? 0;
+    }
+  }
+
+  const cards: CountCard[] = [
+    {
+      href: "/help#getting-started",
+      helper: "Check your account readiness and first steps.",
+      icon: BookOpenCheck,
+      includeInToday: false,
+      label: "Getting Started",
+      module: "my-pending-work",
+      value: null,
+      valueLabel: "Open"
+    }
+  ];
+
+  if (moduleAccess.farmerLeads) {
+    cards.push({
+      href: "/farmer-leads",
+      helper: "Open leads with action or follow-up due today.",
+      icon: Tractor,
+      includeInToday: true,
+      label: "Leads Needing Follow-up",
+      module: "farmer-leads",
+      value: counts.leadsNeedingFollowup
+    });
+  }
+
+  if (moduleAccess.dispatches) {
+    cards.push(
+      {
+        href: "/dispatches",
+        helper: "Dispatches still waiting for payment confirmation.",
+        icon: CircleDollarSign,
+        includeInToday: true,
+        label: "Pending Payment Confirmation",
+        module: "dispatches",
+        value: counts.pendingPaymentConfirmation
+      },
+      {
+        href: "/dispatches",
+        helper: "Approved dispatches ready for the next logistics step.",
+        icon: Send,
+        includeInToday: true,
+        label: "Approved Dispatches Waiting",
+        module: "dispatches",
+        value: counts.approvedDispatchesWaiting
+      }
+    );
+  }
+
+  if (moduleAccess.installations) {
+    cards.push({
+      href: "/installations",
+      helper: "Planned installations waiting to be completed.",
+      icon: ClipboardCheck,
+      includeInToday: true,
+      label: "Installations Planned",
+      module: "installations",
+      value: counts.installationsPlanned
+    });
+  }
+
+  if (moduleAccess.inventory) {
+    cards.push({
+      href: "/devices",
+      helper: "Available warehouse stock for future dispatches.",
+      icon: Warehouse,
+      includeInToday: false,
+      label: "Warehouse Stock",
+      module: "inventory",
+      value: counts.devicesInWarehouse
+    });
+  }
+
+  if (moduleAccess.followUps) {
+    cards.push({
+      href: "/follow-ups",
+      helper: "Post installation follow-ups past their due date.",
+      icon: CalendarClock,
+      includeInToday: true,
+      label: "Overdue Post Installation Follow-ups",
+      module: "follow-ups",
+      value: counts.overduePostInstallationFollowups
+    });
+  }
+
+  if (moduleAccess.pilots) {
+    cards.push(
+      {
+        href: "/pilots",
+        helper: "Pilots currently active or waiting for reports.",
+        icon: Activity,
+        includeInToday: true,
+        label: "Active Pilots",
+        module: "pilots",
+        value: counts.activePilots
+      },
+      {
+        href: "/my-visits",
+        helper: "Assigned pilot visits due today or overdue.",
+        icon: CalendarCheck2,
+        includeInToday: true,
+        label: "Pilot Visits Due",
+        module: "pilots",
+        value: counts.plannedPilotVisitsDue
+      },
+      {
+        href: "/my-visits",
+        helper: "Planned pilot visits still waiting for report submission.",
+        icon: CalendarClock,
+        includeInToday: true,
+        label: "Pilot Visit Reports Pending",
+        module: "pilots",
+        value: counts.plannedPilotVisitReportsPending
+      }
+    );
+  }
+
+  cards.push({
+    href: "/my-pending-work",
+    helper: "Live role-scoped actions from existing workflows.",
+    icon: Package,
+    includeInToday: false,
+    label: "My Work",
+    module: "my-pending-work",
+    value: null,
+    valueLabel: "Open"
+  });
+
+  return pickKpiCardsForRole(cards, currentUser);
+}
+
 async function loadSalesItems({
   currentUser,
   supabase,
@@ -372,7 +791,7 @@ async function loadSalesItems({
   let followupQuery = supabase
     .from("farmer_leads")
     .select(
-      "id, lead_code, farmer_name, village, district, lead_status, funnel_stage, next_action_date, followup_due_date, payment_confirmed, payment_confirmed_date"
+      "id, lead_code, created_by_user_id, farmer_name, village, district, lead_status, funnel_stage, next_action_date, followup_due_date, owner_user_id, payment_confirmed, payment_confirmed_date, rsm_user_id"
     )
     .is("deleted_at", null)
     .not("lead_status", "in", `(${closedLeadStatuses.join(",")})`)
@@ -388,7 +807,12 @@ async function loadSalesItems({
       dueDate: lead.next_action_date,
       href: `/farmer-leads/${lead.id}`,
       id: `lead-followup-${lead.id}`,
+      assignmentUserIds: [lead.owner_user_id, lead.rsm_user_id].filter(
+        Boolean
+      ) as string[],
+      businessKey: `farmer-lead:${lead.id}:follow-up`,
       nextAction: "Follow up with the farmer and update lead progress.",
+      ownerUserId: lead.owner_user_id,
       status: `${lead.lead_status} · ${lead.funnel_stage}`,
       subtitle: `${lead.lead_code ?? "Lead"} · ${compactLocation(
         lead.village,
@@ -401,7 +825,7 @@ async function loadSalesItems({
   let paidLeadQuery = supabase
     .from("farmer_leads")
     .select(
-      "id, lead_code, farmer_name, village, district, lead_status, funnel_stage, next_action_date, followup_due_date, payment_confirmed, payment_confirmed_date"
+      "id, lead_code, created_by_user_id, farmer_name, village, district, lead_status, funnel_stage, next_action_date, followup_due_date, owner_user_id, payment_confirmed, payment_confirmed_date, rsm_user_id"
     )
     .eq("payment_confirmed", true)
     .eq("device_dispatched", false)
@@ -426,7 +850,12 @@ async function loadSalesItems({
         dueDate: lead.payment_confirmed_date,
         href: `/farmer-leads/${lead.id}`,
         id: `lead-dispatch-${lead.id}`,
+        assignmentUserIds: [lead.owner_user_id, lead.rsm_user_id].filter(
+          Boolean
+        ) as string[],
+        businessKey: `farmer-lead:${lead.id}:dispatch-ready`,
         nextAction: "Create or request a Farmer Sale Dispatch.",
+        ownerUserId: lead.owner_user_id,
         status: "Paid · Dispatch pending",
         subtitle: `${lead.lead_code ?? "Lead"} · ${compactLocation(
           lead.village,
@@ -441,7 +870,7 @@ async function loadSalesItems({
     let dealerQuery = supabase
       .from("dealers")
       .select(
-        "id, dealer_code, dealer_name, firm_name, dealer_status, next_action_date, next_dealer_review_date"
+        "id, dealer_code, dealer_name, dealer_owner_user_id, firm_name, dealer_status, next_action_date, next_dealer_review_date, rsm_user_id"
       )
       .is("deleted_at", null)
       .or(`next_action_date.lte.${today},next_dealer_review_date.lte.${today}`)
@@ -455,7 +884,13 @@ async function loadSalesItems({
         dueDate: dealer.next_dealer_review_date ?? dealer.next_action_date,
         href: `/dealers/${dealer.id}`,
         id: `dealer-review-${dealer.id}`,
+        assignmentUserIds: [
+          dealer.dealer_owner_user_id,
+          dealer.rsm_user_id
+        ].filter(Boolean),
+        businessKey: `dealer:${dealer.id}:review`,
         nextAction: "Review dealer progress, blocker, or next action.",
+        ownerUserId: dealer.dealer_owner_user_id,
         status: dealer.dealer_status,
         subtitle: dealer.dealer_code,
         title: `Dealer review due: ${dealer.firm_name || dealer.dealer_name}`
@@ -468,7 +903,7 @@ async function loadSalesItems({
     let institutionQuery = supabase
       .from("institutions")
       .select(
-        "id, institution_code, organization_name, institution_status, next_action_date"
+        "id, account_owner_user_id, institution_code, organization_name, institution_status, next_action_date, rsm_user_id, technical_owner_user_id"
       )
       .is("deleted_at", null)
       .lte("next_action_date", today)
@@ -483,7 +918,14 @@ async function loadSalesItems({
           dueDate: institution.next_action_date,
           href: `/institutional-partners/${institution.id}`,
           id: `institution-review-${institution.id}`,
+          assignmentUserIds: [
+            institution.account_owner_user_id,
+            institution.technical_owner_user_id,
+            institution.rsm_user_id
+          ].filter(Boolean) as string[],
+          businessKey: `institution:${institution.id}:review`,
           nextAction: "Review institution opportunity, blocker, or next action.",
+          ownerUserId: institution.account_owner_user_id,
           status: institution.institution_status,
           subtitle: institution.institution_code,
           title: `Institution review due: ${institution.organization_name}`
@@ -523,7 +965,7 @@ async function loadDispatchItems({
   let paidLeadQuery = supabase
     .from("farmer_leads")
     .select(
-      "id, lead_code, farmer_name, village, district, lead_status, funnel_stage, next_action_date, followup_due_date, payment_confirmed, payment_confirmed_date"
+      "id, lead_code, created_by_user_id, farmer_name, village, district, lead_status, funnel_stage, next_action_date, followup_due_date, owner_user_id, payment_confirmed, payment_confirmed_date, rsm_user_id"
     )
     .eq("payment_confirmed", true)
     .eq("device_dispatched", false)
@@ -547,7 +989,12 @@ async function loadDispatchItems({
         dueDate: lead.payment_confirmed_date,
         href: "/dispatches/new?route=farmer-sale",
         id: `dispatch-farmer-${lead.id}`,
+        assignmentUserIds: [lead.owner_user_id, lead.rsm_user_id].filter(
+          Boolean
+        ) as string[],
+        businessKey: `farmer-lead:${lead.id}:dispatch-ready`,
         nextAction: "Create a Paid Farmer Sale dispatch using Fresh Sale stock.",
+        ownerUserId: lead.owner_user_id,
         status: "Payment confirmed",
         subtitle: `${lead.lead_code ?? "Lead"} · ${lead.farmer_name}`,
         title: "Farmer Sale dispatch to create"
@@ -559,7 +1006,7 @@ async function loadDispatchItems({
     let pilotDispatchQuery = supabase
       .from("pilots")
       .select(
-        "id, pilot_code, pilot_name, pilot_status, farmer_name_snapshot, dispatch_id, product_model, next_visit_due_date"
+        "id, pilot_code, pilot_name, pilot_status, farmer_name_snapshot, dispatch_id, pilot_owner_user_id, product_model, next_visit_due_date"
       )
       .is("deleted_at", null)
       .eq("installation_completed", false)
@@ -582,7 +1029,10 @@ async function loadDispatchItems({
         .map((pilot) => ({
           href: "/dispatches/new?route=pilot",
           id: `dispatch-pilot-${pilot.id}`,
+          assignmentUserIds: [pilot.pilot_owner_user_id],
+          businessKey: `pilot:${pilot.id}:dispatch-ready`,
           nextAction: "Create a Free Pilot dispatch using Pilot Stock.",
+          ownerUserId: pilot.pilot_owner_user_id,
           status: pilot.pilot_status,
           subtitle: `${pilot.pilot_code} · ${pilot.farmer_name_snapshot}`,
           title: `Pilot dispatch to create: ${pilot.pilot_name}`
@@ -613,6 +1063,7 @@ async function loadDispatchItems({
         dueDate: dispatch.expected_delivery_date ?? dispatch.dispatch_date,
         href: `/dispatches/${dispatch.id}`,
         id: `dealer-payment-${dispatch.id}`,
+        businessKey: `dispatch:${dispatch.id}:dealer-payment`,
         nextAction: "Confirm dealer payment before Stock / Dispatch sends the device.",
         status: "Dealer payment pending",
         subtitle: `${dispatch.dispatch_code} · ${dispatch.product_model}`,
@@ -643,6 +1094,7 @@ async function loadDispatchItems({
           dispatch.expected_delivery_date ?? dispatch.payment_confirmed_date,
         href: `/dispatches/${dispatch.id}`,
         id: `dealer-ready-${dispatch.id}`,
+        businessKey: `dispatch:${dispatch.id}:dealer-ready`,
         nextAction: "Dispatch the paid Dealer Dispatch using Fresh Sale stock.",
         status: "Payment confirmed · Ready for dispatch",
         subtitle: `${dispatch.dispatch_code} · ${dispatch.product_model}`,
@@ -670,6 +1122,7 @@ async function loadDispatchItems({
         dueDate: dispatch.expected_delivery_date ?? dispatch.dispatch_date,
         href: `/dispatches/${dispatch.id}`,
         id: `dispatch-action-${dispatch.id}`,
+        businessKey: `dispatch:${dispatch.id}:action`,
         nextAction: "Review and move this dispatch to the next logistics step.",
         status: dispatch.dispatch_status,
         subtitle: `${dispatch.dispatch_code} · ${dispatch.dispatch_type} · ${dispatch.product_model}`,
@@ -711,7 +1164,7 @@ async function loadPilotItems({
   let installQuery = supabase
     .from("pilots")
     .select(
-      "id, pilot_code, pilot_name, pilot_status, farmer_name_snapshot, dispatch_id, product_model, next_visit_due_date"
+      "id, pilot_code, pilot_name, pilot_status, farmer_name_snapshot, dispatch_id, pilot_owner_user_id, product_model, next_visit_due_date"
     )
     .is("deleted_at", null)
     .eq("installation_completed", false)
@@ -726,7 +1179,10 @@ async function loadPilotItems({
       dueDate: pilot.next_visit_due_date,
       href: `/pilots/${pilot.id}`,
       id: `pilot-install-${pilot.id}`,
+      assignmentUserIds: [pilot.pilot_owner_user_id],
+      businessKey: `pilot:${pilot.id}:installation`,
       nextAction: "Confirm pilot device installation when the field team completes it.",
+      ownerUserId: pilot.pilot_owner_user_id,
       status: pilot.pilot_status,
       subtitle: `${pilot.pilot_code} · ${pilot.farmer_name_snapshot}`,
       title: `Pilot needs device installation: ${pilot.pilot_name}`
@@ -775,7 +1231,10 @@ async function loadPilotItems({
         dueDate: visit.planned_visit_date,
         href: `/pilots/${visit.pilot_id}?planned_visit_id=${visit.id}#add-visit-report`,
         id: `visit-report-${visit.id}`,
+        assignmentUserIds: [visit.assigned_user_id].filter(Boolean) as string[],
+        businessKey: `planned-visit:${visit.id}:report`,
         nextAction: "Complete the visit report from My Visits or the Pilot detail page.",
+        ownerUserId: visit.assigned_user_id,
         status: visit.planned_visit_status,
         subtitle: `${pilot?.pilot_code ?? "Pilot"} · ${
           visit.crop_stage_timing || "Crop stage not set"
@@ -834,6 +1293,7 @@ async function loadPilotItems({
             ? `/pilots/${report.pilot_id}#visit-reports`
             : "/pilots",
           id: `report-review-${report.id}`,
+          businessKey: `visit-report:${report.id}:review`,
           nextAction: "Review the submitted visit report and update its status.",
           status: report.report_status,
           subtitle: `${report.visit_report_code} · ${
@@ -912,7 +1372,13 @@ async function loadMarketingItems({
           dueDate: request.deadline_date,
           href: `/marketing-requests/${request.id}`,
           id: `marketing-review-${request.id}`,
+          assignmentUserIds: [
+            request.marketing_head_user_id,
+            request.assigned_to_user_id
+          ].filter(Boolean) as string[],
+          businessKey: `marketing-request:${request.id}`,
           nextAction: "Review the brief, accept it, clarify it, or assign ownership.",
+          ownerUserId: request.marketing_head_user_id,
           status: request.marketing_status,
           subtitle: `${request.request_code} · ${request.priority}`,
           title: `Marketing request awaiting review: ${request.title}`
@@ -929,7 +1395,13 @@ async function loadMarketingItems({
           dueDate: request.deadline_date,
           href: `/marketing-requests/${request.id}`,
           id: `marketing-assigned-${request.id}`,
+          assignmentUserIds: [
+            request.assigned_to_user_id,
+            request.marketing_head_user_id
+          ].filter(Boolean) as string[],
+          businessKey: `marketing-request:${request.id}`,
           nextAction: "Update progress, share a draft link, or deliver the final link.",
+          ownerUserId: request.assigned_to_user_id,
           status: request.marketing_status,
           subtitle: `${request.request_code} · ${request.priority}`,
           title: `Assigned design work: ${request.title}`
@@ -945,7 +1417,14 @@ async function loadMarketingItems({
         dueDate: request.deadline_date,
         href: `/marketing-requests/${request.id}`,
         id: `marketing-overdue-${request.id}`,
+        assignmentUserIds: [
+          request.assigned_to_user_id,
+          request.marketing_head_user_id
+        ].filter(Boolean) as string[],
+        businessKey: `marketing-request:${request.id}`,
         nextAction: "Update the deadline, progress, or delivery status.",
+        ownerUserId:
+          request.assigned_to_user_id ?? request.marketing_head_user_id,
         status: request.marketing_status,
         subtitle: `${request.request_code} · ${request.priority}`,
         title: `Overdue marketing request: ${request.title}`
@@ -960,15 +1439,16 @@ export default async function MyPendingWorkPage() {
   const currentUser = await getCurrentInternalUser(supabase, "/my-pending-work");
   const today = todayDate();
 
-  const [salesItems, dispatchItems, pilotItems, marketingItems] =
+  const [kpiCards, salesItems, dispatchItems, pilotItems, marketingItems] =
     await Promise.all([
+      loadDashboardCards({ currentUser, supabase, today }),
       loadSalesItems({ currentUser, supabase, today }),
       loadDispatchItems({ currentUser, supabase }),
       loadPilotItems({ currentUser, supabase, today }),
       loadMarketingItems({ currentUser, supabase, today })
     ]);
 
-  const groups: PendingWorkGroup[] = [
+  const groups = dedupeGroups([
     {
       description:
         "Lead follow-ups, paid farmer leads ready for dispatch, and dealer or institution reviews.",
@@ -997,24 +1477,50 @@ export default async function MyPendingWorkPage() {
       items: marketingItems,
       title: "Marketing"
     }
-  ].filter((group) => group.items.length > 0);
-  const totalItems = itemCount(groups);
+  ]);
+  const { myGroups, teamGroups } = splitGroupsForCurrentUser(
+    groups,
+    currentUser
+  );
+  const myItemCount = itemCount(myGroups);
+  const teamItemCount = itemCount(teamGroups);
+  const totalItems = myItemCount + teamItemCount;
+  const teamSectionTitle = isOversightUser(currentUser)
+    ? "Oversight"
+    : "Team Actions";
+  const teamSectionDescription = isOversightUser(currentUser)
+    ? "Broad operational items and workflow exceptions visible to your role."
+    : "Team records visible through your existing supervisory scope.";
 
   return (
     <section>
       <PageHeader
         eyebrow="Daily work"
-        title="My Pending Work"
-        description="Your role-based action list from sales, dispatch, pilots, visits, and marketing."
+        title="My Work"
+        description="Your home page for priority KPIs, owned actions, and role-scoped team work."
       />
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {kpiCards.map((card) => (
+          <DailyActionCard card={card} key={card.label} />
+        ))}
+      </div>
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-slate-500">Pending items</p>
+          <p className="text-sm text-slate-500">My actions</p>
           <p className="mt-2 text-2xl font-semibold text-slate-950">
-            {totalItems}
+            {myItemCount}
           </p>
         </div>
+        {isSupervisoryUser(currentUser) ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-sm text-slate-500">{teamSectionTitle}</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">
+              {teamItemCount}
+            </p>
+          </div>
+        ) : null}
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:col-span-2">
           <div className="flex items-start gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-50 text-brand-700">
@@ -1032,24 +1538,55 @@ export default async function MyPendingWorkPage() {
               </p>
               <p className="mt-1 text-sm leading-6 text-slate-500">
                 This live view uses records already available to your role. It
-                does not store notifications or change workflow permissions.
+                does not store notifications, duplicate business records, or
+                change workflow permissions.
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {groups.length ? (
-        <div className="mt-6 grid gap-5 xl:grid-cols-2">
-          {groups.map((group) => (
-            <PendingGroupCard group={group} key={group.title} />
-          ))}
-        </div>
-      ) : (
+      {myGroups.length ? (
+        <section className="mt-6">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">
+              My Actions
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Items directly owned by or assigned to you.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-5 xl:grid-cols-2">
+            {myGroups.map((group) => (
+              <PendingGroupCard group={group} key={`my-${group.title}`} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {teamGroups.length && isSupervisoryUser(currentUser) ? (
+        <section className="mt-6">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">
+              {teamSectionTitle}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {teamSectionDescription}
+            </p>
+          </div>
+          <div className="mt-4 grid gap-5 xl:grid-cols-2">
+            {teamGroups.map((group) => (
+              <PendingGroupCard group={group} key={`team-${group.title}`} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {!myGroups.length && !teamGroups.length ? (
         <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm leading-6 text-slate-500">
           No pending work right now.
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

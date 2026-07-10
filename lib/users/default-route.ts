@@ -1,14 +1,10 @@
-import { hasAnyRole, type UserRole } from "@/lib/users/permissions";
-
 type RoleCapableUser = {
   role: string;
   secondary_role?: string | null;
 };
 
-export function defaultHomePathForUser(user: RoleCapableUser) {
-  return hasAnyRole(user, ["Marketing Head", "Designer"] satisfies UserRole[])
-    ? "/marketing-requests"
-    : "/dashboard";
+export function defaultHomePathForUser() {
+  return "/my-pending-work";
 }
 
 export function isSafeInternalPath(
@@ -30,9 +26,11 @@ export function postLoginPathForUser(
   user: RoleCapableUser,
   nextPath: string | null | undefined
 ) {
+  void user;
+
   if (isSafeInternalPath(nextPath)) {
     return nextPath;
   }
 
-  return defaultHomePathForUser(user);
+  return defaultHomePathForUser();
 }

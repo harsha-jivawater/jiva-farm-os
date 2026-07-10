@@ -32,7 +32,7 @@ export function AppShell({
   const mustChangePassword = currentUser.must_change_password;
   const isPasswordPage = pathname === "/account/password";
   const shouldBlockContent = mustChangePassword && !isPasswordPage;
-  const defaultHomePath = defaultHomePathForUser(currentUser);
+  const defaultHomePath = defaultHomePathForUser();
   const signedInIdentity = currentUser.full_name.trim() || currentUser.email;
   const visibleNavigationGroups = mustChangePassword
     ? []

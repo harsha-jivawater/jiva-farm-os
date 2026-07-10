@@ -10,7 +10,7 @@ export default async function HomePage() {
   }
 
   const supabase = await createClient();
-  const currentUser = await getCurrentInternalUser(supabase, "/login");
+  await getCurrentInternalUser(supabase, "/login");
 
-  redirect(defaultHomePathForUser(currentUser));
+  redirect(defaultHomePathForUser());
 }

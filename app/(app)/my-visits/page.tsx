@@ -66,7 +66,7 @@ export default async function MyVisitsPage({
 }) {
   const query = await searchParams;
   const supabase = await createClient();
-  const currentUser = await getCurrentInternalUser(supabase, "/dashboard");
+  const currentUser = await getCurrentInternalUser(supabase, "/my-pending-work");
 
   if (!canViewModule(currentUser, "pilots")) {
     notFound();

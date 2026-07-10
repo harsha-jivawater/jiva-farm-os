@@ -23,11 +23,12 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.16 | 10 Jul 2026 | Draft | Merges Home/Dashboard into My Work as the primary signed-in landing page while keeping Notifications separate. |
 | v0.15 | 10 Jul 2026 | Draft | Adds Phase 1/2 n8n integration guidance: selected app events can notify n8n, and n8n can pull a secret-protected read-only daily summary. |
 | v0.14 | 09 Jul 2026 | Draft | Adds Admin-controlled per-user CSV download permission guidance. CSV export is off by default and still respects module visibility and record scope. |
 | v0.13 | 09 Jul 2026 | Draft | Adds safe CSV export guidance for operational list pages, including role-scoped exports, current-filter exports, row limits, and no raw backend IDs by default. |
 | v0.12 | 09 Jul 2026 | Draft | Adds Activity Timeline guidance for important detail pages using existing follow-ups, reviews, meetings, visits, reports, marketing updates, and delete/restore audit fields. |
-| v0.11 | 09 Jul 2026 | Draft | Adds lightweight Getting Started checklist guidance for account readiness, first actions, and role-specific onboarding inside Help / SOP and Dashboard. |
+| v0.11 | 09 Jul 2026 | Draft | Adds lightweight Getting Started checklist guidance for account readiness, first actions, and role-specific onboarding inside Help / SOP and My Work. |
 | v0.10 | 09 Jul 2026 | Draft | Adds in-app Help / SOP role-wise training guide alignment, including daily checklists, main pages, handoffs, avoid lists, and escalation points for each role. |
 | v0.9 | 09 Jul 2026 | Draft | Final launch polish: updates sidebar navigation groups, session/password guidance, Marketing deadline workflow notes, brief document link guidance, and soft-delete/restore training notes. |
 | v0.8 | 09 Jul 2026 | Draft | Adds Admin/Management System Health for KPI cache, dispatch aging, installation aging, pilot visit risk, marketing risk, and deleted-record visibility. |
@@ -84,7 +85,7 @@ Notes:
 
 | Group | Menus | Training notes |
 |---|---|---|
-| Daily Work | Dashboard; My Pending Work; My Visits | Daily action areas. Visit Reports are submitted through My Visits or Pilot detail, not as a standalone sidebar page. |
+| Daily Work | My Work; Notifications; My Visits | Daily action areas. Visit Reports are submitted through My Visits or Pilot detail, not as a standalone sidebar page. |
 | Sales & Partners | Farmer Leads; Dealers; Institutional Partners | Contacts and meetings are managed inside Institutional Partner detail where available. |
 | R&D | Pilots | Pilots stay under R&D only. |
 | Operations | Devices; Dispatches; Installations; Post Installation Follow-ups | Device movement, dispatch, installation, and after-installation work stay under Operations only. |
@@ -107,7 +108,7 @@ The current user's primary and secondary role sections appear first where availa
 
 ### Getting Started Checklist
 
-The Dashboard includes a small Getting Started card that links to Help / SOP. The Help / SOP page includes a dynamic Getting Started Checklist that uses existing profile data only.
+My Work includes a small Getting Started card that links to Help / SOP. The Help / SOP page includes a dynamic Getting Started Checklist that uses existing profile data only.
 
 It helps users confirm:
 
@@ -116,7 +117,7 @@ It helps users confirm:
 - region/state is present where applicable
 - temporary password has been changed where required
 - user has reviewed their role SOP
-- user knows to open My Pending Work
+- user knows to open My Work
 - user knows to contact Admin for profile/access corrections
 
 The checklist is guidance only. It does not store completed steps, change permissions, or create a new onboarding workflow.
@@ -182,7 +183,7 @@ Operating rules:
 
 ### Operations Menus
 
-| Role | Home | My Pending Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard | System Health | Data Quality | Marketing Requests |
+| Role | My Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Devices | KPI Dashboard | System Health | Data Quality | Marketing Requests |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Admin | ✅ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ | ✅ | ✅ ✏️ |
 | Management | ✅ | ✅ | 👁 | 👁 | 👁 | ⚠️ ✏️ | ⚠️ | 🔒 | 👁 | 👁 | 👁 | ✅ | ✅ | ✅ | ✅ ✏️ |
@@ -983,11 +984,11 @@ Rules:
 - Designers work from assigned requests and update draft/final links; they do not control final deadline acceptance unless they also have a management/marketing-head role.
 - Heavy design files stay outside the app; Jiva Farm OS stores the request, links, comments, and status trail.
 
-### My Pending Work Triage
+### My Work Triage
 
 ```mermaid
 flowchart LR
-  A["Open My Pending Work"] --> B["Review grouped pending items"]
+  A["Open My Work"] --> B["Review grouped pending items"]
   B --> C["Open source record"]
   C --> D["Complete action in source module"]
   D --> E["Pending item clears when source data changes"]
@@ -995,9 +996,12 @@ flowchart LR
 
 Rules:
 
-- My Pending Work is a live view, not a stored notification table.
+- My Work is a live view, not a stored notification table.
 - It uses existing records, permissions, RLS-safe queries, and role-scope helpers.
 - It groups pending work into Sales, Dispatch, Pilots & Visits, and Marketing.
+- It shows a maximum of four KPI cards for the user's role.
+- It separates My Actions from Team Actions for supervisory roles and Oversight for Admin/Management.
+- It dedupes the same business record so paid leads, marketing requests, and pilot work are not repeated in multiple sections.
 - Updating the source record is what clears the pending item.
 
 ### Data Quality Review
@@ -1129,23 +1133,14 @@ flowchart TD
 
 ## 7. Menu-By-Menu Guide
 
-### Home
+### My Work
 
 | Item | Detail |
 |---|---|
-| Purpose | Quick operating overview for the role. |
-| Used by | Most operational roles except HR & Legal. |
-| Primary actions | Review current workload and open modules. |
-| Important rules | Use source modules to update records; Home is not the source of truth. |
-
-### My Pending Work
-
-| Item | Detail |
-|---|---|
-| Purpose | Show role-scoped records that need the user's action or attention. |
+| Purpose | Primary signed-in home page with role KPIs, owned actions, and scoped team/oversight work. |
 | Used by | All signed-in roles. |
 | Primary actions | Open pending items and continue work in the source module. |
-| Important rules | This is a live view only. It does not send notifications, store notification rows, or change record permissions. |
+| Important rules | This is a live view only. It does not send notifications, store notification rows, or change record permissions. `/dashboard` redirects here for older links. |
 
 ### Data Quality
 

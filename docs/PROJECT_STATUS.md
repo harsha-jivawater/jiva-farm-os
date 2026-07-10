@@ -31,7 +31,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 
 ## Completed Modules
 
-- Dashboard/Home
+- My Work / Home
 - Farmer Leads
 - Dealers
 - Institutions / Institutional Partners
@@ -39,7 +39,6 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - Pilots
 - Pilot Visit Planning
 - My Visits
-- My Pending Work
 - Visit Reports
 - Devices
 - Dispatches
@@ -76,11 +75,12 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - The v0.13 update adds safe CSV export/reporting guidance for role-scoped operational list exports.
 - The v0.14 update adds Admin-controlled per-user CSV download permission guidance.
 - The v0.15 update adds Phase 1/2 n8n integration guidance for outbound events and a secret-protected daily summary.
+- The v0.16 update folds Home/Dashboard into My Work as the primary signed-in landing page.
 
 ## Final Launch Polish
 
 - Sidebar navigation is grouped for rollout readiness:
-  - Daily Work: Dashboard, My Pending Work, My Visits.
+  - Daily Work: My Work, Notifications, My Visits.
   - Sales & Partners: Farmer Leads, Dealers, Institutional Partners.
   - R&D: Pilots.
   - Operations: Devices, Dispatches, Installations, Post Installation Follow-ups.
@@ -99,7 +99,7 @@ Dispatch creation now depends on the device inventory pool migration. Apply the 
 - Help / SOP is now a role-wise training guide inside the app.
 - Each role has a compact operating card covering purpose, daily checklist, main pages, key handoffs, what not to do, and escalation points.
 - The signed-in user's primary/secondary role sections are shown first where available.
-- Dashboard includes a lightweight Getting Started card that links to the Help / SOP checklist.
+- My Work includes a lightweight Getting Started card that links to the Help / SOP checklist.
 - Help / SOP includes account readiness checks for name, role, region/state where applicable, and temporary password status.
 - Help / SOP shows first actions for the signed-in user's primary/secondary roles.
 - Getting Started is dynamic guidance only; there is no stored onboarding table or completed-checkbox persistence.
@@ -195,15 +195,17 @@ Role notes:
 - Requesters can edit core brief details only while the request is `Requested` or `Needs Clarification`; after that they add comments/corrections.
 - No seed/demo/test data was added for this module.
 
-## My Pending Work
+## My Work
 
-- My Pending Work is available at `/my-pending-work`.
-- It is a live role-scoped work view built from existing operational records.
+- My Work is available at `/my-pending-work`.
+- It is the primary signed-in home page and combines the former Home/Dashboard KPI cards with the live role-scoped work view.
+- `/dashboard` redirects to My Work for compatibility with older links.
 - It is not a stored notification system and does not send email notifications.
 - It does not add SQL, schema, or RLS changes.
-- It groups pending records into Sales, Dispatch, Pilots & Visits, and Marketing.
+- It shows at most four KPI cards per role, then groups pending records into Sales, Dispatch, Pilots & Visits, and Marketing.
+- It separates directly owned/assigned items from supervisory Team Actions or Admin/Management Oversight where those scopes apply.
+- Duplicate business records are deduped in the My Work view.
 - Normal record visibility is preserved through existing RLS-safe queries and app record-scope helpers.
-- The Home dashboard includes a lightweight My Pending Work card/link without running heavy pending-work count queries.
 
 ## Data Quality
 

@@ -8,7 +8,6 @@ import {
   Gauge,
   Handshake,
   KeyRound,
-  LayoutDashboard,
   Bell,
   Palette,
   ShieldAlert,
@@ -40,13 +39,7 @@ export const navigationGroups: readonly NavigationGroup[] = [
     label: "Daily Work",
     items: [
       {
-        label: "Dashboard",
-        href: "/dashboard",
-        module: "dashboard",
-        icon: LayoutDashboard
-      },
-      {
-        label: "My Pending Work",
+        label: "My Work",
         href: "/my-pending-work",
         module: "my-pending-work",
         icon: ClipboardList

@@ -181,7 +181,7 @@ export function PasswordForm({
       }
 
       if (mustChangePassword) {
-        router.replace("/dashboard");
+        router.replace("/my-pending-work");
         router.refresh();
       }
     });
