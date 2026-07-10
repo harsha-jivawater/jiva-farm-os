@@ -50,6 +50,7 @@ const filterColumns = [
 
 const listSelectColumns = [
   "id",
+  "created_at",
   "serial_number",
   "device_code",
   "product_model",
@@ -110,7 +111,28 @@ function searchValue(value: string) {
   return value.replace(/[,%()]/g, " ").trim();
 }
 
+function isSupabaseError(
+  error: unknown
+): error is {
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+  message?: string;
+} {
+  return Boolean(error && typeof error === "object");
+}
+
 function logLoadError(area: "list" | "summary", error: unknown) {
+  if (isSupabaseError(error)) {
+    console.error(`[Devices] Unable to load ${area}`, {
+      code: error.code ?? null,
+      message: error.message ?? null,
+      details: error.details ?? null,
+      hint: error.hint ?? null
+    });
+    return;
+  }
+
   console.error(`[Devices] Unable to load ${area}`, error);
 }
 
@@ -292,6 +314,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
     .select(listSelectColumns)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(50);
 
   if (scope.noRecords) {
