@@ -216,7 +216,7 @@ const moduleWriteRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Agronomist",
     "HR & Legal"
   ],
-  pilots: ["Admin", "Management", "R&D Head", "Agronomist", "Research Assistant"],
+  pilots: ["Admin", "R&D Head", "Agronomist", "Research Assistant"],
   installations: [
     "Admin",
     "Sales Head",

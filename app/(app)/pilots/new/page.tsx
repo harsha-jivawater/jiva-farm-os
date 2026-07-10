@@ -11,7 +11,7 @@ import type {
 } from "@/lib/pilots/types";
 import { loadPilotFarmerLeadOptions } from "@/lib/pilots/farmer-lead-options";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentInternalUser } from "@/lib/users/current-user";
+import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 
 type NewPilotPageProps = {
   searchParams: Promise<{
@@ -22,7 +22,12 @@ type NewPilotPageProps = {
 export default async function NewPilotPage({ searchParams }: NewPilotPageProps) {
   const query = await searchParams;
   const supabase = await createClient();
-  const currentUser = await getCurrentInternalUser(supabase, "/pilots");
+  const currentUser = await requireModuleWriteAccess(
+    supabase,
+    "/pilots",
+    "pilots",
+    "You do not have permission to create pilots."
+  );
   const [
     { data: farmerLeads, error: farmerLeadsError },
     { data: devices },

@@ -33,6 +33,7 @@ export function AppShell({
   const isPasswordPage = pathname === "/account/password";
   const shouldBlockContent = mustChangePassword && !isPasswordPage;
   const defaultHomePath = defaultHomePathForUser(currentUser);
+  const signedInIdentity = currentUser.full_name.trim() || currentUser.email;
   const visibleNavigationGroups = mustChangePassword
     ? []
     : navigationGroups
@@ -133,7 +134,7 @@ export function AppShell({
               Signed in as
             </p>
             <p className="truncate text-sm font-semibold text-slate-900">
-              {currentUser.email}
+              {signedInIdentity}
             </p>
             <p className="truncate text-xs text-slate-500">
               {labelForRole(currentUser.role)}
