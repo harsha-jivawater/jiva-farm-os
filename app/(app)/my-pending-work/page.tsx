@@ -6,6 +6,8 @@ import {
   CalendarCheck2,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   CircleDollarSign,
   ClipboardCheck,
   ClipboardList,
@@ -66,6 +68,22 @@ type PendingWorkGroup = {
   icon: LucideIcon;
   items: PendingWorkItem[];
   title: string;
+};
+
+type WorkSection = "sales" | "dispatch" | "pilots" | "marketing";
+
+type GroupedWorkCounts = {
+  dispatch: number;
+  marketing: number;
+  mode: "oversight" | "team-actions" | null;
+  pilots: number;
+  sales: number;
+  total: number;
+};
+
+type GroupedWorkSection = PendingWorkGroup & {
+  count: number | null;
+  section: WorkSection;
 };
 
 type CountCard = {
@@ -255,6 +273,39 @@ const supervisoryRoles = [
   "Agronomist",
   "Marketing Head"
 ];
+const groupedWorkDefinitions: Record<
+  WorkSection,
+  Omit<GroupedWorkSection, "count" | "items">
+> = {
+  sales: {
+    description:
+      "Lead follow-ups, paid farmer leads ready for dispatch, and dealer or institution reviews.",
+    icon: Tractor,
+    section: "sales",
+    title: "Sales"
+  },
+  dispatch: {
+    description:
+      "Farmer Sale dispatches, Free Pilot dispatches, and dispatch records waiting for the next step.",
+    icon: Truck,
+    section: "dispatch",
+    title: "Dispatch"
+  },
+  pilots: {
+    description:
+      "Pilot installation handoffs, planned visits that need reports, and visit reports waiting for review.",
+    icon: Wrench,
+    section: "pilots",
+    title: "Pilots & Visits"
+  },
+  marketing: {
+    description:
+      "Marketing requests awaiting review, assigned design work, and overdue creative requests.",
+    icon: Megaphone,
+    section: "marketing",
+    title: "Marketing"
+  }
+};
 
 function applyScope<T>(query: ScopedQuery<T>, scope: RecordScope) {
   if (scope.noRecords) {
@@ -294,12 +345,68 @@ function readDashboardCounts(value: unknown): DashboardCounts {
   };
 }
 
+function readGroupedWorkCounts(value: unknown): GroupedWorkCounts | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const row = value as Record<string, unknown>;
+  const mode =
+    row.mode === "oversight" || row.mode === "team-actions" ? row.mode : null;
+
+  if (!mode) {
+    return null;
+  }
+
+  return {
+    dispatch: numberValue(row.dispatch),
+    marketing: numberValue(row.marketing),
+    mode,
+    pilots: numberValue(row.pilots),
+    sales: numberValue(row.sales),
+    total: numberValue(row.total)
+  };
+}
+
 function formatCount(value: number | null) {
   return value === null ? "Unavailable" : value.toLocaleString("en-IN");
 }
 
 function itemCount(groups: PendingWorkGroup[]) {
   return groups.reduce((sum, group) => sum + group.items.length, 0);
+}
+
+function readWorkSection(value: string | string[] | undefined): WorkSection | null {
+  const section = Array.isArray(value) ? value[0] : value;
+
+  return section === "sales" ||
+    section === "dispatch" ||
+    section === "pilots" ||
+    section === "marketing"
+    ? section
+    : null;
+}
+
+function readWorkPage(value: string | string[] | undefined) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const page = Number(rawValue);
+
+  return Number.isSafeInteger(page) && page > 0 && page <= 20 ? page : 1;
+}
+
+function groupedWorkHref(section: WorkSection, page = 1) {
+  return page === 1
+    ? `/my-pending-work?workSection=${section}`
+    : `/my-pending-work?workSection=${section}&workPage=${page}`;
+}
+
+function workSectionForGroup(group: PendingWorkGroup): WorkSection {
+  return {
+    Sales: "sales",
+    Dispatch: "dispatch",
+    "Pilots & Visits": "pilots",
+    Marketing: "marketing"
+  }[group.title] as WorkSection;
 }
 
 function displayDate(value: string | null | undefined) {
@@ -376,6 +483,49 @@ function shouldLoadMarketingWork(
   );
 }
 
+function canLoadGroupedSection(
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>,
+  section: WorkSection
+) {
+  if (!isSupervisoryUser(currentUser)) {
+    return false;
+  }
+
+  return (
+    (section === "sales" && shouldLoadSalesWork(currentUser)) ||
+    (section === "dispatch" && shouldLoadDispatchWork(currentUser)) ||
+    (section === "pilots" && shouldLoadPilotWork(currentUser)) ||
+    (section === "marketing" && shouldLoadMarketingWork(currentUser))
+  );
+}
+
+function supportedGroupedSections(
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  return (Object.keys(groupedWorkDefinitions) as WorkSection[]).filter(
+    (section) => canLoadGroupedSection(currentUser, section)
+  );
+}
+
+function groupedWorkCount(
+  counts: GroupedWorkCounts | null,
+  section: WorkSection
+) {
+  return counts ? counts[section] : null;
+}
+
+function groupedWorkSection({
+  count,
+  items,
+  section
+}: {
+  count: number | null;
+  items: PendingWorkItem[];
+  section: WorkSection;
+}): GroupedWorkSection {
+  return { ...groupedWorkDefinitions[section], count, items };
+}
+
 async function safeLoadMyWorkSection<T>({
   fallback,
   label,
@@ -408,6 +558,30 @@ function isPersonalItem(
   return !isSupervisoryUser(currentUser) && !item.ownerUserId;
 }
 
+function applyPersonalOwnership<T>(
+  query: ScopedQuery<T>,
+  {
+    assignmentColumns,
+    currentUser,
+    ownerColumn
+  }: {
+    assignmentColumns: string[];
+    currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+    ownerColumn: string;
+  }
+) {
+  const filters = [ownerColumn, ...assignmentColumns].map(
+    (column) => `${column}.eq.${currentUser.id}`
+  );
+
+  // Non-supervisory users historically receive unassigned operational work.
+  if (!isSupervisoryUser(currentUser)) {
+    filters.push(`${ownerColumn}.is.null`);
+  }
+
+  return query.or(filters.join(","));
+}
+
 function dedupeGroups(groups: PendingWorkGroup[]) {
   const seen = new Set<string>();
 
@@ -426,33 +600,6 @@ function dedupeGroups(groups: PendingWorkGroup[]) {
       })
     }))
     .filter((group) => group.items.length > 0);
-}
-
-function splitGroupsForCurrentUser(
-  groups: PendingWorkGroup[],
-  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
-) {
-  const myGroups: PendingWorkGroup[] = [];
-  const teamGroups: PendingWorkGroup[] = [];
-
-  for (const group of groups) {
-    const myItems = group.items.filter((item) =>
-      isPersonalItem(item, currentUser)
-    );
-    const teamItems = group.items.filter(
-      (item) => !isPersonalItem(item, currentUser)
-    );
-
-    if (myItems.length) {
-      myGroups.push({ ...group, items: myItems });
-    }
-
-    if (teamItems.length && isSupervisoryUser(currentUser)) {
-      teamGroups.push({ ...group, items: teamItems });
-    }
-  }
-
-  return { myGroups, teamGroups };
 }
 
 function preferredKpiLabels(
@@ -919,16 +1066,45 @@ async function loadDashboardCards({
   return pickKpiCardsForRole(cards, currentUser);
 }
 
+async function loadGroupedWorkCounts({
+  supabase,
+  today
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  today: string;
+}) {
+  const { data, error } = await timeAsync("my work grouped counts rpc", () =>
+    supabase.rpc("get_my_work_oversight_summary_counts", { p_today: today })
+  );
+
+  if (error) {
+    logSupabaseError("My Work grouped counts unavailable", error);
+    return null;
+  }
+
+  const counts = readGroupedWorkCounts(data);
+  if (!counts) {
+    console.error("[My Work grouped counts unavailable] Invalid aggregate response");
+  }
+
+  return counts;
+}
+
 async function loadSalesItems({
   currentUser,
+  itemLimit,
+  personalOnly = false,
   supabase,
   today
 }: {
   currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  itemLimit?: number;
+  personalOnly?: boolean;
   supabase: Awaited<ReturnType<typeof createClient>>;
   today: string;
 }) {
   const items: PendingWorkItem[] = [];
+  const listLimit = itemLimit ?? 8;
 
   if (
     !hasAnyRole(currentUser, [
@@ -958,8 +1134,15 @@ async function loadSalesItems({
     .not("funnel_stage", "in", `(${closedFunnelStages.join(",")})`)
     .lte("next_action_date", today)
     .order("next_action_date", { ascending: true })
-    .limit(8);
+    .limit(listLimit);
   followupQuery = applyScope(followupQuery, leadScope);
+  if (personalOnly) {
+    followupQuery = applyPersonalOwnership(followupQuery, {
+      assignmentColumns: ["rsm_user_id"],
+      currentUser,
+      ownerColumn: "owner_user_id"
+    });
+  }
 
   const { data: followupLeads } = await followupQuery;
   items.push(
@@ -991,8 +1174,15 @@ async function loadSalesItems({
     .eq("device_dispatched", false)
     .is("deleted_at", null)
     .order("payment_confirmed_date", { ascending: true, nullsFirst: false })
-    .limit(25);
+    .limit(Math.max(listLimit, 25));
   paidLeadQuery = applyScope(paidLeadQuery, leadScope);
+  if (personalOnly) {
+    paidLeadQuery = applyPersonalOwnership(paidLeadQuery, {
+      assignmentColumns: ["rsm_user_id"],
+      currentUser,
+      ownerColumn: "owner_user_id"
+    });
+  }
 
   const { data: paidLeads } = await paidLeadQuery;
   const paidRows = (paidLeads ?? []) as FarmerLeadPendingRow[];
@@ -1005,7 +1195,7 @@ async function loadSalesItems({
   items.push(
     ...paidRows
       .filter((lead) => !leadDispatchIds.has(lead.id))
-      .slice(0, 8)
+      .slice(0, listLimit)
       .map((lead) => ({
         dueDate: lead.payment_confirmed_date,
         href: `/farmer-leads/${lead.id}`,
@@ -1035,8 +1225,15 @@ async function loadSalesItems({
       .is("deleted_at", null)
       .or(`next_action_date.lte.${today},next_dealer_review_date.lte.${today}`)
       .order("next_action_date", { ascending: true })
-      .limit(8);
+      .limit(listLimit);
     dealerQuery = applyScope(dealerQuery, dealerScopeValue);
+    if (personalOnly) {
+      dealerQuery = applyPersonalOwnership(dealerQuery, {
+        assignmentColumns: ["rsm_user_id"],
+        currentUser,
+        ownerColumn: "dealer_owner_user_id"
+      });
+    }
     const { data: dealers } = await dealerQuery;
 
     items.push(
@@ -1068,8 +1265,15 @@ async function loadSalesItems({
       .is("deleted_at", null)
       .lte("next_action_date", today)
       .order("next_action_date", { ascending: true })
-      .limit(8);
+      .limit(listLimit);
     institutionQuery = applyScope(institutionQuery, institutionScopeValue);
+    if (personalOnly) {
+      institutionQuery = applyPersonalOwnership(institutionQuery, {
+        assignmentColumns: ["technical_owner_user_id", "rsm_user_id"],
+        currentUser,
+        ownerColumn: "account_owner_user_id"
+      });
+    }
     const { data: institutions } = await institutionQuery;
 
     items.push(
@@ -1099,12 +1303,17 @@ async function loadSalesItems({
 
 async function loadDispatchItems({
   currentUser,
+  itemLimit,
+  personalOnly = false,
   supabase
 }: {
   currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  itemLimit?: number;
+  personalOnly?: boolean;
   supabase: Awaited<ReturnType<typeof createClient>>;
 }) {
   const items: PendingWorkItem[] = [];
+  const listLimit = itemLimit ?? 8;
 
   if (
     !hasAnyRole(currentUser, [
@@ -1131,8 +1340,15 @@ async function loadDispatchItems({
     .eq("device_dispatched", false)
     .is("deleted_at", null)
     .order("payment_confirmed_date", { ascending: true, nullsFirst: false })
-    .limit(25);
+    .limit(Math.max(listLimit, 25));
   paidLeadQuery = applyScope(paidLeadQuery, leadScope);
+  if (personalOnly) {
+    paidLeadQuery = applyPersonalOwnership(paidLeadQuery, {
+      assignmentColumns: ["rsm_user_id"],
+      currentUser,
+      ownerColumn: "owner_user_id"
+    });
+  }
   const { data: paidLeads } = await paidLeadQuery;
   const paidRows = (paidLeads ?? []) as FarmerLeadPendingRow[];
   const leadDispatchIds = await dispatchExistsForIds({
@@ -1144,7 +1360,7 @@ async function loadDispatchItems({
   items.push(
     ...paidRows
       .filter((lead) => !leadDispatchIds.has(lead.id))
-      .slice(0, 8)
+      .slice(0, listLimit)
       .map((lead) => ({
         dueDate: lead.payment_confirmed_date,
         href: "/dispatches/new?route=farmer-sale",
@@ -1172,8 +1388,15 @@ async function loadDispatchItems({
       .eq("installation_completed", false)
       .in("pilot_status", ["Planned", "Approved", "Device Assigned"])
       .order("created_at", { ascending: true })
-      .limit(25);
+      .limit(Math.max(listLimit, 25));
     pilotDispatchQuery = applyScope(pilotDispatchQuery, pilotScopeValue);
+    if (personalOnly) {
+      pilotDispatchQuery = applyPersonalOwnership(pilotDispatchQuery, {
+        assignmentColumns: [],
+        currentUser,
+        ownerColumn: "pilot_owner_user_id"
+      });
+    }
     const { data: pilotRows } = await pilotDispatchQuery;
     const pilots = (pilotRows ?? []) as PilotPendingRow[];
     const pilotDispatchIds = await dispatchExistsForIds({
@@ -1185,7 +1408,7 @@ async function loadDispatchItems({
     items.push(
       ...pilots
         .filter((pilot) => !pilotDispatchIds.has(pilot.id))
-        .slice(0, 8)
+        .slice(0, listLimit)
         .map((pilot) => ({
           href: "/dispatches/new?route=pilot",
           id: `dispatch-pilot-${pilot.id}`,
@@ -1214,8 +1437,11 @@ async function loadDispatchItems({
       .eq("payment_confirmed", false)
       .neq("dispatch_status", "Cancelled")
       .order("created_at", { ascending: true })
-      .limit(8);
+      .limit(listLimit);
     dealerPaymentQuery = applyScope(dealerPaymentQuery, dispatchScopeValue);
+    if (personalOnly && isSupervisoryUser(currentUser)) {
+      dealerPaymentQuery = dealerPaymentQuery.is("id", null);
+    }
     const { data: dealerPaymentRows } = await dealerPaymentQuery;
 
     items.push(
@@ -1244,8 +1470,11 @@ async function loadDispatchItems({
       .eq("payment_confirmed", true)
       .in("dispatch_status", ["Approved for Dispatch", "Dispatch Requested"])
       .order("payment_confirmed_date", { ascending: true, nullsFirst: false })
-      .limit(8);
+      .limit(listLimit);
     dealerReadyQuery = applyScope(dealerReadyQuery, dispatchScopeValue);
+    if (personalOnly && isSupervisoryUser(currentUser)) {
+      dealerReadyQuery = dealerReadyQuery.is("id", null);
+    }
     const { data: dealerReadyRows } = await dealerReadyQuery;
 
     items.push(
@@ -1271,8 +1500,11 @@ async function loadDispatchItems({
     .is("deleted_at", null)
     .in("dispatch_status", dispatchActionStatuses)
     .order("created_at", { ascending: true })
-    .limit(12);
+    .limit(itemLimit ?? 12);
   dispatchQuery = applyScope(dispatchQuery, dispatchScopeValue);
+  if (personalOnly && isSupervisoryUser(currentUser)) {
+    dispatchQuery = dispatchQuery.is("id", null);
+  }
   const { data: dispatches } = await dispatchQuery;
 
   items.push(
@@ -1295,14 +1527,19 @@ async function loadDispatchItems({
 
 async function loadPilotItems({
   currentUser,
+  itemLimit,
+  personalOnly = false,
   supabase,
   today
 }: {
   currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  itemLimit?: number;
+  personalOnly?: boolean;
   supabase: Awaited<ReturnType<typeof createClient>>;
   today: string;
 }) {
   const items: PendingWorkItem[] = [];
+  const listLimit = itemLimit ?? 8;
 
   if (
     !hasAnyRole(currentUser, [
@@ -1330,8 +1567,15 @@ async function loadPilotItems({
     .eq("installation_completed", false)
     .in("pilot_status", ["Device Dispatched"])
     .order("updated_at", { ascending: true })
-    .limit(8);
+    .limit(listLimit);
   installQuery = applyScope(installQuery, pilotScopeValue);
+  if (personalOnly) {
+    installQuery = applyPersonalOwnership(installQuery, {
+      assignmentColumns: [],
+      currentUser,
+      ownerColumn: "pilot_owner_user_id"
+    });
+  }
   const { data: installPilots } = await installQuery;
 
   items.push(
@@ -1359,9 +1603,11 @@ async function loadPilotItems({
     .in("planned_visit_status", activePlannedVisitStatuses)
     .or(`planned_visit_date.lte.${today},planned_visit_status.eq.In Progress`)
     .order("planned_visit_date", { ascending: true })
-    .limit(15);
+    .limit(itemLimit ?? 15);
 
-  if (hasRole(currentUser, "Research Assistant")) {
+  if (personalOnly) {
+    visitQuery = visitQuery.eq("assigned_user_id", currentUser.id);
+  } else if (hasRole(currentUser, "Research Assistant")) {
     visitQuery = visitQuery.eq("assigned_user_id", currentUser.id);
   } else if (!hasFullRecordAccess(currentUser, "pilots")) {
     const directReportIds = await loadDirectReportIds(supabase, currentUser.id, [
@@ -1405,6 +1651,7 @@ async function loadPilotItems({
   );
 
   if (
+    !personalOnly &&
     hasAnyRole(currentUser, ["Admin", "Management", "R&D Head", "Agronomist"])
   ) {
     let reportQuery = supabase
@@ -1415,7 +1662,7 @@ async function loadPilotItems({
       .is("deleted_at", null)
       .eq("report_status", "Submitted")
       .order("report_date", { ascending: true })
-      .limit(10);
+      .limit(itemLimit ?? 10);
 
     if (!hasFullRecordAccess(currentUser, "pilots")) {
       const directReportIds = await loadDirectReportIds(
@@ -1470,14 +1717,19 @@ async function loadPilotItems({
 
 async function loadMarketingItems({
   currentUser,
+  itemLimit,
+  personalOnly = false,
   supabase,
   today
 }: {
   currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  itemLimit?: number;
+  personalOnly?: boolean;
   supabase: Awaited<ReturnType<typeof createClient>>;
   today: string;
 }) {
   const items: PendingWorkItem[] = [];
+  const listLimit = itemLimit ?? 8;
 
   if (
     !hasAnyRole(currentUser, [
@@ -1504,9 +1756,16 @@ async function loadMarketingItems({
     .is("deleted_at", null)
     .in("marketing_status", openMarketingStatuses)
     .order("deadline_date", { ascending: true })
-    .limit(25);
+    .limit(Math.max(listLimit, 25));
 
-  if (!canManage) {
+  if (personalOnly && canManage) {
+    query = query.or(
+      [
+        `assigned_to_user_id.eq.${currentUser.id}`,
+        `marketing_head_user_id.eq.${currentUser.id}`
+      ].join(",")
+    );
+  } else if (!canManage) {
     query = query.or(
       [
         `requested_by_user_id.eq.${currentUser.id}`,
@@ -1527,7 +1786,7 @@ async function loadMarketingItems({
             request.marketing_status
           )
         )
-        .slice(0, 8)
+        .slice(0, listLimit)
         .map((request) => ({
           dueDate: request.deadline_date,
           href: `/marketing-requests/${request.id}`,
@@ -1550,7 +1809,7 @@ async function loadMarketingItems({
     items.push(
       ...requests
         .filter((request) => request.assigned_to_user_id === currentUser.id)
-        .slice(0, 8)
+        .slice(0, listLimit)
         .map((request) => ({
           dueDate: request.deadline_date,
           href: `/marketing-requests/${request.id}`,
@@ -1572,7 +1831,7 @@ async function loadMarketingItems({
   items.push(
     ...requests
       .filter((request) => request.deadline_date < today)
-      .slice(0, 8)
+      .slice(0, listLimit)
       .map((request) => ({
         dueDate: request.deadline_date,
         href: `/marketing-requests/${request.id}`,
@@ -1594,86 +1853,201 @@ async function loadMarketingItems({
   return items;
 }
 
-export default async function MyPendingWorkPage() {
+async function loadMyActions({
+  currentUser,
+  supabase,
+  today
+}: {
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  today: string;
+}) {
+  return timeAsync("my work dedicated my actions loader", async () => {
+    const [salesItems, dispatchItems, pilotItems, marketingItems] =
+      await Promise.all([
+        shouldLoadSalesWork(currentUser)
+          ? timeAsync("my work personal sales", () =>
+              loadSalesItems({ currentUser, personalOnly: true, supabase, today })
+            )
+          : Promise.resolve([]),
+        shouldLoadDispatchWork(currentUser)
+          ? timeAsync("my work personal dispatch", () =>
+              loadDispatchItems({ currentUser, personalOnly: true, supabase })
+            )
+          : Promise.resolve([]),
+        shouldLoadPilotWork(currentUser)
+          ? timeAsync("my work personal pilots", () =>
+              loadPilotItems({ currentUser, personalOnly: true, supabase, today })
+            )
+          : Promise.resolve([]),
+        shouldLoadMarketingWork(currentUser)
+          ? timeAsync("my work personal marketing", () =>
+              loadMarketingItems({ currentUser, personalOnly: true, supabase, today })
+            )
+          : Promise.resolve([])
+      ]);
+
+    return dedupeGroups([
+      {
+        description:
+          "Lead follow-ups, paid farmer leads ready for dispatch, and dealer or institution reviews.",
+        icon: Tractor,
+        items: salesItems,
+        title: "Sales"
+      },
+      {
+        description:
+          "Farmer Sale dispatches, Free Pilot dispatches, and dispatch records waiting for the next step.",
+        icon: Truck,
+        items: dispatchItems,
+        title: "Dispatch"
+      },
+      {
+        description:
+          "Pilot installation handoffs, planned visits that need reports, and visit reports waiting for review.",
+        icon: Wrench,
+        items: pilotItems,
+        title: "Pilots & Visits"
+      },
+      {
+        description:
+          "Marketing requests awaiting review, assigned design work, and overdue creative requests.",
+        icon: Megaphone,
+        items: marketingItems,
+        title: "Marketing"
+      }
+    ]);
+  });
+}
+
+function itemKeys(groups: PendingWorkGroup[]) {
+  return new Set(
+    groups.flatMap((group) =>
+      group.items.map((item) => item.businessKey ?? item.id)
+    )
+  );
+}
+
+async function loadSelectedGroupedSection({
+  currentUser,
+  myActionKeys,
+  page,
+  section,
+  supabase,
+  today
+}: {
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  myActionKeys: Set<string>;
+  page: number;
+  section: WorkSection;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  today: string;
+}) {
+  if (!canLoadGroupedSection(currentUser, section)) {
+    return null;
+  }
+
+  return timeAsync(`my work selected ${section} grouped loader`, async () => {
+    const sourceLimit = page * 10 + myActionKeys.size;
+    const items = await (
+      section === "sales"
+        ? loadSalesItems({ currentUser, itemLimit: sourceLimit, supabase, today })
+        : section === "dispatch"
+        ? loadDispatchItems({ currentUser, itemLimit: sourceLimit, supabase })
+        : section === "pilots"
+        ? loadPilotItems({ currentUser, itemLimit: sourceLimit, supabase, today })
+        : loadMarketingItems({ currentUser, itemLimit: sourceLimit, supabase, today })
+    );
+
+    const dedupedItems = dedupeGroups([
+      groupedWorkSection({ count: null, items, section })
+    ]).flatMap((group) => group.items);
+    const groupedItems = dedupedItems
+      .filter((item) => {
+        const key = item.businessKey ?? item.id;
+
+        return (
+          !myActionKeys.has(key) &&
+          !isPersonalItem(item, currentUser) &&
+          !(section === "dispatch" && key.startsWith("farmer-lead:"))
+        );
+      })
+      .slice((page - 1) * 10, page * 10);
+
+    return groupedWorkSection({ count: null, items: groupedItems, section });
+  });
+}
+
+export default async function MyPendingWorkPage({
+  searchParams
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const startedAt = perfStart();
+  const params = await searchParams;
+  const selectedWorkSection = readWorkSection(params.workSection);
+  const selectedWorkPage = readWorkPage(params.workPage);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/my-pending-work");
   const today = todayDate();
-
-  const [kpiCards, salesItems, dispatchItems, pilotItems, marketingItems] =
+  const groupedSections = supportedGroupedSections(currentUser);
+  const canLoadSelectedSection =
+    selectedWorkSection !== null &&
+    groupedSections.includes(selectedWorkSection);
+  const myActionsPromise = safeLoadMyWorkSection({
+    fallback: [],
+    label: "my work dedicated my actions fallback",
+    task: () => loadMyActions({ currentUser, supabase, today })
+  });
+  const selectedSectionPromise = canLoadSelectedSection
+    ? myActionsPromise.then((myGroups) =>
+        safeLoadMyWorkSection({
+          fallback: null,
+          label: "my work selected grouped fallback",
+          task: () =>
+            loadSelectedGroupedSection({
+              currentUser,
+              myActionKeys: itemKeys(myGroups),
+              page: selectedWorkPage,
+              section: selectedWorkSection as WorkSection,
+              supabase,
+              today
+            })
+        })
+      )
+    : Promise.resolve(null);
+  const [kpiCards, myGroups, groupedCounts, selectedGroupedSection] =
     await Promise.all([
       safeLoadMyWorkSection({
         fallback: [],
         label: "my work KPI loader",
         task: () => loadDashboardCards({ currentUser, supabase, today })
       }),
-      shouldLoadSalesWork(currentUser)
+      myActionsPromise,
+      groupedSections.length
         ? safeLoadMyWorkSection({
-            fallback: [],
-            label: "my work sales loader",
-            task: () => loadSalesItems({ currentUser, supabase, today })
+            fallback: null,
+            label: "my work grouped counts fallback",
+            task: () => loadGroupedWorkCounts({ supabase, today })
           })
-        : Promise.resolve([]),
-      shouldLoadDispatchWork(currentUser)
-        ? safeLoadMyWorkSection({
-            fallback: [],
-            label: "my work dispatch loader",
-            task: () => loadDispatchItems({ currentUser, supabase })
-          })
-        : Promise.resolve([]),
-      shouldLoadPilotWork(currentUser)
-        ? safeLoadMyWorkSection({
-            fallback: [],
-            label: "my work pilot loader",
-            task: () => loadPilotItems({ currentUser, supabase, today })
-          })
-        : Promise.resolve([]),
-      shouldLoadMarketingWork(currentUser)
-        ? safeLoadMyWorkSection({
-            fallback: [],
-            label: "my work marketing loader",
-            task: () => loadMarketingItems({ currentUser, supabase, today })
-          })
-        : Promise.resolve([])
+        : Promise.resolve(null),
+      selectedSectionPromise
     ]);
-
-  const groups = dedupeGroups([
-    {
-      description:
-        "Lead follow-ups, paid farmer leads ready for dispatch, and dealer or institution reviews.",
-      icon: Tractor,
-      items: salesItems,
-      title: "Sales"
-    },
-    {
-      description:
-        "Farmer Sale dispatches, Free Pilot dispatches, and dispatch records waiting for the next step.",
-      icon: Truck,
-      items: dispatchItems,
-      title: "Dispatch"
-    },
-    {
-      description:
-        "Pilot installation handoffs, planned visits that need reports, and visit reports waiting for review.",
-      icon: Wrench,
-      items: pilotItems,
-      title: "Pilots & Visits"
-    },
-    {
-      description:
-        "Marketing requests awaiting review, assigned design work, and overdue creative requests.",
-      icon: Megaphone,
-      items: marketingItems,
-      title: "Marketing"
-    }
-  ]);
-  const { myGroups, teamGroups } = splitGroupsForCurrentUser(
-    groups,
-    currentUser
+  const teamGroups = groupedSections.map((section) =>
+    groupedWorkSection({
+      count: groupedWorkCount(groupedCounts, section),
+      items:
+        selectedGroupedSection?.section === section
+          ? selectedGroupedSection.items
+          : [],
+      section
+    })
   );
   const myItemCount = itemCount(myGroups);
-  const teamItemCount = itemCount(teamGroups);
-  const totalItems = myItemCount + teamItemCount;
+  const teamItemCount = groupedCounts?.total ?? null;
+  const totalItems = myItemCount + (teamItemCount ?? 0);
+  const groupedCountsUnavailable =
+    groupedSections.length > 0 && groupedCounts === null;
   const teamSectionTitle = isOversightUser(currentUser)
     ? "Oversight"
     : "Team Actions";
@@ -1708,7 +2082,7 @@ export default async function MyPendingWorkPage() {
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-sm text-slate-500">{teamSectionTitle}</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">
-              {teamItemCount}
+              {teamItemCount === null ? "Unavailable" : teamItemCount}
             </p>
           </div>
         ) : null}
@@ -1723,7 +2097,7 @@ export default async function MyPendingWorkPage() {
             </span>
             <div>
               <p className="text-sm font-semibold text-slate-950">
-                {totalItems
+                {totalItems || groupedCountsUnavailable
                   ? "Review the grouped workflow items below."
                   : "No pending work right now."}
               </p>
@@ -1765,15 +2139,120 @@ export default async function MyPendingWorkPage() {
               {teamSectionDescription}
             </p>
           </div>
-          <div className="mt-4 grid gap-5 xl:grid-cols-2">
-            {teamGroups.map((group) => (
-              <PendingGroupCard group={group} key={`team-${group.title}`} />
-            ))}
+          <div className="mt-4 space-y-3">
+            {teamGroups.map((group) => {
+              const section = workSectionForGroup(group);
+              const expanded = selectedWorkSection === section;
+              const href = expanded
+                ? "/my-pending-work"
+                : groupedWorkHref(section);
+              const Icon = group.icon;
+
+              return (
+                <section
+                  className="rounded-lg border border-slate-200 bg-white shadow-sm"
+                  id={`work-section-${section}`}
+                  key={`team-${group.title}`}
+                >
+                  <Link
+                    aria-controls={`work-section-content-${section}`}
+                    aria-expanded={expanded}
+                    className="flex w-full items-center gap-3 rounded-lg px-4 py-4 text-left outline-none transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                    href={href}
+                    prefetch={false}
+                    scroll={false}
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-slate-950">
+                        {group.title}
+                      </span>
+                      <span className="mt-1 block text-sm leading-6 text-slate-500">
+                        {group.description}
+                      </span>
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-3">
+                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+                        {group.count === null ? "Unavailable" : group.count}
+                      </span>
+                      {expanded ? (
+                        <ChevronDown className="h-5 w-5 text-slate-500" aria-hidden="true" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-slate-500" aria-hidden="true" />
+                      )}
+                    </span>
+                  </Link>
+                  {expanded ? (
+                    <div
+                      className="space-y-3 border-t border-slate-200 p-4"
+                      id={`work-section-content-${section}`}
+                    >
+                      {selectedGroupedSection ? (
+                        group.items.length ? (
+                          <>
+                            {group.items.map((item) => (
+                              <PendingItemCard
+                                item={item}
+                                key={`${group.title}-${item.id}`}
+                              />
+                            ))}
+                            {group.count !== null && group.count > group.items.length ? (
+                              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                                <span>
+                                  Showing {(selectedWorkPage - 1) * 10 + 1}-
+                                  {(selectedWorkPage - 1) * 10 + group.items.length} of {group.count} items.
+                                </span>
+                                {selectedWorkPage > 1 ? (
+                                  <Link
+                                    className="font-medium text-brand-700 hover:text-brand-800"
+                                    href={groupedWorkHref(
+                                      section,
+                                      selectedWorkPage - 1
+                                    )}
+                                    prefetch={false}
+                                    scroll={false}
+                                  >
+                                    Previous
+                                  </Link>
+                                ) : null}
+                                {group.count > selectedWorkPage * 10 ? (
+                                  <Link
+                                    className="font-medium text-brand-700 hover:text-brand-800"
+                                    href={groupedWorkHref(
+                                      section,
+                                      selectedWorkPage + 1
+                                    )}
+                                    prefetch={false}
+                                    scroll={false}
+                                  >
+                                    Show more
+                                  </Link>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </>
+                        ) : (
+                          <p className="text-sm leading-6 text-slate-500">
+                            No grouped work is currently available in this category.
+                          </p>
+                        )
+                      ) : (
+                        <p className="text-sm leading-6 text-slate-500">
+                          Unable to load this grouped work category. Please try again.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })}
           </div>
         </section>
       ) : null}
 
-      {!myGroups.length && !teamGroups.length ? (
+      {!myGroups.length && !teamGroups.length && !groupedCountsUnavailable ? (
         <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm leading-6 text-slate-500">
           No pending work right now.
         </div>

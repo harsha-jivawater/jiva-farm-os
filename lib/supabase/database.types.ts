@@ -2716,6 +2716,12 @@ export type Database = {
         };
         Returns: Json;
       };
+      get_my_work_oversight_summary_counts: {
+        Args: {
+          p_today: string;
+        };
+        Returns: Json;
+      };
       get_installations_page_kpis: {
         Args: {
           p_q?: string | null;
