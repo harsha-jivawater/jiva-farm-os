@@ -165,6 +165,43 @@ type FarmerLeadWorkItemsResult = {
   unavailable: boolean;
 };
 
+type DispatchWorkItemAction =
+  | "dealer_payment_confirm"
+  | "dealer_dispatch_ready"
+  | "dispatch_action"
+  | "pilot_dispatch_ready";
+type DispatchWorkItemSourceTable = "dispatches" | "pilots";
+type DispatchWorkItemStatus = "Open";
+type DispatchWorkItemPayload = {
+  destinationName: string | null;
+  dispatchCode: string | null;
+  dispatchStatus: string | null;
+  dispatchType: string | null;
+  farmerName: string | null;
+  pilotCode: string | null;
+  pilotName: string | null;
+  pilotStatus: string | null;
+  productModel: string | null;
+};
+type DispatchWorkItemRow = {
+  action_type: DispatchWorkItemAction;
+  assignee_user_id: string | null;
+  business_key: string;
+  category: "dispatch";
+  created_at: string;
+  due_at: string | null;
+  id: string;
+  rsm_user_id: string | null;
+  source_id: string;
+  source_table: DispatchWorkItemSourceTable;
+  status: DispatchWorkItemStatus;
+  ui_payload: Json;
+};
+type DispatchWorkItemsResult = {
+  items: PendingWorkItem[];
+  unavailable: boolean;
+};
+
 type DealerPendingRow = {
   id: string;
   dealer_code: string;
@@ -186,19 +223,6 @@ type InstitutionPendingRow = {
   next_action_date: string;
   rsm_user_id: string | null;
   technical_owner_user_id: string | null;
-};
-
-type DispatchPendingRow = {
-  id: string;
-  dispatch_code: string;
-  dispatch_status: string;
-  dispatch_type: string;
-  destination_name_snapshot: string;
-  dispatch_date: string | null;
-  expected_delivery_date: string | null;
-  payment_confirmed: boolean;
-  payment_confirmed_date: string | null;
-  product_model: string;
 };
 
 type PilotPendingRow = {
@@ -253,13 +277,11 @@ type PilotSummary = {
   farmer_name_snapshot: string;
 };
 
-const dispatchActionStatuses = [
-  "Dispatch Requested",
-  "Pending Payment Confirmation",
-  "Pending Approval",
-  "Approved for Dispatch",
-  "Installation Pending",
-  "On Hold"
+const dispatchWorkItemActions: DispatchWorkItemAction[] = [
+  "dealer_payment_confirm",
+  "dealer_dispatch_ready",
+  "dispatch_action",
+  "pilot_dispatch_ready"
 ];
 const activePlannedVisitStatuses = [
   "Planned",
@@ -526,6 +548,28 @@ function groupedWorkSection({
     items,
     unavailableMessage
   };
+}
+
+function dispatchUnavailableMessage({
+  dispatchUnavailable,
+  farmerLeadDispatchUnavailable
+}: {
+  dispatchUnavailable: boolean;
+  farmerLeadDispatchUnavailable: boolean;
+}) {
+  if (dispatchUnavailable && farmerLeadDispatchUnavailable) {
+    return "Dispatch work and Farmer Lead dispatch work are temporarily unavailable.";
+  }
+
+  if (farmerLeadDispatchUnavailable) {
+    return "Farmer Lead dispatch work is temporarily unavailable. Other Dispatch work is still shown.";
+  }
+
+  if (dispatchUnavailable) {
+    return "Dispatch work is temporarily unavailable. Farmer Lead dispatch work is still shown.";
+  }
+
+  return undefined;
 }
 
 async function safeLoadMyWorkSection<T>({
@@ -862,40 +906,6 @@ function PendingGroupCard({ group }: { group: PendingWorkGroup }) {
       </div>
     </section>
   );
-}
-
-async function dispatchExistsForIds({
-  ids,
-  idColumns,
-  supabase
-}: {
-  ids: string[];
-  idColumns: string[];
-  supabase: Awaited<ReturnType<typeof createClient>>;
-}) {
-  if (!ids.length) {
-    return new Set<string>();
-  }
-
-  const filters = idColumns.map((column) => `${column}.in.(${ids.join(",")})`);
-  const { data } = await supabase
-    .from("dispatches")
-    .select(idColumns.join(","))
-    .or(filters.join(","))
-    .neq("dispatch_status", "Cancelled")
-    .is("deleted_at", null);
-
-  const matched = new Set<string>();
-  for (const row of data ?? []) {
-    const record = row as unknown as Record<string, string | null>;
-    for (const column of idColumns) {
-      if (record[column]) {
-        matched.add(record[column] as string);
-      }
-    }
-  }
-
-  return matched;
 }
 
 async function loadPilotMap(
@@ -1429,6 +1439,124 @@ function mapFarmerLeadWorkItem({
   };
 }
 
+function readTextPayloadValue(value: Json | undefined) {
+  return typeof value === "string" ? value : null;
+}
+
+function readDispatchWorkItemPayload(value: Json): DispatchWorkItemPayload {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      destinationName: null,
+      dispatchCode: null,
+      dispatchStatus: null,
+      dispatchType: null,
+      farmerName: null,
+      pilotCode: null,
+      pilotName: null,
+      pilotStatus: null,
+      productModel: null
+    };
+  }
+
+  return {
+    destinationName: readTextPayloadValue(value.destination_name),
+    dispatchCode: readTextPayloadValue(value.dispatch_code),
+    dispatchStatus: readTextPayloadValue(value.dispatch_status),
+    dispatchType: readTextPayloadValue(value.dispatch_type),
+    farmerName: readTextPayloadValue(value.farmer_name),
+    pilotCode: readTextPayloadValue(value.pilot_code),
+    pilotName: readTextPayloadValue(value.pilot_name),
+    pilotStatus: readTextPayloadValue(value.pilot_status),
+    productModel: readTextPayloadValue(value.product_model)
+  };
+}
+
+function subtitleFromParts(parts: Array<string | null | undefined>) {
+  return parts.filter(Boolean).join(" · ");
+}
+
+function mapDispatchWorkItem(item: DispatchWorkItemRow): PendingWorkItem {
+  const payload = readDispatchWorkItemPayload(item.ui_payload);
+  const assignmentUserIds = [
+    item.assignee_user_id,
+    item.rsm_user_id
+  ].filter(Boolean) as string[];
+
+  if (item.action_type === "dealer_payment_confirm") {
+    const dispatchCode = payload.dispatchCode ?? "Dispatch";
+    const destinationName = payload.destinationName ?? "Dealer";
+
+    return {
+      assignmentUserIds,
+      businessKey: item.business_key,
+      dueDate: item.due_at,
+      href: `/dispatches/${item.source_id}`,
+      id: `dealer-payment-${item.source_id}`,
+      nextAction: "Confirm dealer payment before Stock / Dispatch sends the device.",
+      ownerUserId: item.assignee_user_id,
+      status: "Dealer payment pending",
+      subtitle: subtitleFromParts([dispatchCode, payload.productModel]),
+      title: `Dealer payment to confirm: ${destinationName}`
+    };
+  }
+
+  if (item.action_type === "dealer_dispatch_ready") {
+    const dispatchCode = payload.dispatchCode ?? "Dispatch";
+    const destinationName = payload.destinationName ?? "Dealer";
+
+    return {
+      assignmentUserIds,
+      businessKey: item.business_key,
+      dueDate: item.due_at,
+      href: `/dispatches/${item.source_id}`,
+      id: `dealer-ready-${item.source_id}`,
+      nextAction: "Dispatch the paid Dealer Dispatch using Fresh Sale stock.",
+      ownerUserId: item.assignee_user_id,
+      status: "Payment confirmed · Ready for dispatch",
+      subtitle: subtitleFromParts([dispatchCode, payload.productModel]),
+      title: `Paid Dealer Dispatch ready: ${destinationName}`
+    };
+  }
+
+  if (item.action_type === "pilot_dispatch_ready") {
+    const pilotName = payload.pilotName ?? "Pilot";
+    const pilotCode = payload.pilotCode ?? "Pilot";
+
+    return {
+      assignmentUserIds,
+      businessKey: item.business_key,
+      dueDate: item.due_at,
+      href: "/dispatches/new?route=pilot",
+      id: `dispatch-pilot-${item.source_id}`,
+      nextAction: "Create a Free Pilot dispatch using Pilot Stock.",
+      ownerUserId: item.assignee_user_id,
+      status: payload.pilotStatus ?? "Pilot dispatch pending",
+      subtitle: subtitleFromParts([pilotCode, payload.farmerName]),
+      title: `Pilot dispatch to create: ${pilotName}`
+    };
+  }
+
+  const dispatchCode = payload.dispatchCode ?? "Dispatch";
+  const destinationName = payload.destinationName ?? "Destination";
+
+  return {
+    assignmentUserIds,
+    businessKey: item.business_key,
+    dueDate: item.due_at,
+    href: `/dispatches/${item.source_id}`,
+    id: `dispatch-action-${item.source_id}`,
+    nextAction: "Review and move this dispatch to the next logistics step.",
+    ownerUserId: item.assignee_user_id,
+    status: payload.dispatchStatus ?? "Dispatch action",
+    subtitle: subtitleFromParts([
+      dispatchCode,
+      payload.dispatchType,
+      payload.productModel
+    ]),
+    title: `Dispatch needs action: ${destinationName}`
+  };
+}
+
 async function loadFarmerLeadWorkItems({
   currentUser,
   itemLimit,
@@ -1622,8 +1750,7 @@ async function loadDispatchItems({
   itemLimit?: number;
   personalOnly?: boolean;
   supabase: Awaited<ReturnType<typeof createClient>>;
-}) {
-  const items: PendingWorkItem[] = [];
+}): Promise<DispatchWorkItemsResult> {
   const listLimit = itemLimit ?? 8;
 
   if (
@@ -1634,159 +1761,68 @@ async function loadDispatchItems({
       "Accounts"
     ])
   ) {
-    return items;
+    return { items: [], unavailable: false };
   }
 
   if (!canViewModule(currentUser, "dispatches")) {
-    return items;
+    return { items: [], unavailable: false };
   }
 
-  if (canViewModule(currentUser, "pilots")) {
-    const pilotScopeValue = await pilotScope(supabase, currentUser);
-    let pilotDispatchQuery = supabase
-      .from("pilots")
-      .select(
-        "id, pilot_code, pilot_name, pilot_status, farmer_name_snapshot, dispatch_id, pilot_owner_user_id, product_model, next_visit_due_date"
+  const results = await timeAsync(
+    "my work dispatch work_items loader",
+    () =>
+      Promise.all(
+        dispatchWorkItemActions.map((actionType) => {
+          const baseQuery = supabase
+            .from("work_items")
+            .select(
+              "id, source_table, source_id, action_type, business_key, status, category, assignee_user_id, rsm_user_id, due_at, ui_payload, created_at"
+            )
+            .eq("status", "Open")
+            .eq("category", "dispatch")
+            .eq("action_type", actionType)
+            .order("due_at", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: false })
+            .limit(listLimit);
+
+          if (!personalOnly) {
+            return baseQuery;
+          }
+
+          const personalFilters = [
+            `assignee_user_id.eq.${currentUser.id}`,
+            `rsm_user_id.eq.${currentUser.id}`
+          ];
+
+          if (!isSupervisoryUser(currentUser)) {
+            personalFilters.push("assignee_user_id.is.null");
+          }
+
+          return baseQuery.or(personalFilters.join(","));
+        })
       )
-      .is("deleted_at", null)
-      .eq("installation_completed", false)
-      .in("pilot_status", ["Planned", "Approved", "Device Assigned"])
-      .order("created_at", { ascending: true })
-      .limit(Math.max(listLimit, 25));
-    pilotDispatchQuery = applyScope(pilotDispatchQuery, pilotScopeValue);
-    if (personalOnly) {
-      pilotDispatchQuery = applyPersonalOwnership(pilotDispatchQuery, {
-        assignmentColumns: [],
-        currentUser,
-        ownerColumn: "pilot_owner_user_id"
-      });
-    }
-    const { data: pilotRows } = await pilotDispatchQuery;
-    const pilots = (pilotRows ?? []) as PilotPendingRow[];
-    const pilotDispatchIds = await dispatchExistsForIds({
-      idColumns: ["linked_pilot_id", "destination_pilot_id"],
-      ids: pilots.map((pilot) => pilot.id),
-      supabase
-    });
-
-    items.push(
-      ...pilots
-        .filter((pilot) => !pilotDispatchIds.has(pilot.id))
-        .slice(0, listLimit)
-        .map((pilot) => ({
-          href: "/dispatches/new?route=pilot",
-          id: `dispatch-pilot-${pilot.id}`,
-          assignmentUserIds: [pilot.pilot_owner_user_id],
-          businessKey: `pilot:${pilot.id}:dispatch-ready`,
-          nextAction: "Create a Free Pilot dispatch using Pilot Stock.",
-          ownerUserId: pilot.pilot_owner_user_id,
-          status: pilot.pilot_status,
-          subtitle: `${pilot.pilot_code} · ${pilot.farmer_name_snapshot}`,
-          title: `Pilot dispatch to create: ${pilot.pilot_name}`
-        }))
-    );
-  }
-
-  const dispatchScopeValue = await dispatchScope(supabase, currentUser);
-
-  if (hasAnyRole(currentUser, ["Admin", "Accounts"])) {
-    let dealerPaymentQuery = supabase
-      .from("dispatches")
-      .select(
-        "id, dispatch_code, dispatch_status, dispatch_type, destination_name_snapshot, dispatch_date, expected_delivery_date, payment_confirmed, payment_confirmed_date, product_model"
-      )
-      .is("deleted_at", null)
-      .eq("dispatch_type", "Dealer Stock Dispatch")
-      .eq("payment_requirement_type", "Payment Required")
-      .eq("payment_confirmed", false)
-      .neq("dispatch_status", "Cancelled")
-      .order("created_at", { ascending: true })
-      .limit(listLimit);
-    dealerPaymentQuery = applyScope(dealerPaymentQuery, dispatchScopeValue);
-    if (personalOnly && isSupervisoryUser(currentUser)) {
-      dealerPaymentQuery = dealerPaymentQuery.is("id", null);
-    }
-    const { data: dealerPaymentRows } = await dealerPaymentQuery;
-
-    items.push(
-      ...((dealerPaymentRows ?? []) as DispatchPendingRow[]).map((dispatch) => ({
-        dueDate: dispatch.expected_delivery_date ?? dispatch.dispatch_date,
-        href: `/dispatches/${dispatch.id}`,
-        id: `dealer-payment-${dispatch.id}`,
-        businessKey: `dispatch:${dispatch.id}:dealer-payment`,
-        nextAction: "Confirm dealer payment before Stock / Dispatch sends the device.",
-        status: "Dealer payment pending",
-        subtitle: `${dispatch.dispatch_code} · ${dispatch.product_model}`,
-        title: `Dealer payment to confirm: ${dispatch.destination_name_snapshot}`
-      }))
-    );
-  }
-
-  if (hasAnyRole(currentUser, ["Admin", "Stock / Dispatch"])) {
-    let dealerReadyQuery = supabase
-      .from("dispatches")
-      .select(
-        "id, dispatch_code, dispatch_status, dispatch_type, destination_name_snapshot, dispatch_date, expected_delivery_date, payment_confirmed, payment_confirmed_date, product_model"
-      )
-      .is("deleted_at", null)
-      .eq("dispatch_type", "Dealer Stock Dispatch")
-      .eq("payment_requirement_type", "Payment Required")
-      .eq("payment_confirmed", true)
-      .in("dispatch_status", ["Approved for Dispatch", "Dispatch Requested"])
-      .order("payment_confirmed_date", { ascending: true, nullsFirst: false })
-      .limit(listLimit);
-    dealerReadyQuery = applyScope(dealerReadyQuery, dispatchScopeValue);
-    if (personalOnly && isSupervisoryUser(currentUser)) {
-      dealerReadyQuery = dealerReadyQuery.is("id", null);
-    }
-    const { data: dealerReadyRows } = await dealerReadyQuery;
-
-    items.push(
-      ...((dealerReadyRows ?? []) as DispatchPendingRow[]).map((dispatch) => ({
-        dueDate:
-          dispatch.expected_delivery_date ?? dispatch.payment_confirmed_date,
-        href: `/dispatches/${dispatch.id}`,
-        id: `dealer-ready-${dispatch.id}`,
-        businessKey: `dispatch:${dispatch.id}:dealer-ready`,
-        nextAction: "Dispatch the paid Dealer Dispatch using Fresh Sale stock.",
-        status: "Payment confirmed · Ready for dispatch",
-        subtitle: `${dispatch.dispatch_code} · ${dispatch.product_model}`,
-        title: `Paid Dealer Dispatch ready: ${dispatch.destination_name_snapshot}`
-      }))
-    );
-  }
-
-  let dispatchQuery = supabase
-    .from("dispatches")
-    .select(
-      "id, dispatch_code, dispatch_status, dispatch_type, destination_name_snapshot, dispatch_date, expected_delivery_date, payment_confirmed, payment_confirmed_date, product_model"
-    )
-    .is("deleted_at", null)
-    .in("dispatch_status", dispatchActionStatuses)
-    .order("created_at", { ascending: true })
-    .limit(itemLimit ?? 12);
-  dispatchQuery = applyScope(dispatchQuery, dispatchScopeValue);
-  if (personalOnly && isSupervisoryUser(currentUser)) {
-    dispatchQuery = dispatchQuery.is("id", null);
-  }
-  const { data: dispatches } = await dispatchQuery;
-
-  items.push(
-    ...((dispatches ?? []) as DispatchPendingRow[])
-      .filter((dispatch) => dispatch.dispatch_type !== "Dealer Stock Dispatch")
-      .map((dispatch) => ({
-        dueDate: dispatch.expected_delivery_date ?? dispatch.dispatch_date,
-        href: `/dispatches/${dispatch.id}`,
-        id: `dispatch-action-${dispatch.id}`,
-        businessKey: `dispatch:${dispatch.id}:action`,
-        nextAction: "Review and move this dispatch to the next logistics step.",
-        status: dispatch.dispatch_status,
-        subtitle: `${dispatch.dispatch_code} · ${dispatch.dispatch_type} · ${dispatch.product_model}`,
-        title: `Dispatch needs action: ${dispatch.destination_name_snapshot}`
-      }))
+  );
+  const errors = results.flatMap((result) => (result.error ? [result.error] : []));
+  errors.forEach((error) =>
+    logSupabaseError("my work dispatch work_items loader", error)
   );
 
-  return items;
+  const rows = results
+    .flatMap((result) => (result.data ?? []) as DispatchWorkItemRow[])
+    .sort((left, right) => {
+      if (left.due_at !== right.due_at) {
+        if (!left.due_at) return 1;
+        if (!right.due_at) return -1;
+        return left.due_at.localeCompare(right.due_at);
+      }
+
+      return right.created_at.localeCompare(left.created_at);
+    });
+
+  return {
+    items: rows.map(mapDispatchWorkItem),
+    unavailable: errors.length > 0
+  };
 }
 
 async function loadPilotItems({
@@ -2145,7 +2181,7 @@ async function loadMyActions({
           ? timeAsync("my work personal dispatch", () =>
               loadDispatchItems({ currentUser, personalOnly: true, supabase })
             )
-          : Promise.resolve([]),
+          : Promise.resolve({ items: [], unavailable: false }),
         shouldLoadSalesWork(currentUser)
           ? loadFarmerLeadWorkItems({
               currentUser,
@@ -2189,11 +2225,12 @@ async function loadMyActions({
         description:
           "Farmer Sale dispatches, Free Pilot dispatches, and dispatch records waiting for the next step.",
         icon: Truck,
-        items: [...farmerLeadDispatch.items, ...dispatchItems],
+        items: [...farmerLeadDispatch.items, ...dispatchItems.items],
         title: "Dispatch",
-        unavailableMessage: farmerLeadDispatch.unavailable
-          ? "Farmer Lead dispatch work is temporarily unavailable. Other Dispatch work is still shown."
-          : undefined
+        unavailableMessage: dispatchUnavailableMessage({
+          dispatchUnavailable: dispatchItems.unavailable,
+          farmerLeadDispatchUnavailable: farmerLeadDispatch.unavailable
+        })
       },
       {
         description:
@@ -2251,16 +2288,39 @@ async function loadSelectedGroupedSection({
             supabase
           })
         : { items: [], unavailable: false };
-    const otherItems = await (
+    const otherWork =
       section === "sales"
-        ? loadSalesItems({ currentUser, itemLimit: sourceLimit, supabase, today })
+        ? {
+            items: await loadSalesItems({
+              currentUser,
+              itemLimit: sourceLimit,
+              supabase,
+              today
+            }),
+            unavailable: false
+          }
         : section === "dispatch"
-        ? loadDispatchItems({ currentUser, itemLimit: sourceLimit, supabase })
+        ? await loadDispatchItems({ currentUser, itemLimit: sourceLimit, supabase })
         : section === "pilots"
-        ? loadPilotItems({ currentUser, itemLimit: sourceLimit, supabase, today })
-        : loadMarketingItems({ currentUser, itemLimit: sourceLimit, supabase, today })
-    );
-    const items = [...farmerLeadWork.items, ...otherItems];
+        ? {
+            items: await loadPilotItems({
+              currentUser,
+              itemLimit: sourceLimit,
+              supabase,
+              today
+            }),
+            unavailable: false
+          }
+        : {
+            items: await loadMarketingItems({
+              currentUser,
+              itemLimit: sourceLimit,
+              supabase,
+              today
+            }),
+            unavailable: false
+          };
+    const items = [...farmerLeadWork.items, ...otherWork.items];
 
     const dedupedItems = dedupeGroups([
       groupedWorkSection({ count: null, items, section })
@@ -2281,9 +2341,15 @@ async function loadSelectedGroupedSection({
       count: null,
       items: groupedItems,
       section,
-      unavailableMessage: farmerLeadWork.unavailable
-        ? "Farmer Lead work is temporarily unavailable. Other Sales work is still shown."
-        : undefined
+      unavailableMessage:
+        section === "dispatch"
+          ? dispatchUnavailableMessage({
+              dispatchUnavailable: otherWork.unavailable,
+              farmerLeadDispatchUnavailable: false
+            })
+          : farmerLeadWork.unavailable
+          ? "Farmer Lead work is temporarily unavailable. Other Sales work is still shown."
+          : undefined
     });
   });
 }

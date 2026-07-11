@@ -969,16 +969,22 @@ export type Database = {
       work_items: {
         Row: {
           id: string;
-          source_table: "farmer_leads";
+          source_table: "farmer_leads" | "dispatches" | "pilots";
           source_id: string;
-          action_type: "follow_up" | "dispatch_ready";
+          action_type:
+            | "follow_up"
+            | "dispatch_ready"
+            | "dealer_payment_confirm"
+            | "dealer_dispatch_ready"
+            | "dispatch_action"
+            | "pilot_dispatch_ready";
           business_key: string;
           status: "Open";
-          category: "sales";
-          assignee_user_id: string;
-          rsm_user_id: string;
-          region_id: string;
-          state: string;
+          category: "sales" | "dispatch";
+          assignee_user_id: string | null;
+          rsm_user_id: string | null;
+          region_id: string | null;
+          state: string | null;
           due_at: string | null;
           ui_payload: Json;
           created_at: string;
@@ -986,16 +992,22 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          source_table?: "farmer_leads";
+          source_table?: "farmer_leads" | "dispatches" | "pilots";
           source_id: string;
-          action_type: "follow_up" | "dispatch_ready";
+          action_type:
+            | "follow_up"
+            | "dispatch_ready"
+            | "dealer_payment_confirm"
+            | "dealer_dispatch_ready"
+            | "dispatch_action"
+            | "pilot_dispatch_ready";
           business_key: string;
           status?: "Open";
-          category?: "sales";
-          assignee_user_id: string;
-          rsm_user_id: string;
-          region_id: string;
-          state: string;
+          category?: "sales" | "dispatch";
+          assignee_user_id?: string | null;
+          rsm_user_id?: string | null;
+          region_id?: string | null;
+          state?: string | null;
           due_at?: string | null;
           ui_payload?: Json;
           created_at?: string;
@@ -1003,16 +1015,22 @@ export type Database = {
         };
         Update: {
           id?: string;
-          source_table?: "farmer_leads";
+          source_table?: "farmer_leads" | "dispatches" | "pilots";
           source_id?: string;
-          action_type?: "follow_up" | "dispatch_ready";
+          action_type?:
+            | "follow_up"
+            | "dispatch_ready"
+            | "dealer_payment_confirm"
+            | "dealer_dispatch_ready"
+            | "dispatch_action"
+            | "pilot_dispatch_ready";
           business_key?: string;
           status?: "Open";
-          category?: "sales";
-          assignee_user_id?: string;
-          rsm_user_id?: string;
-          region_id?: string;
-          state?: string;
+          category?: "sales" | "dispatch";
+          assignee_user_id?: string | null;
+          rsm_user_id?: string | null;
+          region_id?: string | null;
+          state?: string | null;
           due_at?: string | null;
           ui_payload?: Json;
           created_at?: string;

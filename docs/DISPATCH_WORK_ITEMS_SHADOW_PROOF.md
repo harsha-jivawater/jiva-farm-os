@@ -596,3 +596,32 @@ Stage C cannot begin until all of these pass:
 - [x] representative RLS remains correct
 - [x] migration history recorded
 - [x] Stage B committed and pushed
+
+## Stage C Initial Cutover
+
+Started on 2026-07-12 after all Stage B gates passed.
+
+Initial cutover scope:
+
+- `loadDispatchItems` in My Work now reads Dispatch-category rows from `public.work_items`
+- covered actions are `dealer_payment_confirm`, `dealer_dispatch_ready`, `dispatch_action`, and `pilot_dispatch_ready`
+- Farmer Sale dispatch-ready remains on the existing Farmer Lead `work_items` path
+- no SQL, RLS, trigger, or service-role access changes
+- KPI cards remain on their existing bounded count path
+- Pilot, Marketing, Sales dealer review, and Institution review loaders are unchanged
+
+Query budget:
+
+- one bounded `work_items` query per Dispatch action type
+- each query orders by `due_at asc nulls last, created_at desc`
+- each query is limited by the existing My Work item limit
+- failures are isolated to the Dispatch group unavailable state
+
+Validation status:
+
+- `npm run lint` passed
+- `npm run typecheck` passed
+- `npm run build` passed
+- live authenticated Admin RLS query sees the current two `pilot_dispatch_ready` rows
+- live authenticated Stock / Dispatch RLS query sees zero `pilot_dispatch_ready` rows, preserving Stage B visibility
+- full production UI verification remains required before declaring Stage C complete

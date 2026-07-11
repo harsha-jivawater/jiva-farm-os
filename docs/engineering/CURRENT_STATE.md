@@ -84,7 +84,7 @@ get_my_work_oversight_summary_counts
 
 ### Dispatch Read Model
 
-The Dispatch action lifecycle has been inspected. Stage A has been applied and reconciled. Stage B triggers are applied, verified, and recorded in Supabase migration history.
+The Dispatch action lifecycle has been inspected. Stage A has been applied and reconciled. Stage B triggers are applied, verified, and recorded in Supabase migration history. Stage C has started with the My Work Dispatch item loader cut over to `work_items`.
 
 Prepared action types:
 
@@ -95,11 +95,12 @@ dispatch_action
 pilot_dispatch_ready
 ```
 
-Stage A is applied and reconciled. Stage B synchronization triggers are applied and verified. Stage B does not change My Work rendering.
+Stage A is applied and reconciled. Stage B synchronization triggers are applied and verified. Stage C changes My Work Dispatch item loading only; KPI cards still use their existing count path.
 
 ## Current Risks
 
-- legacy Dispatch, Pilot, and Marketing sections still reconstruct work from operational tables when opened
+- Dispatch KPI cards still use existing bounded operational counts
+- legacy Pilot and Marketing sections still reconstruct work from operational tables when opened
 - migration history uses Supabase's applied timestamp for Stage B (`20260711192035`) while the reviewed local file remains `202607110004_dispatch_work_items_shadow_triggers.sql`
 - production SQL must remain manually controlled
 - standalone Sales Head RLS parity was not independently tested during the Farmer Lead proof because no suitable non-Admin user was available
@@ -116,7 +117,7 @@ Stage A is applied and reconciled. Stage B synchronization triggers are applied 
 
 ## Next Review Gate
 
-Before implementing Dispatch My Work cutover, keep Stage C bounded to:
+Before expanding Dispatch My Work cutover, keep Stage C bounded to:
 
 1. one selected Dispatch consumer path
 2. work_items-backed reads only for proven Dispatch/Pilot actions
@@ -125,4 +126,4 @@ Before implementing Dispatch My Work cutover, keep Stage C bounded to:
 5. failure isolation per action group
 6. parity with the existing role behavior
 
-The Stage A and Stage B proofs are documented in `docs/DISPATCH_WORK_ITEMS_SHADOW_PROOF.md`. Stage A is captured in migration `202607110003_dispatch_work_items_shadow_proof.sql`; Stage B trigger synchronization is captured locally in `202607110004_dispatch_work_items_shadow_triggers.sql` and recorded in Supabase migration history as `20260711192035 dispatch_work_items_shadow_triggers`.
+The Stage A, Stage B, and initial Stage C proofs are documented in `docs/DISPATCH_WORK_ITEMS_SHADOW_PROOF.md`. Stage A is captured in migration `202607110003_dispatch_work_items_shadow_proof.sql`; Stage B trigger synchronization is captured locally in `202607110004_dispatch_work_items_shadow_triggers.sql` and recorded in Supabase migration history as `20260711192035 dispatch_work_items_shadow_triggers`.

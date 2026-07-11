@@ -10,7 +10,7 @@ Goal: move Dispatch actions from direct operational-table reconstruction into th
 
 Required stages:
 
-- [ ] inspect current Dispatch My Work rules
+- [x] inspect current Dispatch My Work rules
 - [x] define exact Dispatch action types
 - [x] define stable business keys
 - [x] create Stage A projection function draft for controlled review
@@ -21,9 +21,9 @@ Required stages:
 - [x] prepare Stage B guarded triggers for controlled review
 - [x] apply and test Stage B guarded triggers
 - [ ] prove performance
-- [ ] cut over one consumer
+- [x] cut over one consumer
 - [ ] validate production
-- [ ] update engineering documentation
+- [x] update engineering documentation
 
 ## Completed
 
