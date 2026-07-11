@@ -11,11 +11,11 @@ Goal: move Dispatch actions from direct operational-table reconstruction into th
 Required stages:
 
 - [ ] inspect current Dispatch My Work rules
-- [ ] define exact Dispatch action types
-- [ ] define stable business keys
-- [ ] create projection function
-- [ ] create bounded backfill
-- [ ] create reconciliation
+- [x] define exact Dispatch action types
+- [x] define stable business keys
+- [x] create Stage A projection function draft for controlled review
+- [x] create Stage A bounded backfill draft for controlled review
+- [x] create Stage A reconciliation draft for controlled review
 - [ ] validate RLS by representative role
 - [ ] add guarded triggers
 - [ ] prove performance

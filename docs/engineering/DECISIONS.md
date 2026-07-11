@@ -133,3 +133,29 @@ The next module does not begin until the current production cutover is stable.
 Large diffs and many new helper functions are warning signals for performance work.
 
 A fix that adds hundreds of lines must demonstrate a meaningful reduction in query cost and architectural complexity.
+
+---
+
+## ADR-011 — work_items is a polymorphic read model
+
+**Status:** Accepted
+
+`work_items.source_id` intentionally has no single-table foreign key once multiple source tables are projected.
+
+Reason:
+
+- Farmer Lead work references `farmer_leads`
+- Dispatch work references `dispatches`
+- Free Pilot dispatch-ready work references `pilots`
+- one physical foreign key cannot represent all supported source tables
+
+Strict validation remains required:
+
+- `source_table` has a supported-value check
+- `category` has a supported-value check
+- `action_type` has a supported-value check
+- source/category/action combinations are checked
+- `status` remains constrained to `Open`
+- `ui_payload` is source/action-aware and must remain a JSON object
+
+Integrity is enforced by stable business keys, `unique (source_table, source_id, action_type)`, projector functions, reconciliation functions, and future source-table synchronization triggers. Operational source tables remain the source of truth.

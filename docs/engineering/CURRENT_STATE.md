@@ -84,19 +84,18 @@ get_my_work_oversight_summary_counts
 
 ### Dispatch Read Model
 
-The next engineering task is to inspect and define the exact Dispatch action lifecycle before writing SQL.
+The Dispatch action lifecycle has been inspected and Stage A has been prepared for manual review.
 
-Do not assume action types.
+Prepared action types:
 
-Inspect:
+```text
+dealer_payment_confirm
+dealer_dispatch_ready
+dispatch_action
+pilot_dispatch_ready
+```
 
-- current My Work Dispatch loader
-- Dispatch statuses and transitions
-- payment rules
-- pilot versus Farmer Sale routes
-- delivery confirmation behavior
-- installation handoff behavior
-- role visibility and ownership
+Stage A is prepared for controlled review only. It is not applied, has no triggers, and does not change My Work rendering.
 
 ## Current Risks
 
@@ -126,3 +125,5 @@ Before implementing Dispatch projection, produce:
 5. backfill and reconciliation plan
 6. trigger dependencies
 7. query and complexity budgets
+
+These have been documented in `docs/DISPATCH_WORK_ITEMS_SHADOW_PROOF.md` and prepared in migration `202607110003_dispatch_work_items_shadow_proof.sql`.
