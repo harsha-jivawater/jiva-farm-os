@@ -41,7 +41,10 @@ import {
 import {
   dispatchScope,
   dealerScope,
+  deviceScope,
+  followupScope,
   hasFullRecordAccess,
+  installationScope,
   institutionScope,
   loadDirectReportIds,
   loadManagedPilotIds,
@@ -74,12 +77,8 @@ type PendingWorkGroup = {
 type WorkSection = "sales" | "dispatch" | "pilots" | "marketing";
 
 type GroupedWorkCounts = {
-  dispatch: number;
-  marketing: number;
   mode: "oversight" | "team-actions" | null;
-  pilots: number;
-  sales: number;
-  total: number;
+  sales: number | null;
 };
 
 type GroupedWorkSection = PendingWorkGroup & {
@@ -119,8 +118,24 @@ type DashboardModuleAccess = {
   pilots: boolean;
 };
 
+type CountQueryResult = {
+  count: number | null;
+  error: {
+    code?: string;
+    details?: string;
+    hint?: string;
+    message?: string;
+  } | null;
+};
+
+type CountLoadResult = {
+  unavailable: boolean;
+  value: number | null;
+};
+
 type ScopedQuery<T> = T & {
   is: (column: string, value: null) => T;
+  neq: (column: string, value: string) => T;
   or: (filters: string) => T;
 };
 
@@ -261,6 +276,18 @@ const openMarketingStatuses = [
   "Draft Shared",
   "Corrections Requested"
 ];
+const activePilotStatuses = [
+  "Approved",
+  "Device Assigned",
+  "Device Dispatched",
+  "Device Installed",
+  "Monitoring Active",
+  "Visit Report Pending",
+  "Final Report Pending",
+  "Final Report Submitted",
+  "Final Report Reviewed",
+  "Scale-up Recommended"
+];
 const unavailableCounts: DashboardCounts = {
   activePilots: null,
   approvedDispatchesWaiting: null,
@@ -329,51 +356,6 @@ function applyScope<T>(query: ScopedQuery<T>, scope: RecordScope) {
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function readDashboardCounts(value: unknown): DashboardCounts {
-  if (!value || typeof value !== "object") {
-    return unavailableCounts;
-  }
-
-  const row = value as Record<string, unknown>;
-
-  return {
-    activePilots: numberValue(row.activePilots),
-    approvedDispatchesWaiting: numberValue(row.approvedDispatchesWaiting),
-    devicesInWarehouse: numberValue(row.devicesInWarehouse),
-    installationsPlanned: numberValue(row.installationsPlanned),
-    leadsNeedingFollowup: numberValue(row.leadsNeedingFollowup),
-    overduePostInstallationFollowups: numberValue(
-      row.overduePostInstallationFollowups
-    ),
-    pendingPaymentConfirmation: numberValue(row.pendingPaymentConfirmation),
-    plannedPilotVisitReportsPending: null,
-    plannedPilotVisitsDue: null
-  };
-}
-
-function readGroupedWorkCounts(value: unknown): GroupedWorkCounts | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const row = value as Record<string, unknown>;
-  const mode =
-    row.mode === "oversight" || row.mode === "team-actions" ? row.mode : null;
-
-  if (!mode) {
-    return null;
-  }
-
-  return {
-    dispatch: numberValue(row.dispatch),
-    marketing: numberValue(row.marketing),
-    mode,
-    pilots: numberValue(row.pilots),
-    sales: numberValue(row.sales),
-    total: numberValue(row.total)
-  };
 }
 
 function formatCount(value: number | null) {
@@ -524,7 +506,7 @@ function groupedWorkCount(
   counts: GroupedWorkCounts | null,
   section: WorkSection
 ) {
-  return counts ? counts[section] : null;
+  return counts && section === "sales" ? counts.sales : null;
 }
 
 function groupedWorkSection({
@@ -600,6 +582,65 @@ function applyPersonalOwnership<T>(
   }
 
   return query.or(filters.join(","));
+}
+
+function excludeCurrentUserFromColumns<T>(
+  query: T & { or: (filters: string) => T },
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>,
+  columns: string[]
+) {
+  let nextQuery = query;
+
+  for (const column of columns) {
+    nextQuery = nextQuery.or(
+      `${column}.is.null,${column}.neq.${currentUser.id}`
+    ) as T & { or: (filters: string) => T };
+  }
+
+  return nextQuery;
+}
+
+async function loadExactCount({
+  label,
+  task
+}: {
+  label: string;
+  task: () => PromiseLike<CountQueryResult>;
+}): Promise<CountLoadResult> {
+  try {
+    const { count, error } = await timeAsync(label, task);
+
+    if (error) {
+      logSupabaseError(label, error);
+      return { unavailable: true, value: null };
+    }
+
+    return { unavailable: false, value: count ?? 0 };
+  } catch (error) {
+    console.error(`[${label}]`, {
+      message: error instanceof Error ? error.message : "Unknown count failure"
+    });
+    return { unavailable: true, value: null };
+  }
+}
+
+async function safeCountLoader<T>({
+  fallback,
+  label,
+  task
+}: {
+  fallback: T;
+  label: string;
+  task: () => Promise<T>;
+}) {
+  try {
+    return await task();
+  } catch (error) {
+    console.error(`[${label}]`, {
+      message: error instanceof Error ? error.message : "Unknown count failure"
+    });
+    return fallback;
+  }
 }
 
 function dedupeGroups(groups: PendingWorkGroup[]) {
@@ -876,6 +917,195 @@ async function loadPilotMap(
   );
 }
 
+async function loadDashboardKpiCounts({
+  currentUser,
+  includeDevices,
+  includeDispatches,
+  includeFarmerLeads,
+  includeFollowUps,
+  includeInstallations,
+  includePilots,
+  supabase,
+  today
+}: {
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  includeDevices: boolean;
+  includeDispatches: boolean;
+  includeFarmerLeads: boolean;
+  includeFollowUps: boolean;
+  includeInstallations: boolean;
+  includePilots: boolean;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  today: string;
+}) {
+  const counts = { ...unavailableCounts };
+  const loaderTasks: Array<Promise<void>> = [];
+
+  if (includeFarmerLeads) {
+    loaderTasks.push(
+      loadExactCount({
+        label: "my work KPI leads needing follow-up count",
+        task: () =>
+          supabase
+            .from("work_items")
+            .select("id", { count: "exact", head: true })
+            .eq("source_table", "farmer_leads")
+            .eq("status", "Open")
+            .eq("category", "sales")
+            .eq("action_type", "follow_up")
+      }).then((result) => {
+        counts.leadsNeedingFollowup = result.value;
+      })
+    );
+  }
+
+  if (includeDispatches) {
+    loaderTasks.push(
+      safeCountLoader({
+        fallback: null,
+        label: "my work KPI dispatch counts",
+        task: async () => {
+          const dispatchScopeValue = await dispatchScope(supabase, currentUser);
+          let pendingPaymentQuery = supabase
+            .from("dispatches")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("payment_confirmed", false);
+          pendingPaymentQuery = applyScope(pendingPaymentQuery, dispatchScopeValue);
+
+          let approvedDispatchQuery = supabase
+            .from("dispatches")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("dispatch_status", "Approved for Dispatch");
+          approvedDispatchQuery = applyScope(
+            approvedDispatchQuery,
+            dispatchScopeValue
+          );
+
+          const [pendingPayment, approvedDispatches] = await Promise.all([
+            loadExactCount({
+              label: "my work KPI pending payment confirmation count",
+              task: () => pendingPaymentQuery
+            }),
+            loadExactCount({
+              label: "my work KPI approved dispatches waiting count",
+              task: () => approvedDispatchQuery
+            })
+          ]);
+
+          return { approvedDispatches, pendingPayment };
+        }
+      }).then((result) => {
+        counts.pendingPaymentConfirmation =
+          result?.pendingPayment.value ?? null;
+        counts.approvedDispatchesWaiting =
+          result?.approvedDispatches.value ?? null;
+      })
+    );
+  }
+
+  if (includeInstallations) {
+    loaderTasks.push(
+      safeCountLoader({
+        fallback: { unavailable: true, value: null },
+        label: "my work KPI installations planned loader",
+        task: async () => {
+          const scope = await installationScope(supabase, currentUser);
+          let query = supabase
+            .from("installations")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("installation_status", "Planned");
+          query = applyScope(query, scope);
+          return loadExactCount({
+            label: "my work KPI installations planned count",
+            task: () => query
+          });
+        }
+      }).then((result) => {
+        counts.installationsPlanned = result.value;
+      })
+    );
+  }
+
+  if (includeDevices) {
+    loaderTasks.push(
+      safeCountLoader({
+        fallback: { unavailable: true, value: null },
+        label: "my work KPI warehouse devices loader",
+        task: async () => {
+          const scope = await deviceScope(supabase, currentUser);
+          let query = supabase
+            .from("devices")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("device_status", "In Warehouse");
+          query = applyScope(query, scope);
+          return loadExactCount({
+            label: "my work KPI warehouse devices count",
+            task: () => query
+          });
+        }
+      }).then((result) => {
+        counts.devicesInWarehouse = result.value;
+      })
+    );
+  }
+
+  if (includeFollowUps) {
+    loaderTasks.push(
+      safeCountLoader({
+        fallback: { unavailable: true, value: null },
+        label: "my work KPI overdue followups loader",
+        task: async () => {
+          const scope = await followupScope(supabase, currentUser);
+          let query = supabase
+            .from("followups")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .in("followup_status", ["Due", "Rescheduled", "Escalated"])
+            .lt("followup_due_date", today);
+          query = applyScope(query, scope);
+          return loadExactCount({
+            label: "my work KPI overdue post-installation followups count",
+            task: () => query
+          });
+        }
+      }).then((result) => {
+        counts.overduePostInstallationFollowups = result.value;
+      })
+    );
+  }
+
+  if (includePilots) {
+    loaderTasks.push(
+      safeCountLoader({
+        fallback: { unavailable: true, value: null },
+        label: "my work KPI active pilots loader",
+        task: async () => {
+          const scope = await pilotScope(supabase, currentUser);
+          let query = supabase
+            .from("pilots")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .in("pilot_status", activePilotStatuses);
+          query = applyScope(query, scope);
+          return loadExactCount({
+            label: "my work KPI active pilots count",
+            task: () => query
+          });
+        }
+      }).then((result) => {
+        counts.activePilots = result.value;
+      })
+    );
+  }
+
+  await Promise.all(loaderTasks);
+  return counts;
+}
+
 async function loadDashboardCards({
   currentUser,
   supabase,
@@ -907,43 +1137,27 @@ async function loadDashboardCards({
   const includePlannedVisits =
     selectedLabels.has("Pilot Visits Due") ||
     selectedLabels.has("Pilot Visit Reports Pending");
-  const needsDashboardCounts =
-    includeFarmerLeads ||
-    includeDispatches ||
-    includeInstallations ||
-    includeDevices ||
-    includeFollowUps ||
-    includePilots;
 
-  const [dashboardCountsResult, plannedVisitCountsResult] = await Promise.all([
-    needsDashboardCounts
-      ? timeAsync("my work role KPI counts rpc", () =>
-          supabase.rpc("get_dashboard_home_counts", {
-            p_include_dispatches: includeDispatches,
-            p_include_devices: includeDevices,
-            p_include_farmer_leads: includeFarmerLeads,
-            p_include_followups: includeFollowUps,
-            p_include_installations: includeInstallations,
-            p_include_pilots: includePilots
-          })
-        )
-      : Promise.resolve({ data: null, error: null }),
+  const [counts, plannedVisitCountsResult] = await Promise.all([
+    timeAsync("my work role KPI independent counts", () =>
+      loadDashboardKpiCounts({
+        currentUser,
+        includeDevices,
+        includeDispatches,
+        includeFarmerLeads,
+        includeFollowUps,
+        includeInstallations,
+        includePilots,
+        supabase,
+        today
+      })
+    ),
     includePlannedVisits
       ? timeAsync("my work planned visit summary rpc", () =>
           supabase.rpc("get_visible_planned_visit_counts", { p_today: today })
         )
       : Promise.resolve({ data: null, error: null })
   ]);
-  const counts = dashboardCountsResult.error
-    ? { ...unavailableCounts }
-    : readDashboardCounts(dashboardCountsResult.data);
-
-  if (dashboardCountsResult.error) {
-    logSupabaseError(
-      "My Work role KPI counts unavailable",
-      dashboardCountsResult.error
-    );
-  }
 
   if (plannedVisitCountsResult.error) {
     logSupabaseError(
@@ -1091,25 +1305,55 @@ async function loadDashboardCards({
   return pickKpiCardsForRole(cards, currentUser);
 }
 
-async function loadGroupedWorkCounts({
-  supabase,
-  today
+async function loadFarmerLeadGroupedSalesCount({
+  currentUser,
+  supabase
 }: {
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
   supabase: Awaited<ReturnType<typeof createClient>>;
-  today: string;
 }) {
-  const { data, error } = await timeAsync("my work grouped counts rpc", () =>
-    supabase.rpc("get_my_work_oversight_summary_counts", { p_today: today })
+  let farmerLeadWorkQuery = supabase
+    .from("work_items")
+    .select("id", { count: "exact", head: true })
+    .eq("source_table", "farmer_leads")
+    .eq("status", "Open")
+    .eq("category", "sales")
+    .in("action_type", ["follow_up", "dispatch_ready"]);
+  farmerLeadWorkQuery = excludeCurrentUserFromColumns(
+    farmerLeadWorkQuery,
+    currentUser,
+    ["assignee_user_id", "rsm_user_id"]
   );
 
-  if (error) {
-    logSupabaseError("My Work grouped counts unavailable", error);
+  return loadExactCount({
+    label: "my work grouped sales farmer lead work_items count",
+    task: () => farmerLeadWorkQuery
+  });
+}
+
+async function loadGroupedWorkCounts({
+  currentUser,
+  supabase
+}: {
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}) {
+  const groupedSections = supportedGroupedSections(currentUser);
+  if (!groupedSections.length) {
     return null;
   }
 
-  const counts = readGroupedWorkCounts(data);
-  if (!counts) {
-    console.error("[My Work grouped counts unavailable] Invalid aggregate response");
+  const mode = isOversightUser(currentUser) ? "oversight" : "team-actions";
+  const counts: GroupedWorkCounts = { mode, sales: null };
+
+  if (groupedSections.includes("sales")) {
+    counts.sales = (
+      await safeCountLoader({
+        fallback: { unavailable: true, value: null },
+        label: "my work grouped sales count loader",
+        task: () => loadFarmerLeadGroupedSalesCount({ currentUser, supabase })
+      })
+    ).value;
   }
 
   return counts;
@@ -2094,7 +2338,7 @@ export default async function MyPendingWorkPage({
         ? safeLoadMyWorkSection({
             fallback: null,
             label: "my work grouped counts fallback",
-            task: () => loadGroupedWorkCounts({ supabase, today })
+            task: () => loadGroupedWorkCounts({ currentUser, supabase })
           })
         : Promise.resolve(null),
       selectedSectionPromise
@@ -2114,10 +2358,7 @@ export default async function MyPendingWorkPage({
     })
   );
   const myItemCount = itemCount(myGroups);
-  const teamItemCount = groupedCounts?.total ?? null;
-  const totalItems = myItemCount + (teamItemCount ?? 0);
-  const groupedCountsUnavailable =
-    groupedSections.length > 0 && groupedCounts === null;
+  const totalItems = myItemCount;
   const teamSectionTitle = isOversightUser(currentUser)
     ? "Oversight"
     : "Team Actions";
@@ -2152,7 +2393,7 @@ export default async function MyPendingWorkPage({
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-sm text-slate-500">{teamSectionTitle}</p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">
-              {teamItemCount === null ? "Unavailable" : teamItemCount}
+              Open sections
             </p>
           </div>
         ) : null}
@@ -2167,7 +2408,7 @@ export default async function MyPendingWorkPage({
             </span>
             <div>
               <p className="text-sm font-semibold text-slate-950">
-                {totalItems || groupedCountsUnavailable
+                {totalItems || teamGroups.length
                   ? "Review the grouped workflow items below."
                   : "No pending work right now."}
               </p>
@@ -2245,7 +2486,7 @@ export default async function MyPendingWorkPage({
                     </span>
                     <span className="inline-flex shrink-0 items-center gap-3">
                       <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
-                        {group.count === null ? "Unavailable" : group.count}
+                        {group.count === null ? "View" : group.count}
                       </span>
                       {expanded ? (
                         <ChevronDown className="h-5 w-5 text-slate-500" aria-hidden="true" />
@@ -2273,11 +2514,10 @@ export default async function MyPendingWorkPage({
                                 key={`${group.title}-${item.id}`}
                               />
                             ))}
-                            {group.count !== null && group.count > group.items.length ? (
+                            {selectedWorkPage > 1 || group.items.length === 10 ? (
                               <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
                                 <span>
-                                  Showing {(selectedWorkPage - 1) * 10 + 1}-
-                                  {(selectedWorkPage - 1) * 10 + group.items.length} of {group.count} items.
+                                  Showing page {selectedWorkPage}
                                 </span>
                                 {selectedWorkPage > 1 ? (
                                   <Link
@@ -2292,7 +2532,7 @@ export default async function MyPendingWorkPage({
                                     Previous
                                   </Link>
                                 ) : null}
-                                {group.count > selectedWorkPage * 10 ? (
+                                {group.items.length === 10 ? (
                                   <Link
                                     className="font-medium text-brand-700 hover:text-brand-800"
                                     href={groupedWorkHref(
@@ -2327,7 +2567,7 @@ export default async function MyPendingWorkPage({
         </section>
       ) : null}
 
-      {!myGroups.length && !teamGroups.length && !groupedCountsUnavailable ? (
+      {!myGroups.length && !teamGroups.length ? (
         <div className="mt-6 rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm leading-6 text-slate-500">
           No pending work right now.
         </div>
