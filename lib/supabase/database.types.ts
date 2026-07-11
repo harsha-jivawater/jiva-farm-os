@@ -969,7 +969,12 @@ export type Database = {
       work_items: {
         Row: {
           id: string;
-          source_table: "farmer_leads" | "dispatches" | "pilots";
+          source_table:
+            | "farmer_leads"
+            | "dispatches"
+            | "pilots"
+            | "planned_pilot_visits"
+            | "visit_reports";
           source_id: string;
           action_type:
             | "follow_up"
@@ -977,10 +982,13 @@ export type Database = {
             | "dealer_payment_confirm"
             | "dealer_dispatch_ready"
             | "dispatch_action"
-            | "pilot_dispatch_ready";
+            | "pilot_dispatch_ready"
+            | "pilot_installation_confirm"
+            | "planned_visit_report_needed"
+            | "visit_report_review";
           business_key: string;
           status: "Open";
-          category: "sales" | "dispatch";
+          category: "sales" | "dispatch" | "pilots";
           assignee_user_id: string | null;
           rsm_user_id: string | null;
           region_id: string | null;
@@ -992,7 +1000,12 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          source_table?: "farmer_leads" | "dispatches" | "pilots";
+          source_table?:
+            | "farmer_leads"
+            | "dispatches"
+            | "pilots"
+            | "planned_pilot_visits"
+            | "visit_reports";
           source_id: string;
           action_type:
             | "follow_up"
@@ -1000,10 +1013,13 @@ export type Database = {
             | "dealer_payment_confirm"
             | "dealer_dispatch_ready"
             | "dispatch_action"
-            | "pilot_dispatch_ready";
+            | "pilot_dispatch_ready"
+            | "pilot_installation_confirm"
+            | "planned_visit_report_needed"
+            | "visit_report_review";
           business_key: string;
           status?: "Open";
-          category?: "sales" | "dispatch";
+          category?: "sales" | "dispatch" | "pilots";
           assignee_user_id?: string | null;
           rsm_user_id?: string | null;
           region_id?: string | null;
@@ -1015,7 +1031,12 @@ export type Database = {
         };
         Update: {
           id?: string;
-          source_table?: "farmer_leads" | "dispatches" | "pilots";
+          source_table?:
+            | "farmer_leads"
+            | "dispatches"
+            | "pilots"
+            | "planned_pilot_visits"
+            | "visit_reports";
           source_id?: string;
           action_type?:
             | "follow_up"
@@ -1023,10 +1044,13 @@ export type Database = {
             | "dealer_payment_confirm"
             | "dealer_dispatch_ready"
             | "dispatch_action"
-            | "pilot_dispatch_ready";
+            | "pilot_dispatch_ready"
+            | "pilot_installation_confirm"
+            | "planned_visit_report_needed"
+            | "visit_report_review";
           business_key?: string;
           status?: "Open";
-          category?: "sales" | "dispatch";
+          category?: "sales" | "dispatch" | "pilots";
           assignee_user_id?: string | null;
           rsm_user_id?: string | null;
           region_id?: string | null;
@@ -2787,6 +2811,12 @@ export type Database = {
           p_today: string;
         };
         Returns: Json;
+      };
+      get_visible_pilot_work_item_count: {
+        Args: {
+          p_today: string;
+        };
+        Returns: number;
       };
       get_my_work_oversight_summary_counts: {
         Args: {

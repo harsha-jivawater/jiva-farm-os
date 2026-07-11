@@ -43,11 +43,8 @@ import {
   dealerScope,
   deviceScope,
   followupScope,
-  hasFullRecordAccess,
   installationScope,
   institutionScope,
-  loadDirectReportIds,
-  loadManagedPilotIds,
   pilotScope,
   type RecordScope
 } from "@/lib/users/record-scope";
@@ -78,6 +75,7 @@ type WorkSection = "sales" | "dispatch" | "pilots" | "marketing";
 
 type GroupedWorkCounts = {
   mode: "oversight" | "team-actions" | null;
+  pilots: number | null;
   sales: number | null;
 };
 
@@ -202,6 +200,49 @@ type DispatchWorkItemsResult = {
   unavailable: boolean;
 };
 
+type PilotWorkItemAction =
+  | "pilot_installation_confirm"
+  | "planned_visit_report_needed"
+  | "visit_report_review";
+type PilotWorkItemSourceTable =
+  | "pilots"
+  | "planned_pilot_visits"
+  | "visit_reports";
+type PilotWorkItemStatus = "Open";
+type PilotWorkItemPayload = {
+  cropStageTiming: string | null;
+  farmerName: string | null;
+  pilotCode: string | null;
+  pilotId: string | null;
+  pilotName: string | null;
+  pilotStatus: string | null;
+  plannedVisitStatus: string | null;
+  productModel: string | null;
+  reportStatus: string | null;
+  reportTitle: string | null;
+  visitNumber: number | null;
+  visitReportCode: string | null;
+  visitType: string | null;
+};
+type PilotWorkItemRow = {
+  action_type: PilotWorkItemAction;
+  assignee_user_id: string | null;
+  business_key: string;
+  category: "pilots";
+  created_at: string;
+  due_at: string | null;
+  id: string;
+  rsm_user_id: string | null;
+  source_id: string;
+  source_table: PilotWorkItemSourceTable;
+  status: PilotWorkItemStatus;
+  ui_payload: Json;
+};
+type PilotWorkItemsResult = {
+  items: PendingWorkItem[];
+  unavailable: boolean;
+};
+
 type DealerPendingRow = {
   id: string;
   dealer_code: string;
@@ -225,39 +266,6 @@ type InstitutionPendingRow = {
   technical_owner_user_id: string | null;
 };
 
-type PilotPendingRow = {
-  id: string;
-  pilot_code: string;
-  pilot_name: string;
-  pilot_status: string;
-  farmer_name_snapshot: string;
-  dispatch_id: string | null;
-  pilot_owner_user_id: string;
-  product_model: string;
-  next_visit_due_date: string | null;
-};
-
-type PlannedVisitPendingRow = {
-  id: string;
-  assigned_user_id: string | null;
-  crop_stage_timing: string | null;
-  linked_visit_report_id: string | null;
-  pilot_id: string;
-  planned_visit_date: string;
-  planned_visit_status: string;
-  visit_number: number;
-  visit_type: string;
-};
-
-type VisitReportPendingRow = {
-  id: string;
-  pilot_id: string | null;
-  report_date: string;
-  report_status: string;
-  report_title: string;
-  visit_report_code: string;
-};
-
 type MarketingRequestPendingRow = {
   id: string;
   request_code: string;
@@ -270,25 +278,21 @@ type MarketingRequestPendingRow = {
   marketing_head_user_id: string | null;
 };
 
-type PilotSummary = {
-  id: string;
-  pilot_code: string;
-  pilot_name: string;
-  farmer_name_snapshot: string;
-};
-
 const dispatchWorkItemActions: DispatchWorkItemAction[] = [
   "dealer_payment_confirm",
   "dealer_dispatch_ready",
   "dispatch_action",
   "pilot_dispatch_ready"
 ];
-const activePlannedVisitStatuses = [
-  "Planned",
-  "Assigned",
-  "Due",
-  "In Progress",
-  "Rescheduled"
+const pilotWorkItemActions: PilotWorkItemAction[] = [
+  "pilot_installation_confirm",
+  "planned_visit_report_needed",
+  "visit_report_review"
+];
+const personalPilotWorkItemActions: PilotWorkItemAction[] = [
+  "pilot_installation_confirm",
+  "planned_visit_report_needed",
+  "visit_report_review"
 ];
 const openMarketingStatuses = [
   "Requested",
@@ -528,7 +532,19 @@ function groupedWorkCount(
   counts: GroupedWorkCounts | null,
   section: WorkSection
 ) {
-  return counts && section === "sales" ? counts.sales : null;
+  if (!counts) {
+    return null;
+  }
+
+  if (section === "sales") {
+    return counts.sales;
+  }
+
+  if (section === "pilots") {
+    return counts.pilots;
+  }
+
+  return null;
 }
 
 function groupedWorkSection({
@@ -905,25 +921,6 @@ function PendingGroupCard({ group }: { group: PendingWorkGroup }) {
         )}
       </div>
     </section>
-  );
-}
-
-async function loadPilotMap(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  pilotIds: string[]
-) {
-  if (!pilotIds.length) {
-    return new Map<string, PilotSummary>();
-  }
-
-  const { data } = await supabase
-    .from("pilots")
-    .select("id, pilot_code, pilot_name, farmer_name_snapshot")
-    .in("id", pilotIds)
-    .is("deleted_at", null);
-
-  return new Map(
-    ((data ?? []) as PilotSummary[]).map((pilot) => [pilot.id, pilot])
   );
 }
 
@@ -1343,10 +1340,12 @@ async function loadFarmerLeadGroupedSalesCount({
 
 async function loadGroupedWorkCounts({
   currentUser,
-  supabase
+  supabase,
+  today
 }: {
   currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
   supabase: Awaited<ReturnType<typeof createClient>>;
+  today: string;
 }) {
   const groupedSections = supportedGroupedSections(currentUser);
   if (!groupedSections.length) {
@@ -1354,7 +1353,7 @@ async function loadGroupedWorkCounts({
   }
 
   const mode = isOversightUser(currentUser) ? "oversight" : "team-actions";
-  const counts: GroupedWorkCounts = { mode, sales: null };
+  const counts: GroupedWorkCounts = { mode, pilots: null, sales: null };
 
   if (groupedSections.includes("sales")) {
     counts.sales = (
@@ -1364,6 +1363,26 @@ async function loadGroupedWorkCounts({
         task: () => loadFarmerLeadGroupedSalesCount({ currentUser, supabase })
       })
     ).value;
+  }
+
+  if (groupedSections.includes("pilots")) {
+    counts.pilots = await safeCountLoader({
+      fallback: null,
+      label: "my work grouped pilots work_items count",
+      task: async () => {
+        const { data, error } = await supabase.rpc(
+          "get_visible_pilot_work_item_count",
+          { p_today: today }
+        );
+
+        if (error) {
+          logSupabaseError("my work grouped pilots work_items count", error);
+          return null;
+        }
+
+        return numberValue(data);
+      }
+    });
   }
 
   return counts;
@@ -1554,6 +1573,127 @@ function mapDispatchWorkItem(item: DispatchWorkItemRow): PendingWorkItem {
       payload.productModel
     ]),
     title: `Dispatch needs action: ${destinationName}`
+  };
+}
+
+function readNumberPayloadValue(value: Json | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function readPilotWorkItemPayload(value: Json): PilotWorkItemPayload {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      cropStageTiming: null,
+      farmerName: null,
+      pilotCode: null,
+      pilotId: null,
+      pilotName: null,
+      pilotStatus: null,
+      plannedVisitStatus: null,
+      productModel: null,
+      reportStatus: null,
+      reportTitle: null,
+      visitNumber: null,
+      visitReportCode: null,
+      visitType: null
+    };
+  }
+
+  return {
+    cropStageTiming: readTextPayloadValue(value.crop_stage_timing),
+    farmerName: readTextPayloadValue(value.farmer_name),
+    pilotCode: readTextPayloadValue(value.pilot_code),
+    pilotId: readTextPayloadValue(value.pilot_id),
+    pilotName: readTextPayloadValue(value.pilot_name),
+    pilotStatus: readTextPayloadValue(value.pilot_status),
+    plannedVisitStatus: readTextPayloadValue(value.planned_visit_status),
+    productModel: readTextPayloadValue(value.product_model),
+    reportStatus: readTextPayloadValue(value.report_status),
+    reportTitle: readTextPayloadValue(value.report_title),
+    visitNumber: readNumberPayloadValue(value.visit_number),
+    visitReportCode: readTextPayloadValue(value.visit_report_code),
+    visitType: readTextPayloadValue(value.visit_type)
+  };
+}
+
+function shouldShowPilotWorkItem(item: PilotWorkItemRow, today: string) {
+  if (item.action_type !== "planned_visit_report_needed") {
+    return true;
+  }
+
+  const payload = readPilotWorkItemPayload(item.ui_payload);
+
+  return (
+    payload.plannedVisitStatus === "In Progress" ||
+    Boolean(item.due_at && item.due_at <= today)
+  );
+}
+
+function mapPilotWorkItem(item: PilotWorkItemRow): PendingWorkItem {
+  const payload = readPilotWorkItemPayload(item.ui_payload);
+  const assignmentUserIds = [
+    item.assignee_user_id,
+    item.rsm_user_id
+  ].filter(Boolean) as string[];
+
+  if (item.action_type === "pilot_installation_confirm") {
+    const pilotName = payload.pilotName ?? "Pilot";
+    const pilotCode = payload.pilotCode ?? "Pilot";
+
+    return {
+      assignmentUserIds,
+      businessKey: item.business_key,
+      dueDate: item.due_at,
+      href: `/pilots/${item.source_id}`,
+      id: `pilot-install-${item.source_id}`,
+      nextAction: "Confirm pilot device installation when the field team completes it.",
+      ownerUserId: item.assignee_user_id,
+      status: payload.pilotStatus ?? "Device dispatched",
+      subtitle: subtitleFromParts([pilotCode, payload.farmerName]),
+      title: `Pilot needs device installation: ${pilotName}`
+    };
+  }
+
+  if (item.action_type === "planned_visit_report_needed") {
+    const pilotId = payload.pilotId ?? item.source_id;
+    const visitNumber =
+      payload.visitNumber === null ? "Visit" : `Visit ${payload.visitNumber}`;
+
+    return {
+      assignmentUserIds,
+      businessKey: item.business_key,
+      dueDate: item.due_at,
+      href: `/pilots/${pilotId}?planned_visit_id=${item.source_id}#add-visit-report`,
+      id: `visit-report-${item.source_id}`,
+      nextAction: "Complete the visit report from My Visits or the Pilot detail page.",
+      ownerUserId: item.assignee_user_id,
+      status: payload.plannedVisitStatus ?? "Report needed",
+      subtitle: subtitleFromParts([
+        payload.pilotCode ?? "Pilot",
+        payload.cropStageTiming ?? "Crop stage not set"
+      ]),
+      title: `Visit report needed: ${visitNumber} · ${
+        payload.visitType ?? "Visit"
+      }`
+    };
+  }
+
+  const pilotId = payload.pilotId;
+
+  return {
+    assignmentUserIds,
+    businessKey: item.business_key,
+    dueDate: item.due_at,
+    href: pilotId ? `/pilots/${pilotId}#visit-reports` : "/pilots",
+    id: `report-review-${item.source_id}`,
+    nextAction: "Review the submitted visit report and update its status.",
+    ownerUserId: item.assignee_user_id,
+    status: payload.reportStatus ?? "Submitted",
+    subtitle: subtitleFromParts([
+      payload.visitReportCode,
+      payload.pilotName ?? "Pilot context not set"
+    ]),
+    title: `Report needs review: ${payload.reportTitle ?? "Visit report"}`
   };
 }
 
@@ -1837,8 +1977,7 @@ async function loadPilotItems({
   personalOnly?: boolean;
   supabase: Awaited<ReturnType<typeof createClient>>;
   today: string;
-}) {
-  const items: PendingWorkItem[] = [];
+}): Promise<PilotWorkItemsResult> {
   const listLimit = itemLimit ?? 8;
 
   if (
@@ -1850,169 +1989,63 @@ async function loadPilotItems({
       "Research Assistant"
     ])
   ) {
-    return items;
+    return { items: [], unavailable: false };
   }
 
   if (!canViewModule(currentUser, "pilots")) {
-    return items;
+    return { items: [], unavailable: false };
   }
 
-  const pilotScopeValue = await pilotScope(supabase, currentUser);
-  let installQuery = supabase
-    .from("pilots")
-    .select(
-      "id, pilot_code, pilot_name, pilot_status, farmer_name_snapshot, dispatch_id, pilot_owner_user_id, product_model, next_visit_due_date"
-    )
-    .is("deleted_at", null)
-    .eq("installation_completed", false)
-    .in("pilot_status", ["Device Dispatched"])
-    .order("updated_at", { ascending: true })
-    .limit(listLimit);
-  installQuery = applyScope(installQuery, pilotScopeValue);
-  if (personalOnly) {
-    installQuery = applyPersonalOwnership(installQuery, {
-      assignmentColumns: [],
-      currentUser,
-      ownerColumn: "pilot_owner_user_id"
-    });
-  }
-  const { data: installPilots } = await installQuery;
+  const actionTypes = personalOnly
+    ? personalPilotWorkItemActions
+    : pilotWorkItemActions;
+  const results = await timeAsync(
+    "my work pilot work_items loader",
+    () =>
+      Promise.all(
+        actionTypes.map((actionType) => {
+          const baseQuery = supabase
+            .from("work_items")
+            .select(
+              "id, source_table, source_id, action_type, business_key, status, category, assignee_user_id, rsm_user_id, due_at, ui_payload, created_at"
+            )
+            .eq("status", "Open")
+            .eq("category", "pilots")
+            .eq("action_type", actionType)
+            .order("due_at", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: false })
+            .limit(actionType === "planned_visit_report_needed" ? listLimit * 2 : listLimit);
 
-  items.push(
-    ...((installPilots ?? []) as PilotPendingRow[]).map((pilot) => ({
-      dueDate: pilot.next_visit_due_date,
-      href: `/pilots/${pilot.id}`,
-      id: `pilot-install-${pilot.id}`,
-      assignmentUserIds: [pilot.pilot_owner_user_id],
-      businessKey: `pilot:${pilot.id}:installation`,
-      nextAction: "Confirm pilot device installation when the field team completes it.",
-      ownerUserId: pilot.pilot_owner_user_id,
-      status: pilot.pilot_status,
-      subtitle: `${pilot.pilot_code} · ${pilot.farmer_name_snapshot}`,
-      title: `Pilot needs device installation: ${pilot.pilot_name}`
-    }))
-  );
-
-  let visitQuery = supabase
-    .from("planned_pilot_visits")
-    .select(
-      "id, assigned_user_id, crop_stage_timing, linked_visit_report_id, pilot_id, planned_visit_date, planned_visit_status, visit_number, visit_type"
-    )
-    .is("deleted_at", null)
-    .is("linked_visit_report_id", null)
-    .in("planned_visit_status", activePlannedVisitStatuses)
-    .or(`planned_visit_date.lte.${today},planned_visit_status.eq.In Progress`)
-    .order("planned_visit_date", { ascending: true })
-    .limit(itemLimit ?? 15);
-
-  if (personalOnly) {
-    visitQuery = visitQuery.eq("assigned_user_id", currentUser.id);
-  } else if (hasRole(currentUser, "Research Assistant")) {
-    visitQuery = visitQuery.eq("assigned_user_id", currentUser.id);
-  } else if (!hasFullRecordAccess(currentUser, "pilots")) {
-    const directReportIds = await loadDirectReportIds(supabase, currentUser.id, [
-      "Research Assistant"
-    ]);
-    const managedPilotIds = await loadManagedPilotIds(
-      supabase,
-      currentUser,
-      directReportIds
-    );
-    visitQuery = managedPilotIds.length
-      ? visitQuery.in("pilot_id", managedPilotIds)
-      : visitQuery.is("id", null);
-  }
-
-  const { data: visitRows } = await visitQuery;
-  const visits = (visitRows ?? []) as PlannedVisitPendingRow[];
-  const pilotMap = await loadPilotMap(
-    supabase,
-    Array.from(new Set(visits.map((visit) => visit.pilot_id)))
-  );
-
-  items.push(
-    ...visits.map((visit) => {
-      const pilot = pilotMap.get(visit.pilot_id);
-      return {
-        dueDate: visit.planned_visit_date,
-        href: `/pilots/${visit.pilot_id}?planned_visit_id=${visit.id}#add-visit-report`,
-        id: `visit-report-${visit.id}`,
-        assignmentUserIds: [visit.assigned_user_id].filter(Boolean) as string[],
-        businessKey: `planned-visit:${visit.id}:report`,
-        nextAction: "Complete the visit report from My Visits or the Pilot detail page.",
-        ownerUserId: visit.assigned_user_id,
-        status: visit.planned_visit_status,
-        subtitle: `${pilot?.pilot_code ?? "Pilot"} · ${
-          visit.crop_stage_timing || "Crop stage not set"
-        }`,
-        title: `Visit report needed: Visit ${visit.visit_number} · ${visit.visit_type}`
-      };
-    })
-  );
-
-  if (
-    !personalOnly &&
-    hasAnyRole(currentUser, ["Admin", "Management", "R&D Head", "Agronomist"])
-  ) {
-    let reportQuery = supabase
-      .from("visit_reports")
-      .select(
-        "id, pilot_id, report_date, report_status, report_title, visit_report_code"
+          return personalOnly
+            ? baseQuery.or(
+                `assignee_user_id.eq.${currentUser.id},rsm_user_id.eq.${currentUser.id}`
+              )
+            : baseQuery;
+        })
       )
-      .is("deleted_at", null)
-      .eq("report_status", "Submitted")
-      .order("report_date", { ascending: true })
-      .limit(itemLimit ?? 10);
+  );
+  const errors = results.flatMap((result) => (result.error ? [result.error] : []));
+  errors.forEach((error) =>
+    logSupabaseError("my work pilot work_items loader", error)
+  );
 
-    if (!hasFullRecordAccess(currentUser, "pilots")) {
-      const directReportIds = await loadDirectReportIds(
-        supabase,
-        currentUser.id,
-        ["Research Assistant"]
-      );
-      const managedPilotIds = await loadManagedPilotIds(
-        supabase,
-        currentUser,
-        directReportIds
-      );
-      reportQuery = managedPilotIds.length
-        ? reportQuery.in("pilot_id", managedPilotIds)
-        : reportQuery.is("id", null);
-    }
+  const rows = results
+    .flatMap((result) => (result.data ?? []) as PilotWorkItemRow[])
+    .filter((item) => shouldShowPilotWorkItem(item, today))
+    .sort((left, right) => {
+      if (left.due_at !== right.due_at) {
+        if (!left.due_at) return 1;
+        if (!right.due_at) return -1;
+        return left.due_at.localeCompare(right.due_at);
+      }
 
-    const { data: reportRows } = await reportQuery;
-    const reports = (reportRows ?? []) as VisitReportPendingRow[];
-    const reportPilotMap = await loadPilotMap(
-      supabase,
-      Array.from(
-        new Set(reports.map((report) => report.pilot_id).filter(Boolean))
-      ) as string[]
-    );
+      return right.created_at.localeCompare(left.created_at);
+    });
 
-    items.push(
-      ...reports.map((report) => {
-        const pilot = report.pilot_id
-          ? reportPilotMap.get(report.pilot_id)
-          : null;
-        return {
-          dueDate: report.report_date,
-          href: report.pilot_id
-            ? `/pilots/${report.pilot_id}#visit-reports`
-            : "/pilots",
-          id: `report-review-${report.id}`,
-          businessKey: `visit-report:${report.id}:review`,
-          nextAction: "Review the submitted visit report and update its status.",
-          status: report.report_status,
-          subtitle: `${report.visit_report_code} · ${
-            pilot?.pilot_name ?? "Pilot context not set"
-          }`,
-          title: `Report needs review: ${report.report_title}`
-        };
-      })
-    );
-  }
-
-  return items;
+  return {
+    items: rows.map(mapPilotWorkItem),
+    unavailable: errors.length > 0
+  };
 }
 
 async function loadMarketingItems({
@@ -2202,7 +2235,7 @@ async function loadMyActions({
           ? timeAsync("my work personal pilots", () =>
               loadPilotItems({ currentUser, personalOnly: true, supabase, today })
             )
-          : Promise.resolve([]),
+          : Promise.resolve({ items: [], unavailable: false }),
         shouldLoadMarketingWork(currentUser)
           ? timeAsync("my work personal marketing", () =>
               loadMarketingItems({ currentUser, personalOnly: true, supabase, today })
@@ -2236,8 +2269,11 @@ async function loadMyActions({
         description:
           "Pilot installation handoffs, planned visits that need reports, and visit reports waiting for review.",
         icon: Wrench,
-        items: pilotItems,
-        title: "Pilots & Visits"
+        items: pilotItems.items,
+        title: "Pilots & Visits",
+        unavailableMessage: pilotItems.unavailable
+          ? "Pilot monitoring work is temporarily unavailable."
+          : undefined
       },
       {
         description:
@@ -2302,15 +2338,12 @@ async function loadSelectedGroupedSection({
         : section === "dispatch"
         ? await loadDispatchItems({ currentUser, itemLimit: sourceLimit, supabase })
         : section === "pilots"
-        ? {
-            items: await loadPilotItems({
-              currentUser,
-              itemLimit: sourceLimit,
-              supabase,
-              today
-            }),
-            unavailable: false
-          }
+        ? await loadPilotItems({
+            currentUser,
+            itemLimit: sourceLimit,
+            supabase,
+            today
+          })
         : {
             items: await loadMarketingItems({
               currentUser,
@@ -2347,6 +2380,8 @@ async function loadSelectedGroupedSection({
               dispatchUnavailable: otherWork.unavailable,
               farmerLeadDispatchUnavailable: false
             })
+          : section === "pilots" && otherWork.unavailable
+          ? "Pilot monitoring work is temporarily unavailable."
           : farmerLeadWork.unavailable
           ? "Farmer Lead work is temporarily unavailable. Other Sales work is still shown."
           : undefined
@@ -2404,7 +2439,7 @@ export default async function MyPendingWorkPage({
         ? safeLoadMyWorkSection({
             fallback: null,
             label: "my work grouped counts fallback",
-            task: () => loadGroupedWorkCounts({ currentUser, supabase })
+            task: () => loadGroupedWorkCounts({ currentUser, supabase, today })
           })
         : Promise.resolve(null),
       selectedSectionPromise

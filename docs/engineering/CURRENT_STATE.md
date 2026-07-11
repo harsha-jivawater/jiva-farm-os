@@ -24,6 +24,7 @@ Farmer Lead actions read from work_items
 Initial My Work loading is bounded
 Closed legacy grouped categories are lazy
 Initial Dispatch selected-section reads are deployed from work_items
+Pilot Monitoring production read model is applied and reconciled
 ```
 
 ## Completed Architecture
@@ -128,3 +129,37 @@ Before expanding Dispatch My Work cutover, keep Stage C bounded to:
 6. parity with the existing role behavior
 
 The Stage A, Stage B, and initial Stage C proofs are documented in `docs/DISPATCH_WORK_ITEMS_SHADOW_PROOF.md`. Stage A is captured in migration `202607110003_dispatch_work_items_shadow_proof.sql`; Stage B trigger synchronization is captured locally in `202607110004_dispatch_work_items_shadow_triggers.sql` and recorded in Supabase migration history as `20260711192035 dispatch_work_items_shadow_triggers`.
+
+### Pilot Monitoring Read Model
+
+Stage A and Stage B implementation is applied for Pilots & Visits:
+
+```text
+pilot_installation_confirm
+planned_visit_report_needed
+visit_report_review
+```
+
+Prepared migrations:
+
+```text
+20260711194735_pilot_work_items_shadow_proof.sql
+20260711194741_pilot_work_items_shadow_triggers.sql
+```
+
+Recorded Supabase migration history:
+
+```text
+20260711194735 pilot_work_items_shadow_proof
+20260711194741 pilot_work_items_shadow_triggers
+```
+
+Production validation:
+
+- backfills completed: 6 Pilot rows, 0 planned visit rows, 0 visit report rows
+- Pilot Monitoring reconciliation drift: 0
+- rollback-safe trigger proof passed for create/remove/relink paths
+- representative RLS passed for Admin, R&D Head, Agronomist, Research Assistant, and Stock / Dispatch non-visibility
+- `supabase db lint --linked --schema public --fail-on none` returned no schema errors
+
+The My Work Pilot loader is cut over to `work_items`, and the collapsed Pilots & Visits count uses the new RLS-preserving count RPC.

@@ -55,10 +55,12 @@ Required stages:
 
 ### Pilots and Visits Read Model
 
-- [ ] define action types
-- [ ] establish projection and reconciliation
-- [ ] migrate My Work consumer
-- [ ] restore lightweight collapsed count
+- [x] define action types
+- [x] prepare projection and reconciliation
+- [x] migrate My Work consumer locally
+- [x] restore lightweight collapsed count locally
+- [x] apply production migrations
+- [x] validate production
 
 ### Marketing Read Model
 
