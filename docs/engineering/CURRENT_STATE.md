@@ -13,7 +13,7 @@ main
 Latest confirmed production commit:
 
 ```text
-4712c6a Add Dispatch work items shadow proof
+b061d50 Verify Dispatch work item sync triggers
 ```
 
 Production status:

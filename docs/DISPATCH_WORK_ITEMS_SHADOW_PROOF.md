@@ -595,4 +595,4 @@ Stage C cannot begin until all of these pass:
 - [x] Farmer Lead reconciliation = 0
 - [x] representative RLS remains correct
 - [x] migration history recorded
-- [ ] Stage B committed and pushed
+- [x] Stage B committed and pushed
