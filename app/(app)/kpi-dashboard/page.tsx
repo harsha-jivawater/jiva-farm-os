@@ -36,6 +36,8 @@ import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { hasAnyRole, hasRole } from "@/lib/users/permissions";
 import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
+export const maxDuration = 60;
+
 type KpiDashboardPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -285,6 +287,8 @@ function refreshErrorMessage(errorCode: string) {
       return "KPI refresh received an invalid filter value. Reset filters and try again.";
     case "kpi_rpc":
       return "KPI refresh calculation failed inside Supabase. Check the KPI summary RPC logs.";
+    case "timeout":
+      return "KPI refresh is taking longer than expected. Showing the latest saved cache while refresh catches up.";
     default:
       return "KPI Dashboard refresh failed. Please try again or contact Admin.";
   }
@@ -295,6 +299,14 @@ function classifyRefreshError(error: SupabaseRpcError) {
   const details = error.details?.toLowerCase() ?? "";
   const hint = error.hint?.toLowerCase() ?? "";
   const combined = `${message} ${details} ${hint}`;
+
+  if (
+    error.code === "57014" ||
+    combined.includes("canceling statement due to statement timeout") ||
+    combined.includes("statement timeout")
+  ) {
+    return "timeout";
+  }
 
   if (error.code === "42501" || combined.includes("permission denied")) {
     return "permission";
@@ -905,6 +917,13 @@ function KpiCacheStatus({
   sourceDescription?: string;
   timestampLabel?: string;
 }) {
+  const statusDescription =
+    sourceDescription ??
+    cacheMeta.message ??
+    (cacheMeta.isDirty
+      ? `Some KPI sections are marked stale: ${cacheMeta.dirtySections.join(", ")}.`
+      : "Showing saved KPI values from the dashboard cache.");
+
   return (
     <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -913,10 +932,7 @@ function KpiCacheStatus({
             {timestampLabel} {formatDateTime(cacheMeta.lastRefreshedAt)}
           </p>
           <p className="mt-1 text-sm leading-6 text-slate-500">
-            {sourceDescription ??
-            (cacheMeta.isDirty
-              ? `Some KPI sections are marked stale: ${cacheMeta.dirtySections.join(", ")}.`
-              : "Showing saved KPI values from the dashboard cache.")}
+            {statusDescription}
           </p>
           {refreshStatus === "success" ? (
             <p className="mt-2 text-sm font-medium text-emerald-700">
