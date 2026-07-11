@@ -1,6 +1,6 @@
 # Jiva Farm OS Current Engineering State
 
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-12_
 
 ## Production
 
@@ -13,7 +13,7 @@ main
 Latest confirmed production commit:
 
 ```text
-d532039 Bound My Work initial loading
+4712c6a Add Dispatch work items shadow proof
 ```
 
 Production status:
@@ -84,7 +84,7 @@ get_my_work_oversight_summary_counts
 
 ### Dispatch Read Model
 
-The Dispatch action lifecycle has been inspected and Stage A has been prepared for manual review.
+The Dispatch action lifecycle has been inspected. Stage A has been applied and reconciled. Stage B triggers are applied, verified, and recorded in Supabase migration history.
 
 Prepared action types:
 
@@ -95,12 +95,12 @@ dispatch_action
 pilot_dispatch_ready
 ```
 
-Stage A is prepared for controlled review only. It is not applied, has no triggers, and does not change My Work rendering.
+Stage A is applied and reconciled. Stage B synchronization triggers are applied and verified. Stage B does not change My Work rendering.
 
 ## Current Risks
 
 - legacy Dispatch, Pilot, and Marketing sections still reconstruct work from operational tables when opened
-- migration history contains local/remote inconsistencies
+- migration history uses Supabase's applied timestamp for Stage B (`20260711192035`) while the reviewed local file remains `202607110004_dispatch_work_items_shadow_triggers.sql`
 - production SQL must remain manually controlled
 - standalone Sales Head RLS parity was not independently tested during the Farmer Lead proof because no suitable non-Admin user was available
 
@@ -116,14 +116,13 @@ Stage A is prepared for controlled review only. It is not applied, has no trigge
 
 ## Next Review Gate
 
-Before implementing Dispatch projection, produce:
+Before implementing Dispatch My Work cutover, keep Stage C bounded to:
 
-1. exact existing Dispatch action definitions
-2. source columns and terminal statuses
-3. stable business keys
-4. expected assignee and role visibility
-5. backfill and reconciliation plan
-6. trigger dependencies
-7. query and complexity budgets
+1. one selected Dispatch consumer path
+2. work_items-backed reads only for proven Dispatch/Pilot actions
+3. no broad aggregate RPCs
+4. no service-role reads
+5. failure isolation per action group
+6. parity with the existing role behavior
 
-These have been documented in `docs/DISPATCH_WORK_ITEMS_SHADOW_PROOF.md` and prepared in migration `202607110003_dispatch_work_items_shadow_proof.sql`.
+The Stage A and Stage B proofs are documented in `docs/DISPATCH_WORK_ITEMS_SHADOW_PROOF.md`. Stage A is captured in migration `202607110003_dispatch_work_items_shadow_proof.sql`; Stage B trigger synchronization is captured locally in `202607110004_dispatch_work_items_shadow_triggers.sql` and recorded in Supabase migration history as `20260711192035 dispatch_work_items_shadow_triggers`.

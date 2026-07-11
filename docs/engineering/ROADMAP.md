@@ -1,6 +1,6 @@
 # Jiva Farm OS Engineering Roadmap
 
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-12_
 
 ## Current Priority
 
@@ -16,8 +16,10 @@ Required stages:
 - [x] create Stage A projection function draft for controlled review
 - [x] create Stage A bounded backfill draft for controlled review
 - [x] create Stage A reconciliation draft for controlled review
-- [ ] validate RLS by representative role
-- [ ] add guarded triggers
+- [x] apply and reconcile Stage A
+- [x] validate RLS by representative role
+- [x] prepare Stage B guarded triggers for controlled review
+- [x] apply and test Stage B guarded triggers
 - [ ] prove performance
 - [ ] cut over one consumer
 - [ ] validate production

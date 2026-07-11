@@ -1,6 +1,8 @@
 # Dispatch Work-Item Shadow Proof
 
-This Stage A proof prepares Dispatch-related `work_items` only. It does not change My Work rendering, does not create synchronization triggers, and does not replace Dispatches, Pilots, or Farmer Leads as the source of truth.
+This proof covers Dispatch-related `work_items`. Operational Dispatches, Pilots, and Farmer Leads remain the source of truth.
+
+Stage A is applied and reconciled. Stage B is applied, recorded in Supabase migration history, and verified. Stage B does not change My Work rendering.
 
 ## Schema Assumptions
 
@@ -206,3 +208,391 @@ Stage B should add guarded source-table synchronization for:
 - Dispatch changes that affect old and new Pilot references
 
 Use `IS DISTINCT FROM` guards and keep trigger dependencies narrow.
+
+## Stage B Migration
+
+Reviewed local migration:
+
+```text
+supabase/migrations/202607110004_dispatch_work_items_shadow_triggers.sql
+```
+
+Stage B creates synchronization triggers only. It does not add My Work consumer code and does not reimplement candidate logic.
+
+Production migration history records the same Stage B migration as:
+
+```text
+20260711192035 dispatch_work_items_shadow_triggers
+```
+
+Local migration SHA256:
+
+```text
+070f05780fdcef13ee590bc24440ce3aa0d34d30d90ae16c6964c718d8024db2
+```
+
+### Trigger Responsibilities
+
+Existing Farmer Lead trigger responsibility:
+
+- refresh Farmer Lead `dispatch_ready` work when linked/destination Farmer Lead Dispatch references, Dispatch status, or Dispatch deletion state change.
+
+New Dispatch Stage B trigger responsibility:
+
+- refresh Dispatch-sourced work items through `public.project_dispatch_work_items(uuid)`
+- refresh related Pilot dispatch-ready work through `public.project_pilot_dispatch_work_items(uuid)`
+- avoid direct `work_items` writes
+- avoid duplicate Farmer Lead projection calls
+
+### Exact Trigger Names
+
+Dispatch triggers:
+
+```text
+trg_dispatches_sync_dispatch_work_items_insert
+trg_dispatches_sync_dispatch_work_items_update
+trg_dispatches_sync_dispatch_work_items_delete
+```
+
+Pilot triggers:
+
+```text
+trg_pilots_sync_dispatch_work_items_insert
+trg_pilots_sync_dispatch_work_items_update
+trg_pilots_sync_dispatch_work_items_delete
+```
+
+Only these six Stage B trigger names are dropped/recreated by the migration.
+
+### UPDATE Column Guards
+
+Dispatch UPDATE trigger fields:
+
+```text
+dispatch_code
+dispatch_date
+dispatch_status
+dispatch_type
+destination_name_snapshot
+destination_pilot_id
+destination_state
+expected_delivery_date
+linked_pilot_id
+payment_confirmed
+payment_confirmed_date
+payment_requirement_type
+product_model
+deleted_at
+```
+
+Pilot UPDATE trigger fields:
+
+```text
+deleted_at
+farmer_name_snapshot
+installation_completed
+pilot_code
+pilot_name
+pilot_owner_user_id
+pilot_status
+region_id
+rsm_user_id
+state
+```
+
+Every UPDATE trigger uses `OLD.column IS DISTINCT FROM NEW.column` so nullable fields are handled safely.
+
+### Write-Amplification Budget
+
+Per Dispatch row change:
+
+- exactly one `project_dispatch_work_items` call
+- one `project_pilot_dispatch_work_items` call per distinct affected Pilot ID
+- no null Pilot IDs are projected
+- no direct `work_items` insert/update/delete happens inside trigger functions
+
+Expected Dispatch UPDATE fan-out:
+
+```text
+1 Dispatch projector
+0-4 distinct Pilot projectors in theory
+normally 0-2 Pilot projectors
+```
+
+## Stage B Rollback-Safe Test Plan
+
+Run each test inside a transaction and rollback.
+
+### 1. Dealer payment reversal
+
+```sql
+begin;
+
+-- Replace <dispatch_id> with a Dealer Dispatch currently payment_confirmed = true.
+update public.dispatches
+set payment_confirmed = false
+where id = '<dispatch_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: `dealer_dispatch_ready` removed, `dealer_payment_confirm` created, reconciliation remains zero.
+
+### 2. Dealer payment confirmation
+
+```sql
+begin;
+
+-- Replace <dispatch_id> with a Dealer Dispatch currently payment_confirmed = false.
+update public.dispatches
+set payment_confirmed = true,
+    payment_confirmed_date = current_date
+where id = '<dispatch_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: `dealer_payment_confirm` removed, `dealer_dispatch_ready` created when status qualifies, reconciliation remains zero.
+
+### 3. Dispatch cancellation
+
+```sql
+begin;
+
+update public.dispatches
+set dispatch_status = 'Cancelled'
+where id = '<dispatch_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: Dispatch-sourced work items for that Dispatch removed, related Pilot dispatch-ready recalculated, reconciliation remains zero.
+
+### 4. Dispatch restoration
+
+```sql
+begin;
+
+update public.dispatches
+set dispatch_status = 'Dispatch Requested'
+where id = '<dispatch_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: correct Dispatch action recreated, related Pilot dispatch-ready removed if a valid non-cancelled Dispatch now exists, reconciliation remains zero.
+
+### 5. Dispatch soft delete
+
+```sql
+begin;
+
+update public.dispatches
+set deleted_at = now()
+where id = '<dispatch_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: Dispatch work items removed, related Pilot dispatch-ready recalculated, reconciliation remains zero.
+
+### 6. Dispatch Pilot relink
+
+```sql
+begin;
+
+update public.dispatches
+set linked_pilot_id = '<new_pilot_id>'
+where id = '<dispatch_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: old and new Pilot projections refreshed, no stale Pilot work items, no duplicates, reconciliation remains zero.
+
+### 7. Dispatch due-date or display-field update
+
+```sql
+begin;
+
+update public.dispatches
+set expected_delivery_date = current_date + 1,
+    destination_name_snapshot = destination_name_snapshot
+where id = '<dispatch_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: same business key retained, projected `due_at` or `ui_payload` updated, one item only, reconciliation remains zero.
+
+### 8. Pilot becomes ineligible
+
+```sql
+begin;
+
+update public.pilots
+set installation_completed = true
+where id = '<pilot_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: `pilot_dispatch_ready` removed, reconciliation remains zero.
+
+### 9. Pilot becomes eligible again
+
+```sql
+begin;
+
+update public.pilots
+set installation_completed = false,
+    pilot_status = 'Approved'
+where id = '<pilot_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: one `pilot_dispatch_ready` item recreated when no non-cancelled Dispatch exists, reconciliation remains zero.
+
+### 10. Pilot payload refresh
+
+```sql
+begin;
+
+update public.pilots
+set pilot_name = pilot_name || ' '
+where id = '<pilot_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: same business key retained, `ui_payload` updated, one item only, reconciliation remains zero.
+
+### 11. Pilot soft delete
+
+```sql
+begin;
+
+update public.pilots
+set deleted_at = now()
+where id = '<pilot_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: `pilot_dispatch_ready` removed, reconciliation remains zero.
+
+### 12. Hard-delete safety
+
+Use only a temporary/test record inside a rollback transaction.
+
+```sql
+begin;
+
+delete from public.pilots
+where id = '<temporary_test_pilot_id>';
+
+select count(*) as total_discrepancies
+from public.get_dispatch_work_item_shadow_drift();
+
+rollback;
+```
+
+Expected: stale work item removed by DELETE trigger, reconciliation remains zero. Do not hard-delete real production records outside rollback-safe testing.
+
+### Farmer Lead Regression Check
+
+After Stage B tests, confirm existing Farmer Lead projection remains clean:
+
+```sql
+select count(*) as farmer_lead_discrepancies
+from public.get_farmer_lead_work_item_shadow_drift();
+```
+
+Required result:
+
+```text
+0
+```
+
+## Stage B Verification Results
+
+Verified on 2026-07-12 after applying the Stage B migration through Supabase migration history.
+
+Schema and trigger inspection:
+
+- six Stage B triggers exist
+- `trg_pilots_sync_dispatch_work_items_update` watches `farmer_name_snapshot`
+- no trigger references nonexistent `pilots.farmer_name`
+- `pilot_dispatch_work_item_candidates` maps `ui_payload.farmer_name` from `pilots.farmer_name_snapshot`
+- `sync_dispatch_work_items()` and `sync_pilot_dispatch_work_items()` are `SECURITY DEFINER` with `search_path = ''`
+- sync trigger functions are executable by `postgres`, `service_role`, and `supabase_admin`; not by `public`, `anon`, or `authenticated`
+
+Rollback-safe proofs passed:
+
+- Pilot payload refresh: updating `farmer_name_snapshot` refreshed `ui_payload.farmer_name`; `item_count = 1`
+- Dispatch cancellation path: rollback-created Dispatch action was removed on cancellation and related Pilot projection was recalculated
+- Dispatch Pilot relink: OLD Pilot gained one `pilot_dispatch_ready`; NEW Pilot lost its blocked item; no duplicates
+- Dispatch due/display refresh: same business key retained, `due_at` and payload refreshed, `item_count = 1`
+- Pilot eligibility: item removed when ineligible and recreated when eligible again
+- Pilot soft delete: item removed
+- representative RLS: Admin sees `pilot_dispatch_ready`; Stock / Dispatch does not
+
+Final reconciliation:
+
+```text
+Dispatch discrepancies: 0
+Farmer Lead discrepancies: 0
+```
+
+Current data limitation:
+
+- no Dealer Stock Dispatch rows currently exist, so dealer payment reversal/confirmation tests could not be exercised without inventing production test data
+- no hard-delete test was run against real production records
+
+## Stage C Prerequisites
+
+Stage C cannot begin until all of these pass:
+
+- [x] Stage B migration manually reviewed
+- [x] Stage B migration applied
+- [x] six triggers verified
+- [x] rollback-safe trigger tests pass for available production data
+- [x] Dispatch reconciliation = 0
+- [x] Farmer Lead reconciliation = 0
+- [x] representative RLS remains correct
+- [x] migration history recorded
+- [ ] Stage B committed and pushed
