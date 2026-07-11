@@ -13,7 +13,7 @@ main
 Latest confirmed production commit:
 
 ```text
-b061d50 Verify Dispatch work item sync triggers
+c3036e1 Cut over Dispatch My Work to work items
 ```
 
 Production status:
@@ -23,6 +23,7 @@ My Work is working
 Farmer Lead actions read from work_items
 Initial My Work loading is bounded
 Closed legacy grouped categories are lazy
+Initial Dispatch selected-section reads are deployed from work_items
 ```
 
 ## Completed Architecture

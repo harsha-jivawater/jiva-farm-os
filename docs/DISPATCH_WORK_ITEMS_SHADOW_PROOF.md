@@ -624,4 +624,6 @@ Validation status:
 - `npm run build` passed
 - live authenticated Admin RLS query sees the current two `pilot_dispatch_ready` rows
 - live authenticated Stock / Dispatch RLS query sees zero `pilot_dispatch_ready` rows, preserving Stage B visibility
+- production deployment for `c3036e1` reached READY on Vercel
+- production `/my-pending-work` route is reachable and redirects to Vercel SSO before authentication
 - full production UI verification remains required before declaring Stage C complete
