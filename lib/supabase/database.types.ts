@@ -966,6 +966,60 @@ export type Database = {
         };
         Relationships: [];
       };
+      work_items: {
+        Row: {
+          id: string;
+          source_table: "farmer_leads";
+          source_id: string;
+          action_type: "follow_up" | "dispatch_ready";
+          business_key: string;
+          status: "Open";
+          category: "sales";
+          assignee_user_id: string;
+          rsm_user_id: string;
+          region_id: string;
+          state: string;
+          due_at: string | null;
+          ui_payload: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          source_table?: "farmer_leads";
+          source_id: string;
+          action_type: "follow_up" | "dispatch_ready";
+          business_key: string;
+          status?: "Open";
+          category?: "sales";
+          assignee_user_id: string;
+          rsm_user_id: string;
+          region_id: string;
+          state: string;
+          due_at?: string | null;
+          ui_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          source_table?: "farmer_leads";
+          source_id?: string;
+          action_type?: "follow_up" | "dispatch_ready";
+          business_key?: string;
+          status?: "Open";
+          category?: "sales";
+          assignee_user_id?: string;
+          rsm_user_id?: string;
+          region_id?: string;
+          state?: string;
+          due_at?: string | null;
+          ui_payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       farmer_lead_followups: {
         Row: {
           id: string;

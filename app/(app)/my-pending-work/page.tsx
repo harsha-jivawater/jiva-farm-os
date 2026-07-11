@@ -41,7 +41,6 @@ import {
 import {
   dispatchScope,
   dealerScope,
-  farmerLeadScope,
   hasFullRecordAccess,
   institutionScope,
   loadDirectReportIds,
@@ -49,6 +48,7 @@ import {
   pilotScope,
   type RecordScope
 } from "@/lib/users/record-scope";
+import type { Json } from "@/lib/supabase/database.types";
 
 type PendingWorkItem = {
   assignmentUserIds?: string[];
@@ -68,6 +68,7 @@ type PendingWorkGroup = {
   icon: LucideIcon;
   items: PendingWorkItem[];
   title: string;
+  unavailableMessage?: string;
 };
 
 type WorkSection = "sales" | "dispatch" | "pilots" | "marketing";
@@ -123,21 +124,30 @@ type ScopedQuery<T> = T & {
   or: (filters: string) => T;
 };
 
-type FarmerLeadPendingRow = {
+type FarmerLeadWorkItemAction = "follow_up" | "dispatch_ready";
+type FarmerLeadWorkItemPresentation = "sales" | "dispatch";
+type FarmerLeadWorkItemSourceTable = "farmer_leads";
+type FarmerLeadWorkItemStatus = "Open";
+type FarmerLeadWorkItemPayload = {
+  farmerName: string | null;
+  leadCode: string | null;
+};
+type FarmerLeadWorkItemRow = {
+  action_type: FarmerLeadWorkItemAction;
+  assignee_user_id: string;
+  business_key: string;
+  created_at: string;
+  due_at: string | null;
   id: string;
-  lead_code: string | null;
-  created_by_user_id: string;
-  farmer_name: string;
-  village: string;
-  district: string;
-  lead_status: string;
-  funnel_stage: string;
-  next_action_date: string;
-  followup_due_date: string | null;
-  owner_user_id: string | null;
-  payment_confirmed: boolean;
-  payment_confirmed_date: string | null;
-  rsm_user_id: string | null;
+  rsm_user_id: string;
+  source_id: string;
+  source_table: FarmerLeadWorkItemSourceTable;
+  status: FarmerLeadWorkItemStatus;
+  ui_payload: Json;
+};
+type FarmerLeadWorkItemsResult = {
+  items: PendingWorkItem[];
+  unavailable: boolean;
 };
 
 type DealerPendingRow = {
@@ -228,8 +238,6 @@ type PilotSummary = {
   farmer_name_snapshot: string;
 };
 
-const closedLeadStatuses = ["Won", "Lost", "Parked"];
-const closedFunnelStages = ["Won", "Lost", "Parked"];
 const dispatchActionStatuses = [
   "Dispatch Requested",
   "Pending Payment Confirmation",
@@ -413,10 +421,6 @@ function displayDate(value: string | null | undefined) {
   return value ? formatDisplayDate(value) : "Not set";
 }
 
-function compactLocation(...parts: Array<string | null | undefined>) {
-  return parts.filter(Boolean).join(", ");
-}
-
 function isSupervisoryUser(
   currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
 ) {
@@ -453,6 +457,15 @@ function shouldLoadDispatchWork(
       "Stock / Dispatch",
       "Accounts"
     ]) && canViewModule(currentUser, "dispatches")
+  );
+}
+
+function shouldLoadFarmerLeadDispatchWork(
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>
+) {
+  return (
+    hasAnyRole(currentUser, ["Stock / Dispatch"]) &&
+    canViewModule(currentUser, "dispatches")
   );
 }
 
@@ -517,13 +530,20 @@ function groupedWorkCount(
 function groupedWorkSection({
   count,
   items,
-  section
+  section,
+  unavailableMessage
 }: {
   count: number | null;
   items: PendingWorkItem[];
   section: WorkSection;
+  unavailableMessage?: string;
 }): GroupedWorkSection {
-  return { ...groupedWorkDefinitions[section], count, items };
+  return {
+    ...groupedWorkDefinitions[section],
+    count,
+    items,
+    unavailableMessage
+  };
 }
 
 async function safeLoadMyWorkSection<T>({
@@ -599,7 +619,7 @@ function dedupeGroups(groups: PendingWorkGroup[]) {
         return true;
       })
     }))
-    .filter((group) => group.items.length > 0);
+    .filter((group) => group.items.length > 0 || group.unavailableMessage);
 }
 
 function preferredKpiLabels(
@@ -784,6 +804,11 @@ function PendingGroupCard({ group }: { group: PendingWorkGroup }) {
         </div>
       </div>
       <div className="space-y-3 p-4">
+        {group.unavailableMessage ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+            {group.unavailableMessage}
+          </div>
+        ) : null}
         {group.items.length ? (
           group.items.map((item) => (
             <PendingItemCard item={item} key={`${group.title}-${item.id}`} />
@@ -1090,6 +1115,141 @@ async function loadGroupedWorkCounts({
   return counts;
 }
 
+function readFarmerLeadWorkItemPayload(
+  value: Json
+): FarmerLeadWorkItemPayload {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { farmerName: null, leadCode: null };
+  }
+
+  return {
+    farmerName:
+      typeof value.farmer_name === "string" ? value.farmer_name : null,
+    leadCode: typeof value.lead_code === "string" ? value.lead_code : null
+  };
+}
+
+function mapFarmerLeadWorkItem({
+  item,
+  presentation
+}: {
+  item: FarmerLeadWorkItemRow;
+  presentation: FarmerLeadWorkItemPresentation;
+}): PendingWorkItem {
+  const payload = readFarmerLeadWorkItemPayload(item.ui_payload);
+  const farmerName = payload.farmerName ?? "Farmer";
+  const leadCode = payload.leadCode ?? "Lead";
+  const assignmentUserIds = [item.assignee_user_id, item.rsm_user_id];
+
+  if (item.action_type === "follow_up") {
+    return {
+      assignmentUserIds,
+      businessKey: item.business_key,
+      dueDate: item.due_at,
+      href: `/farmer-leads/${item.source_id}`,
+      id: `lead-followup-${item.source_id}`,
+      nextAction: "Follow up with the farmer and update lead progress.",
+      ownerUserId: item.assignee_user_id,
+      status: "Follow-up due",
+      subtitle: leadCode,
+      title: `Lead follow-up: ${farmerName}`
+    };
+  }
+
+  if (presentation === "dispatch") {
+    return {
+      assignmentUserIds,
+      businessKey: item.business_key,
+      dueDate: item.due_at,
+      href: "/dispatches/new?route=farmer-sale",
+      id: `dispatch-farmer-${item.source_id}`,
+      nextAction: "Create a Paid Farmer Sale dispatch using Fresh Sale stock.",
+      ownerUserId: item.assignee_user_id,
+      status: "Payment confirmed",
+      subtitle: `${leadCode} · ${farmerName}`,
+      title: "Farmer Sale dispatch to create"
+    };
+  }
+
+  return {
+    assignmentUserIds,
+    businessKey: item.business_key,
+    dueDate: item.due_at,
+    href: `/farmer-leads/${item.source_id}`,
+    id: `lead-dispatch-${item.source_id}`,
+    nextAction: "Create or request a Farmer Sale Dispatch.",
+    ownerUserId: item.assignee_user_id,
+    status: "Paid · Dispatch pending",
+    subtitle: leadCode,
+    title: `Paid lead ready for dispatch: ${farmerName}`
+  };
+}
+
+async function loadFarmerLeadWorkItems({
+  currentUser,
+  itemLimit,
+  personalOnly = false,
+  presentation,
+  supabase
+}: {
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  itemLimit?: number;
+  personalOnly?: boolean;
+  presentation: FarmerLeadWorkItemPresentation;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}): Promise<FarmerLeadWorkItemsResult> {
+  const actionTypes: FarmerLeadWorkItemAction[] =
+    presentation === "dispatch" ? ["dispatch_ready"] : ["follow_up", "dispatch_ready"];
+  const listLimit = itemLimit ?? 8;
+  const results = await timeAsync(
+    "my work farmer lead work_items loader",
+    () =>
+      Promise.all(
+        actionTypes.map((actionType) => {
+          const baseQuery = supabase
+            .from("work_items")
+            .select(
+              "id, source_table, source_id, action_type, business_key, status, assignee_user_id, rsm_user_id, due_at, ui_payload, created_at"
+            )
+            .eq("source_table", "farmer_leads")
+            .eq("status", "Open")
+            .eq("category", "sales")
+            .eq("action_type", actionType)
+            .order("due_at", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: false })
+            .limit(listLimit);
+
+          return personalOnly
+            ? baseQuery.or(
+                `assignee_user_id.eq.${currentUser.id},rsm_user_id.eq.${currentUser.id}`
+              )
+            : baseQuery;
+        })
+      )
+  );
+  const errors = results.flatMap((result) => (result.error ? [result.error] : []));
+  errors.forEach((error) =>
+    logSupabaseError("my work farmer lead work_items loader", error)
+  );
+
+  const rows = results
+    .flatMap((result) => (result.data ?? []) as FarmerLeadWorkItemRow[])
+    .sort((left, right) => {
+      if (left.due_at !== right.due_at) {
+        if (!left.due_at) return 1;
+        if (!right.due_at) return -1;
+        return left.due_at.localeCompare(right.due_at);
+      }
+
+      return right.created_at.localeCompare(left.created_at);
+    });
+
+  return {
+    items: rows.map((item) => mapFarmerLeadWorkItem({ item, presentation })),
+    unavailable: errors.length > 0
+  };
+}
+
 async function loadSalesItems({
   currentUser,
   itemLimit,
@@ -1121,99 +1281,6 @@ async function loadSalesItems({
   if (!canViewModule(currentUser, "farmer-leads")) {
     return items;
   }
-
-  const leadScope = await farmerLeadScope(supabase, currentUser);
-
-  let followupQuery = supabase
-    .from("farmer_leads")
-    .select(
-      "id, lead_code, created_by_user_id, farmer_name, village, district, lead_status, funnel_stage, next_action_date, followup_due_date, owner_user_id, payment_confirmed, payment_confirmed_date, rsm_user_id"
-    )
-    .is("deleted_at", null)
-    .not("lead_status", "in", `(${closedLeadStatuses.join(",")})`)
-    .not("funnel_stage", "in", `(${closedFunnelStages.join(",")})`)
-    .lte("next_action_date", today)
-    .order("next_action_date", { ascending: true })
-    .limit(listLimit);
-  followupQuery = applyScope(followupQuery, leadScope);
-  if (personalOnly) {
-    followupQuery = applyPersonalOwnership(followupQuery, {
-      assignmentColumns: ["rsm_user_id"],
-      currentUser,
-      ownerColumn: "owner_user_id"
-    });
-  }
-
-  const { data: followupLeads } = await followupQuery;
-  items.push(
-    ...((followupLeads ?? []) as FarmerLeadPendingRow[]).map((lead) => ({
-      dueDate: lead.next_action_date,
-      href: `/farmer-leads/${lead.id}`,
-      id: `lead-followup-${lead.id}`,
-      assignmentUserIds: [lead.owner_user_id, lead.rsm_user_id].filter(
-        Boolean
-      ) as string[],
-      businessKey: `farmer-lead:${lead.id}:follow-up`,
-      nextAction: "Follow up with the farmer and update lead progress.",
-      ownerUserId: lead.owner_user_id,
-      status: `${lead.lead_status} · ${lead.funnel_stage}`,
-      subtitle: `${lead.lead_code ?? "Lead"} · ${compactLocation(
-        lead.village,
-        lead.district
-      )}`,
-      title: `Lead follow-up: ${lead.farmer_name}`
-    }))
-  );
-
-  let paidLeadQuery = supabase
-    .from("farmer_leads")
-    .select(
-      "id, lead_code, created_by_user_id, farmer_name, village, district, lead_status, funnel_stage, next_action_date, followup_due_date, owner_user_id, payment_confirmed, payment_confirmed_date, rsm_user_id"
-    )
-    .eq("payment_confirmed", true)
-    .eq("device_dispatched", false)
-    .is("deleted_at", null)
-    .order("payment_confirmed_date", { ascending: true, nullsFirst: false })
-    .limit(Math.max(listLimit, 25));
-  paidLeadQuery = applyScope(paidLeadQuery, leadScope);
-  if (personalOnly) {
-    paidLeadQuery = applyPersonalOwnership(paidLeadQuery, {
-      assignmentColumns: ["rsm_user_id"],
-      currentUser,
-      ownerColumn: "owner_user_id"
-    });
-  }
-
-  const { data: paidLeads } = await paidLeadQuery;
-  const paidRows = (paidLeads ?? []) as FarmerLeadPendingRow[];
-  const leadDispatchIds = await dispatchExistsForIds({
-    idColumns: ["linked_farmer_lead_id", "destination_farmer_lead_id"],
-    ids: paidRows.map((lead) => lead.id),
-    supabase
-  });
-
-  items.push(
-    ...paidRows
-      .filter((lead) => !leadDispatchIds.has(lead.id))
-      .slice(0, listLimit)
-      .map((lead) => ({
-        dueDate: lead.payment_confirmed_date,
-        href: `/farmer-leads/${lead.id}`,
-        id: `lead-dispatch-${lead.id}`,
-        assignmentUserIds: [lead.owner_user_id, lead.rsm_user_id].filter(
-          Boolean
-        ) as string[],
-        businessKey: `farmer-lead:${lead.id}:dispatch-ready`,
-        nextAction: "Create or request a Farmer Sale Dispatch.",
-        ownerUserId: lead.owner_user_id,
-        status: "Paid · Dispatch pending",
-        subtitle: `${lead.lead_code ?? "Lead"} · ${compactLocation(
-          lead.village,
-          lead.district
-        )}`,
-        title: `Paid lead ready for dispatch: ${lead.farmer_name}`
-      }))
-  );
 
   if (canViewModule(currentUser, "dealers")) {
     const dealerScopeValue = await dealerScope(supabase, currentUser);
@@ -1329,53 +1396,6 @@ async function loadDispatchItems({
   if (!canViewModule(currentUser, "dispatches")) {
     return items;
   }
-
-  const leadScope = await farmerLeadScope(supabase, currentUser);
-  let paidLeadQuery = supabase
-    .from("farmer_leads")
-    .select(
-      "id, lead_code, created_by_user_id, farmer_name, village, district, lead_status, funnel_stage, next_action_date, followup_due_date, owner_user_id, payment_confirmed, payment_confirmed_date, rsm_user_id"
-    )
-    .eq("payment_confirmed", true)
-    .eq("device_dispatched", false)
-    .is("deleted_at", null)
-    .order("payment_confirmed_date", { ascending: true, nullsFirst: false })
-    .limit(Math.max(listLimit, 25));
-  paidLeadQuery = applyScope(paidLeadQuery, leadScope);
-  if (personalOnly) {
-    paidLeadQuery = applyPersonalOwnership(paidLeadQuery, {
-      assignmentColumns: ["rsm_user_id"],
-      currentUser,
-      ownerColumn: "owner_user_id"
-    });
-  }
-  const { data: paidLeads } = await paidLeadQuery;
-  const paidRows = (paidLeads ?? []) as FarmerLeadPendingRow[];
-  const leadDispatchIds = await dispatchExistsForIds({
-    idColumns: ["linked_farmer_lead_id", "destination_farmer_lead_id"],
-    ids: paidRows.map((lead) => lead.id),
-    supabase
-  });
-
-  items.push(
-    ...paidRows
-      .filter((lead) => !leadDispatchIds.has(lead.id))
-      .slice(0, listLimit)
-      .map((lead) => ({
-        dueDate: lead.payment_confirmed_date,
-        href: "/dispatches/new?route=farmer-sale",
-        id: `dispatch-farmer-${lead.id}`,
-        assignmentUserIds: [lead.owner_user_id, lead.rsm_user_id].filter(
-          Boolean
-        ) as string[],
-        businessKey: `farmer-lead:${lead.id}:dispatch-ready`,
-        nextAction: "Create a Paid Farmer Sale dispatch using Fresh Sale stock.",
-        ownerUserId: lead.owner_user_id,
-        status: "Payment confirmed",
-        subtitle: `${lead.lead_code ?? "Lead"} · ${lead.farmer_name}`,
-        title: "Farmer Sale dispatch to create"
-      }))
-  );
 
   if (canViewModule(currentUser, "pilots")) {
     const pilotScopeValue = await pilotScope(supabase, currentUser);
@@ -1863,7 +1883,14 @@ async function loadMyActions({
   today: string;
 }) {
   return timeAsync("my work dedicated my actions loader", async () => {
-    const [salesItems, dispatchItems, pilotItems, marketingItems] =
+    const [
+      salesItems,
+      dispatchItems,
+      farmerLeadSales,
+      farmerLeadDispatch,
+      pilotItems,
+      marketingItems
+    ] =
       await Promise.all([
         shouldLoadSalesWork(currentUser)
           ? timeAsync("my work personal sales", () =>
@@ -1875,6 +1902,22 @@ async function loadMyActions({
               loadDispatchItems({ currentUser, personalOnly: true, supabase })
             )
           : Promise.resolve([]),
+        shouldLoadSalesWork(currentUser)
+          ? loadFarmerLeadWorkItems({
+              currentUser,
+              personalOnly: true,
+              presentation: "sales",
+              supabase
+            })
+          : Promise.resolve({ items: [], unavailable: false }),
+        shouldLoadFarmerLeadDispatchWork(currentUser)
+          ? loadFarmerLeadWorkItems({
+              currentUser,
+              personalOnly: true,
+              presentation: "dispatch",
+              supabase
+            })
+          : Promise.resolve({ items: [], unavailable: false }),
         shouldLoadPilotWork(currentUser)
           ? timeAsync("my work personal pilots", () =>
               loadPilotItems({ currentUser, personalOnly: true, supabase, today })
@@ -1892,15 +1935,21 @@ async function loadMyActions({
         description:
           "Lead follow-ups, paid farmer leads ready for dispatch, and dealer or institution reviews.",
         icon: Tractor,
-        items: salesItems,
-        title: "Sales"
+        items: [...farmerLeadSales.items, ...salesItems],
+        title: "Sales",
+        unavailableMessage: farmerLeadSales.unavailable
+          ? "Farmer Lead work is temporarily unavailable. Other Sales work is still shown."
+          : undefined
       },
       {
         description:
           "Farmer Sale dispatches, Free Pilot dispatches, and dispatch records waiting for the next step.",
         icon: Truck,
-        items: dispatchItems,
-        title: "Dispatch"
+        items: [...farmerLeadDispatch.items, ...dispatchItems],
+        title: "Dispatch",
+        unavailableMessage: farmerLeadDispatch.unavailable
+          ? "Farmer Lead dispatch work is temporarily unavailable. Other Dispatch work is still shown."
+          : undefined
       },
       {
         description:
@@ -1949,7 +1998,16 @@ async function loadSelectedGroupedSection({
 
   return timeAsync(`my work selected ${section} grouped loader`, async () => {
     const sourceLimit = page * 10 + myActionKeys.size;
-    const items = await (
+    const farmerLeadWork =
+      section === "sales"
+        ? await loadFarmerLeadWorkItems({
+            currentUser,
+            itemLimit: sourceLimit,
+            presentation: "sales",
+            supabase
+          })
+        : { items: [], unavailable: false };
+    const otherItems = await (
       section === "sales"
         ? loadSalesItems({ currentUser, itemLimit: sourceLimit, supabase, today })
         : section === "dispatch"
@@ -1958,6 +2016,7 @@ async function loadSelectedGroupedSection({
         ? loadPilotItems({ currentUser, itemLimit: sourceLimit, supabase, today })
         : loadMarketingItems({ currentUser, itemLimit: sourceLimit, supabase, today })
     );
+    const items = [...farmerLeadWork.items, ...otherItems];
 
     const dedupedItems = dedupeGroups([
       groupedWorkSection({ count: null, items, section })
@@ -1974,7 +2033,14 @@ async function loadSelectedGroupedSection({
       })
       .slice((page - 1) * 10, page * 10);
 
-    return groupedWorkSection({ count: null, items: groupedItems, section });
+    return groupedWorkSection({
+      count: null,
+      items: groupedItems,
+      section,
+      unavailableMessage: farmerLeadWork.unavailable
+        ? "Farmer Lead work is temporarily unavailable. Other Sales work is still shown."
+        : undefined
+    });
   });
 }
 
@@ -2040,7 +2106,11 @@ export default async function MyPendingWorkPage({
         selectedGroupedSection?.section === section
           ? selectedGroupedSection.items
           : [],
-      section
+      section,
+      unavailableMessage:
+        selectedGroupedSection?.section === section
+          ? selectedGroupedSection.unavailableMessage
+          : undefined
     })
   );
   const myItemCount = itemCount(myGroups);
@@ -2189,6 +2259,11 @@ export default async function MyPendingWorkPage({
                       className="space-y-3 border-t border-slate-200 p-4"
                       id={`work-section-content-${section}`}
                     >
+                      {group.unavailableMessage ? (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                          {group.unavailableMessage}
+                        </div>
+                      ) : null}
                       {selectedGroupedSection ? (
                         group.items.length ? (
                           <>
