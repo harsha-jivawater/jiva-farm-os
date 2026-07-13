@@ -93,11 +93,22 @@ export function LiveFilterForm({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const formKey = searchParams.toString();
 
+  const clearPendingUpdate = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
   const updateUrl = useCallback(
     (form: HTMLFormElement) => {
       const params = formSearchParams(form);
       const query = params.toString();
       const targetPath = action ?? pathname;
+
+      if (!form.isConnected || window.location.pathname !== targetPath) {
+        return;
+      }
 
       router.replace(query ? `${targetPath}?${query}` : targetPath, {
         scroll: false
@@ -108,9 +119,7 @@ export function LiveFilterForm({
 
   const scheduleUpdate = useCallback(
     (form: HTMLFormElement, debounce: boolean) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      clearPendingUpdate();
 
       if (!debounce) {
         updateUrl(form);
@@ -119,16 +128,12 @@ export function LiveFilterForm({
 
       timeoutRef.current = setTimeout(() => updateUrl(form), debounceMs);
     },
-    [debounceMs, updateUrl]
+    [clearPendingUpdate, debounceMs, updateUrl]
   );
 
   useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
+    return clearPendingUpdate;
+  }, [clearPendingUpdate]);
 
   return (
     <form
