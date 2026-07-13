@@ -225,21 +225,21 @@ function ActionButtons({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <Link
+      <a
         aria-label={`View ${pilot.pilot_name}`}
         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
         href={`/pilots/${pilot.id}`}
       >
         <Eye className="h-4 w-4" aria-hidden="true" />
-      </Link>
+      </a>
       {canWrite ? (
-        <Link
+        <a
           aria-label={`Edit ${pilot.pilot_name}`}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
           href={`/pilots/${pilot.id}/edit`}
         >
           <Pencil className="h-4 w-4" aria-hidden="true" />
-        </Link>
+        </a>
       ) : null}
     </div>
   );
@@ -655,12 +655,12 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
               {pilots.map((pilot) => (
                 <tr key={pilot.id} className="align-top">
                   <td className="px-4 py-3">
-                    <Link
+                    <a
                       className="font-semibold text-slate-950 hover:text-brand-700"
                       href={`/pilots/${pilot.id}`}
                     >
                       {pilot.pilot_code}
-                    </Link>
+                    </a>
                     <p className="mt-1 text-xs text-slate-500">
                       {pilot.pilot_name}
                     </p>
