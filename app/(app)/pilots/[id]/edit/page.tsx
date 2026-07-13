@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import {
   createPlannedPilotVisitAction,
+  deletePlannedPilotVisitAction,
   updatePilotAction,
   updatePlannedPilotVisitAction
 } from "@/app/(app)/pilots/actions";
 import { PageHeader } from "@/components/page-header";
+import { DeletePlannedVisitButton } from "@/components/pilots/delete-planned-visit-button";
 import { PilotForm } from "@/components/pilots/pilot-form";
 import { PlannedVisitForm } from "@/components/pilots/planned-visit-form";
 import type {
@@ -285,6 +287,11 @@ export default async function EditPilotPage({
               pilotRow.id,
               visit.id
             );
+            const deletePlannedVisitAction = deletePlannedPilotVisitAction.bind(
+              null,
+              pilotRow.id,
+              visit.id
+            );
 
             return (
               <details
@@ -395,20 +402,26 @@ export default async function EditPilotPage({
                     </div>
                   </div>
                   {canManageVisitPlans ? (
-                    <details className="mt-4 rounded-md border border-slate-200 bg-white">
-                      <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-brand-700">
-                        Edit planned visit
-                      </summary>
-                      <div className="border-t border-slate-200 p-3">
-                        <PlannedVisitForm
-                          action={updatePlannedVisitAction}
-                          compact
-                          submitLabel="Save visit"
-                          users={(users ?? []) as UserOption[]}
-                          visit={visit}
-                        />
-                      </div>
-                    </details>
+                    <div className="mt-4 space-y-3">
+                      <details className="rounded-md border border-slate-200 bg-white">
+                        <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-brand-700">
+                          Edit planned visit
+                        </summary>
+                        <div className="border-t border-slate-200 p-3">
+                          <PlannedVisitForm
+                            action={updatePlannedVisitAction}
+                            compact
+                            submitLabel="Save visit"
+                            users={(users ?? []) as UserOption[]}
+                            visit={visit}
+                          />
+                        </div>
+                      </details>
+                      <DeletePlannedVisitButton
+                        action={deletePlannedVisitAction}
+                        visitLabel={`Visit ${visit.visit_number}`}
+                      />
+                    </div>
                   ) : null}
                 </div>
               </details>

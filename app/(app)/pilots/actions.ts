@@ -1482,6 +1482,80 @@ export async function updatePlannedPilotVisitAction(
   return { status: "success", message: "Planned visit saved." };
 }
 
+export async function deletePlannedPilotVisitAction(
+  pilotId: string,
+  plannedVisitId: string
+) {
+  const supabase = await createClient();
+  const errorPath = `/pilots/${pilotId}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+  requireVisitPlanManager(profile, errorPath);
+
+  const { data: plannedVisit, error: plannedVisitError } = await supabase
+    .from("planned_pilot_visits")
+    .select("linked_pilot_visit_id, linked_visit_report_id")
+    .eq("id", plannedVisitId)
+    .eq("pilot_id", pilotId)
+    .maybeSingle();
+
+  if (plannedVisitError) {
+    redirectWithError(errorPath, plannedVisitError.message);
+  }
+
+  if (!plannedVisit) {
+    redirectWithError(errorPath, "Selected planned visit was not found.");
+  }
+
+  if (
+    plannedVisit.linked_pilot_visit_id ||
+    plannedVisit.linked_visit_report_id
+  ) {
+    redirectWithError(
+      errorPath,
+      "This planned visit already has visit history or a report linked to it. Cancel or reschedule it instead of deleting it."
+    );
+  }
+
+  const { error } = await supabase
+    .from("planned_pilot_visits")
+    .delete()
+    .eq("id", plannedVisitId)
+    .eq("pilot_id", pilotId);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  const { data: nextPlannedVisit, error: nextPlannedVisitError } =
+    await supabase
+      .from("planned_pilot_visits")
+      .select("planned_visit_date")
+      .eq("pilot_id", pilotId)
+      .in("planned_visit_status", ["Planned", "Assigned", "Due", "In Progress"])
+      .order("planned_visit_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+  if (nextPlannedVisitError) {
+    redirectWithError(errorPath, nextPlannedVisitError.message);
+  }
+
+  const { error: pilotUpdateError } = await supabase
+    .from("pilots")
+    .update({
+      next_visit_due_date: nextPlannedVisit?.planned_visit_date ?? null
+    })
+    .eq("id", pilotId);
+
+  if (pilotUpdateError) {
+    redirectWithError(errorPath, pilotUpdateError.message);
+  }
+
+  revalidatePilot(pilotId);
+  revalidatePath("/my-visits");
+  redirect(`${errorPath}?deleted_planned_visit=1#monitoring-plan`);
+}
+
 export async function updatePlannedPilotVisitStatusAction(
   plannedVisitId: string,
   status: string,

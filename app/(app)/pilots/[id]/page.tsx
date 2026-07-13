@@ -5,6 +5,7 @@ import {
   createPlannedPilotVisitAction,
   createPilotVisitAction,
   createVisitReportAction,
+  deletePlannedPilotVisitAction,
   deletePilotAction,
   generatePilotVisitScheduleAction,
   restorePilotAction,
@@ -17,6 +18,7 @@ import {
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { formatDisplayDateTime } from "@/lib/date-utils";
 import { PageHeader } from "@/components/page-header";
+import { DeletePlannedVisitButton } from "@/components/pilots/delete-planned-visit-button";
 import { PlannedVisitForm } from "@/components/pilots/planned-visit-form";
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
 import { PilotVisitForm } from "@/components/pilots/pilot-visit-form";
@@ -65,6 +67,7 @@ type PilotDetailPageProps = {
   }>;
   searchParams: Promise<{
     error?: string;
+    deleted_planned_visit?: string;
     planned_visit_id?: string;
     pilot_visit_id?: string;
     restored?: string;
@@ -813,6 +816,12 @@ export default async function PilotDetailPage({
         </div>
       ) : null}
 
+      {query.deleted_planned_visit ? (
+        <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
+          Planned visit deleted from the monitoring plan.
+        </div>
+      ) : null}
+
       {isDeleted ? (
         <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
           <p className="font-semibold">Deleted record</p>
@@ -1088,6 +1097,11 @@ export default async function PilotDetailPage({
               pilot.id,
               plannedVisit.id
             );
+            const deletePlannedVisitAction = deletePlannedPilotVisitAction.bind(
+              null,
+              pilot.id,
+              plannedVisit.id
+            );
 
             return (
               <details
@@ -1208,19 +1222,25 @@ export default async function PilotDetailPage({
                       </Link>
                     ) : null}
                     {canManageVisitPlans ? (
-                      <details className="w-full rounded-md border border-slate-200 bg-white">
-                        <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-brand-700">
-                          Edit planned visit
-                        </summary>
-                        <div className="border-t border-slate-200 p-3">
-                          <PlannedVisitForm
-                            action={updateAction}
-                            compact
-                            users={usersList}
-                            visit={plannedVisit}
-                          />
-                        </div>
-                      </details>
+                      <div className="w-full space-y-3">
+                        <details className="rounded-md border border-slate-200 bg-white">
+                          <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-brand-700">
+                            Edit planned visit
+                          </summary>
+                          <div className="border-t border-slate-200 p-3">
+                            <PlannedVisitForm
+                              action={updateAction}
+                              compact
+                              users={usersList}
+                              visit={plannedVisit}
+                            />
+                          </div>
+                        </details>
+                        <DeletePlannedVisitButton
+                          action={deletePlannedVisitAction}
+                          visitLabel={`Visit ${plannedVisit.visit_number}`}
+                        />
+                      </div>
                     ) : null}
                   </div>
                 </div>
