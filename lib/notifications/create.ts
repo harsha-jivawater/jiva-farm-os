@@ -37,6 +37,26 @@ function normalizeNotification(
   };
 }
 
+function isIgnoredNotificationError(error: { code?: string }) {
+  return error.code === "23505" || error.code === "42501";
+}
+
+function logIgnoredNotificationError(
+  error: { code?: string; message?: string },
+  payload: NotificationInsert
+) {
+  if (error.code === "23505") {
+    return;
+  }
+
+  console.warn("[notifications] skipped notification insert", {
+    code: error.code,
+    message: error.message,
+    notificationType: payload.notification_type,
+    recordType: payload.record_type
+  });
+}
+
 export async function createNotification(
   supabase: SupabaseClient,
   input: CreateNotificationInput
@@ -54,7 +74,8 @@ export async function createNotification(
     .single();
 
   if (error) {
-    if (error.code === "23505") {
+    if (isIgnoredNotificationError(error)) {
+      logIgnoredNotificationError(error, payload);
       return null;
     }
 
