@@ -26,6 +26,7 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
+import { RefreshKpiDashboardSubmitButton } from "@/components/kpi-dashboard/refresh-submit-button";
 import { deviceStatusOptions, productModelOptions } from "@/lib/devices/options";
 import { formatDisplayDateTime } from "@/lib/date-utils";
 import { primaryCropOptions } from "@/lib/farmer-leads/options";
@@ -889,13 +890,7 @@ function RefreshKpiDashboardForm({ filters }: { filters: DashboardFilters }) {
       <input name="rsm_user_id" type="hidden" value={filters.rsmUserId} />
       <input name="product_model" type="hidden" value={filters.productModel} />
       <input name="crop" type="hidden" value={filters.crop} />
-      <button
-        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
-        type="submit"
-      >
-        <RotateCcw className="h-4 w-4" aria-hidden="true" />
-        Refresh KPI Dashboard
-      </button>
+      <RefreshKpiDashboardSubmitButton />
     </form>
   );
 }
