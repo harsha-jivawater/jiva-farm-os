@@ -47,7 +47,7 @@ function validateFile(file: File, kind: UploadKind) {
     return `Unsupported file extension. Allowed: ${rule.extensions.join(", ")}.`;
   }
 
-  if (!rule.mimeTypes.includes(mimeType)) {
+  if (mimeType && !rule.mimeTypes.includes(mimeType)) {
     return "Unsupported file type. Please upload the accepted file format shown on the form.";
   }
 

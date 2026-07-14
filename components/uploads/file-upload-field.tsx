@@ -73,7 +73,7 @@ export function FileUploadField({
 
             if (
               !rule.extensions.includes(extension) ||
-              !rule.mimeTypes.includes(file.type.toLowerCase())
+              (file.type && !rule.mimeTypes.includes(file.type.toLowerCase()))
             ) {
               window.alert("This file type is not supported for this upload.");
               event.target.value = "";

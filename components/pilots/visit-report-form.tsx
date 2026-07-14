@@ -338,7 +338,6 @@ export function VisitReportForm({
         value={report?.reviewed_date ?? ""}
       />
       <input name="report_title" type="hidden" value={generatedReportTitle} />
-      <input name="report_link" type="hidden" value={report?.report_link ?? ""} />
       {legacyNarrativeFields.map(({ key }) => (
         <input
           key={key}
@@ -568,6 +567,13 @@ export function VisitReportForm({
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
+          <FileUploadField
+            currentValue={report?.report_link}
+            helperText="Upload the visit report document when it is available."
+            kind="document"
+            label="Visit report document"
+            name="report_link"
+          />
           <FileUploadField
             currentValue={report?.photo_folder_link}
             helperText="Upload one visit photo. Existing ZIP links remain saved."
