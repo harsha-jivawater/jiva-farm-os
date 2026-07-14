@@ -67,6 +67,7 @@ type PlannedVisitActionState = {
 };
 
 const pilotOwnerRoles = ["Agronomist", "Research Assistant", "R&D Head"];
+const pilotVisitAssigneeRoles = ["Agronomist", "Research Assistant", "R&D Head"];
 const reportSubmitterRoles = [
   "Agronomist",
   "Research Assistant",
@@ -1072,13 +1073,15 @@ export async function createPilotAction(formData: FormData) {
 
   for (const visit of initialPlannedVisits) {
     if (
-      !(await userHasRole(supabase, visit.assigned_user_id, [
-        "Research Assistant"
-      ]))
+      !(await userHasRole(
+        supabase,
+        visit.assigned_user_id,
+        pilotVisitAssigneeRoles
+      ))
     ) {
       redirectWithError(
         errorPath,
-        "Assign each planned visit to a Research Assistant."
+        "Assign each planned visit to an Agronomist, Research Assistant, or R&D Head."
       );
     }
   }
@@ -1348,13 +1351,15 @@ export async function createPlannedPilotVisitAction(
   }
 
   if (
-    !(await userHasRole(supabase, payload.assigned_user_id, [
-      "Research Assistant"
-    ]))
+    !(await userHasRole(
+      supabase,
+      payload.assigned_user_id,
+      pilotVisitAssigneeRoles
+    ))
   ) {
     return {
       status: "error",
-      message: "Assign the visit to a Research Assistant."
+      message: "Assign the visit to an Agronomist, Research Assistant, or R&D Head."
     };
   }
 
@@ -1421,13 +1426,15 @@ export async function updatePlannedPilotVisitAction(
   }
 
   if (
-    !(await userHasRole(supabase, payload.assigned_user_id, [
-      "Research Assistant"
-    ]))
+    !(await userHasRole(
+      supabase,
+      payload.assigned_user_id,
+      pilotVisitAssigneeRoles
+    ))
   ) {
     return {
       status: "error",
-      message: "Assign the visit to a Research Assistant."
+      message: "Assign the visit to an Agronomist, Research Assistant, or R&D Head."
     };
   }
 

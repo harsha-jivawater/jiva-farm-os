@@ -634,6 +634,7 @@ export type Database = {
           payment_confirmed: boolean;
           payment_confirmed_by_user_id: string | null;
           payment_confirmed_date: string | null;
+          dealer_dispatch_group_id: string | null;
           zoho_invoice_reference: string | null;
           zoho_estimate_reference: string | null;
           management_exception_approved: boolean;
@@ -681,6 +682,7 @@ export type Database = {
           payment_confirmed?: boolean;
           payment_confirmed_by_user_id?: string | null;
           payment_confirmed_date?: string | null;
+          dealer_dispatch_group_id?: string | null;
           zoho_invoice_reference?: string | null;
           zoho_estimate_reference?: string | null;
           management_exception_approved?: boolean;
@@ -728,6 +730,7 @@ export type Database = {
           payment_confirmed?: boolean;
           payment_confirmed_by_user_id?: string | null;
           payment_confirmed_date?: string | null;
+          dealer_dispatch_group_id?: string | null;
           zoho_invoice_reference?: string | null;
           zoho_estimate_reference?: string | null;
           management_exception_approved?: boolean;

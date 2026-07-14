@@ -1006,6 +1006,7 @@ export async function createDispatchAction(formData: FormData) {
     });
 
     const shouldMarkApproved = advancedStatus(payload.dispatch_status);
+    const dealerDispatchGroupId = crypto.randomUUID();
     const insertPayloads = devices.map(
       (batchDevice) =>
         ({
@@ -1021,6 +1022,7 @@ export async function createDispatchAction(formData: FormData) {
           payment_confirmed: false,
           payment_confirmed_by_user_id: null,
           payment_confirmed_date: null,
+          dealer_dispatch_group_id: dealerDispatchGroupId,
           dispatch_date: null
         }) as DispatchInsert
     );
@@ -1440,6 +1442,7 @@ export async function confirmDealerDispatchPaymentAction(dispatchId: string) {
         "dispatch_status",
         "dispatch_type",
         "destination_name_snapshot",
+        "dealer_dispatch_group_id",
         "payment_confirmed",
         "expected_delivery_date"
       ].join(",")
@@ -1459,6 +1462,7 @@ export async function confirmDealerDispatchPaymentAction(dispatchId: string) {
     | "dispatch_status"
     | "dispatch_type"
     | "destination_name_snapshot"
+    | "dealer_dispatch_group_id"
     | "payment_confirmed"
     | "expected_delivery_date"
   >;
@@ -1477,16 +1481,26 @@ export async function confirmDealerDispatchPaymentAction(dispatchId: string) {
   )
     ? "Approved for Dispatch"
     : dispatch.dispatch_status;
+  const updatePayload = {
+    dispatch_status: nextStatus,
+    payment_confirmed: true,
+    payment_confirmed_by_user_id: profile.id,
+    payment_confirmed_date: paymentDate
+  };
 
-  const { error: updateError } = await supabase
-    .from("dispatches")
-    .update({
-      dispatch_status: nextStatus,
-      payment_confirmed: true,
-      payment_confirmed_by_user_id: profile.id,
-      payment_confirmed_date: paymentDate
-    })
-    .eq("id", dispatchId);
+  let updateQuery = supabase.from("dispatches").update(updatePayload);
+
+  if (dispatch.dealer_dispatch_group_id) {
+    updateQuery = updateQuery
+      .eq("dealer_dispatch_group_id", dispatch.dealer_dispatch_group_id)
+      .eq("dispatch_type", "Dealer Stock Dispatch")
+      .eq("payment_confirmed", false)
+      .is("deleted_at", null);
+  } else {
+    updateQuery = updateQuery.eq("id", dispatchId);
+  }
+
+  const { error: updateError } = await updateQuery;
 
   if (updateError) {
     redirectWithError(errorPath, updateError.message);

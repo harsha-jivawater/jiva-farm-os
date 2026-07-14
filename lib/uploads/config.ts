@@ -21,11 +21,12 @@ const MB = 1024 * 1024;
 
 export const uploadRules = {
   image: {
-    accept: ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp",
-    description: "JPG, PNG, or WebP up to 10 MB.",
-    extensions: [".jpg", ".jpeg", ".png", ".webp"],
+    accept:
+      ".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif",
+    description: "JPG, PNG, WebP, HEIC, or HEIF up to 10 MB.",
+    extensions: [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"],
     maxBytes: 10 * MB,
-    mimeTypes: ["image/jpeg", "image/png", "image/webp"]
+    mimeTypes: ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]
   },
   document: {
     accept:
@@ -61,14 +62,26 @@ export const uploadRules = {
   },
   evidence: {
     accept:
-      ".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf,.doc,.docx,image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     description: "Image, PDF, DOC, or DOCX up to 25 MB.",
-    extensions: [".jpg", ".jpeg", ".png", ".webp", ".pdf", ".doc", ".docx"],
+    extensions: [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".heic",
+      ".heif",
+      ".pdf",
+      ".doc",
+      ".docx"
+    ],
     maxBytes: 25 * MB,
     mimeTypes: [
       "image/jpeg",
       "image/png",
       "image/webp",
+      "image/heic",
+      "image/heif",
       "application/pdf",
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -76,8 +89,9 @@ export const uploadRules = {
   },
   "lab-report": {
     accept:
-      ".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    description: "PDF, DOC, DOCX, JPG, PNG, XLS, or XLSX up to 25 MB.",
+      ".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.heic,.heif,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp,image/heic,image/heif,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    description:
+      "PDF, DOC, DOCX, JPG, PNG, WebP, HEIC, HEIF, XLS, or XLSX up to 25 MB.",
     extensions: [
       ".pdf",
       ".doc",
@@ -85,6 +99,9 @@ export const uploadRules = {
       ".jpg",
       ".jpeg",
       ".png",
+      ".webp",
+      ".heic",
+      ".heif",
       ".xls",
       ".xlsx"
     ],
@@ -95,6 +112,9 @@ export const uploadRules = {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "image/jpeg",
       "image/png",
+      "image/webp",
+      "image/heic",
+      "image/heif",
       "application/vnd.ms-excel",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     ]

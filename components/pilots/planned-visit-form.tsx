@@ -43,6 +43,7 @@ const initialActionState: PlannedVisitActionState = {
   status: "idle",
   message: null
 };
+const visitAssigneeRoles = ["Agronomist", "Research Assistant", "R&D Head"];
 
 function inputClassName() {
   return "h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100";
@@ -98,7 +99,7 @@ export function PlannedVisitForm({
     initialActionState
   );
   const assignableUsers = users.filter((user) =>
-    hasAnyRole(user, ["Research Assistant"])
+    hasAnyRole(user, visitAssigneeRoles)
   );
   const [selectedParameters, setSelectedParameters] = useState<string[]>(
     visit?.parameters_to_collect ?? []
@@ -219,7 +220,7 @@ export function PlannedVisitForm({
             className="mb-1.5 block text-sm font-medium text-slate-700"
             htmlFor={fieldName("assigned_user_id")}
           >
-            Assigned Research Assistant
+            Assigned visitor
           </label>
           <select
             className={inputClassName()}
@@ -228,7 +229,7 @@ export function PlannedVisitForm({
             name={fieldName("assigned_user_id")}
             required
           >
-            <option value="">Select Research Assistant</option>
+            <option value="">Select visitor</option>
             {assignableUsers.map((user) => (
               <option key={user.id} value={user.id}>
                 {user.full_name} · {labelForRole(user.role)}

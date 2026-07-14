@@ -1071,7 +1071,7 @@ export default async function PilotDetailPage({
       </SectionCard>
 
       <SectionCard
-        description="Planned visits for this pilot. Research Assistants complete these through My Visits and Visit Reports."
+        description="Planned visits for this pilot. Assigned visitors complete these through My Visits and Visit Reports."
         id="monitoring-plan"
         title="Monitoring Plan"
       >

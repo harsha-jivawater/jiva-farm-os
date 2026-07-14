@@ -256,7 +256,7 @@ export default async function EditPilotPage({
               Monitoring Plan
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              Planned visits for this pilot. Research Assistants complete these
+              Planned visits for this pilot. Assigned visitors complete these
               through My Visits and Visit Reports.
             </p>
           </div>

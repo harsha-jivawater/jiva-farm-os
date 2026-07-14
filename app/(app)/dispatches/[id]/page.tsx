@@ -271,6 +271,19 @@ export default async function DispatchDetailPage({
   }
 
   const dispatch = data as Dispatch;
+  let dealerDispatchGroupCount = 0;
+
+  if (dispatch.dealer_dispatch_group_id) {
+    const { count } = await supabase
+      .from("dispatches")
+      .select("id", { count: "exact", head: true })
+      .eq("dealer_dispatch_group_id", dispatch.dealer_dispatch_group_id)
+      .eq("dispatch_type", "Dealer Stock Dispatch")
+      .is("deleted_at", null);
+
+    dealerDispatchGroupCount = count ?? 0;
+  }
+
   const source = dispatchSourceLink(dispatch);
   const handoff = dispatchHandoff(dispatch, canCreateInstallation);
   const isDealerRoute = dispatchRoute(dispatch) === "Dealer Dispatch";
@@ -326,7 +339,9 @@ export default async function DispatchDetailPage({
                 type="submit"
               >
                 <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                Confirm dealer payment
+                {dealerDispatchGroupCount > 1
+                  ? `Confirm payment for ${dealerDispatchGroupCount} devices`
+                  : "Confirm dealer payment"}
               </button>
             </form>
           ) : null}
@@ -366,6 +381,11 @@ export default async function DispatchDetailPage({
             value={handoff.currentStage}
           >
             {handoff.nextAction}
+            {isDealerRoute &&
+            !dispatch.payment_confirmed &&
+            dealerDispatchGroupCount > 1
+              ? ` Confirming payment here will approve all ${dealerDispatchGroupCount} devices in this dealer order.`
+              : null}
           </HandoffItem>
         </div>
       </div>
