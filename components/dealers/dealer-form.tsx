@@ -28,6 +28,7 @@ import {
 } from "@/lib/dealers/options";
 import type { Dealer, RegionOption, UserOption } from "@/lib/dealers/types";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
+import { SectorSelect } from "@/components/sector/sector-select";
 import { labelForRole } from "@/lib/users/options";
 import { hasRole } from "@/lib/users/permissions";
 import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
@@ -492,6 +493,7 @@ export function DealerForm({
           Dealer profile
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <SectorSelect defaultValue={dealer?.business_sector} />
           {dealer ? (
             <div>
               <p className="mb-1.5 text-sm font-medium text-slate-700">

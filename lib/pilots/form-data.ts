@@ -49,6 +49,7 @@ import {
   normalizeOptionalIndianMobileNumber,
   validateIndianMobileNumber
 } from "@/lib/validation/mobile-number";
+import { businessSectorOptions, defaultBusinessSector } from "@/lib/sector/options";
 
 function getText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -198,6 +199,7 @@ export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
   const trialDescription = getText(formData, "baseline_notes") ?? "";
 
   return {
+    business_sector: getText(formData, "business_sector") ?? defaultBusinessSector,
     pilot_name: getText(formData, "pilot_name") ?? "",
     pilot_type: getText(formData, "pilot_type") ?? defaultPilotType,
     pilot_objective: getText(formData, "pilot_objective") ?? "",
@@ -343,6 +345,9 @@ export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
 }
 
 export function validatePilotPayload(payload: PilotFormPayload) {
+  if (!businessSectorOptions.some((option) => option.value === payload.business_sector)) {
+    return "Business sector is not valid.";
+  }
   if (!payload.pilot_name) return "Pilot name is required.";
   if (!payload.pilot_type) return "Pilot type is required.";
   if (!payload.pilot_objective) return "Pilot objective is required.";

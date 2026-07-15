@@ -7,6 +7,7 @@ import { ArrowLeft, Save, Search } from "lucide-react";
 import { CustomCropFields } from "@/components/crops/custom-crop-fields";
 import { CropMultiSelect } from "@/components/crops/crop-multi-select";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
+import { SectorSelect } from "@/components/sector/sector-select";
 import { defaultNextActionDate } from "@/lib/institutions/form-data";
 import {
   agreementStatusOptions,
@@ -495,6 +496,7 @@ export function InstitutionForm({
           Organization profile
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <SectorSelect defaultValue={institution?.business_sector} />
           {institution ? (
             <div>
               <p className="mb-1.5 text-sm font-medium text-slate-700">

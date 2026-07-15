@@ -29,6 +29,7 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 type FarmerSaleDispatchLead = {
   id: string;
+  business_sector: string;
   lead_code: string;
   farmer_name: string;
   mobile_number: string;
@@ -46,6 +47,7 @@ type FarmerSaleDispatchLead = {
 
 type PilotDispatchSource = {
   id: string;
+  business_sector: string;
   pilot_code: string;
   pilot_name: string;
   pilot_type: string;
@@ -65,6 +67,7 @@ type PilotDispatchSource = {
 
 type DealerDispatchSource = {
   id: string;
+  business_sector: string;
   dealer_code: string;
   dealer_name: string;
   firm_name: string | null;
@@ -511,6 +514,7 @@ async function getFarmerSaleLeadForDispatch(
     .select(
       [
         "id",
+        "business_sector",
         "lead_code",
         "farmer_name",
         "mobile_number",
@@ -569,6 +573,7 @@ function applyFarmerSaleLeadSnapshot(
   payload.destination_address = lead.village;
   payload.destination_state = lead.state;
   payload.destination_district = lead.district;
+  payload.business_sector = lead.business_sector;
   payload.payment_confirmed = true;
   payload.payment_confirmed_by_user_id = lead.payment_confirmed_by_user_id;
   payload.payment_confirmed_date = lead.payment_confirmed_date;
@@ -588,6 +593,7 @@ async function getPilotForDispatch(
     .select(
       [
         "id",
+        "business_sector",
         "pilot_code",
         "pilot_name",
         "pilot_type",
@@ -643,6 +649,7 @@ async function getDealerForDispatch(
     .select(
       [
         "id",
+        "business_sector",
         "dealer_code",
         "dealer_name",
         "firm_name",
@@ -677,6 +684,7 @@ function applyPilotDispatchSnapshot(
   payload.destination_address = pilot.village;
   payload.destination_state = pilot.state;
   payload.destination_district = pilot.district;
+  payload.business_sector = pilot.business_sector;
   payload.payment_requirement_type = "Unpaid Pilot";
   payload.payment_confirmed = false;
   payload.payment_confirmed_by_user_id = null;
@@ -701,6 +709,7 @@ function applyDealerDispatchSnapshot(
   payload.destination_address = dealer.dealer_address;
   payload.destination_state = dealer.state;
   payload.destination_district = dealer.district;
+  payload.business_sector = dealer.business_sector;
   payload.payment_requirement_type = "Payment Required";
   payload.payment_confirmed = paymentState?.payment_confirmed ?? false;
   payload.payment_confirmed_by_user_id =

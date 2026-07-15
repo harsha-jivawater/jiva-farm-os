@@ -8,6 +8,7 @@ import { CustomCropFields } from "@/components/crops/custom-crop-fields";
 import { CropSelect } from "@/components/crops/crop-select";
 import { PlannedVisitForm } from "@/components/pilots/planned-visit-form";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
+import { SectorSelect } from "@/components/sector/sector-select";
 import { formatDisplayDate } from "@/lib/date-utils";
 import {
   comparisonMethodOptions,
@@ -572,6 +573,7 @@ export function PilotForm({
           Pilot basics
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <SectorSelect defaultValue={pilot?.business_sector} />
           {pilot ? (
             <div>
               <p className="mb-1.5 text-sm font-medium text-slate-700">

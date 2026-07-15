@@ -300,6 +300,7 @@ export type Database = {
       dealers: {
         Row: {
           id: string;
+          business_sector: string;
           dealer_code: string;
           dealer_name: string;
           firm_name: string | null;
@@ -368,6 +369,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          business_sector?: string;
           dealer_code?: string;
           dealer_name: string;
           firm_name?: string | null;
@@ -436,6 +438,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          business_sector?: string;
           dealer_code?: string;
           dealer_name?: string;
           firm_name?: string | null;
@@ -609,6 +612,7 @@ export type Database = {
       dispatches: {
         Row: {
           id: string;
+          business_sector: string;
           dispatch_code: string;
           dispatch_date: string | null;
           dispatch_status: string;
@@ -657,6 +661,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          business_sector?: string;
           dispatch_code?: string;
           dispatch_date?: string | null;
           dispatch_status?: string;
@@ -705,6 +710,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          business_sector?: string;
           dispatch_code?: string;
           dispatch_date?: string | null;
           dispatch_status?: string;
@@ -756,6 +762,7 @@ export type Database = {
       farmer_leads: {
         Row: {
           id: string;
+          business_sector: string;
           lead_code: string;
           lead_date: string;
           lead_type: string;
@@ -827,6 +834,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          business_sector?: string;
           lead_code?: string;
           lead_date?: string;
           lead_type?: string;
@@ -898,6 +906,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          business_sector?: string;
           lead_code?: string;
           lead_date?: string;
           lead_type?: string;
@@ -1254,6 +1263,7 @@ export type Database = {
       installations: {
         Row: {
           id: string;
+          business_sector: string;
           installation_code: string;
           installation_date: string;
           installation_type: string;
@@ -1306,6 +1316,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          business_sector?: string;
           installation_code?: string;
           installation_date: string;
           installation_type: string;
@@ -1358,6 +1369,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          business_sector?: string;
           installation_code?: string;
           installation_date?: string;
           installation_type?: string;
@@ -1413,6 +1425,7 @@ export type Database = {
       pilots: {
         Row: {
           id: string;
+          business_sector: string;
           pilot_code: string;
           pilot_name: string;
           pilot_type: string;
@@ -1511,6 +1524,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          business_sector?: string;
           pilot_code?: string;
           pilot_name: string;
           pilot_type: string;
@@ -1609,6 +1623,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          business_sector?: string;
           pilot_code?: string;
           pilot_name?: string;
           pilot_type?: string;
@@ -2031,6 +2046,7 @@ export type Database = {
       institutions: {
         Row: {
           id: string;
+          business_sector: string;
           institution_code: string;
           organization_name: string;
           organization_type: string;
@@ -2108,6 +2124,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          business_sector?: string;
           institution_code?: string;
           organization_name: string;
           organization_type: string;
@@ -2185,6 +2202,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          business_sector?: string;
           institution_code?: string;
           organization_name?: string;
           organization_type?: string;

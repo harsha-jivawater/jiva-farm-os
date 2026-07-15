@@ -24,6 +24,7 @@ import {
   normalizeIndianMobileNumber,
   validateIndianMobileNumber
 } from "@/lib/validation/mobile-number";
+import { businessSectorOptions, defaultBusinessSector } from "@/lib/sector/options";
 
 function getText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -91,6 +92,7 @@ export function farmerLeadPayloadFromForm(
   const funnelStage = getText(formData, "funnel_stage") ?? defaultFunnelStage;
   const paymentConfirmed = getCheckbox(formData, "payment_confirmed");
   const payload: FarmerLeadInsert | FarmerLeadUpdate = {
+    business_sector: getText(formData, "business_sector") ?? defaultBusinessSector,
     lead_code: leadCode ?? generateLeadCode(),
     farmer_name: getRequiredText(formData, "farmer_name"),
     mobile_number:
@@ -126,6 +128,9 @@ export function farmerLeadPayloadFromForm(
 }
 
 export function validateFarmerLeadPayload(payload: FarmerLeadInsert | FarmerLeadUpdate) {
+  if (!businessSectorOptions.some((option) => option.value === payload.business_sector)) {
+    return "Business sector is not valid.";
+  }
   if (!payload.farmer_name) {
     return "Farmer name is required.";
   }

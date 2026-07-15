@@ -43,6 +43,7 @@ import {
   normalizeOptionalIndianMobileNumber,
   validateIndianMobileNumber
 } from "@/lib/validation/mobile-number";
+import { businessSectorOptions, defaultBusinessSector } from "@/lib/sector/options";
 
 function getText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -122,6 +123,7 @@ export function institutionPayloadFromForm(
   const cropFocus = getTextList(formData, "crop_focus");
 
   return {
+    business_sector: getText(formData, "business_sector") ?? defaultBusinessSector,
     organization_name: getText(formData, "organization_name") ?? "",
     organization_type:
       getText(formData, "organization_type") ?? defaultOrganizationType,
@@ -235,6 +237,9 @@ export function institutionPayloadFromForm(
 }
 
 export function validateInstitutionPayload(payload: InstitutionFormPayload) {
+  if (!businessSectorOptions.some((option) => option.value === payload.business_sector)) {
+    return "Business sector is not valid.";
+  }
   if (!payload.organization_name) {
     return "Organization name is required.";
   }

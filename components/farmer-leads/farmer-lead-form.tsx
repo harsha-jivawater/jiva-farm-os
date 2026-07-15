@@ -8,6 +8,7 @@ import { CustomCropFields } from "@/components/crops/custom-crop-fields";
 import { CropSelect } from "@/components/crops/crop-select";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
 import { FileUploadField } from "@/components/uploads/file-upload-field";
+import { SectorSelect } from "@/components/sector/sector-select";
 import {
   UserSearchSelect,
   type UserSearchOption
@@ -134,6 +135,7 @@ export function FarmerLeadForm({
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-slate-950">Lead details</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <SectorSelect defaultValue={lead?.business_sector} />
           <div>
             <label
               className="mb-1.5 block text-sm font-medium text-slate-700"

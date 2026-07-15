@@ -18,6 +18,7 @@ import {
   normalizeIndianMobileNumber,
   validateIndianMobileNumber
 } from "@/lib/validation/mobile-number";
+import { businessSectorOptions, defaultBusinessSector } from "@/lib/sector/options";
 
 function getText(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
@@ -89,6 +90,7 @@ export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
   const primaryDistrict = districts[0] ?? getText(formData, "district") ?? "";
 
   return {
+    business_sector: getText(formData, "business_sector") ?? defaultBusinessSector,
     dealer_name: getText(formData, "dealer_name") ?? "",
     firm_name: getText(formData, "firm_name"),
     contact_number:
@@ -155,6 +157,9 @@ export function dealerPayloadFromForm(formData: FormData): DealerFormPayload {
 }
 
 export function validateDealerPayload(payload: DealerFormPayload) {
+  if (!businessSectorOptions.some((option) => option.value === payload.business_sector)) {
+    return "Business sector is not valid.";
+  }
   if (!payload.dealer_name) {
     return "Contact person is required.";
   }
