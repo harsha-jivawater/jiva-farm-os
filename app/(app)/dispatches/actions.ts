@@ -1007,11 +1007,12 @@ export async function createDispatchAction(formData: FormData) {
 
     const shouldMarkApproved = advancedStatus(payload.dispatch_status);
     const dealerDispatchGroupId = crypto.randomUUID();
+    const batchPayload = { ...payload };
+    delete batchPayload.dispatch_code;
     const insertPayloads = devices.map(
       (batchDevice) =>
         ({
-          ...payload,
-          dispatch_code: undefined,
+          ...batchPayload,
           device_id: batchDevice.id,
           serial_number_snapshot: batchDevice.serial_number,
           product_model: batchDevice.product_model,
