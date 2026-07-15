@@ -30,6 +30,7 @@ import { RefreshKpiDashboardSubmitButton } from "@/components/kpi-dashboard/refr
 import { deviceStatusOptions, productModelOptions } from "@/lib/devices/options";
 import { formatDisplayDateTime } from "@/lib/date-utils";
 import { primaryCropOptions } from "@/lib/farmer-leads/options";
+import { businessSectorOptions } from "@/lib/sector/options";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -56,6 +57,14 @@ type DashboardFilters = {
 type ChartDatum = {
   label: string;
   value: number;
+};
+
+type SectorPerformanceRow = {
+  sector: string;
+  leads: number;
+  dealers: number;
+  institutions: number;
+  pilots: number;
 };
 
 type SummaryFilterRegion = Pick<
@@ -436,6 +445,74 @@ function hasDashboardEntityFilters(filters: DashboardFilters) {
   );
 }
 
+async function loadSectorPerformance(
+  supabase: SupabaseClient,
+  filters: DashboardFilters
+): Promise<SectorPerformanceRow[]> {
+  const rows = await Promise.all(
+    businessSectorOptions.map(async ({ value: sector }) => {
+      const leadsQuery = supabase
+        .from("farmer_leads")
+        .select("id", { count: "exact", head: true })
+        .eq("business_sector", sector)
+        .is("deleted_at", null);
+      const dealersQuery = supabase
+        .from("dealers")
+        .select("id", { count: "exact", head: true })
+        .eq("business_sector", sector)
+        .is("deleted_at", null);
+      const institutionsQuery = supabase
+        .from("institutions")
+        .select("id", { count: "exact", head: true })
+        .eq("business_sector", sector)
+        .is("deleted_at", null);
+      const pilotsQuery = supabase
+        .from("pilots")
+        .select("id", { count: "exact", head: true })
+        .eq("business_sector", sector)
+        .is("deleted_at", null);
+
+      if (filters.state) {
+        leadsQuery.eq("state", filters.state);
+        dealersQuery.eq("state", filters.state);
+        institutionsQuery.eq("primary_state", filters.state);
+        pilotsQuery.eq("state", filters.state);
+      }
+
+      if (filters.regionId) {
+        leadsQuery.eq("region_id", filters.regionId);
+        dealersQuery.eq("region_id", filters.regionId);
+        institutionsQuery.eq("primary_region_id", filters.regionId);
+        pilotsQuery.eq("region_id", filters.regionId);
+      }
+
+      if (filters.rsmUserId) {
+        leadsQuery.eq("rsm_user_id", filters.rsmUserId);
+        dealersQuery.eq("rsm_user_id", filters.rsmUserId);
+        institutionsQuery.eq("rsm_user_id", filters.rsmUserId);
+        pilotsQuery.eq("rsm_user_id", filters.rsmUserId);
+      }
+
+      const [leads, dealers, institutions, pilots] = await Promise.all([
+        leadsQuery,
+        dealersQuery,
+        institutionsQuery,
+        pilotsQuery
+      ]);
+
+      return {
+        sector,
+        leads: leads.count ?? 0,
+        dealers: dealers.count ?? 0,
+        institutions: institutions.count ?? 0,
+        pilots: pilots.count ?? 0
+      };
+    })
+  );
+
+  return rows;
+}
+
 async function loadResearchAssistantPilotIds(
   supabase: SupabaseClient,
   userId: string,
@@ -677,6 +754,17 @@ function KpiCard({
       <p className="mt-3 text-2xl font-semibold text-slate-950">{value}</p>
       <p className="mt-1 min-h-5 text-xs text-slate-500">
         {helper ?? (isEmpty ? "No data yet" : "")}
+      </p>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md bg-slate-50 px-3 py-2">
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-slate-950">
+        {formatNumber(value)}
       </p>
     </div>
   );
@@ -954,6 +1042,7 @@ function KpiDashboardSummaryView({
   filters,
   refreshError,
   refreshStatus,
+  sectorPerformance,
   summary,
   timestampLabel
 }: {
@@ -964,6 +1053,7 @@ function KpiDashboardSummaryView({
   filters: DashboardFilters;
   refreshError: string;
   refreshStatus: string;
+  sectorPerformance: SectorPerformanceRow[];
   summary: KpiDashboardSummary;
   timestampLabel?: string;
 }) {
@@ -1072,6 +1162,33 @@ function KpiDashboardSummaryView({
         regions={summary.filters.regions}
         rsmUsers={summary.filters.rsmUsers}
       />
+
+      <section className="mt-6">
+        <SectionTitle title="Sector Performance" />
+        <div className="grid gap-4 lg:grid-cols-3">
+          {sectorPerformance.map((row) => (
+            <div
+              className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+              key={row.sector}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold text-slate-950">
+                  {row.sector}
+                </h2>
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  {row.leads + row.dealers + row.institutions + row.pilots} records
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <Metric label="Leads" value={row.leads} />
+                <Metric label="Dealers" value={row.dealers} />
+                <Metric label="Institutions" value={row.institutions} />
+                <Metric label="Pilots" value={row.pilots} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="mt-6 space-y-8">
         {canSeeManagementSections ? (
@@ -1834,6 +1951,10 @@ export default async function KpiDashboardPage({
   const shouldUseLiveRsmSummary =
     hasRole(currentUser, "RSM") &&
     !hasAnyRole(currentUser, ["Admin", "Management", "Sales Head"]);
+  const sectorPerformance = await timeAsync(
+    "kpi dashboard sector performance",
+    () => loadSectorPerformance(supabase, filters)
+  );
 
   if (shouldUseLiveRsmSummary) {
     const { data: liveSummaryData, error: liveSummaryError } = await timeAsync(
@@ -1883,6 +2004,7 @@ export default async function KpiDashboardPage({
         filters={filters}
         refreshError={refreshError}
         refreshStatus={refreshStatus}
+        sectorPerformance={sectorPerformance}
         summary={liveSummary}
         timestampLabel="Calculated at"
       />
@@ -1929,6 +2051,7 @@ export default async function KpiDashboardPage({
           filters={filters}
           refreshError={refreshError}
           refreshStatus={refreshStatus}
+          sectorPerformance={sectorPerformance}
           summary={summary}
         />
       );
