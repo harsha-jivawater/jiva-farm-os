@@ -35,17 +35,185 @@ function statusPill(isActive: boolean) {
   );
 }
 
+type UserUsage = {
+  created: number;
+  assigned: number;
+  fieldActivity: number;
+};
+
+type UserReferenceRow = Record<string, string | null | undefined>;
+
+function buildUserUsage(
+  users: InternalUser[],
+  datasets: Array<{
+    rows: UserReferenceRow[];
+    createdFields?: string[];
+    assignedFields?: string[];
+    activityFields?: string[];
+  }>
+) {
+  const usage = new Map<string, UserUsage>(
+    users.map((user) => [user.id, { created: 0, assigned: 0, fieldActivity: 0 }])
+  );
+
+  for (const dataset of datasets) {
+    for (const row of dataset.rows) {
+      for (const field of dataset.createdFields ?? []) {
+        const userId = row[field];
+        if (userId && usage.has(userId)) {
+          usage.get(userId)!.created += 1;
+        }
+      }
+      for (const field of dataset.assignedFields ?? []) {
+        const userId = row[field];
+        if (userId && usage.has(userId)) {
+          usage.get(userId)!.assigned += 1;
+        }
+      }
+      for (const field of dataset.activityFields ?? []) {
+        const userId = row[field];
+        if (userId && usage.has(userId)) {
+          usage.get(userId)!.fieldActivity += 1;
+        }
+      }
+    }
+  }
+
+  return usage;
+}
+
 export default async function InternalUsersPage({
   searchParams
 }: InternalUsersPageProps) {
   const params = await searchParams;
   const supabase = await createClient();
-  const [{ data: usersData, error }, { data: regionsData }] = await Promise.all([
+  const [
+    { data: usersData, error },
+    { data: regionsData },
+    { data: farmerLeadUsage },
+    { data: dealerUsage },
+    { data: institutionUsage },
+    { data: pilotUsage },
+    { data: pilotVisitUsage },
+    { data: visitReportUsage },
+    { data: followupUsage },
+    { data: installationUsage },
+    { data: meetingUsage }
+  ] = await Promise.all([
     supabase.from("users").select("*").order("is_active", { ascending: false }).order("full_name"),
-    supabase.from("regions").select("*").order("region_name")
+    supabase.from("regions").select("*").order("region_name"),
+    supabase
+      .from("farmer_leads")
+      .select("created_by_user_id, owner_user_id, followup_owner_user_id")
+      .is("deleted_at", null),
+    supabase
+      .from("dealers")
+      .select("created_by_user_id, dealer_owner_user_id")
+      .is("deleted_at", null),
+    supabase
+      .from("institutions")
+      .select("created_by_user_id, account_owner_user_id, sales_head_user_id, rsm_user_id, rd_head_user_id, technical_owner_user_id")
+      .is("deleted_at", null),
+    supabase
+      .from("pilots")
+      .select("created_by_user_id, pilot_owner_user_id, research_assistant_user_id, agronomist_user_id, rd_head_user_id, rsm_user_id")
+      .is("deleted_at", null),
+    supabase
+      .from("pilot_visits")
+      .select("visited_by_user_id, accompanied_by_user_id, rd_head_user_id")
+      .is("deleted_at", null),
+    supabase
+      .from("visit_reports")
+      .select("submitted_by_user_id, reviewed_by_user_id")
+      .is("deleted_at", null),
+    supabase
+      .from("followups")
+      .select("created_by_user_id, followup_owner_user_id")
+      .is("deleted_at", null),
+    supabase
+      .from("installations")
+      .select("created_by_user_id, installed_by_user_id, verified_by_user_id, followup_owner_user_id")
+      .is("deleted_at", null),
+    supabase
+      .from("institution_meetings")
+      .select("created_by_user_id, primary_internal_owner_user_id, rsm_user_id, sales_head_user_id, rd_head_user_id, agronomist_user_id")
   ]);
   const users = (usersData ?? []) as InternalUser[];
   const activeUsers = users.filter((user) => user.is_active);
+  const usage = buildUserUsage(users, [
+    {
+      rows: (farmerLeadUsage ?? []) as UserReferenceRow[],
+      createdFields: ["created_by_user_id"],
+      assignedFields: ["owner_user_id", "followup_owner_user_id"]
+    },
+    {
+      rows: (dealerUsage ?? []) as UserReferenceRow[],
+      createdFields: ["created_by_user_id"],
+      assignedFields: ["dealer_owner_user_id"]
+    },
+    {
+      rows: (institutionUsage ?? []) as UserReferenceRow[],
+      createdFields: ["created_by_user_id"],
+      assignedFields: [
+        "account_owner_user_id",
+        "sales_head_user_id",
+        "rsm_user_id",
+        "rd_head_user_id",
+        "technical_owner_user_id"
+      ]
+    },
+    {
+      rows: (pilotUsage ?? []) as UserReferenceRow[],
+      createdFields: ["created_by_user_id"],
+      assignedFields: [
+        "pilot_owner_user_id",
+        "research_assistant_user_id",
+        "agronomist_user_id",
+        "rd_head_user_id",
+        "rsm_user_id"
+      ]
+    },
+    {
+      rows: (pilotVisitUsage ?? []) as UserReferenceRow[],
+      assignedFields: ["visited_by_user_id", "accompanied_by_user_id", "rd_head_user_id"],
+      activityFields: ["visited_by_user_id", "accompanied_by_user_id"]
+    },
+    {
+      rows: (visitReportUsage ?? []) as UserReferenceRow[],
+      assignedFields: ["reviewed_by_user_id"],
+      activityFields: ["submitted_by_user_id"]
+    },
+    {
+      rows: (followupUsage ?? []) as UserReferenceRow[],
+      createdFields: ["created_by_user_id"],
+      assignedFields: ["followup_owner_user_id"]
+    },
+    {
+      rows: (installationUsage ?? []) as UserReferenceRow[],
+      createdFields: ["created_by_user_id"],
+      assignedFields: ["installed_by_user_id", "verified_by_user_id", "followup_owner_user_id"],
+      activityFields: ["installed_by_user_id", "verified_by_user_id"]
+    },
+    {
+      rows: (meetingUsage ?? []) as UserReferenceRow[],
+      createdFields: ["created_by_user_id"],
+      assignedFields: [
+        "primary_internal_owner_user_id",
+        "rsm_user_id",
+        "sales_head_user_id",
+        "rd_head_user_id",
+        "agronomist_user_id"
+      ]
+    }
+  ]);
+  const usageTotals = Array.from(usage.values()).reduce(
+    (totals, item) => ({
+      created: totals.created + item.created,
+      assigned: totals.assigned + item.assigned,
+      fieldActivity: totals.fieldActivity + item.fieldActivity
+    }),
+    { created: 0, assigned: 0, fieldActivity: 0 }
+  );
   const regionMap = new Map(
     (regionsData ?? []).map((region) => [region.id, region.region_name])
   );
@@ -130,6 +298,24 @@ export default async function InternalUsersPage({
             @jivawater.com
           </p>
         </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-medium text-slate-500">Records Created</p>
+          <p className="mt-3 text-2xl font-semibold text-slate-950">
+            {usageTotals.created}
+          </p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-medium text-slate-500">Current Assignments</p>
+          <p className="mt-3 text-2xl font-semibold text-slate-950">
+            {usageTotals.assigned}
+          </p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-medium text-slate-500">Field Activity</p>
+          <p className="mt-3 text-2xl font-semibold text-slate-950">
+            {usageTotals.fieldActivity}
+          </p>
+        </div>
       </div>
 
       <div className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -143,6 +329,7 @@ export default async function InternalUsersPage({
                 <th className="px-4 py-3">State</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Replacement</th>
+                <th className="px-4 py-3">Usage</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
@@ -151,7 +338,7 @@ export default async function InternalUsersPage({
                 <tr>
                   <td
                     className="px-4 py-6 text-center text-sm text-slate-500"
-                    colSpan={7}
+                    colSpan={8}
                   >
                     No internal users found. Add a team member to start assigning work.
                   </td>
@@ -171,6 +358,11 @@ export default async function InternalUsersPage({
                         (item) => item.id === user.replacement_user_id
                       )
                     : null;
+                  const userUsage = usage.get(user.id) ?? {
+                    created: 0,
+                    assigned: 0,
+                    fieldActivity: 0
+                  };
 
                   return (
                     <tr key={user.id}>
@@ -204,6 +396,11 @@ export default async function InternalUsersPage({
                       <td className="px-4 py-3">{statusPill(user.is_active)}</td>
                       <td className="px-4 py-3 text-slate-600">
                         {replacementUser?.full_name ?? "Not set"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-600">
+                        <p>Created: {userUsage.created}</p>
+                        <p>Assigned: {userUsage.assigned}</p>
+                        <p>Field activity: {userUsage.fieldActivity}</p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
