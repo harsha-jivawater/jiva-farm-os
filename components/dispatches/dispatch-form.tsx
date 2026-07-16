@@ -1160,11 +1160,30 @@ export function DispatchForm({
               onChange={(event) => setPaymentConfirmed(event.target.checked)}
               type="checkbox"
             />
-            Payment confirmed
+            Payment received
           </label>
           {isFarmerSaleRoute ? (
             <input name="payment_confirmed" type="hidden" value="on" />
           ) : null}
+
+          <div>
+            <label
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+              htmlFor="payment_confirmed_date"
+            >
+              Payment received date
+            </label>
+            <input
+              className={inputClassName()}
+              defaultValue={dateValue(dispatch?.payment_confirmed_date)}
+              id="payment_confirmed_date"
+              name="payment_confirmed_date"
+              type="date"
+            />
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Confirming payment without a date uses today&apos;s date.
+            </p>
+          </div>
 
           <div>
             <label

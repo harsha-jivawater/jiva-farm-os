@@ -1510,10 +1510,19 @@ export async function confirmDealerDispatchPaymentAction(dispatchId: string) {
     updateQuery = updateQuery.eq("id", dispatchId);
   }
 
-  const { error: updateError } = await updateQuery;
+  const { data: updatedRows, error: updateError } = await updateQuery.select(
+    "id, payment_confirmed, payment_confirmed_date"
+  );
 
   if (updateError) {
     redirectWithError(errorPath, updateError.message);
+  }
+
+  if (!updatedRows || updatedRows.length === 0) {
+    redirectWithError(
+      errorPath,
+      "Payment could not be updated. Please refresh the dispatch and try again."
+    );
   }
 
   await sendN8nEvent("dealer_payment_confirmed", {

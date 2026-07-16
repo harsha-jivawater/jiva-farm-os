@@ -63,6 +63,7 @@ const listSelectColumns = [
   "destination_district",
   "destination_state",
   "payment_confirmed",
+  "payment_confirmed_date",
   "payment_requirement_type",
   "dispatch_date"
 ].join(",");
@@ -462,7 +463,7 @@ export default async function DispatchesPage({
 
           <label>
             <span className="mb-1.5 block text-sm font-medium text-slate-700">
-              Payment confirmed
+              Payment received
             </span>
             <select
               className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
@@ -591,7 +592,10 @@ export default async function DispatchesPage({
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         <p>
-                          {dispatch.payment_confirmed ? "Confirmed" : "Pending"}
+                          {dispatch.payment_confirmed ? "Received" : "Pending"}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {formatDate(dispatch.payment_confirmed_date)}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
                           {labelFor(
@@ -667,7 +671,13 @@ export default async function DispatchesPage({
                     <div className="col-span-2">
                       <dt className="text-slate-400">Payment</dt>
                       <dd className="mt-1 font-medium text-slate-700">
-                        {dispatch.payment_confirmed ? "Confirmed" : "Pending"}
+                        {dispatch.payment_confirmed ? "Received" : "Pending"}
+                      </dd>
+                    </div>
+                    <div className="col-span-2">
+                      <dt className="text-slate-400">Payment received date</dt>
+                      <dd className="mt-1 font-medium text-slate-700">
+                        {formatDate(dispatch.payment_confirmed_date)}
                       </dd>
                     </div>
                   </dl>

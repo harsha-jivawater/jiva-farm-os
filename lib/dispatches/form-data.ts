@@ -66,6 +66,7 @@ export function dispatchPayloadFromForm(
       getText(formData, "payment_requirement_type") ??
       defaultPaymentRequirementType,
     payment_confirmed: getCheckbox(formData, "payment_confirmed"),
+    payment_confirmed_date: getText(formData, "payment_confirmed_date"),
     zoho_invoice_reference: getText(formData, "zoho_invoice_reference"),
     zoho_estimate_reference: getText(formData, "zoho_estimate_reference"),
     courier_or_transport_name: getText(

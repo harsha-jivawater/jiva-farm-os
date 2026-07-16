@@ -439,10 +439,10 @@ export default async function DispatchDetailPage({
           )}
         />
         <DetailItem
-          label={isDealerRoute ? "Dealer payment" : "Payment confirmed"}
+          label={isDealerRoute ? "Dealer payment received" : "Payment received"}
           value={
             dispatch.payment_confirmed
-              ? "Payment confirmed"
+              ? "Payment received"
               : "Pending confirmation"
           }
         />
@@ -457,7 +457,7 @@ export default async function DispatchDetailPage({
           }
         />
         <DetailItem
-          label="Confirmed on"
+          label="Payment received on"
           value={formatDate(dispatch.payment_confirmed_date)}
         />
         <DetailItem
