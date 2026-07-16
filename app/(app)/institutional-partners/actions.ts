@@ -151,21 +151,20 @@ export async function createInstitutionAction(formData: FormData) {
     created_by_user_id: profile.id
   } as InstitutionInsert;
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("institutions")
-    .insert(insertPayload)
-    .select("id")
-    .single();
+    .insert(insertPayload);
 
-  if (error || !data) {
+  if (error) {
     redirectWithError(
       errorPath,
-      error?.message ?? "Institution was not created."
+      error.message
     );
   }
 
   revalidatePath("/institutional-partners");
-  redirect(`/institutional-partners/${data.id}`);
+  revalidatePath(`/institutional-partners/${institutionId}`);
+  redirect(`/institutional-partners/${institutionId}`);
 }
 
 export async function updateInstitutionAction(id: string, formData: FormData) {
