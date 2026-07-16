@@ -1,9 +1,14 @@
-export type PaymentLink = {
-  label: string;
-  discount: number;
-  amount: number;
-  url: string;
-};
+import type { Database } from "@/lib/supabase/database.types";
+
+export type PaymentLink = Pick<
+  Database["public"]["Tables"]["sales_payment_links"]["Row"],
+  | "product_name"
+  | "offer_label"
+  | "discount_percent"
+  | "regular_price_inr"
+  | "amount_inr"
+  | "payment_url"
+>;
 
 export type ProductPaymentLinks = {
   product: string;
@@ -11,77 +16,22 @@ export type ProductPaymentLinks = {
   links: PaymentLink[];
 };
 
-export const productPaymentLinks: ProductPaymentLinks[] = [
-  {
-    product: "Dihanga",
-    regularPrice: 159850,
-    links: [
-      {
-        label: "Regular price",
-        discount: 0,
-        amount: 159850,
-        url: "https://rzp.io/rzp/jwfd1dihanga"
-      }
-    ]
-  },
-  {
-    product: "Jahnavi",
-    regularPrice: 63950,
-    links: [
-      {
-        label: "Regular price",
-        discount: 0,
-        amount: 63950,
-        url: "https://rzp.io/rzp/jwfd1jahnavi"
-      },
-      {
-        label: "5% discount",
-        discount: 5,
-        amount: 60752,
-        url: "https://rzp.io/rzp/jwfd2jahnavi"
-      },
-      {
-        label: "10% discount",
-        discount: 10,
-        amount: 57555,
-        url: "https://rzp.io/rzp/jwfd3jahnavi"
-      },
-      {
-        label: "15% discount",
-        discount: 15,
-        amount: 54357,
-        url: "https://rzp.io/rzp/jwfd4jahnavi"
-      }
-    ]
-  },
-  {
-    product: "Vipasa",
-    regularPrice: 26950,
-    links: [
-      {
-        label: "Regular price",
-        discount: 0,
-        amount: 26950,
-        url: "https://rzp.io/rzp/jwfd1vipasa"
-      },
-      {
-        label: "5% discount",
-        discount: 5,
-        amount: 25602,
-        url: "https://rzp.io/rzp/jwfd2vipasa"
-      },
-      {
-        label: "10% discount",
-        discount: 10,
-        amount: 24255,
-        url: "https://rzp.io/rzp/jwfd3vipasa"
-      },
-      {
-        label: "15% discount",
-        discount: 15,
-        amount: 22907,
-        url: "https://rzp.io/rzp/jwfd4vipasa"
-      }
-    ]
+export function groupPaymentLinks(rows: PaymentLink[]): ProductPaymentLinks[] {
+  const grouped = new Map<string, ProductPaymentLinks>();
+
+  for (const row of rows) {
+    const existing = grouped.get(row.product_name);
+    if (existing) {
+      existing.links.push(row);
+      continue;
+    }
+
+    grouped.set(row.product_name, {
+      product: row.product_name,
+      regularPrice: row.regular_price_inr,
+      links: [row]
+    });
   }
-];
+
+  return Array.from(grouped.values());
+}

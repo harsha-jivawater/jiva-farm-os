@@ -1,7 +1,8 @@
 import { ExternalLink, Link2, Percent, Tag } from "lucide-react";
 import { CopyPaymentLinkButton } from "@/components/payment-links/copy-payment-link-button";
 import { PageHeader } from "@/components/page-header";
-import { productPaymentLinks } from "@/lib/payment-links";
+import { groupPaymentLinks, type PaymentLink } from "@/lib/payment-links";
+import { createClient } from "@/lib/supabase/server";
 
 const currencyFormatter = new Intl.NumberFormat("en-IN", {
   currency: "INR",
@@ -13,7 +14,18 @@ function formatAmount(amount: number) {
   return currencyFormatter.format(amount);
 }
 
-export default function PaymentLinksPage() {
+export default async function PaymentLinksPage() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sales_payment_links")
+    .select(
+      "product_name, offer_label, discount_percent, regular_price_inr, amount_inr, payment_url"
+    )
+    .eq("is_active", true)
+    .order("product_name")
+    .order("sort_order");
+  const productPaymentLinks = groupPaymentLinks((data ?? []) as PaymentLink[]);
+
   return (
     <section>
       <PageHeader
@@ -21,6 +33,12 @@ export default function PaymentLinksPage() {
         title="Payment Links"
         description="Share the right Razorpay link with customers and dealers based on the agreed price."
       />
+
+      {error ? (
+        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Payment links could not be loaded. Please contact Admin.
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -79,27 +97,27 @@ export default function PaymentLinksPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {product.links.map((link) => (
-                    <tr className="align-middle" key={link.url}>
+                    <tr className="align-middle" key={link.payment_url}>
                       <td className="px-4 py-4 font-medium text-slate-900 sm:px-5">
-                        {link.label}
+                        {link.offer_label}
                       </td>
-                      <td className="px-4 py-4 text-slate-600">{link.discount}%</td>
+                      <td className="px-4 py-4 text-slate-600">{link.discount_percent}%</td>
                       <td className="px-4 py-4 font-semibold text-slate-950">
-                        {formatAmount(link.amount)}
+                        {formatAmount(link.amount_inr)}
                       </td>
                       <td className="max-w-[22rem] px-4 py-4 text-xs text-slate-500">
                         <a
                           className="inline-flex max-w-full items-center gap-1 truncate text-brand-700 hover:text-brand-800 hover:underline"
-                          href={link.url}
+                          href={link.payment_url}
                           rel="noreferrer"
                           target="_blank"
                         >
-                          <span className="truncate">{link.url}</span>
+                          <span className="truncate">{link.payment_url}</span>
                           <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         </a>
                       </td>
                       <td className="px-4 py-4">
-                        <CopyPaymentLinkButton url={link.url} />
+                        <CopyPaymentLinkButton url={link.payment_url} />
                       </td>
                     </tr>
                   ))}

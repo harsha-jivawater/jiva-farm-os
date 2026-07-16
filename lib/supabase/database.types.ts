@@ -9,6 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      sales_payment_links: {
+        Row: {
+          id: string;
+          product_name: string;
+          offer_label: string;
+          discount_percent: number;
+          regular_price_inr: number;
+          amount_inr: number;
+          payment_url: string;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_name: string;
+          offer_label: string;
+          discount_percent?: number;
+          regular_price_inr: number;
+          amount_inr: number;
+          payment_url: string;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_name?: string;
+          offer_label?: string;
+          discount_percent?: number;
+          regular_price_inr?: number;
+          amount_inr?: number;
+          payment_url?: string;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       devices: {
         Row: {
           id: string;
