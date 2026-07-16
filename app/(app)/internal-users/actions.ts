@@ -459,22 +459,19 @@ export async function createInternalUserAction(formData: FormData) {
 
   payload.is_active = true;
   payload.must_change_password = true;
+  const userId = crypto.randomUUID();
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("users")
-    .insert(payload)
-    .select("id")
-    .single();
+    .insert({ ...payload, id: userId });
 
-  if (error || !data) {
-    redirectWithError(
-      "/internal-users/new",
-      error?.message ?? "Internal user was not created."
-    );
+  if (error) {
+    redirectWithError("/internal-users/new", error.message);
   }
 
   revalidatePath("/internal-users");
-  redirect(`/internal-users/${data.id}/edit?created=1`);
+  revalidatePath(`/internal-users/${userId}/edit`);
+  redirect(`/internal-users/${userId}/edit?created=1`);
 }
 
 export async function updateInternalUserAction(id: string, formData: FormData) {

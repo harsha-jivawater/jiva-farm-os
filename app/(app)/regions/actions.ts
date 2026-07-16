@@ -40,19 +40,19 @@ export async function createRegionAction(formData: FormData) {
   }
 
   payload.is_active = true;
+  const regionId = crypto.randomUUID();
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("regions")
-    .insert(payload)
-    .select("id")
-    .single();
+    .insert({ ...payload, id: regionId });
 
-  if (error || !data) {
-    redirectWithError(errorPath, error?.message ?? "Region was not created.");
+  if (error) {
+    redirectWithError(errorPath, error.message);
   }
 
   revalidatePath("/regions");
-  redirect(`/regions/${data.id}/edit?created=1`);
+  revalidatePath(`/regions/${regionId}/edit`);
+  redirect(`/regions/${regionId}/edit?created=1`);
 }
 
 export async function updateRegionAction(id: string, formData: FormData) {

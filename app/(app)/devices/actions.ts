@@ -96,21 +96,20 @@ export async function createDeviceAction(formData: FormData) {
     stock_entered_by_user_id: profile.id
   } as DeviceInsert;
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("devices")
-    .insert(insertPayload)
-    .select("id")
-    .single();
+    .insert(insertPayload);
 
-  if (error || !data) {
+  if (error) {
     redirectWithError(
       "/devices/new",
-      deviceErrorMessage(error?.message ?? "Device was not created.", error?.code)
+      deviceErrorMessage(error.message, error.code)
     );
   }
 
   revalidatePath("/devices");
-  redirect(`/devices/${data.id}`);
+  revalidatePath(`/devices/${newDeviceId}`);
+  redirect(`/devices/${newDeviceId}`);
 }
 
 export async function updateDeviceAction(id: string, formData: FormData) {

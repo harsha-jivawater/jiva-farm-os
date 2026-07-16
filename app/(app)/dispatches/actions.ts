@@ -1098,8 +1098,10 @@ export async function createDispatchAction(formData: FormData) {
     );
   }
 
+  const dispatchId = crypto.randomUUID();
   const insertPayload = {
     ...payload,
+    id: dispatchId,
     device_id: device.id,
     serial_number_snapshot: device.serial_number,
     product_model: device.product_model,
@@ -1125,37 +1127,32 @@ export async function createDispatchAction(formData: FormData) {
     );
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("dispatches")
-    .insert(insertPayload)
-    .select("id, dispatch_code")
-    .single();
+    .insert(insertPayload);
 
-  if (error || !data) {
-    redirectWithError(
-      "/dispatches/new",
-      error?.message ?? "Dispatch was not created."
-    );
+  if (error) {
+    redirectWithError("/dispatches/new", error.message);
   }
 
   if (insertPayload.dispatch_status === "Dispatched") {
     await applyDispatchedSideEffects({
       supabase,
       profileId: profile.id,
-      dispatchId: data.id,
+      dispatchId,
       payload: insertPayload,
       device,
       createMovement: true,
       destinationSnapshot: pilotDeviceDestinationSnapshot(pilotDispatch),
-      errorPath: `/dispatches/${data.id}/edit`
+      errorPath: `/dispatches/${dispatchId}/edit`
     });
 
     if (farmerSaleLead) {
       await markFarmerSaleLeadDispatched({
         supabase,
-        dispatchId: data.id,
+        dispatchId,
         lead: farmerSaleLead,
-        errorPath: `/dispatches/${data.id}/edit`
+        errorPath: `/dispatches/${dispatchId}/edit`
       });
     }
   }
@@ -1164,11 +1161,11 @@ export async function createDispatchAction(formData: FormData) {
     await sendN8nEvent("pilot_dispatch_requested", {
       dueDate: insertPayload.dispatch_date ?? insertPayload.expected_delivery_date,
       nextAction: "Customer Service Team to process the Pilot Stock dispatch.",
-      recordCode: data.dispatch_code ?? pilotDispatch.pilot_code,
+      recordCode: insertPayload.dispatch_code ?? pilotDispatch.pilot_code,
       recordType: "Dispatch",
       status: insertPayload.dispatch_status,
       title: `${pilotDispatch.pilot_code} · ${pilotDispatch.pilot_name}`,
-      url: appSearchUrl("/dispatches", data.dispatch_code ?? pilotDispatch.pilot_code)
+      url: appSearchUrl("/dispatches", insertPayload.dispatch_code ?? pilotDispatch.pilot_code)
     });
   }
 
@@ -1186,7 +1183,8 @@ export async function createDispatchAction(formData: FormData) {
     revalidatePath("/dealers");
     revalidatePath(`/dealers/${dealerDispatch.id}`);
   }
-  redirect(`/dispatches/${data.id}`);
+  revalidatePath(`/dispatches/${dispatchId}`);
+  redirect(`/dispatches/${dispatchId}`);
 }
 
 export async function updateDispatchAction(id: string, formData: FormData) {

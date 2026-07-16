@@ -112,17 +112,16 @@ async function createFarmerSaleVisitReport({
       | null
   };
 
-  const { data, error } = await supabase
+  const reportId = crypto.randomUUID();
+  const { error } = await supabase
     .from("visit_reports")
-    .insert(visitReportPayload)
-    .select("id")
-    .single();
+    .insert({ ...visitReportPayload, id: reportId });
 
-  if (error || !data) {
-    throw new Error(error?.message ?? "Visit report was not created.");
+  if (error) {
+    throw new Error(error.message);
   }
 
-  return data.id as string;
+  return reportId;
 }
 
 async function saveFollowup({

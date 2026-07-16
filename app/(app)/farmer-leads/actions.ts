@@ -327,24 +327,22 @@ export async function createFarmerLeadAction(formData: FormData) {
     );
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("farmer_leads")
-    .insert({ ...payload, id: leadId })
-    .select("id")
-    .single();
+    .insert({ ...payload, id: leadId });
 
-  if (error || !data) {
+  if (error) {
     redirectWithError(
       "/farmer-leads/new",
       isFarmerLeadMobileUniqueError(error)
         ? "A Farmer Lead with this mobile number already exists."
-        : (error?.message ?? "Lead was not created.")
+        : error.message
     );
   }
 
   if (payload.payment_confirmed && !payload.device_dispatched) {
     await sendPaidLeadReadyForDispatchEvent({
-      id: data.id,
+      id: leadId,
       lead_code: payload.lead_code,
       farmer_name: payload.farmer_name,
       lead_status: payload.lead_status,
@@ -354,7 +352,8 @@ export async function createFarmerLeadAction(formData: FormData) {
   }
 
   revalidatePath("/farmer-leads");
-  redirect(`/farmer-leads/${data.id}`);
+  revalidatePath(`/farmer-leads/${leadId}`);
+  redirect(`/farmer-leads/${leadId}`);
 }
 
 export async function updateFarmerLeadAction(id: string, formData: FormData) {

@@ -1092,14 +1092,12 @@ export async function createPilotAction(formData: FormData) {
     created_by_user_id: profile.id
   } as PilotInsert;
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("pilots")
-    .insert(insertPayload)
-    .select("id")
-    .single();
+    .insert(insertPayload);
 
-  if (error || !data) {
-    redirectWithError(errorPath, error?.message ?? "Pilot was not created.");
+  if (error) {
+    redirectWithError(errorPath, error.message);
   }
 
   if (initialPlannedVisits.length > 0) {
@@ -1109,7 +1107,7 @@ export async function createPilotAction(formData: FormData) {
           ({
             ...visit,
             id: crypto.randomUUID(),
-            pilot_id: data.id,
+            pilot_id: pilotId,
             created_by_user_id: profile.id
           }) as PlannedPilotVisitInsert & { id: string }
       );
@@ -1118,7 +1116,7 @@ export async function createPilotAction(formData: FormData) {
       .insert(visitRows);
 
     if (visitError) {
-      redirectWithError(`/pilots/${data.id}`, visitError.message);
+      redirectWithError(`/pilots/${pilotId}`, visitError.message);
     }
 
     await Promise.all(
@@ -1132,7 +1130,7 @@ export async function createPilotAction(formData: FormData) {
         return notifyPlannedVisitAssignment({
           actorUserId: profile.id,
           assignedUserId: visit.assigned_user_id,
-          pilotId: data.id,
+          pilotId,
           plannedVisitDate: details.plannedVisitDate,
           plannedVisitId: visit.id,
           supabase,
@@ -1147,7 +1145,7 @@ export async function createPilotAction(formData: FormData) {
       .update({
         next_visit_due_date: initialPlannedVisits[0]?.planned_visit_date ?? null
       })
-      .eq("id", data.id);
+      .eq("id", pilotId);
 
     revalidatePath("/my-visits");
   }
@@ -1155,13 +1153,14 @@ export async function createPilotAction(formData: FormData) {
   await syncFarmerLeadPilotState({
     supabase,
     farmerLeadId,
-    pilotId: data.id,
+    pilotId,
     payload,
     errorPath
   });
 
   revalidatePath("/pilots");
-  redirect(`/pilots/${data.id}`);
+  revalidatePath(`/pilots/${pilotId}`);
+  redirect(`/pilots/${pilotId}`);
 }
 
 export async function updatePilotAction(id: string, formData: FormData) {
@@ -1826,21 +1825,19 @@ export async function createVisitReportAction(
         visit_report_required: true
       };
 
-      const { data: createdVisit, error: createVisitError } = await supabase
+      const { error: createVisitError } = await supabase
         .from("pilot_visits")
-        .insert(actualVisitPayload)
-        .select("id")
-        .single();
+        .insert(actualVisitPayload);
 
-      if (createVisitError || !createdVisit) {
+      if (createVisitError) {
         redirectWithError(
           errorPath,
-          createVisitError?.message ?? "Actual pilot visit was not created."
+          createVisitError.message
         );
       }
 
-      payload.pilot_visit_id = createdVisit.id;
-      plannedVisit.linked_pilot_visit_id = createdVisit.id;
+      payload.pilot_visit_id = actualVisitId;
+      plannedVisit.linked_pilot_visit_id = actualVisitId;
     }
   }
 
@@ -1871,23 +1868,18 @@ export async function createVisitReportAction(
     pilot_id: pilotId
   } as VisitReportInsert;
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("visit_reports")
-    .insert(insertPayload)
-    .select("id, visit_report_code")
-    .single();
+    .insert(insertPayload);
 
-  if (error || !data) {
-    redirectWithError(
-      errorPath,
-      error?.message ?? "Visit report was not created."
-    );
+  if (error) {
+    redirectWithError(errorPath, error.message);
   }
 
   if (payload.pilot_visit_id) {
     await supabase
       .from("pilot_visits")
-      .update({ visit_report_id: data.id })
+      .update({ visit_report_id: reportId })
       .eq("id", payload.pilot_visit_id);
   }
 
@@ -1896,7 +1888,7 @@ export async function createVisitReportAction(
       .from("planned_pilot_visits")
       .update({
         linked_pilot_visit_id: payload.pilot_visit_id,
-        linked_visit_report_id: data.id,
+        linked_visit_report_id: reportId,
         planned_visit_status: "Completed"
       })
       .eq("id", plannedVisit.id);
@@ -1917,7 +1909,7 @@ export async function createVisitReportAction(
         ? "R&D Head to review the final pilot report."
         : "Review field observations and follow up if needed.",
     ownerName: userDisplayName(profile),
-    recordCode: data.visit_report_code ?? insertPayload.visit_report_code,
+    recordCode: insertPayload.visit_report_code ?? pilotSummary?.pilot_code,
     recordType: "Visit Report",
     status: insertPayload.report_status ?? "Submitted",
     title:

@@ -469,27 +469,26 @@ async function createFarmerSaleFollowup({
     outcome: "Follow-up Required"
   };
 
-  const { data, error } = await supabase
+  const followupId = crypto.randomUUID();
+  const { error } = await supabase
     .from("followups")
-    .insert(followupPayload)
-    .select("id")
-    .single();
+    .insert({ ...followupPayload, id: followupId });
 
-  if (error || !data) {
-    throw new Error(error?.message ?? "Follow-up was not created.");
+  if (error) {
+    throw new Error(error.message);
   }
 
   await supabase
     .from("installations")
     .update({
-      linked_followup_id: data.id,
+      linked_followup_id: followupId,
       followup_required: true,
       followup_due_date: followupDueDate
     })
     .eq("id", installationId);
 
   return {
-    id: data.id,
+    id: followupId,
     dueDate: followupDueDate
   };
 }
@@ -711,35 +710,31 @@ export async function createInstallationAction(formData: FormData) {
     verified_date: payload.installation_status === "Verified" ? now : null
   } as InstallationInsert;
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("installations")
-    .insert(insertPayload)
-    .select("id")
-    .single();
+    .insert(insertPayload);
 
-  if (error || !data) {
-    redirectWithError(
-      errorPath,
-      error?.message ?? "Installation was not created."
-    );
+  if (error) {
+    redirectWithError(errorPath, error.message);
   }
 
   if (isInstalledStatus(insertPayload.installation_status)) {
     await applyInstalledSideEffects({
       supabase,
       profileId: profile.id,
-      installationId: data.id,
+      installationId,
       payload: insertPayload,
       createMovement: true,
       createFollowup: farmerLead.payment_confirmed,
-      errorPath: `/installations/${data.id}/edit`
+      errorPath: `/installations/${installationId}/edit`
     });
   }
 
   revalidatePath("/installations");
   revalidatePath("/devices");
   revalidatePath("/farmer-leads");
-  redirect(`/installations/${data.id}`);
+  revalidatePath(`/installations/${installationId}`);
+  redirect(`/installations/${installationId}`);
 }
 
 export async function updateInstallationAction(id: string, formData: FormData) {

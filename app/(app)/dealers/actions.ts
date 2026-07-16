@@ -102,18 +102,17 @@ export async function createDealerAction(formData: FormData) {
     created_by_user_id: profile.id
   } as DealerInsert;
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("dealers")
-    .insert(insertPayload)
-    .select("id")
-    .single();
+    .insert(insertPayload);
 
-  if (error || !data) {
-    redirectWithError(errorPath, error?.message ?? "Dealer was not created.");
+  if (error) {
+    redirectWithError(errorPath, error.message);
   }
 
   revalidatePath("/dealers");
-  redirect(`/dealers/${data.id}`);
+  revalidatePath(`/dealers/${dealerId}`);
+  redirect(`/dealers/${dealerId}`);
 }
 
 export async function updateDealerAction(id: string, formData: FormData) {

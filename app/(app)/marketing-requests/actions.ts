@@ -150,34 +150,32 @@ export async function createMarketingRequestAction(formData: FormData) {
     redirectWithError(errorPath, validationError);
   }
 
+  const requestId = crypto.randomUUID();
   const insertPayload: MarketingRequestInsert = {
     ...payload,
+    id: requestId,
     request_code: marketingRequestCode(),
     requested_by_user_id: profile.id
   };
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("marketing_requests")
-    .insert(insertPayload)
-    .select("id")
-    .single();
+    .insert(insertPayload);
 
-  if (error || !data) {
-    redirectWithError(
-      errorPath,
-      error?.message ?? "Marketing request was not created."
-    );
+  if (error) {
+    redirectWithError(errorPath, error.message);
   }
 
   await addHistory(
-    data.id,
+    requestId,
     profile.id,
     "Status Update",
     "Request created."
   );
 
   revalidatePath("/marketing-requests");
-  redirect(`/marketing-requests/${data.id}`);
+  revalidatePath(`/marketing-requests/${requestId}`);
+  redirect(`/marketing-requests/${requestId}`);
 }
 
 export async function updateMarketingRequestAction(
