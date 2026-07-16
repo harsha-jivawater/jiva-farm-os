@@ -465,7 +465,7 @@ export async function institutionScope(
     );
 
     filters.push(
-      eqFilter("technical_owner_user_id", user.id),
+      inFilter("technical_owner_user_id", unique([user.id, ...directReportIds])),
       inFilter("id", institutionIds)
     );
   }
