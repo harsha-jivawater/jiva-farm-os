@@ -278,7 +278,7 @@ export default async function PilotDetailPage({
     { data: institutions },
     { data: dealers },
     { data: farmerLead },
-    { data: plannedVisits },
+    { data: plannedVisits, error: plannedVisitsError },
     { data: visits },
     { data: reports },
     { data: linkedDispatch }
@@ -343,6 +343,14 @@ export default async function PilotDetailPage({
   const visitsList = (visits ?? []) as PilotVisit[];
   const reportsList = (reports ?? []) as VisitReport[];
   const dispatch = linkedDispatch as LinkedDispatch | null;
+
+  if (plannedVisitsError) {
+    console.error("[pilots] Planned visit load failed", {
+      code: plannedVisitsError.code,
+      message: plannedVisitsError.message,
+      pilotId: pilot.id
+    });
+  }
   const [
     monitoringPlanUrl,
     pilotFolderUrl,
@@ -1076,6 +1084,12 @@ export default async function PilotDetailPage({
         title="Monitoring Plan"
       >
         <div className="space-y-2">
+          {plannedVisitsError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+              The monitoring plan could not be loaded. Refresh this page or
+              sign in again before making changes.
+            </div>
+          ) : null}
           {plannedVisitsByDate.length > 0 ? (
             <div className="hidden rounded-md bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid md:grid-cols-[0.9fr_1fr_1.4fr_1.3fr_1fr_1fr_auto] md:items-center md:gap-3">
               <span>Visit</span>
@@ -1247,7 +1261,7 @@ export default async function PilotDetailPage({
               </details>
             );
           })}
-          {plannedVisitsList.length === 0 ? (
+          {!plannedVisitsError && plannedVisitsList.length === 0 ? (
             <EmptyState>
               No planned visits yet. Add the first planned visit for this pilot.
             </EmptyState>

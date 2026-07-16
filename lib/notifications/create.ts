@@ -67,11 +67,7 @@ export async function createNotification(
     return null;
   }
 
-  const { data, error } = await supabase
-    .from("notifications")
-    .insert(payload)
-    .select("id")
-    .single();
+  const { error } = await supabase.from("notifications").insert(payload);
 
   if (error) {
     if (isIgnoredNotificationError(error)) {
@@ -82,7 +78,7 @@ export async function createNotification(
     throw error;
   }
 
-  return data?.id ?? null;
+  return null;
 }
 
 export async function notifyMarketingAssignment({
