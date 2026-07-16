@@ -8,6 +8,7 @@ import {
   Gauge,
   Handshake,
   KeyRound,
+  Link2,
   Palette,
   ShieldAlert,
   Stethoscope,
@@ -71,6 +72,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/institutional-partners",
         module: "institutional-partners",
         icon: Handshake
+      },
+      {
+        label: "Payment Links",
+        href: "/payment-links",
+        module: "payment-links",
+        icon: Link2
       }
     ]
   },

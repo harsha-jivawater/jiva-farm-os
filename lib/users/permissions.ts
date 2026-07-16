@@ -33,6 +33,7 @@ export type ModuleKey =
   | "monitoring-devices"
   | "kpi-dashboard"
   | "marketing-requests"
+  | "payment-links"
   | "internal-users"
   | "regions";
 
@@ -191,6 +192,7 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Marketing Head",
     "Designer"
   ],
+  "payment-links": ["Sales Head", "RSM", "Salesperson"],
   "internal-users": ["Admin"],
   regions: ["Admin", "Sales Head", "Management"]
 };
@@ -249,6 +251,7 @@ const moduleWriteRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Marketing Head",
     "Designer"
   ],
+  "payment-links": [],
   "internal-users": ["Admin"],
   regions: ["Admin", "Sales Head"]
 };
