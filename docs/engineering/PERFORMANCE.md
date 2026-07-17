@@ -1,6 +1,6 @@
 # Jiva Farm OS Performance Record
 
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-17_
 
 Only measured results belong in this file. Estimates and expected improvements must be labeled clearly and must not be recorded as completed results.
 
@@ -78,6 +78,36 @@ The bounded My Work deployment was confirmed working after commit:
 ```text
 d532039 Bound My Work initial loading
 ```
+
+## Research Assistant Visit-Report KPI Timeout
+
+### Production symptom
+
+The Research Assistant `Reports Submitted` exact count returned HTTP 500 after
+the database statement timeout. Production had one visit report, but the query
+had to evaluate the broader cross-module visit-report RLS policy tree before it
+could reject that unrelated row.
+
+### Resolution
+
+Migration `20260717050000_visit_reports_submitter_date_index.sql` adds a partial
+index on active visit reports by submitter and report date. Permissions and RLS
+policies are unchanged.
+
+### Staging result
+
+Authenticated `EXPLAIN (ANALYZE, BUFFERS)` after the migration used
+`idx_visit_reports_submitter_date_active`:
+
+```text
+Planning time: 1184.108 ms
+Execution time: 31.877 ms
+Matching rows: 0
+RLS subplans executed: 0
+```
+
+The same query completed inside a two-second test timeout. Production
+verification remains required after the migration is applied.
 
 ## Performance Acceptance Rules
 

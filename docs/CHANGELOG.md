@@ -32,8 +32,12 @@ Simple reverse chronological record of major Jiva Farm OS work.
   migration-ledger, branch-protection, and release activation sequence.
 - Documented feature-branch releases, environment separation, production
   prerequisites, and rollback procedure.
-- No production migration, data write, deployment, purchase, or remote
-  repository setting was changed during this local hardening work.
+- Activated the release through an isolated Supabase staging project, a
+  staging-backed Vercel Preview, reviewed production migration-ledger repair,
+  ordered production migrations, and a merge-to-main Vercel deployment.
+- Added a targeted active visit-report submitter/date index after production
+  smoke testing found a Research Assistant KPI count statement timeout; no RLS
+  policy or role permission was changed.
 
 ## 2026-07-10
 
