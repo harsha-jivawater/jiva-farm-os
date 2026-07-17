@@ -106,8 +106,14 @@ Matching rows: 0
 RLS subplans executed: 0
 ```
 
-The same query completed inside a two-second test timeout. Production
-verification remains required after the migration is applied.
+The same query completed inside a two-second test timeout.
+
+### Production verification
+
+After migration `20260717050000` was applied, the live Research Assistant KPI
+dashboard returned `Reports Submitted: 0`. The matching `visit_reports` HEAD
+request changed from HTTP 500 before the migration to HTTP 200 afterward, and
+no new statement timeout appeared in the database log.
 
 ## Performance Acceptance Rules
 
