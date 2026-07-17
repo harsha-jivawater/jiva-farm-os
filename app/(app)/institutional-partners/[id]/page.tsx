@@ -59,7 +59,7 @@ import {
   type UserOption
 } from "@/lib/institutions/types";
 import { createClient } from "@/lib/supabase/server";
-import { resolveFileUrl } from "@/lib/uploads/server";
+import { resolveFileUrls } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import {
@@ -531,18 +531,22 @@ export default async function InstitutionDetailPage({
     | "rsm_user_id"
   >[];
   const linkedDealers = (dealers ?? []) as LinkedDealer[];
-  const [proposalUrl, presentationUrl, mouUrl] = await Promise.all([
-    resolveFileUrl(supabase, institution.proposal_link),
-    resolveFileUrl(supabase, institution.presentation_link),
-    resolveFileUrl(supabase, institution.mou_agreement_link)
+  const institutionFileReferences = [
+    institution.proposal_link,
+    institution.presentation_link,
+    institution.mou_agreement_link
+  ];
+  const meetingFileReferences = meetingsList.map((meeting) => meeting.notes_link);
+  const resolvedFileUrls = await resolveFileUrls(supabase, [
+    ...institutionFileReferences,
+    ...meetingFileReferences
   ]);
+  const [proposalUrl, presentationUrl, mouUrl] = resolvedFileUrls;
   const meetingNotesUrls = new Map<string, string | null>(
-    await Promise.all(
-      meetingsList.map(async (meeting) => [
+    meetingsList.map((meeting, index) => [
         meeting.id,
-        await resolveFileUrl(supabase, meeting.notes_link)
+        resolvedFileUrls[institutionFileReferences.length + index] ?? null
       ] as [string, string | null])
-    )
   );
   const regionsList = (regions ?? []) as RegionOption[];
   const userMap = new Map(usersList.map((user) => [user.id, user]));

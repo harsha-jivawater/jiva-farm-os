@@ -1,0 +1,38 @@
+name: Release readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_url:
+        description: Exact Vercel preview or production URL to smoke test
+        required: true
+        type: string
+
+concurrency:
+  cancel-in-progress: false
+  group: release-readiness
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    name: Release readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 24
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run release checks
+        run: npm run release:check
+      - name: Smoke test supplied deployment
+        env:
+          SMOKE_BASE_URL: ${{ inputs.deployment_url }}
+        run: npm run release:smoke

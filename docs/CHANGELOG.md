@@ -2,6 +2,39 @@
 
 Simple reverse chronological record of major Jiva Farm OS work.
 
+## 2026-07-17
+
+### Production hardening
+
+- Added a reproducible production schema baseline and retained the previous
+  migration chain in an audit archive.
+- Added automated role, workflow, database, RLS, and browser regression tests.
+- Added immutable migration checksum and naming guards.
+- Added environment contract validation without printing secret values.
+- Added a non-mutating health endpoint and deployment smoke checker.
+- Added application-wide anti-framing, MIME, referrer, browser-permission,
+  indexing, and transport security headers.
+- Added pull-request CI, release-readiness workflow, failure evidence, and
+  weekly dependency update configuration.
+- Added file-signature validation, transactional upload cleanup, scoped private
+  Storage policies, and database-enforced concurrent Dispatch protection.
+- Replaced 12 KPI sector count requests with one RLS-aware aggregate and batched
+  private attachment signing on high-attachment detail pages.
+- Added enforced JavaScript bundle budgets and aligned local, CI, and Vercel
+  execution on Node.js 24.
+- Removed anonymous execution of internal database functions and fixed legacy
+  function search paths.
+- Removed signed-in RPC access to internal work-item backfill, projection,
+  candidate, and trigger functions while preserving application RLS helpers.
+- Created and successfully restore-tested a private production logical backup;
+  exact populated-table counts and foreign-key integrity matched production.
+- Audited live Supabase and Vercel state and documented the attended staging,
+  migration-ledger, branch-protection, and release activation sequence.
+- Documented feature-branch releases, environment separation, production
+  prerequisites, and rollback procedure.
+- No production migration, data write, deployment, purchase, or remote
+  repository setting was changed during this local hardening work.
+
 ## 2026-07-10
 
 ### My Work and navigation

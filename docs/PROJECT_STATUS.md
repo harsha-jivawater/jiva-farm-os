@@ -22,14 +22,37 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 ## Deployment State
 
 - GitHub `main` deploys to Vercel production.
+- Pull-request quality and integration workflows are defined for future
+  required-status enforcement on `main`.
 - Supabase is used for production database, authentication, RLS, and private file storage.
 - Supabase GitHub connection is not required for normal app deployment.
 - Schema changes must be committed as Supabase migrations before production use.
 - SQL-dependent code should be deployed only after the required SQL has been reviewed and applied in Supabase.
-- Code-only changes can be committed and pushed after checks pass:
-  - `npm run lint`
-  - `npm run typecheck`
-  - `npx next build`
+- Code-only changes should move through a feature branch and pull request after
+  `npm run release:check` passes.
+- Production readiness includes a non-mutating `/api/health` endpoint,
+  deployment smoke command, security headers, and a documented rollback path.
+- GitHub branch protection and separated Vercel Preview credentials must be
+  enabled after the hardening workflow is merged.
+
+## Production Hardening Release Candidate - 17 July 2026
+
+- Phases 1-5 are implemented and locally verified: reproducible schema,
+  automated regression coverage, release controls, upload/Dispatch integrity,
+  and targeted performance improvements.
+- The full local suite covers 48 application tests, 36 database tests, browser
+  smoke tests, type checking, linting, production build, dependency audit, and
+  bundle budgets.
+- A private logical production backup was restored successfully against the
+  hardened local schema; exact populated-table row counts and all foreign keys
+  matched production. The local production-data copy was then erased.
+- Live Supabase and Vercel were inspected read-only. Production remains healthy.
+- The release candidate is not deployed. Remote activation is intentionally
+  waiting for a separate staging Supabase environment, Vercel environment
+  separation, migration-ledger reconciliation, and protected pull-request
+  checks.
+- See `docs/engineering/PRODUCTION_HARDENING_PHASE_6.md` for the exact attended
+  release sequence.
 
 ## Completed Modules
 

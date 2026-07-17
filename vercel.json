@@ -1,3 +1,5 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run check:deployment-env && npm run build && npm run check:bundle",
   "regions": ["hnd1"]
 }
