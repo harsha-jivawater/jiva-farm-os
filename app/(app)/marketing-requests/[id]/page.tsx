@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { ArrowUpRight, CheckCircle2, Pencil } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Pencil, UploadCloud } from "lucide-react";
 import {
   addMarketingRequestUpdateAction,
   markMarketingRequestCompletedAction,
@@ -16,6 +16,7 @@ import {
   PriorityPill
 } from "@/components/marketing-requests/marketing-status-pill";
 import { PageHeader } from "@/components/page-header";
+import { canManageMarketingLibrary } from "@/lib/marketing-assets/permissions";
 import { loadMarketingRequestFormOptions } from "@/lib/marketing-requests/load-options";
 import {
   labelFor,
@@ -350,6 +351,7 @@ export default async function MarketingRequestDetailPage({
   const action = currentAction(request);
   const workingDeadline = finalWorkingDeadline(request);
   const canManage = canManageMarketingRequests(currentUser);
+  const canPublishToLibrary = canManageMarketingLibrary(currentUser);
   const canWorkflow = canUpdateMarketingWorkflow(currentUser, request);
   const canEditBrief = canEditMarketingRequestBrief(currentUser, request);
   const canComment = canCommentOnMarketingRequest(currentUser, request);
@@ -587,7 +589,7 @@ export default async function MarketingRequestDetailPage({
         description="Completion is recorded by the system when Marketing marks the work completed."
       >
         {isCompleted ? (
-          <div>
+          <div className="space-y-4">
             <InfoRow
               label="Completed On"
               value={formatDateTime(request.completed_at)}
@@ -596,6 +598,15 @@ export default async function MarketingRequestDetailPage({
               label="Completed By"
               value={userLabel(userMap, request.completed_by_user_id)}
             />
+            {canPublishToLibrary ? (
+              <Link
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                href={`/marketing-library/new?requestId=${request.id}`}
+              >
+                <UploadCloud className="h-4 w-4" aria-hidden="true" />
+                Add to Marketing Library
+              </Link>
+            ) : null}
           </div>
         ) : canWorkflow ? (
           <form action={completionAction}>

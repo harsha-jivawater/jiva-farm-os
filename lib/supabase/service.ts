@@ -14,8 +14,8 @@ export function createServiceClient() {
     );
   }
 
-  // Service-role access bypasses RLS. Use only in secret-protected server routes
-  // that return explicitly whitelisted, read-only data.
+  // Service-role access bypasses RLS. Keep it in server-only routes and actions
+  // with explicit authorization and a narrowly whitelisted data surface.
   return createClient<Database>(url, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,

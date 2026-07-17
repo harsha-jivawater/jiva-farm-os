@@ -51,6 +51,198 @@ export type Database = {
         };
         Relationships: [];
       };
+      marketing_assets: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          audience: string;
+          sector: string;
+          crop: string | null;
+          language: string;
+          asset_type: string;
+          delivery_format: string;
+          status: string;
+          source_marketing_request_id: string | null;
+          created_by_user_id: string;
+          uploaded_by_role: string;
+          review_required_role: string | null;
+          updated_by_user_id: string;
+          submitted_at: string | null;
+          reviewed_by_user_id: string | null;
+          reviewed_at: string | null;
+          review_note: string | null;
+          published_by_user_id: string | null;
+          published_at: string | null;
+          archived_by_user_id: string | null;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          audience: string;
+          sector: string;
+          crop?: string | null;
+          language: string;
+          asset_type: string;
+          delivery_format?: string;
+          status?: string;
+          source_marketing_request_id?: string | null;
+          created_by_user_id: string;
+          uploaded_by_role: string;
+          review_required_role?: string | null;
+          updated_by_user_id: string;
+          submitted_at?: string | null;
+          reviewed_by_user_id?: string | null;
+          reviewed_at?: string | null;
+          review_note?: string | null;
+          published_by_user_id?: string | null;
+          published_at?: string | null;
+          archived_by_user_id?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          audience?: string;
+          sector?: string;
+          crop?: string | null;
+          language?: string;
+          asset_type?: string;
+          delivery_format?: string;
+          status?: string;
+          source_marketing_request_id?: string | null;
+          created_by_user_id?: string;
+          uploaded_by_role?: string;
+          review_required_role?: string | null;
+          updated_by_user_id?: string;
+          submitted_at?: string | null;
+          reviewed_by_user_id?: string | null;
+          reviewed_at?: string | null;
+          review_note?: string | null;
+          published_by_user_id?: string | null;
+          published_at?: string | null;
+          archived_by_user_id?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      marketing_asset_versions: {
+        Row: {
+          id: string;
+          asset_id: string;
+          version_number: number;
+          is_current: boolean;
+          storage_path: string | null;
+          youtube_url: string | null;
+          original_file_name: string | null;
+          mime_type: string | null;
+          file_size_bytes: number | null;
+          change_note: string | null;
+          created_by_user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          asset_id: string;
+          version_number?: number;
+          is_current?: boolean;
+          storage_path?: string | null;
+          youtube_url?: string | null;
+          original_file_name?: string | null;
+          mime_type?: string | null;
+          file_size_bytes?: number | null;
+          change_note?: string | null;
+          created_by_user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          asset_id?: string;
+          version_number?: number;
+          is_current?: boolean;
+          storage_path?: string | null;
+          youtube_url?: string | null;
+          original_file_name?: string | null;
+          mime_type?: string | null;
+          file_size_bytes?: number | null;
+          change_note?: string | null;
+          created_by_user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      marketing_asset_events: {
+        Row: {
+          id: string;
+          asset_id: string;
+          event_type: string;
+          note: string | null;
+          created_by_user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          asset_id: string;
+          event_type: string;
+          note?: string | null;
+          created_by_user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          asset_id?: string;
+          event_type?: string;
+          note?: string | null;
+          created_by_user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      marketing_asset_shares: {
+        Row: {
+          id: string;
+          asset_id: string;
+          token_hash: string;
+          created_by_user_id: string;
+          created_at: string;
+          revoked_by_user_id: string | null;
+          revoked_at: string | null;
+          last_accessed_at: string | null;
+          access_count: number;
+        };
+        Insert: {
+          id?: string;
+          asset_id: string;
+          token_hash: string;
+          created_by_user_id: string;
+          created_at?: string;
+          revoked_by_user_id?: string | null;
+          revoked_at?: string | null;
+          last_accessed_at?: string | null;
+          access_count?: number;
+        };
+        Update: {
+          id?: string;
+          asset_id?: string;
+          token_hash?: string;
+          created_by_user_id?: string;
+          created_at?: string;
+          revoked_by_user_id?: string | null;
+          revoked_at?: string | null;
+          last_accessed_at?: string | null;
+          access_count?: number;
+        };
+        Relationships: [];
+      };
       devices: {
         Row: {
           id: string;
@@ -2790,6 +2982,23 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      record_marketing_asset_share_access: {
+        Args: { p_token_hash: string };
+        Returns: string | null;
+      };
+      replace_marketing_asset_version: {
+        Args: {
+          p_asset_id: string;
+          p_version_id: string;
+          p_storage_path: string | null;
+          p_youtube_url: string | null;
+          p_original_file_name: string | null;
+          p_mime_type: string | null;
+          p_file_size_bytes: number | null;
+          p_change_note: string | null;
+        };
+        Returns: number;
+      };
       mark_current_user_password_changed: {
         Args: Record<PropertyKey, never>;
         Returns: undefined;

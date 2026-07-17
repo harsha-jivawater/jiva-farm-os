@@ -83,6 +83,8 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 - System Health
 - Data Quality
 - Marketing Requests with completion tracking
+- Marketing Library with counterpart approval, immutable versions, private files,
+  approved YouTube videos, and revocable no-login customer links
 - Regions
 - Internal Users
 - Help/SOP
@@ -91,9 +93,34 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 - Force first-login password change
 - CSV import for Farmer Leads and Devices with validation feedback
 
+## Marketing Library Release - 17 July 2026
+
+- Marketing Library is available under Team Workflows at `/marketing-library`.
+- All active internal roles can browse published material. Admin, Marketing
+  Head, and Designer can upload and manage material.
+- Upload and filter classification is ordered Audience, Sector, Agriculture-only
+  Crop, then Language. Crop is absent until Agriculture is selected.
+- Marketing Head uploads require Designer review; Designer uploads require
+  Marketing Head review. Admin can override. The database enforces separation
+  of uploader and reviewer for non-Admin users.
+- File assets upload directly to the private `marketing-assets` Supabase Storage
+  bucket through short-lived signed upload authorization. Stored bytes are
+  verified before the database record is submitted for review.
+- Video assets accept validated HTTPS YouTube links and render through the
+  privacy-enhanced YouTube embed host.
+- Published assets can receive customer bearer links that work without login,
+  do not expire automatically, and can be manually revoked. Only SHA-256 token
+  hashes are stored; a full link is displayed once when created.
+- Customer file opens use five-minute Supabase signed URLs, so private Storage
+  remains private and revocation takes effect for subsequent opens.
+- Local verification passed 59 unit tests, 64 pgTAP database/security tests,
+  production build and bundle budgets, and an authenticated Playwright flow
+  covering upload, review, Viewer access, public access, and revocation.
+
 ## Documentation Updates
 
 - Role-based usage manual updated to v0.17 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Marketing Library guidance is included in v0.18.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.

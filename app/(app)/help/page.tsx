@@ -89,12 +89,14 @@ const firstActionsByRole: Record<UserRole, readonly string[]> = {
     "Open Marketing Requests.",
     "Review new requests.",
     "Accept or revise deadlines.",
-    "Assign Designer."
+    "Assign Designer.",
+    "Upload or review Marketing Library material."
   ],
   Designer: [
     "Open Marketing Requests.",
     "Check assigned work.",
-    "Add draft/final links and progress updates."
+    "Add draft/final links and progress updates.",
+    "Upload or review Marketing Library material."
   ],
   "HR & Legal": [
     "Review relevant Dealer or Institutional Partner records where visible.",
@@ -102,6 +104,7 @@ const firstActionsByRole: Record<UserRole, readonly string[]> = {
   ],
   Viewer: [
     "Use dashboards and permitted pages for read-only visibility.",
+    "Use Marketing Library for approved customer and internal material.",
     "Do not expect edit buttons."
   ]
 };

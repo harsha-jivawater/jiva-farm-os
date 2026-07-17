@@ -8,6 +8,7 @@ import {
   Gauge,
   Handshake,
   KeyRound,
+  Library,
   Link2,
   Palette,
   ShieldAlert,
@@ -129,6 +130,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/marketing-requests",
         module: "marketing-requests",
         icon: Palette
+      },
+      {
+        label: "Marketing Library",
+        href: "/marketing-library",
+        module: "marketing-library",
+        icon: Library
       }
     ]
   },
