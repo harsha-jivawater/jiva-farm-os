@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   defaultDeviceStatus,
   defaultHolderType,
+  defaultInventoryPool,
   defaultStockEntrySource
 } from "@/lib/devices/options";
 import { validateDevicePayload } from "@/lib/devices/form-data";
@@ -60,6 +61,7 @@ function rowToPayload(
     device_code: clean(row.device_code),
     product_model: String(row.product_model ?? "").trim(),
     device_status: clean(row.device_status) ?? defaultDeviceStatus,
+    inventory_pool: clean(row.inventory_pool) ?? defaultInventoryPool,
     stock_entry_source: clean(row.stock_entry_source) ?? defaultStockEntrySource,
     stock_entry_date: stockEntryDate ?? todayDate(),
     current_holder_type: currentHolderType,
