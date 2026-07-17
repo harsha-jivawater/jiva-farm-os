@@ -2,7 +2,7 @@ begin;
 
 set local search_path = public, extensions;
 
-select plan(36);
+select plan(37);
 
 select has_table('public', 'users', 'users table exists');
 select has_table('public', 'farmer_leads', 'farmer leads table exists');
@@ -184,6 +184,20 @@ select is(
   ),
   3,
   'active dispatch uniqueness is enforced for devices, farmer leads, and pilots'
+);
+select ok(
+  exists (
+    select 1
+    from pg_class index_relation
+    join pg_index index_definition
+      on index_definition.indexrelid = index_relation.oid
+    join pg_namespace index_namespace
+      on index_namespace.oid = index_relation.relnamespace
+    where index_namespace.nspname = 'public'
+      and index_relation.relname = 'idx_visit_reports_submitter_date_active'
+      and index_definition.indpred is not null
+  ),
+  'active visit reports have an owner-and-date index for role-scoped KPI counts'
 );
 select ok(
   not exists (
