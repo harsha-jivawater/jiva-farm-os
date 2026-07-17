@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Search } from "lucide-react";
 import { StateDistrictSelect } from "@/src/components/location/StateDistrictSelect";
 import {
   defaultDispatchStatus,
@@ -183,6 +183,7 @@ export function DispatchForm({
   const [selectedDealerDeviceIds, setSelectedDealerDeviceIds] = useState<
     string[]
   >([]);
+  const [deviceSearch, setDeviceSearch] = useState("");
   const [dealerDeviceSearch, setDealerDeviceSearch] = useState("");
   const [dealerProductModelFilter, setDealerProductModelFilter] = useState("");
   const [serialNumber, setSerialNumber] = useState(
@@ -286,7 +287,7 @@ export function DispatchForm({
       : isDealerRoute
         ? "Dealer"
         : destinationType;
-  const filteredDevices = devices.filter((device) => {
+  const routeEligibleDevices = devices.filter((device) => {
     const isCurrentDispatchDevice =
       mode === "edit" &&
       Boolean(dispatch?.device_id) &&
@@ -312,6 +313,23 @@ export function DispatchForm({
 
     return isWarehouseDispatchDevice(device);
   });
+  const normalizedDeviceSearch = deviceSearch.trim().toLowerCase();
+  const filteredDevices = routeEligibleDevices.filter((device) => {
+    if (selectedDeviceId && device.id === selectedDeviceId) {
+      return true;
+    }
+
+    if (!normalizedDeviceSearch) {
+      return true;
+    }
+
+    return deviceSearchText(device).includes(normalizedDeviceSearch);
+  });
+  const matchingDeviceCount = normalizedDeviceSearch
+    ? routeEligibleDevices.filter((device) =>
+        deviceSearchText(device).includes(normalizedDeviceSearch)
+      ).length
+    : routeEligibleDevices.length;
   const dealerDispatchDevices = devices.filter(
     (device) =>
       device.inventory_pool === "Fresh Sale" &&
@@ -415,6 +433,7 @@ export function DispatchForm({
     setSelectedLeadId("");
     setSelectedPilotId("");
     setSelectedDealerId("");
+    setDeviceSearch("");
     setSelectedDealerDeviceIds([]);
     setDealerDeviceSearch("");
     setDealerProductModelFilter("");
@@ -753,6 +772,27 @@ export function DispatchForm({
         ) : (
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
+              <label>
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                  Search devices
+                </span>
+                <span className="relative block">
+                  <Search
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    className={`${inputClassName()} pl-9`}
+                    onChange={(event) => setDeviceSearch(event.target.value)}
+                    placeholder="Search serial, model, code, pool, or location"
+                    type="search"
+                    value={deviceSearch}
+                  />
+                </span>
+              </label>
+            </div>
+
+            <div className="md:col-span-2">
               <label
                 className="mb-1.5 block text-sm font-medium text-slate-700"
                 htmlFor="device_id"
@@ -783,10 +823,16 @@ export function DispatchForm({
               </select>
               {filteredDevices.length === 0 ? (
                 <p className="mt-1 text-xs leading-5 text-amber-700">
-                  No eligible devices found for this route. Check device pool and
-                  warehouse status.
+                  {routeEligibleDevices.length === 0
+                    ? "No eligible devices found for this route. Check device pool and warehouse status."
+                    : "No devices match the current search."}
                 </p>
-              ) : null}
+              ) : (
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Showing {matchingDeviceCount} of {routeEligibleDevices.length}{" "}
+                  eligible devices for this route.
+                </p>
+              )}
             </div>
 
             <div>

@@ -90,6 +90,8 @@ const dealerSelectColumns = [
   "dealer_address"
 ].join(",");
 
+const dispatchDeviceOptionLimit = 2000;
+
 function collectLinkedIds(rows: DispatchLinkRow[] | null, key: "farmerLead" | "pilot") {
   const ids = new Set<string>();
 
@@ -135,8 +137,9 @@ export default async function NewDispatchPage({
     .is("deleted_at", null)
     .in("device_status", [...preferredDispatchDeviceStatuses])
     .eq("current_holder_type", "Warehouse")
+    .order("created_at", { ascending: false })
     .order("serial_number", { ascending: true })
-    .limit(200);
+    .limit(dispatchDeviceOptionLimit);
   const { data: eligibleLeads } = await supabase
     .from("farmer_leads")
     .select(
