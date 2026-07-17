@@ -26,7 +26,7 @@ import {
   type Installation
 } from "@/lib/follow-ups/types";
 import { createClient } from "@/lib/supabase/server";
-import { resolveFileUrl } from "@/lib/uploads/server";
+import { resolveFileUrls } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canWriteModule } from "@/lib/users/permissions";
 import { followupScope } from "@/lib/users/record-scope";
@@ -83,9 +83,9 @@ export default async function FollowupDetailPage({
   }
 
   const followup = data as Followup;
-  const [reportUrl, photosUrl] = await Promise.all([
-    resolveFileUrl(supabase, followup.report_link),
-    resolveFileUrl(supabase, followup.photo_folder_link)
+  const [reportUrl, photosUrl] = await resolveFileUrls(supabase, [
+    followup.report_link,
+    followup.photo_folder_link
   ]);
   const [{ data: farmerLead }, { data: installation }] = await Promise.all([
     followup.farmer_lead_id

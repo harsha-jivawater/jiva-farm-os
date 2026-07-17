@@ -12,45 +12,55 @@
 
 ## Required Local Checks
 
-Run these before pushing code:
+Run the full release gate before opening or updating a pull request:
 
 ```bash
-npm run lint
-npm run typecheck
-npx next build
+npm run release:check
 ```
 
-Only push after these checks pass.
+Database and browser integration checks run in GitHub Actions against a
+disposable local Supabase stack. For local integration verification, start
+Supabase and run `npm run test:db` followed by `npm run test:e2e`.
 
 ## Deploying Code
 
-Use the normal GitHub to Vercel flow:
+Use a feature branch and pull request:
 
 ```bash
 git status
-git add .
+git switch -c codex/describe-the-change
+git add <reviewed-files>
 git commit -m "Describe the change"
-git push
+git push -u origin codex/describe-the-change
 ```
 
-Vercel deploys production from the `main` branch.
+1. Confirm the `Application quality` and `Integration` checks pass.
+2. Verify the Vercel preview uses non-production environment credentials.
+3. Run Release readiness against the exact preview URL.
+4. Review migration order and rollback notes when SQL is involved.
+5. Merge only after the preview and checks are green.
+
+Vercel deploys production from `main`. Do not push directly to `main` after
+branch protection is enabled.
 
 ## SQL And Deployment Order
 
 For SQL-dependent changes:
 
 1. Create a reviewed migration in `supabase/migrations`.
-2. Do not apply SQL automatically from local development.
-3. Apply the SQL in Supabase production only after review.
-4. Confirm the SQL succeeds.
-5. Push the dependent app code.
-6. Smoke test the affected production pages.
+2. Run `npm run check:migrations`, local replay, pgTAP, and database lint.
+3. Verify a restorable production backup and the migration ledger.
+4. Apply the reviewed SQL to production before dependent app code.
+5. Confirm the migration and targeted read-only checks succeed.
+6. Merge the dependent app code.
+7. Run the deployment smoke check and affected workflow tests.
 
 For code-only changes:
 
-1. Run lint/typecheck/build.
-2. Commit and push.
-3. Verify the Vercel deployment.
+1. Run `npm run release:check`.
+2. Open a pull request and wait for both required checks.
+3. Verify the preview and merge.
+4. Verify the Vercel production deployment.
 
 Never deploy code that depends on unapplied SQL.
 
@@ -65,6 +75,88 @@ Never deploy code that depends on unapplied SQL.
 - Always commit migrations for schema changes.
 - Do not apply rollback or draft SQL files unless specifically required.
 - Keep production `NEXT_PUBLIC_ENABLE_QA_SEED` unset or `false`.
+- Never use `supabase db reset --linked` against production.
+- Never edit the immutable baseline migrations. Add a new migration instead.
+
+## Environment Boundaries
+
+- Production and Preview must not share write-capable Supabase credentials.
+- Preview must use a separate staging/disposable Supabase project before any
+  authenticated or mutating preview test.
+- Set `SUPABASE_ENVIRONMENT=production` for Vercel Production and
+  `SUPABASE_ENVIRONMENT=staging` for Vercel Preview. Deployment builds reject a
+  mismatched marker.
+- Preview must not contain `SUPABASE_SERVICE_ROLE_KEY`, `N8N_WEBHOOK_SECRET`, or
+  `N8N_SUMMARY_SECRET`.
+- Production secrets belong in Vercel Production environment variables only.
+- Do not add `SUPABASE_SERVICE_ROLE_KEY`, n8n secrets, or other server secrets
+  to any `NEXT_PUBLIC_` variable.
+- `N8N_SUMMARY_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` must be configured
+  together for the daily summary route.
+- When `N8N_INTEGRATION_ENABLED=true`, both `N8N_WEBHOOK_URL` and a strong
+  `N8N_WEBHOOK_SECRET` are required.
+- Validate pulled production variables without printing their values:
+
+```bash
+vercel env run -- npm run check:env-production
+```
+
+## Hardening Release Activation
+
+The July hardening release is locally verified but must be activated while an
+operator is present:
+
+1. Create and fund a staging Supabase project or branch.
+2. Configure Vercel Preview to use only staging credentials.
+3. Configure the production and preview `SUPABASE_ENVIRONMENT` markers.
+4. Merge through a pull request and observe both quality jobs.
+5. Enable `main` branch protection and required checks.
+6. Confirm the private logical backup checksums and retain an encrypted copy
+   outside the development laptop.
+7. Reconcile the 18-entry production migration ledger with the consolidated
+   baseline before applying any new SQL.
+8. Apply the post-baseline migrations in order, validate preview, deploy, and
+   run the read-only release smoke check.
+
+Do not run production SQL while the migration ledger is divergent. Do not use
+the production database for preview testing.
+
+## Repository Protection
+
+After the quality workflow is present on `main`, configure GitHub protection
+for `main`:
+
+- require a pull request before merging;
+- require `Application quality` and `Integration` status checks;
+- require the branch to be up to date before merging;
+- block force pushes and branch deletion;
+- require one approval when a second qualified reviewer is available.
+
+Dependabot checks npm and GitHub Actions weekly. Dependency pull requests still
+require the normal CI checks and human review.
+
+## Release And Rollback
+
+Run a non-mutating smoke check against an exact deployment URL:
+
+```bash
+SMOKE_BASE_URL=https://exact-deployment-url npm run release:smoke
+```
+
+The check verifies `/api/health`, login rendering, anonymous protection of
+`/pilots`, and core security headers. It does not sign in or write records.
+
+If production verification fails:
+
+1. Stop further operational testing and capture the deployment URL and time.
+2. Roll back the Vercel deployment to the last known-good build.
+3. Do not reverse database migrations blindly. Use a reviewed forward fix or
+   the migration-specific rollback procedure.
+4. Re-run `/api/health`, login, and the affected role workflow after rollback.
+5. Record the incident and corrective action before redeploying.
+
+The baseline migration ledger and restorable production backup remain hard
+prerequisites for future production SQL changes.
 
 ## RLS Notes
 

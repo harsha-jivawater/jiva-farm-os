@@ -449,68 +449,31 @@ async function loadSectorPerformance(
   supabase: SupabaseClient,
   filters: DashboardFilters
 ): Promise<SectorPerformanceRow[]> {
-  const rows = await Promise.all(
-    businessSectorOptions.map(async ({ value: sector }) => {
-      const leadsQuery = supabase
-        .from("farmer_leads")
-        .select("id", { count: "exact", head: true })
-        .eq("business_sector", sector)
-        .is("deleted_at", null);
-      const dealersQuery = supabase
-        .from("dealers")
-        .select("id", { count: "exact", head: true })
-        .eq("business_sector", sector)
-        .is("deleted_at", null);
-      const institutionsQuery = supabase
-        .from("institutions")
-        .select("id", { count: "exact", head: true })
-        .eq("business_sector", sector)
-        .is("deleted_at", null);
-      const pilotsQuery = supabase
-        .from("pilots")
-        .select("id", { count: "exact", head: true })
-        .eq("business_sector", sector)
-        .is("deleted_at", null);
+  const { data, error } = await supabase.rpc("get_sector_performance", {
+    p_state: filters.state || null,
+    p_region_id: filters.regionId || null,
+    p_rsm_user_id: filters.rsmUserId || null
+  });
 
-      if (filters.state) {
-        leadsQuery.eq("state", filters.state);
-        dealersQuery.eq("state", filters.state);
-        institutionsQuery.eq("primary_state", filters.state);
-        pilotsQuery.eq("state", filters.state);
-      }
+  if (error) {
+    console.error("[KPI Dashboard] Sector performance RPC failed", error);
+  }
 
-      if (filters.regionId) {
-        leadsQuery.eq("region_id", filters.regionId);
-        dealersQuery.eq("region_id", filters.regionId);
-        institutionsQuery.eq("primary_region_id", filters.regionId);
-        pilotsQuery.eq("region_id", filters.regionId);
-      }
-
-      if (filters.rsmUserId) {
-        leadsQuery.eq("rsm_user_id", filters.rsmUserId);
-        dealersQuery.eq("rsm_user_id", filters.rsmUserId);
-        institutionsQuery.eq("rsm_user_id", filters.rsmUserId);
-        pilotsQuery.eq("rsm_user_id", filters.rsmUserId);
-      }
-
-      const [leads, dealers, institutions, pilots] = await Promise.all([
-        leadsQuery,
-        dealersQuery,
-        institutionsQuery,
-        pilotsQuery
-      ]);
-
-      return {
-        sector,
-        leads: leads.count ?? 0,
-        dealers: dealers.count ?? 0,
-        institutions: institutions.count ?? 0,
-        pilots: pilots.count ?? 0
-      };
-    })
+  const rowsBySector = new Map(
+    (data ?? []).map((row) => [row.sector, row] as const)
   );
 
-  return rows;
+  return businessSectorOptions.map(({ value: sector }) => {
+    const row = rowsBySector.get(sector);
+
+    return {
+      sector,
+      leads: Number(row?.leads ?? 0),
+      dealers: Number(row?.dealers ?? 0),
+      institutions: Number(row?.institutions ?? 0),
+      pilots: Number(row?.pilots ?? 0)
+    };
+  });
 }
 
 async function loadResearchAssistantPilotIds(

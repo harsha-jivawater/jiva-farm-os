@@ -52,7 +52,7 @@ import {
   type DealerPerformanceInstallation
 } from "@/lib/dealers/performance";
 import { createClient } from "@/lib/supabase/server";
-import { resolveFileUrl } from "@/lib/uploads/server";
+import { resolveFileUrls } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import {
@@ -374,11 +374,14 @@ export default async function DealerDetailPage({
   const canDelete = canDeleteActive && !isDeleted;
   const canRestore = canViewDeletedRecords && isDeleted;
   const dealerPrimaryName = dealer.firm_name || dealer.dealer_name;
-  const [agreementUrl, documentsUrl, trainingUrl] = await Promise.all([
-    resolveFileUrl(supabase, dealer.agreement_link),
-    resolveFileUrl(supabase, dealer.dealer_documents_folder_link),
-    resolveFileUrl(supabase, dealer.training_material_shared_link)
-  ]);
+  const [agreementUrl, documentsUrl, trainingUrl] = await resolveFileUrls(
+    supabase,
+    [
+      dealer.agreement_link,
+      dealer.dealer_documents_folder_link,
+      dealer.training_material_shared_link
+    ]
+  );
   const monthStart = new Date();
   monthStart.setDate(1);
   const monthStartDate = monthStart.toISOString().slice(0, 10);

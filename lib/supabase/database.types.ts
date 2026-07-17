@@ -2937,6 +2937,20 @@ export type Database = {
         };
         Returns: Json;
       };
+      get_sector_performance: {
+        Args: {
+          p_state?: string | null;
+          p_region_id?: string | null;
+          p_rsm_user_id?: string | null;
+        };
+        Returns: {
+          sector: string;
+          leads: number;
+          dealers: number;
+          institutions: number;
+          pilots: number;
+        }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

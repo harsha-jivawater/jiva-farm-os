@@ -92,6 +92,19 @@ function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
 
+function dispatchWriteErrorMessage(error: { code?: string; message: string }) {
+  if (
+    error.code === "23505" &&
+    /uq_dispatches_active_(device|farmer_destination|pilot_destination)/.test(
+      error.message
+    )
+  ) {
+    return "Another active dispatch was created for this device or destination. Refresh the page and review the existing dispatch.";
+  }
+
+  return error.message;
+}
+
 function getDispatchRoute(formData: FormData) {
   const route = String(formData.get("dispatch_route") ?? "").trim();
 
@@ -1049,7 +1062,7 @@ export async function createDispatchAction(formData: FormData) {
     const { error } = await supabase.from("dispatches").insert(insertPayloads);
 
     if (error) {
-      redirectWithError("/dispatches/new", error.message);
+      redirectWithError("/dispatches/new", dispatchWriteErrorMessage(error));
     }
 
     revalidatePath("/dispatches");
@@ -1132,7 +1145,7 @@ export async function createDispatchAction(formData: FormData) {
     .insert(insertPayload);
 
   if (error) {
-    redirectWithError("/dispatches/new", error.message);
+    redirectWithError("/dispatches/new", dispatchWriteErrorMessage(error));
   }
 
   if (insertPayload.dispatch_status === "Dispatched") {
@@ -1366,7 +1379,10 @@ export async function updateDispatchAction(id: string, formData: FormData) {
     .eq("id", id);
 
   if (error) {
-    redirectWithError(`/dispatches/${id}/edit`, error.message);
+    redirectWithError(
+      `/dispatches/${id}/edit`,
+      dispatchWriteErrorMessage(error)
+    );
   }
 
   if (

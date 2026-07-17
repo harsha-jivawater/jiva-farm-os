@@ -50,7 +50,7 @@ import {
   plannedVisitTypeOptions
 } from "@/lib/pilots/visit-planning";
 import { createClient } from "@/lib/supabase/server";
-import { resolveFileUrl } from "@/lib/uploads/server";
+import { resolveFileUrls } from "@/lib/uploads/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import {
@@ -351,6 +351,27 @@ export default async function PilotDetailPage({
       pilotId: pilot.id
     });
   }
+  const primaryFileReferences = [
+    pilot.monitoring_plan_link,
+    pilot.pilot_folder_link,
+    pilot.baseline_report_link,
+    pilot.soil_report_link,
+    pilot.water_report_link,
+    pilot.final_pilot_report_link,
+    pilot.photo_folder_link,
+    pilot.data_sheet_link
+  ];
+  const reportFileReferences = reportsList.map((report) => report.report_link);
+  const visitPhotoReferences = visitsList.map((visit) => visit.photo_folder_link);
+  const visitDataSheetReferences = visitsList.map(
+    (visit) => visit.raw_data_sheet_link
+  );
+  const resolvedFileUrls = await resolveFileUrls(supabase, [
+    ...primaryFileReferences,
+    ...reportFileReferences,
+    ...visitPhotoReferences,
+    ...visitDataSheetReferences
+  ]);
   const [
     monitoringPlanUrl,
     pilotFolderUrl,
@@ -360,41 +381,29 @@ export default async function PilotDetailPage({
     finalPilotReportUrl,
     pilotPhotosUrl,
     pilotDataSheetUrl
-  ] = await Promise.all([
-    resolveFileUrl(supabase, pilot.monitoring_plan_link),
-    resolveFileUrl(supabase, pilot.pilot_folder_link),
-    resolveFileUrl(supabase, pilot.baseline_report_link),
-    resolveFileUrl(supabase, pilot.soil_report_link),
-    resolveFileUrl(supabase, pilot.water_report_link),
-    resolveFileUrl(supabase, pilot.final_pilot_report_link),
-    resolveFileUrl(supabase, pilot.photo_folder_link),
-    resolveFileUrl(supabase, pilot.data_sheet_link)
-  ]);
+  ] = resolvedFileUrls;
+  const reportOffset = primaryFileReferences.length;
+  const visitPhotoOffset = reportOffset + reportFileReferences.length;
+  const visitDataSheetOffset = visitPhotoOffset + visitPhotoReferences.length;
   const reportUrls = new Map<string, string | null>(
-    await Promise.all(
-      reportsList.map(async (report) => [
+    reportsList.map((report, index) => [
         report.id,
-        await resolveFileUrl(supabase, report.report_link)
+        resolvedFileUrls[reportOffset + index] ?? null
       ] as [string, string | null])
-    )
   );
   const deleteAction = deletePilotAction.bind(null, pilot.id);
   const restoreAction = restorePilotAction.bind(null, pilot.id);
   const visitPhotoUrls = new Map<string, string | null>(
-    await Promise.all(
-      visitsList.map(async (visit) => [
+    visitsList.map((visit, index) => [
         visit.id,
-        await resolveFileUrl(supabase, visit.photo_folder_link)
+        resolvedFileUrls[visitPhotoOffset + index] ?? null
       ] as [string, string | null])
-    )
   );
   const visitDataSheetUrls = new Map<string, string | null>(
-    await Promise.all(
-      visitsList.map(async (visit) => [
+    visitsList.map((visit, index) => [
         visit.id,
-        await resolveFileUrl(supabase, visit.raw_data_sheet_link)
+        resolvedFileUrls[visitDataSheetOffset + index] ?? null
       ] as [string, string | null])
-    )
   );
   const userMap = new Map(usersList.map((user) => [user.id, user]));
   const deletedBy = pilot.deleted_by_user_id
