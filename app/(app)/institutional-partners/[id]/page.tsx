@@ -55,6 +55,7 @@ import {
   type Institution,
   type InstitutionContact,
   type InstitutionMeeting,
+  type InstitutionReview,
   type RegionOption,
   type UserOption
 } from "@/lib/institutions/types";
@@ -437,6 +438,7 @@ export default async function InstitutionDetailPage({
     { data: regions },
     { data: contacts },
     { data: meetings },
+    { data: institutionReviews },
     { data: relatedPilots },
     { data: dealerConnections },
     { data: dealers }
@@ -463,6 +465,12 @@ export default async function InstitutionDetailPage({
       .eq("institution_id", institution.id)
       .is("deleted_at", null)
       .order("meeting_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("institution_reviews")
+      .select("*")
+      .eq("institution_id", institution.id)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     supabase
       .from("pilots")
@@ -492,6 +500,7 @@ export default async function InstitutionDetailPage({
   const usersList = (users ?? []) as UserOption[];
   const contactsList = (contacts ?? []) as InstitutionContact[];
   const meetingsList = (meetings ?? []) as InstitutionMeeting[];
+  const institutionReviewsList = (institutionReviews ?? []) as InstitutionReview[];
   const relatedPilotsList = (relatedPilots ?? []) as RelatedPilot[];
   const pilotFarmerLeadIds = Array.from(
     new Set(
@@ -649,8 +658,23 @@ export default async function InstitutionDetailPage({
         `${labelFor(meeting.meeting_type, meetingTypeOptions)} · ${labelFor(
           meeting.outcome,
           meetingOutcomeOptions
-        )}`,
+      )}`,
       title: "Meeting recorded"
+    })),
+    ...institutionReviewsList.map((review) => ({
+      actor: actorLabel(
+        review.reviewed_by_user_id
+          ? userMap.get(review.reviewed_by_user_id)
+          : undefined
+      ),
+      category: "Review",
+      date: review.created_at,
+      description:
+        review.notes_from_last_interaction ||
+        review.support_required ||
+        review.remarks ||
+        "Institution review recorded.",
+      title: "Institution review recorded"
     })),
     ...contactsList.map((contact) => ({
       actor: actorLabel(userMap.get(contact.created_by_user_id)),

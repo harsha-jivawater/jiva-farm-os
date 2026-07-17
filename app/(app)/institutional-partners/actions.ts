@@ -18,7 +18,8 @@ import type {
   InstitutionInsert,
   InstitutionMeetingInsert,
   InstitutionMeetingUpdate,
-  InstitutionUpdate,
+  InstitutionReviewInsert,
+  InstitutionUpdate
 } from "@/lib/institutions/types";
 import { createClient } from "@/lib/supabase/server";
 import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
@@ -35,6 +36,15 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+function textValue(formData: FormData, key: string) {
+  const value = String(formData.get(key) ?? "").trim();
+  return value || null;
+}
+
+function localDateValue() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 async function getCurrentProfile(supabase: SupabaseClient, errorPath: string) {
@@ -320,17 +330,20 @@ export async function updateInstitutionReviewAction(
   const profile = await getCurrentProfile(supabase, errorPath);
   assertCanManageInstitutionProfile(profile, errorPath);
 
-  const priority = String(formData.get("priority") ?? "").trim();
-  const nextActionDate = String(formData.get("next_action_date") ?? "").trim();
+  const priority = textValue(formData, "priority");
+  const nextActionDate = textValue(formData, "next_action_date");
+  const supportRequired = textValue(formData, "support_required");
+  const notesFromLastInteraction = textValue(
+    formData,
+    "notes_from_last_interaction"
+  );
+  const remarks = textValue(formData, "remarks");
   const updatePayload: InstitutionUpdate = {
-    priority,
-    next_action_date: nextActionDate,
-    support_required:
-      String(formData.get("support_required") ?? "").trim() || undefined,
-    notes_from_last_interaction:
-      String(formData.get("notes_from_last_interaction") ?? "").trim() ||
-      undefined,
-    remarks: String(formData.get("remarks") ?? "").trim() || undefined
+    priority: priority ?? undefined,
+    next_action_date: nextActionDate ?? undefined,
+    support_required: supportRequired,
+    notes_from_last_interaction: notesFromLastInteraction,
+    remarks
   };
 
   if (!updatePayload.priority) {
@@ -349,6 +362,25 @@ export async function updateInstitutionReviewAction(
 
   if (error) {
     redirectWithError(errorPath, error.message);
+  }
+
+  const reviewSnapshot: InstitutionReviewInsert = {
+    institution_id: institutionId,
+    reviewed_by_user_id: profile.id,
+    review_date: localDateValue(),
+    priority,
+    support_required: supportRequired,
+    notes_from_last_interaction: notesFromLastInteraction,
+    next_action_date: nextActionDate,
+    remarks
+  };
+
+  const { error: reviewError } = await supabase
+    .from("institution_reviews")
+    .insert(reviewSnapshot);
+
+  if (reviewError) {
+    redirectWithError(errorPath, reviewError.message);
   }
 
   await revalidateInstitution(institutionId);
