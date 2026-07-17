@@ -1,10 +1,14 @@
 import { cp, mkdir, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 const root = process.cwd();
-const stagedTests = `/private/tmp/jiva-supabase-tests-${process.pid}`;
-const supabaseHome = "/private/tmp/jiva-supabase-test";
+const stagedTests = path.join(
+  tmpdir(),
+  `jiva-supabase-tests-${process.pid}`
+);
+const supabaseHome = path.join(tmpdir(), "jiva-supabase-test");
 const localDatabaseUrl =
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 

@@ -1,7 +1,12 @@
 import { spawn, spawnSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 const environment = { ...process.env };
+const supabaseHome = path.join(tmpdir(), "jiva-supabase-test");
+
+mkdirSync(supabaseHome, { recursive: true });
 
 function parseEnvironment(output) {
   return Object.fromEntries(
@@ -18,7 +23,7 @@ if (!environment.E2E_BASE_URL?.trim()) {
     encoding: "utf8",
     env: {
       ...environment,
-      HOME: "/private/tmp/jiva-supabase-test"
+      HOME: supabaseHome
     }
   });
 
