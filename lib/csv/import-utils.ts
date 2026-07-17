@@ -135,6 +135,80 @@ export function parseNumber(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function paddedDatePart(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function isValidCalendarDate(year: number, month: number, day: number) {
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+export function normalizeImportDate(
+  value: string | null | undefined,
+  fieldLabel = "Date"
+) {
+  const trimmed = String(value ?? "").trim();
+
+  if (!trimmed) {
+    return { error: null, value: null };
+  }
+
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (isoMatch) {
+    const [, yearValue, monthValue, dayValue] = isoMatch;
+    const year = Number(yearValue);
+    const month = Number(monthValue);
+    const day = Number(dayValue);
+
+    return isValidCalendarDate(year, month, day)
+      ? { error: null, value: trimmed }
+      : {
+          error: `${fieldLabel} is not a valid calendar date. Use MM-DD-YYYY, for example 07-17-2026.`,
+          value: null
+        };
+  }
+
+  const usMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+
+  if (!usMatch) {
+    return {
+      error: `${fieldLabel} must use MM-DD-YYYY, for example 07-17-2026.`,
+      value: null
+    };
+  }
+
+  const [, monthValue, dayValue, yearValue] = usMatch;
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+
+  if (month > 12 && day <= 12) {
+    return {
+      error: `${fieldLabel} looks like DD-MM-YYYY. Use MM-DD-YYYY, for example 07-17-2026.`,
+      value: null
+    };
+  }
+
+  if (!isValidCalendarDate(year, month, day)) {
+    return {
+      error: `${fieldLabel} is not a valid calendar date. Use MM-DD-YYYY, for example 07-17-2026.`,
+      value: null
+    };
+  }
+
+  return {
+    error: null,
+    value: `${year}-${paddedDatePart(month)}-${paddedDatePart(day)}`
+  };
+}
+
 export function todayDate() {
   return new Date().toISOString().slice(0, 10);
 }
