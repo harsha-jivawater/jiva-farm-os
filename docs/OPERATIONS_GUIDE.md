@@ -101,36 +101,39 @@ Never deploy code that depends on unapplied SQL.
 vercel env run -- npm run check:env-production
 ```
 
-## Hardening Release Activation
+## Hardening Release Activation Record
 
-The July hardening release is locally verified but must be activated while an
-operator is present:
+The July hardening release was activated through an attended release on
+17 July 2026:
 
-1. Create and fund a staging Supabase project or branch.
-2. Configure Vercel Preview to use only staging credentials.
-3. Configure the production and preview `SUPABASE_ENVIRONMENT` markers.
-4. Merge through a pull request and observe both quality jobs.
-5. Enable `main` branch protection and required checks.
-6. Confirm the private logical backup checksums and retain an encrypted copy
-   outside the development laptop.
-7. Reconcile the 18-entry production migration ledger with the consolidated
-   baseline before applying any new SQL.
-8. Apply the post-baseline migrations in order, validate preview, deploy, and
-   run the read-only release smoke check.
+1. An isolated staging Supabase environment and staging-backed Vercel Preview
+   were used for migration replay and release verification.
+2. Production and Preview `SUPABASE_ENVIRONMENT` markers were configured.
+3. The private logical backup was restore-tested before production SQL changes.
+4. The production migration ledger was reconciled with the consolidated
+   baseline and reviewed migrations were applied in order.
+5. Production hardening PR #6 and KPI timeout hotfix PR #15 passed the required
+   quality and integration checks before merge.
+6. The Vercel production deployment, read-only smoke checks, and affected role
+   workflows were verified.
+7. `main` branch protection was enabled with required checks and destructive
+   branch operations blocked.
 
-Do not run production SQL while the migration ledger is divergent. Do not use
-the production database for preview testing.
+Future releases must repeat the same staging, backup, migration, protected-PR,
+smoke, and rollback controls. Do not run production SQL while the migration
+ledger is divergent, and do not use the production database for preview testing.
 
 ## Repository Protection
 
-After the quality workflow is present on `main`, configure GitHub protection
-for `main`:
+GitHub protection for `main` is active and currently:
 
 - require a pull request before merging;
 - require `Application quality` and `Integration` status checks;
 - require the branch to be up to date before merging;
+- require review conversations to be resolved;
 - block force pushes and branch deletion;
-- require one approval when a second qualified reviewer is available.
+- does not require an approval while the repository has no second qualified
+  reviewer. Add an approval requirement when a second reviewer is available.
 
 Dependabot checks npm and GitHub Actions weekly. Dependency pull requests still
 require the normal CI checks and human review.

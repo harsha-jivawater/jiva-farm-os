@@ -2,20 +2,26 @@
 
 ## Objective
 
-Prepare a controlled staging and production release, verify recovery evidence,
-and identify the remaining remote activation steps.
+Record the completed controlled staging and production release, recovery
+evidence, remote safeguards, and post-release verification.
 
 ## Verified Remote State
 
 - Supabase production `mzjmvenyzcnbgykxmjvc` is healthy on Postgres 17.6.
 - Vercel project `jiva-farm-os` is healthy and uses Node.js 24 in `hnd1`.
-- The latest observed production deployment was ready.
-- Recent deployments were direct production builds from `main`; no preview
-  deployment history was present.
-- Only one Supabase project exists and no staging branch/project is available.
-- Supabase reports PITR disabled and no listed physical backup restore point.
-- Production contains 18 legacy migration-ledger entries, while the repository
-  now uses an immutable consolidated baseline.
+- An isolated Supabase staging project and staging-backed Vercel Preview were
+  used to replay migrations and verify the release before production.
+- The production migration ledger is aligned with the immutable consolidated
+  baseline and reviewed migrations through `20260717050000`.
+- Production runs merge commit `fb2b7e8` on Vercel deployment
+  `dpl_GwWBqtrTWzBdAaxNy53jHmWXRG2S`; the deployment is `READY` and serves
+  `jivawater.org` and `www.jivawater.org`.
+- GitHub `main` protection requires pull requests, `Application quality` and
+  `Integration`, an up-to-date branch, and resolved conversations. Force pushes
+  and branch deletion are blocked.
+- The pre-release audit found managed PITR disabled and no listed physical
+  restore point, so the verified logical backup remains required recovery
+  evidence.
 
 ## Recovery Evidence
 
@@ -37,21 +43,35 @@ managed PITR or an independently retained encrypted off-machine backup.
 - Preview builds reject production service-role and n8n secrets.
 - Release smoke checks remain read-only.
 
-## Remaining Remote Activation
+## Completed Remote Activation
 
-These steps require an attended release because they create resources, alter
-remote controls, or affect production:
+The attended release completed these remote steps on 17 July 2026:
 
-1. Create a staging Supabase project or branch after confirming its cost.
-2. Configure Vercel Preview with staging Supabase values and
-   `SUPABASE_ENVIRONMENT=staging`; do not add production server secrets.
-3. Set `SUPABASE_ENVIRONMENT=production` in Vercel Production.
-4. Merge the hardening branch so GitHub and Vercel can observe the new checks.
-5. Protect `main` and require `Application quality` and `Integration`.
-6. Review the verified backup, then reconcile the production migration ledger.
-7. Apply only the reviewed post-baseline migrations in version order.
-8. Validate a preview, deploy production, and run the read-only smoke check and
-   affected role workflows.
+1. Created and used an isolated Supabase staging environment.
+2. Configured Vercel Preview with staging Supabase values and
+   `SUPABASE_ENVIRONMENT=staging`, without production server secrets.
+3. Configured `SUPABASE_ENVIRONMENT=production` for Vercel Production.
+4. Ran the application, database, RLS, browser, build, audit, and bundle checks.
+5. Reconciled the production migration ledger and applied the reviewed
+   post-baseline migrations in order.
+6. Validated the staging-backed preview and merged production hardening PR #6.
+7. Deployed `main`, ran read-only smoke checks, and verified affected role
+   workflows.
+8. Diagnosed the Research Assistant KPI timeout found during production smoke
+   testing, applied migration `20260717050000`, and merged hotfix PR #15.
+9. Protected `main` with the required pull-request and status-check controls.
 
-No production ledger repair, SQL migration, Vercel deployment, branch
-protection change, or staging-resource purchase was performed unattended.
+## Post-Release Verification
+
+- The release suite passed 48 application tests and 37 database tests.
+- Both required GitHub Actions jobs completed successfully.
+- The Vercel production deployment is `READY` and its deployment status passed.
+- The Research Assistant KPI dashboard loaded successfully and showed the
+  expected submitted-report count for the test profile.
+- The affected visit-report request returned `200` after the index migration;
+  no RLS policy or role permission was changed by the hotfix.
+- The active production deployment had no error or fatal logs in the final
+  verification window.
+
+Future releases must follow the same protected pull-request, staging, migration,
+backup, smoke-test, and rollback process documented in `docs/OPERATIONS_GUIDE.md`.
