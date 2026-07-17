@@ -19,6 +19,10 @@ export type InstitutionMeetingInsert =
   Database["public"]["Tables"]["institution_meetings"]["Insert"];
 export type InstitutionMeetingUpdate =
   Database["public"]["Tables"]["institution_meetings"]["Update"];
+export type InstitutionReview =
+  Database["public"]["Tables"]["institution_reviews"]["Row"];
+export type InstitutionReviewInsert =
+  Database["public"]["Tables"]["institution_reviews"]["Insert"];
 
 export type InstitutionFormPayload = InstitutionInsert | InstitutionUpdate;
 export type ContactFormPayload =

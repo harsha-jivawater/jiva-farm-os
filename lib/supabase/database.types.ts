@@ -2865,6 +2865,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      institution_reviews: {
+        Row: {
+          id: string;
+          institution_id: string;
+          reviewed_by_user_id: string | null;
+          review_date: string;
+          priority: string | null;
+          support_required: string | null;
+          notes_from_last_interaction: string | null;
+          next_action_date: string | null;
+          remarks: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          institution_id: string;
+          reviewed_by_user_id?: string | null;
+          review_date?: string;
+          priority?: string | null;
+          support_required?: string | null;
+          notes_from_last_interaction?: string | null;
+          next_action_date?: string | null;
+          remarks?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          institution_id?: string;
+          reviewed_by_user_id?: string | null;
+          review_date?: string;
+          priority?: string | null;
+          support_required?: string | null;
+          notes_from_last_interaction?: string | null;
+          next_action_date?: string | null;
+          remarks?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
       regions: {
         Row: {
           id: string;
