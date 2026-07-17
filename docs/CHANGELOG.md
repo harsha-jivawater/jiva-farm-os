@@ -4,6 +4,32 @@ Simple reverse chronological record of major Jiva Farm OS work.
 
 ## 2026-07-17
 
+### Marketing Library
+
+- Added a Team Workflows Marketing Library for approved customer and internal
+  material, with Audience, Sector, Agriculture-only Crop, Language, asset-type,
+  and status filters.
+- Added Admin, Marketing Head, and Designer uploads with Marketing Head/Designer
+  counterpart approval and Admin override.
+- Added immutable asset versions, workflow event history, requested-change
+  resubmission, publishing, and archiving.
+- Added a private 50 MB `marketing-assets` Storage bucket and signed direct
+  browser uploads so large files do not pass through Vercel functions.
+- Added stored-byte signature validation for image, PDF, Word, Excel,
+  PowerPoint, and ZIP assets.
+- Added validated YouTube-only video records with privacy-enhanced embeds.
+- Added permanent no-login customer share links backed by hashed bearer tokens,
+  five-minute private file URLs, access counts, and manual revocation.
+- Added database-enforced review separation and status transitions, current-only
+  file access for ordinary users, controlled revision writes, protected share
+  counters, scoped Storage policies, service-role hardening, and anonymous
+  privilege revocation.
+- Added Marketing Request handoff into the Library, Action Center review and
+  result notifications, role permissions, navigation, SOP guidance, and release
+  operations documentation.
+- Added unit, pgTAP, and gated authenticated Playwright coverage for the full
+  upload, review, Viewer, customer sharing, and revoke lifecycle.
+
 ### Production hardening
 
 - Added a reproducible production schema baseline and retained the previous

@@ -67,6 +67,18 @@ describe("upload validation", () => {
       "soil-report-final.pdf"
     );
   });
+
+  it("accepts a presentation in the Marketing Library upload policy", async () => {
+    const presentation = file(
+      "dealer-deck.pptx",
+      [0x50, 0x4b, 0x03, 0x04, 0x14, 0x00],
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    );
+
+    await expect(
+      validateUploadFile(presentation, "marketing-asset")
+    ).resolves.toBeNull();
+  });
 });
 
 describe("upload batches", () => {

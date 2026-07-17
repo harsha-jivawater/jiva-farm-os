@@ -7,7 +7,8 @@ export type UploadKind =
   | "sheet"
   | "zip"
   | "evidence"
-  | "lab-report";
+  | "lab-report"
+  | "marketing-asset";
 
 export type UploadRule = {
   accept: string;
@@ -118,8 +119,74 @@ export const uploadRules = {
       "application/vnd.ms-excel",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     ]
+  },
+  "marketing-asset": {
+    accept:
+      ".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/zip",
+    description:
+      "JPG, PNG, WebP, PDF, Office document, presentation, or ZIP up to 50 MB.",
+    extensions: [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp",
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".xls",
+      ".xlsx",
+      ".ppt",
+      ".pptx",
+      ".zip"
+    ],
+    maxBytes: 50 * MB,
+    mimeTypes: [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "application/zip",
+      "application/x-zip-compressed"
+    ]
   }
 } satisfies Record<UploadKind, UploadRule>;
+
+export function canonicalUploadContentType(
+  fileName: string,
+  fallback = "application/octet-stream"
+) {
+  const normalized = fileName.toLowerCase();
+  const dotIndex = normalized.lastIndexOf(".");
+  const extension = dotIndex >= 0 ? normalized.slice(dotIndex) : "";
+  const canonicalTypes: Record<string, string> = {
+    ".csv": "text/csv",
+    ".doc": "application/msword",
+    ".docx":
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+    ".jpeg": "image/jpeg",
+    ".jpg": "image/jpeg",
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx":
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".webp": "image/webp",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx":
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".zip": "application/zip"
+  };
+
+  return canonicalTypes[extension] ?? fallback;
+}
 
 export function isStorageReference(value: string | null | undefined) {
   return Boolean(value?.startsWith(STORAGE_REFERENCE_PREFIX));

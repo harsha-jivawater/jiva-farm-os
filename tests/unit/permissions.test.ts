@@ -55,6 +55,9 @@ describe("role permissions", () => {
     ["Agronomist", "dispatches", true, false],
     ["Accounts", "dispatches", true, true],
     ["Viewer", "kpi-dashboard", true, false],
+    ["Viewer", "marketing-library", true, false],
+    ["Marketing Head", "marketing-library", true, true],
+    ["Designer", "marketing-library", true, true],
     ["Viewer", "internal-users", false, false]
   ])(
     "%s has the intended %s access",

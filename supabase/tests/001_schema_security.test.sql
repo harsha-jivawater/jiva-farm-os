@@ -2,7 +2,7 @@ begin;
 
 set local search_path = public, extensions;
 
-select plan(37);
+select plan(64);
 
 select has_table('public', 'users', 'users table exists');
 select has_table('public', 'farmer_leads', 'farmer leads table exists');
@@ -11,6 +11,22 @@ select has_table('public', 'institutions', 'institutions table exists');
 select has_table('public', 'pilots', 'pilots table exists');
 select has_table('public', 'work_items', 'work items table exists');
 select has_table('public', 'sales_payment_links', 'payment links table exists');
+select has_table('public', 'marketing_assets', 'marketing assets table exists');
+select has_table(
+  'public',
+  'marketing_asset_versions',
+  'marketing asset versions table exists'
+);
+select has_table(
+  'public',
+  'marketing_asset_events',
+  'marketing asset events table exists'
+);
+select has_table(
+  'public',
+  'marketing_asset_shares',
+  'marketing asset shares table exists'
+);
 
 select ok(
   not exists (
@@ -27,6 +43,14 @@ select ok(
 select ok(
   not has_table_privilege('anon', 'public.sales_payment_links', 'select'),
   'anonymous users cannot read protected payment links'
+);
+select ok(
+  not has_table_privilege('anon', 'public.marketing_asset_shares', 'select'),
+  'anonymous users cannot query permanent Marketing Library bearer tokens'
+);
+select ok(
+  has_table_privilege('service_role', 'public.marketing_asset_shares', 'select'),
+  'server-only public share resolution has an explicit service-role grant'
 );
 select ok(
   has_table_privilege('authenticated', 'public.sales_payment_links', 'select'),
@@ -56,6 +80,22 @@ select ok(
 select ok(
   has_function_privilege('authenticated', 'public.is_admin()', 'execute'),
   'signed-in users retain role-helper access required by row-level security'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.record_marketing_asset_share_access(text)',
+    'execute'
+  ),
+  'signed-in users cannot invoke public share access accounting'
+);
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.replace_marketing_asset_version(uuid,uuid,text,text,text,text,bigint,text)',
+    'execute'
+  ),
+  'Marketing Library uploaders retain the transaction-safe revision RPC grant'
 );
 select ok(
   not has_function_privilege(
@@ -104,6 +144,31 @@ select ok(
       and public = false
   ),
   'application upload bucket exists and is private'
+);
+select ok(
+  exists (
+    select 1
+    from storage.buckets
+    where id = 'marketing-assets'
+      and public = false
+      and file_size_limit = 52428800
+  ),
+  'Marketing Library storage is private with a 50 MB hard limit'
+);
+select is(
+  (
+    select count(*)::integer
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname in (
+        'marketing_assets_storage_read',
+        'marketing_assets_storage_insert',
+        'marketing_assets_storage_delete'
+      )
+  ),
+  3,
+  'Marketing Library storage has scoped read, insert, and cleanup policies'
 );
 select is(
   (select file_size_limit from storage.buckets where id = 'app-uploads'),
@@ -235,6 +300,20 @@ values
     'e2e-viewer@jivawater.com',
     'Viewer',
     false
+  ),
+  (
+    '10000000-0000-0000-0000-000000000003',
+    'Library Marketing Head',
+    'e2e-marketing-head@jivawater.com',
+    'Marketing Head',
+    false
+  ),
+  (
+    '10000000-0000-0000-0000-000000000004',
+    'Library Designer',
+    'e2e-designer@jivawater.com',
+    'Designer',
+    false
   );
 
 insert into public.sales_payment_links (
@@ -299,6 +378,343 @@ select ok(
     'farmer-leads/10000000-0000-4000-8000-000000000012/report/file.pdf'
   ),
   'a viewer cannot upload application files'
+);
+reset role;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000003","email":"e2e-marketing-head@jivawater.com","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+select lives_ok(
+  $$
+    insert into public.marketing_assets (
+      id,
+      title,
+      audience,
+      sector,
+      crop,
+      language,
+      asset_type,
+      status,
+      created_by_user_id,
+      uploaded_by_role,
+      review_required_role,
+      updated_by_user_id,
+      submitted_at
+    ) values (
+      '20000000-0000-4000-8000-000000000001',
+      'Agriculture product leaflet',
+      'Farmers',
+      'Agriculture',
+      'Tomato',
+      'English',
+      'Leaflet',
+      'Draft',
+      '10000000-0000-0000-0000-000000000003',
+      'Marketing Head',
+      'Designer',
+      '10000000-0000-0000-0000-000000000003',
+      null
+    );
+
+    insert into public.marketing_asset_versions (
+      id,
+      asset_id,
+      storage_path,
+      original_file_name,
+      mime_type,
+      file_size_bytes,
+      created_by_user_id
+    ) values (
+      '20000000-0000-4000-8000-000000000002',
+      '20000000-0000-4000-8000-000000000001',
+      'assets/20000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-000000000002/leaflet.pdf',
+      'leaflet.pdf',
+      'application/pdf',
+      1024,
+      '10000000-0000-0000-0000-000000000003'
+    );
+
+    update public.marketing_assets
+    set
+      status = 'Pending Review',
+      submitted_at = now(),
+      updated_by_user_id = '10000000-0000-0000-0000-000000000003'
+    where id = '20000000-0000-4000-8000-000000000001';
+  $$,
+  'a Marketing Head can submit a versioned asset for Designer review'
+);
+select is(
+  (select count(*) from public.marketing_assets),
+  1::bigint,
+  'the uploader can read the pending asset'
+);
+select throws_ok(
+  $$
+    update public.marketing_assets
+    set
+      status = 'Published',
+      reviewed_by_user_id = '10000000-0000-0000-0000-000000000003',
+      reviewed_at = now(),
+      published_by_user_id = '10000000-0000-0000-0000-000000000003',
+      published_at = now()
+    where id = '20000000-0000-4000-8000-000000000001'
+  $$,
+  'P0001',
+  'This asset must be reviewed by the required counterpart role.',
+  'an uploader cannot approve their own asset'
+);
+select throws_ok(
+  $$
+    update public.marketing_asset_versions
+    set original_file_name = 'changed.pdf'
+    where id = '20000000-0000-4000-8000-000000000002'
+  $$,
+  '42501',
+  'permission denied for table marketing_asset_versions',
+  'saved asset versions cannot be updated outside the controlled revision RPC'
+);
+select lives_ok(
+  $$
+    insert into public.marketing_assets (
+      id,
+      title,
+      audience,
+      sector,
+      language,
+      asset_type,
+      status,
+      created_by_user_id,
+      uploaded_by_role,
+      review_required_role,
+      updated_by_user_id,
+      submitted_at
+    ) values (
+      '20000000-0000-4000-8000-000000000003',
+      'Dealer pitch deck revision',
+      'Dealers',
+      'Dairy',
+      'English',
+      'Pitch Deck',
+      'Draft',
+      '10000000-0000-0000-0000-000000000003',
+      'Marketing Head',
+      'Designer',
+      '10000000-0000-0000-0000-000000000003',
+      null
+    );
+
+    insert into public.marketing_asset_versions (
+      id,
+      asset_id,
+      storage_path,
+      original_file_name,
+      mime_type,
+      file_size_bytes,
+      created_by_user_id
+    ) values (
+      '20000000-0000-4000-8000-000000000004',
+      '20000000-0000-4000-8000-000000000003',
+      'assets/20000000-0000-4000-8000-000000000003/20000000-0000-4000-8000-000000000004/deck.pptx',
+      'deck.pptx',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      2048,
+      '10000000-0000-0000-0000-000000000003'
+    );
+
+    update public.marketing_assets
+    set
+      status = 'Pending Review',
+      submitted_at = now(),
+      updated_by_user_id = '10000000-0000-0000-0000-000000000003'
+    where id = '20000000-0000-4000-8000-000000000003';
+  $$,
+  'a Marketing Head can submit a second asset for revision testing'
+);
+reset role;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000002","email":"e2e-viewer@jivawater.com","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+select is(
+  (select count(*) from public.marketing_assets),
+  0::bigint,
+  'ordinary internal users cannot read pending Marketing Library assets'
+);
+reset role;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000004","email":"e2e-designer@jivawater.com","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+select lives_ok(
+  $$
+    update public.marketing_assets
+    set
+      status = 'Changes Requested',
+      reviewed_by_user_id = '10000000-0000-0000-0000-000000000004',
+      reviewed_at = now(),
+      review_note = 'Replace the dealer pricing slide.',
+      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
+    where id = '20000000-0000-4000-8000-000000000003'
+  $$,
+  'the required Designer can request changes from the uploader'
+);
+select throws_ok(
+  $$
+    update public.marketing_assets
+    set
+      title = 'Designer-authored title change',
+      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
+    where id = '20000000-0000-4000-8000-000000000003'
+  $$,
+  'P0001',
+  'Only the original uploader can edit asset details after changes are requested.',
+  'the reviewer cannot rewrite the uploader asset metadata'
+);
+select lives_ok(
+  $$
+    update public.marketing_assets
+    set
+      status = 'Published',
+      reviewed_by_user_id = '10000000-0000-0000-0000-000000000004',
+      reviewed_at = now(),
+      published_by_user_id = '10000000-0000-0000-0000-000000000004',
+      published_at = now(),
+      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
+    where id = '20000000-0000-4000-8000-000000000001';
+
+    insert into public.marketing_asset_shares (
+      asset_id,
+      token_hash,
+      created_by_user_id
+    ) values (
+      '20000000-0000-4000-8000-000000000001',
+      repeat('a', 64),
+      '10000000-0000-0000-0000-000000000004'
+    );
+  $$,
+  'the required Designer can publish and create a revocable share record'
+);
+select throws_ok(
+  $$
+    update public.marketing_asset_shares
+    set access_count = 99
+    where token_hash = repeat('a', 64)
+  $$,
+  'P0001',
+  'Marketing share identity and access counters are system-managed.',
+  'internal managers cannot tamper with customer-link access counters'
+);
+select throws_ok(
+  $$
+    update public.marketing_assets
+    set
+      status = 'Pending Review',
+      submitted_at = now(),
+      reviewed_by_user_id = null,
+      reviewed_at = null,
+      published_by_user_id = null,
+      published_at = null,
+      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
+    where id = '20000000-0000-4000-8000-000000000001'
+  $$,
+  'P0001',
+  'This Marketing Library status transition is not allowed.',
+  'a published asset cannot be moved back into review'
+);
+reset role;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000003","email":"e2e-marketing-head@jivawater.com","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+select lives_ok(
+  $$
+    select public.replace_marketing_asset_version(
+      '20000000-0000-4000-8000-000000000003',
+      '20000000-0000-4000-8000-000000000005',
+      'assets/20000000-0000-4000-8000-000000000003/20000000-0000-4000-8000-000000000005/deck-v2.pptx',
+      null,
+      'deck-v2.pptx',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      3072,
+      'Updated dealer pricing slide.'
+    );
+
+    update public.marketing_assets
+    set
+      status = 'Pending Review',
+      submitted_at = now(),
+      reviewed_by_user_id = null,
+      reviewed_at = null,
+      review_note = null,
+      updated_by_user_id = '10000000-0000-0000-0000-000000000003'
+    where id = '20000000-0000-4000-8000-000000000003';
+  $$,
+  'the original uploader can transactionally submit version 2 for re-review'
+);
+select ok(
+  (
+    select count(*) = 2 and count(*) filter (where is_current) = 1
+    from public.marketing_asset_versions
+    where asset_id = '20000000-0000-4000-8000-000000000003'
+  ),
+  'revision history retains two immutable versions and exactly one current version'
+);
+reset role;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000004","email":"e2e-designer@jivawater.com","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+select lives_ok(
+  $$
+    update public.marketing_assets
+    set
+      status = 'Published',
+      reviewed_by_user_id = '10000000-0000-0000-0000-000000000004',
+      reviewed_at = now(),
+      published_by_user_id = '10000000-0000-0000-0000-000000000004',
+      published_at = now(),
+      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
+    where id = '20000000-0000-4000-8000-000000000003'
+  $$,
+  'the required Designer can publish the corrected revision'
+);
+reset role;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000002","email":"e2e-viewer@jivawater.com","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+select is(
+  (select count(*) from public.marketing_assets),
+  2::bigint,
+  'ordinary internal users can read published Marketing Library assets'
+);
+select is(
+  (select count(*) from public.marketing_asset_versions),
+  2::bigint,
+  'ordinary internal users can read only the current version of each published asset'
+);
+select is(
+  (select count(*) from public.marketing_asset_shares),
+  0::bigint,
+  'ordinary internal users cannot inspect customer share-token records'
 );
 reset role;
 

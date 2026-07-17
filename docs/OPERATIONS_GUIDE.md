@@ -9,6 +9,7 @@
 - Supabase production project ref: `mzjmvenyzcnbgykxmjvc`
 - Supabase is used for authentication, database, RLS, and file storage.
 - Supabase Storage bucket for app uploads: `app-uploads`
+- Supabase Storage bucket for Marketing Library: private `marketing-assets`
 
 ## Required Local Checks
 
@@ -77,6 +78,42 @@ Never deploy code that depends on unapplied SQL.
 - Keep production `NEXT_PUBLIC_ENABLE_QA_SEED` unset or `false`.
 - Never use `supabase db reset --linked` against production.
 - Never edit the immutable baseline migrations. Add a new migration instead.
+
+## Marketing Library Operations
+
+- All active internal users can read published Marketing Library material.
+- Only Admin, Marketing Head, and Designer can upload, review, publish, archive,
+  create customer links, or revoke customer links.
+- Marketing Head and Designer approve each other's uploads. A non-Admin uploader
+  cannot approve their own material; this is enforced in PostgreSQL as well as
+  the UI.
+- Direct file uploads use a short-lived signed upload authorization and bypass
+  the Vercel request-body path. Never replace this with a public bucket or put
+  `SUPABASE_SERVICE_ROLE_KEY` in browser code.
+- Accepted files are images, PDF, Word, Excel, PowerPoint, and ZIP up to 50 MB.
+  Stored file signatures are validated before an asset enters review.
+- Videos must use HTTPS YouTube links. Do not upload video files to Supabase.
+- Customer links are permanent bearer links by business decision. Anyone who
+  receives a link can open it without login until it is revoked.
+- The raw bearer token is never stored and is shown once after creation. If a
+  team member loses it, revoke that share record and create a new link.
+- Revoking a link blocks later page opens immediately. A file URL already signed
+  during a valid open may remain usable for at most five minutes.
+- Archiving material revokes every active customer link for that asset.
+- The server-only service client is limited to stored-byte verification and
+  orphan cleanup during upload, plus public share resolution. Public resolution
+  returns one published asset and current version only.
+- Audit review status, version history, link opens, and revocations from the
+  asset detail page. Do not query or expose `token_hash` in user-facing code.
+
+Release order for migration `20260717064803_marketing_library.sql`:
+
+1. Confirm backup and migration ledger.
+2. Run clean migration replay and `npm run test:db`.
+3. Apply the migration before merging dependent application code.
+4. Verify the private bucket, table grants, RLS policies, and public-share RPC.
+5. Merge the application pull request and run authenticated and anonymous smoke
+   checks.
 
 ## Environment Boundaries
 

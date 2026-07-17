@@ -1,8 +1,8 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.17
+Version: v0.18
 Status: Draft  
-Last updated: 10 Jul 2026
+Last updated: 17 Jul 2026
 Owner: Jiva Farm OS Admin / Management  
 Audience: Internal Jiva Farm OS users  
 
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.18 | 17 Jul 2026 | Draft | Adds Marketing Library browsing, cross-role approval, private file/YouTube content, and manually revocable customer links. |
 | v0.17 | 10 Jul 2026 | Draft | Adds My Work as home, Action Center sidebar placement, Inventory lifecycle cards, Dispatch and Free Pilot corrections, Installation auto-linking, Marketing completion tracking, and current operating guidance. |
 | v0.16 | 10 Jul 2026 | Draft | Merges Home/Dashboard into My Work as the primary signed-in landing page while keeping Notifications separate. |
 | v0.15 | 10 Jul 2026 | Draft | Adds Phase 1/2 n8n integration guidance: selected app events can notify n8n, and n8n can pull a secret-protected read-only daily summary. |
@@ -53,8 +54,8 @@ Use it when:
 | Agronomist | Agronomy / technical | Pilot visibility, technical oversight, visit/report review, field guidance |
 | Research Assistant | Field research | My Visits, visit reports, pilot observations, field evidence |
 | R&D Head | R&D leadership | Pilot review, R&D approval, reports, agronomy performance |
-| Marketing Head | Marketing leadership | Review, assign, progress, and deliver Marketing Requests |
-| Designer | Marketing execution | Work assigned Marketing Requests, share draft/final links, and add comments |
+| Marketing Head | Marketing leadership | Review and deliver Marketing Requests; upload material and publish Designer submissions |
+| Designer | Marketing execution | Complete Marketing Requests; upload material and publish Marketing Head submissions |
 | Accounts | Finance | Payment confirmation, device/dispatch finance checks |
 | Stock / Dispatch | Customer Service Team | Inventory/device records, dispatches, operational installation support |
 | HR & Legal | Legal / compliance | Dealer and institution legal approval workflows |
@@ -186,24 +187,54 @@ Operating rules:
 - Payloads are compact and avoid raw backend IDs, emails, full notes, comments, private upload links, and secrets.
 - Users should continue using Jiva Farm OS as the source of truth for record updates.
 
+### Marketing Library
+
+Marketing Library is the approved source for material shared with farmers,
+dealers, corporates, or the internal team.
+
+Classification order:
+
+1. Audience
+2. Sector
+3. Crop, shown only for Agriculture
+4. Language
+
+Operating rules:
+
+- Every active internal role can browse published material.
+- Admin, Marketing Head, and Designer can upload and manage material.
+- Marketing Head uploads go to Designer for review.
+- Designer uploads go to Marketing Head for review.
+- A non-Admin uploader cannot publish their own submission.
+- Videos use YouTube links. Other digital material uses the private file upload.
+- A customer link works without login and never expires automatically.
+- Treat customer links as confidential bearer links and send them only to the
+  intended customer or partner.
+- The full customer link is shown once. If it is lost, revoke the old link and
+  create a new one.
+- Revoke a link when material is outdated, shared incorrectly, or no longer
+  approved. Archiving the material revokes all its active links.
+- Use a Marketing Request's `Add to Marketing Library` action after the request
+  is completed when the final output should become reusable approved material.
+
 ### Operations Menus
 
-| Role | My Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Inventory | System Health | Data Quality | Marketing Requests |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Admin | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ | ✅ ✏️ |
-| Management | ✅ | ✅ | 👁 | 👁 | 👁 | ⚠️ | 👁 | 👁 | 👁 | 👁 | ✅ | ✅ | ✅ ✏️ |
-| Sales Head | ✅ | ✅ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | ✏️ | 👁 | 🔒 | 🔒 | ✏️ ⚠️ |
-| RSM | ✅ | ✅ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | ✏️ ⚠️ |
-| Salesperson | ✅ | ✅ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | ✏️ ⚠️ |
-| Agronomist | ✅ | 👁 | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | 👁 | 👁 | ✏️ | 👁 | 🔒 | 🔒 | ✏️ ⚠️ |
-| Research Assistant | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 👁 ⚠️ | ⭐ ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ✏️ ⚠️ |
-| R&D Head | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 | ✏️ ⚠️ |
-| Marketing Head | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ |
-| Designer | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ |
-| Accounts | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | 👁 | 🔒 | 🔒 | 🔒 |
-| Stock / Dispatch | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | 🔒 |
-| HR & Legal | 🔒 | 👁 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
-| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 | 🔒 |
+| Role | My Work | Farmer Leads | Dealers | Institutional Partners | Pilots | My Visits | Dispatches | Installations | Post Installation Follow-ups | Inventory | System Health | Data Quality | Marketing Requests | Marketing Library |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Admin | ✅ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ | ✅ | ✅ ✏️ | ⭐ ✅ ✏️ |
+| Management | ✅ | ✅ | 👁 | 👁 | 👁 | ⚠️ | 👁 | 👁 | 👁 | 👁 | ✅ | ✅ | ✅ ✏️ | 👁 |
+| Sales Head | ✅ | ✅ | ⭐ ✏️ | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | ✏️ | 👁 | 🔒 | 🔒 | ✏️ ⚠️ | 👁 |
+| RSM | ✅ | ✅ ⚠️ | ⭐ ✏️ ⚠️ | ⭐ ✏️ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 👁 ⚠️ | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | ✏️ ⚠️ | 👁 |
+| Salesperson | ✅ | ✅ ⚠️ | 👁 ⚠️ | 👁 ⚠️ | 🔒 | 👁 ⚠️ | 🔒 | ✏️ ⚠️ | ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | ✏️ ⚠️ | 👁 |
+| Agronomist | ✅ | 👁 | 👁 | 👁 | ✏️ ⚠️ | ⭐ ✏️ | 👁 | 👁 | ✏️ | 👁 | 🔒 | 🔒 | ✏️ ⚠️ | 👁 |
+| Research Assistant | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 👁 ⚠️ | ⭐ ✏️ ⚠️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ✏️ ⚠️ | 👁 |
+| R&D Head | ✅ | 👁 | 👁 | 👁 | ⭐ ✏️ | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 | ✏️ ⚠️ | 👁 |
+| Marketing Head | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✅ ✏️ | ⭐ ✅ ✏️ |
+| Designer | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | ⭐ ✏️ ⚠️ | ⭐ ✅ ✏️ |
+| Accounts | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | 👁 | 🔒 | 🔒 | 🔒 | 👁 |
+| Stock / Dispatch | ✅ | ✅ | 👁 ⚠️ | 🔒 | 🔒 | 🔒 | ⭐ ✏️ | ⭐ ✏️ | 🔒 | ⭐ ✏️ | 🔒 | 🔒 | 🔒 | 👁 |
+| HR & Legal | 🔒 | 👁 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 👁 |
+| Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 | 🔒 | 👁 |
 
 ### Team And Utility Menus
 

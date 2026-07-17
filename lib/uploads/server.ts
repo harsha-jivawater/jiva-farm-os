@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   UPLOAD_BUCKET,
+  canonicalUploadContentType,
   isStorageReference,
   storagePathFromReference,
   storageReferenceFromPath,
@@ -81,11 +82,13 @@ async function fileContentsMatchExtension(file: File, extension: string) {
     }
     case ".doc":
     case ".xls":
+    case ".ppt":
       return startsWithBytes(bytes, [
         0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1
       ]);
     case ".docx":
     case ".xlsx":
+    case ".pptx":
     case ".zip":
       return isZip;
     case ".csv":
@@ -95,27 +98,11 @@ async function fileContentsMatchExtension(file: File, extension: string) {
   }
 }
 
-function normalizedUploadContentType(file: File) {
-  const extension = extensionFor(file.name);
-  const canonicalTypes: Record<string, string> = {
-    ".csv": "text/csv",
-    ".doc": "application/msword",
-    ".docx":
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".heic": "image/heic",
-    ".heif": "image/heif",
-    ".jpeg": "image/jpeg",
-    ".jpg": "image/jpeg",
-    ".pdf": "application/pdf",
-    ".png": "image/png",
-    ".webp": "image/webp",
-    ".xls": "application/vnd.ms-excel",
-    ".xlsx":
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".zip": "application/zip"
-  };
-
-  return canonicalTypes[extension] ?? (file.type || "application/octet-stream");
+export function normalizedUploadContentType(file: File) {
+  return canonicalUploadContentType(
+    file.name,
+    file.type || "application/octet-stream"
+  );
 }
 
 export async function validateUploadFile(file: File, kind: UploadKind) {
