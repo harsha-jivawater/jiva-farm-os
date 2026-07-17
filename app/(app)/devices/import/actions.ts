@@ -11,6 +11,7 @@ import type { DeviceInsert } from "@/lib/devices/types";
 import type { ImportActionState } from "@/lib/csv/import-types";
 import {
   MAX_IMPORT_ROWS,
+  normalizeImportDate,
   todayDate,
   type CsvRecord
 } from "@/lib/csv/import-utils";
@@ -44,7 +45,11 @@ function clean(value: string | null | undefined) {
   return trimmed || null;
 }
 
-function rowToPayload(row: CsvRecord, userId: string): DeviceInsert {
+function rowToPayload(
+  row: CsvRecord,
+  userId: string,
+  stockEntryDate: string | null
+): DeviceInsert {
   const currentHolderType = clean(row.current_holder_type) ?? defaultHolderType;
   const currentHolderName =
     clean(row.current_holder_name_snapshot) ??
@@ -56,7 +61,7 @@ function rowToPayload(row: CsvRecord, userId: string): DeviceInsert {
     product_model: String(row.product_model ?? "").trim(),
     device_status: clean(row.device_status) ?? defaultDeviceStatus,
     stock_entry_source: clean(row.stock_entry_source) ?? defaultStockEntrySource,
-    stock_entry_date: clean(row.stock_entry_date) ?? todayDate(),
+    stock_entry_date: stockEntryDate ?? todayDate(),
     current_holder_type: currentHolderType,
     current_holder_name_snapshot: currentHolderName,
     current_location_text: clean(row.current_location_text),
@@ -120,7 +125,17 @@ export async function importDevicesAction(
 
     rows.forEach((row, index) => {
       const rowNumber = index + 2;
-      const payload = rowToPayload(row, profile.id);
+      const stockEntryDate = normalizeImportDate(
+        row.stock_entry_date,
+        "Stock entry date"
+      );
+
+      if (stockEntryDate.error) {
+        rowErrors.push(`Row ${rowNumber}: ${stockEntryDate.error}`);
+        return;
+      }
+
+      const payload = rowToPayload(row, profile.id, stockEntryDate.value);
       const validationError = validateDevicePayload(payload);
       const serialKey = payload.serial_number.toLowerCase();
 

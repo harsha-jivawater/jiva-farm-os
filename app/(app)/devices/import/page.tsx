@@ -40,7 +40,7 @@ export default async function DeviceImportPage() {
       <CsvImporter
         action={importDevicesAction}
         columns={[...columns]}
-        instructions="Required fields are serial_number and product_model. Defaults are In Warehouse, Warehouse, Production, and today's stock entry date when optional values are blank."
+        instructions="Required fields are serial_number and product_model. Use MM-DD-YYYY for stock_entry_date, for example 07-17-2026. Defaults are In Warehouse, Warehouse, Production, and today's stock entry date when optional values are blank."
         templateHref="/templates/devices-import-template.csv"
         title="Device CSV import"
       />

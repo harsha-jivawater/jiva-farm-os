@@ -48,6 +48,12 @@ import {
   yesNoPendingNaOptions
 } from "@/lib/institutions/options";
 import {
+  hasInstitutionProposalShared,
+  institutionProposalSharedLabel,
+  institutionStatusImpliesScaleUp,
+  institutionStatusNeedsPilotRecord
+} from "@/lib/institutions/opportunity-summary";
+import {
   display,
   displayList,
   formatDate,
@@ -278,7 +284,7 @@ function currentActionNeeded(
     return "Legal approval needed";
   }
 
-  if (institution.proposal_shared !== "Yes") {
+  if (!hasInstitutionProposalShared(institution)) {
     return "Share proposal";
   }
 
@@ -290,8 +296,23 @@ function currentActionNeeded(
     return "Pilot in progress";
   }
 
-  if (isScaleUpActive(institution.scale_up_status)) {
+  if (
+    isScaleUpActive(institution.scale_up_status) ||
+    institutionStatusImpliesScaleUp(institution.institution_status)
+  ) {
     return "Scale-up follow-up";
+  }
+
+  if (institutionStatusNeedsPilotRecord(institution.institution_status)) {
+    return "Create or link pilot";
+  }
+
+  if (institution.institution_status === "Pilot Proposal Shared") {
+    return "Follow up on pilot proposal";
+  }
+
+  if (institution.institution_status === "Jiva Proposal Shared") {
+    return "Follow up on proposal";
   }
 
   return "Review next action";
@@ -327,10 +348,53 @@ function institutionHandoff(
     };
   }
 
-  if (institution.proposal_shared !== "Yes") {
+  if (!hasInstitutionProposalShared(institution)) {
     return {
       currentStage: "Opportunity development",
       nextAction: "Share proposal or schedule the next institution meeting.",
+      nextHref: canCreatePilot ? "/pilots/new" : undefined,
+      nextLinkLabel: "Create pilot",
+      nextOwner: accountOwnerLabel
+    };
+  }
+
+  if (
+    isScaleUpActive(institution.scale_up_status) ||
+    institutionStatusImpliesScaleUp(institution.institution_status)
+  ) {
+    return {
+      currentStage: "Scale-up follow-up",
+      nextAction: "Review commercial readiness and continue scale-up follow-up.",
+      nextHref: undefined,
+      nextLinkLabel: "No direct action",
+      nextOwner: accountOwnerLabel
+    };
+  }
+
+  if (institutionStatusNeedsPilotRecord(institution.institution_status)) {
+    return {
+      currentStage: "Pilot approved / proof pending",
+      nextAction: "Create or link the approved pilot and assign monitoring ownership.",
+      nextHref: canCreatePilot ? "/pilots/new" : undefined,
+      nextLinkLabel: "Create pilot",
+      nextOwner: technicalOwnerLabel
+    };
+  }
+
+  if (institution.institution_status === "Pilot Proposal Shared") {
+    return {
+      currentStage: "Pilot proposal shared",
+      nextAction: "Follow up for pilot approval, then create or link the pilot.",
+      nextHref: canCreatePilot ? "/pilots/new" : undefined,
+      nextLinkLabel: "Create pilot",
+      nextOwner: accountOwnerLabel
+    };
+  }
+
+  if (institution.institution_status === "Jiva Proposal Shared") {
+    return {
+      currentStage: "Proposal shared",
+      nextAction: "Follow up with the institution and confirm the pilot or commercial next step.",
       nextHref: canCreatePilot ? "/pilots/new" : undefined,
       nextLinkLabel: "Create pilot",
       nextOwner: accountOwnerLabel
@@ -826,7 +890,14 @@ export default async function InstitutionDetailPage({
           />
           <SummaryCard
             label="Proposal shared"
-            value={labelFor(institution.proposal_shared, yesNoPendingNaOptions)}
+            tone={hasInstitutionProposalShared(institution) ? "success" : "neutral"}
+            value={labelFor(
+              institutionProposalSharedLabel(institution),
+              [
+                ...yesNoPendingNaOptions,
+                ...institutionStatusOptions
+              ]
+            )}
           />
           <SummaryCard
             label="Opportunity type"
@@ -1316,7 +1387,13 @@ export default async function InstitutionDetailPage({
             label="Proposal shared"
             value={
               <>
-                {labelFor(institution.proposal_shared, yesNoPendingNaOptions)}
+                {labelFor(
+                  institutionProposalSharedLabel(institution),
+                  [
+                    ...yesNoPendingNaOptions,
+                    ...institutionStatusOptions
+                  ]
+                )}
                 <p className="mt-1 text-xs font-medium text-slate-500">
                   {formatDate(institution.proposal_shared_date)}
                 </p>
