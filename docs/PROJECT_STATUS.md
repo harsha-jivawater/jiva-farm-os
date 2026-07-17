@@ -22,8 +22,8 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 ## Deployment State
 
 - GitHub `main` deploys to Vercel production.
-- Pull-request quality and integration workflows are defined for future
-  required-status enforcement on `main`.
+- Pull requests into `main` must pass the required `Application quality` and
+  `Integration` checks and be up to date before merging.
 - Supabase is used for production database, authentication, RLS, and private file storage.
 - Supabase GitHub connection is not required for normal app deployment.
 - Schema changes must be committed as Supabase migrations before production use.
@@ -32,27 +32,37 @@ Action Center is the global notification entry directly below the logo. Daily Wo
   `npm run release:check` passes.
 - Production readiness includes a non-mutating `/api/health` endpoint,
   deployment smoke command, security headers, and a documented rollback path.
-- GitHub branch protection and separated Vercel Preview credentials must be
-  enabled after the hardening workflow is merged.
+- Vercel Preview uses isolated staging Supabase credentials; production
+  credentials and server secrets remain limited to the Production environment.
+- GitHub branch protection is active for `main`. Pull requests, required checks,
+  an up-to-date branch, and resolved conversations are enforced; force pushes
+  and branch deletion are blocked.
 
-## Production Hardening Release Candidate - 17 July 2026
+## Production Hardening Release - 17 July 2026
 
-- Phases 1-5 are implemented and locally verified: reproducible schema,
+- Phases 1-6 are complete: reproducible schema,
   automated regression coverage, release controls, upload/Dispatch integrity,
-  and targeted performance improvements.
-- The full local suite covers 48 application tests, 36 database tests, browser
+  targeted performance improvements, staged release validation, and production
+  activation.
+- The release suite covers 48 application tests, 37 database tests, browser
   smoke tests, type checking, linting, production build, dependency audit, and
   bundle budgets.
 - A private logical production backup was restored successfully against the
   hardened local schema; exact populated-table row counts and all foreign keys
   matched production. The local production-data copy was then erased.
-- Live Supabase and Vercel were inspected read-only. Production remains healthy.
-- The release candidate is not deployed. Remote activation is intentionally
-  waiting for a separate staging Supabase environment, Vercel environment
-  separation, migration-ledger reconciliation, and protected pull-request
-  checks.
-- See `docs/engineering/PRODUCTION_HARDENING_PHASE_6.md` for the exact attended
-  release sequence.
+- The consolidated migration ledger was reconciled and the reviewed production
+  migrations were applied through `20260717050000`.
+- The hardening release and KPI timeout fix were merged through pull requests
+  #6 and #15. Production is running merge commit `fb2b7e8` on Vercel deployment
+  `dpl_GwWBqtrTWzBdAaxNy53jHmWXRG2S`.
+- Production smoke checks passed. The Research Assistant KPI dashboard loaded
+  successfully after the visit-report index migration, and the affected
+  Supabase request returned `200` instead of the earlier timeout response.
+- The active production deployment is `READY`, serves `jivawater.org` and
+  `www.jivawater.org`, and had no error or fatal logs in the final verification
+  window.
+- See `docs/engineering/PRODUCTION_HARDENING_PHASE_6.md` for the completed
+  attended release record.
 
 ## Completed Modules
 

@@ -38,6 +38,9 @@ Simple reverse chronological record of major Jiva Farm OS work.
 - Added a targeted active visit-report submitter/date index after production
   smoke testing found a Research Assistant KPI count statement timeout; no RLS
   policy or role permission was changed.
+- Reconciled the project status, Phase 6 release record, and operations guide
+  with the completed deployment, migration, verification, and branch-protection
+  state.
 
 ## 2026-07-10
 
