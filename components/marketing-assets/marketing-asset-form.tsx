@@ -166,10 +166,19 @@ export function MarketingAssetForm({
       }
 
       const supabase = createClient();
+      const uploadContentType =
+        payload.contentType || file.type || "application/octet-stream";
+      const uploadBody =
+        file.type === uploadContentType
+          ? file
+          : new File([file], file.name, {
+              lastModified: file.lastModified,
+              type: uploadContentType
+            });
       const { error: storageError } = await supabase.storage
         .from("marketing-assets")
-        .uploadToSignedUrl(payload.path, payload.token, file, {
-          contentType: payload.contentType ?? file.type,
+        .uploadToSignedUrl(payload.path, payload.token, uploadBody, {
+          contentType: uploadContentType,
           upsert: false
         });
 
@@ -183,7 +192,7 @@ export function MarketingAssetForm({
         version_id: versionId,
         uploaded_storage_path: payload.path,
         uploaded_original_file_name: file.name,
-        uploaded_mime_type: payload.contentType ?? file.type,
+        uploaded_mime_type: uploadContentType,
         uploaded_file_size_bytes: String(file.size)
       };
 

@@ -2,7 +2,7 @@ begin;
 
 set local search_path = public, extensions;
 
-select plan(64);
+select plan(65);
 
 select has_table('public', 'users', 'users table exists');
 select has_table('public', 'farmer_leads', 'farmer leads table exists');
@@ -154,6 +154,15 @@ select ok(
       and file_size_limit = 52428800
   ),
   'Marketing Library storage is private with a 50 MB hard limit'
+);
+select ok(
+  exists (
+    select 1
+    from storage.buckets
+    where id = 'marketing-assets'
+      and 'application/x-zip-compressed' = any (allowed_mime_types)
+  ),
+  'Marketing Library storage accepts common ZIP MIME aliases'
 );
 select is(
   (

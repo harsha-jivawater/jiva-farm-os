@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { canonicalUploadContentType } from "@/lib/uploads/config";
 import {
   applyUploadedFilesToPayload,
   resolveFileUrls,
@@ -78,6 +79,17 @@ describe("upload validation", () => {
     await expect(
       validateUploadFile(presentation, "marketing-asset")
     ).resolves.toBeNull();
+  });
+
+  it("canonicalizes Office and ZIP uploads before signed storage upload", () => {
+    expect(
+      canonicalUploadContentType("dealer-deck.pptx", "application/octet-stream")
+    ).toBe(
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    );
+    expect(
+      canonicalUploadContentType("material.zip", "application/x-zip-compressed")
+    ).toBe("application/zip");
   });
 });
 
