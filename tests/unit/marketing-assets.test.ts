@@ -74,6 +74,15 @@ describe("Marketing Library classification", () => {
       )
     ).toBeNull();
   });
+
+  it("accepts Insert Link as a delivery format", () => {
+    expect(
+      validateMarketingAssetInput(
+        { ...validFileInput, delivery_format: "Insert Link" },
+        true
+      )
+    ).toBeNull();
+  });
 });
 
 describe("Marketing Library YouTube links", () => {
@@ -122,4 +131,3 @@ describe("Marketing Library review separation", () => {
     expect(canReviewMarketingAsset(user("admin", "Admin"), asset)).toBe(true);
   });
 });
-

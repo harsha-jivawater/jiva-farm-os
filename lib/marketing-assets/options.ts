@@ -65,7 +65,8 @@ export const marketingAssetTypeOptions = [
 export const marketingAssetDeliveryOptions = [
   { value: "Digital", label: "Digital" },
   { value: "Physical", label: "Physical" },
-  { value: "Both", label: "Physical and digital" }
+  { value: "Both", label: "Physical and digital" },
+  { value: "Insert Link", label: "Insert link" }
 ] as const;
 
 export const marketingAssetStatusOptions = [
@@ -81,4 +82,3 @@ export function optionIncludes(
 ) {
   return options.some((option) => option.value === value);
 }
-
