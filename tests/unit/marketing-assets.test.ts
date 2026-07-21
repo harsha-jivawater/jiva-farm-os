@@ -31,7 +31,9 @@ const validFileInput = {
   language: "English",
   asset_type: "Leaflet",
   delivery_format: "Digital",
+  content_source: "file" as const,
   youtube_url: null,
+  external_url: null,
   source_marketing_request_id: null,
   change_note: null
 };
@@ -75,13 +77,30 @@ describe("Marketing Library classification", () => {
     ).toBeNull();
   });
 
-  it("accepts Insert Link as a delivery format", () => {
+  it("accepts HTTPS material links as a file alternative", () => {
     expect(
       validateMarketingAssetInput(
-        { ...validFileInput, delivery_format: "Insert Link" },
-        true
+        {
+          ...validFileInput,
+          content_source: "link",
+          external_url: "https://example.com/material.pdf"
+        },
+        false
       )
     ).toBeNull();
+  });
+
+  it("rejects non-HTTPS material links", () => {
+    expect(
+      validateMarketingAssetInput(
+        {
+          ...validFileInput,
+          content_source: "link",
+          external_url: "http://example.com/material.pdf"
+        },
+        false
+      )
+    ).toMatch(/https/i);
   });
 });
 

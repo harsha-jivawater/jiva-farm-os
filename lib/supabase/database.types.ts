@@ -143,6 +143,7 @@ export type Database = {
           is_current: boolean;
           storage_path: string | null;
           youtube_url: string | null;
+          external_url: string | null;
           original_file_name: string | null;
           mime_type: string | null;
           file_size_bytes: number | null;
@@ -157,6 +158,7 @@ export type Database = {
           is_current?: boolean;
           storage_path?: string | null;
           youtube_url?: string | null;
+          external_url?: string | null;
           original_file_name?: string | null;
           mime_type?: string | null;
           file_size_bytes?: number | null;
@@ -171,6 +173,7 @@ export type Database = {
           is_current?: boolean;
           storage_path?: string | null;
           youtube_url?: string | null;
+          external_url?: string | null;
           original_file_name?: string | null;
           mime_type?: string | null;
           file_size_bytes?: number | null;
@@ -3037,6 +3040,20 @@ export type Database = {
           p_version_id: string;
           p_storage_path: string | null;
           p_youtube_url: string | null;
+          p_original_file_name: string | null;
+          p_mime_type: string | null;
+          p_file_size_bytes: number | null;
+          p_change_note: string | null;
+        };
+        Returns: number;
+      };
+      replace_marketing_asset_content_version: {
+        Args: {
+          p_asset_id: string;
+          p_version_id: string;
+          p_storage_path: string | null;
+          p_youtube_url: string | null;
+          p_external_url: string | null;
           p_original_file_name: string | null;
           p_mime_type: string | null;
           p_file_size_bytes: number | null;

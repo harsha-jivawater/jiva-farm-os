@@ -649,14 +649,15 @@ select set_config(
 set local role authenticated;
 select lives_ok(
   $$
-    select public.replace_marketing_asset_version(
+    select public.replace_marketing_asset_content_version(
       '20000000-0000-4000-8000-000000000003',
       '20000000-0000-4000-8000-000000000005',
-      'assets/20000000-0000-4000-8000-000000000003/20000000-0000-4000-8000-000000000005/deck-v2.pptx',
       null,
-      'deck-v2.pptx',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      3072,
+      null,
+      'https://example.com/dealer-deck-v2.pdf',
+      null,
+      null,
+      null,
       'Updated dealer pricing slide.'
     );
 
@@ -670,7 +671,7 @@ select lives_ok(
       updated_by_user_id = '10000000-0000-0000-0000-000000000003'
     where id = '20000000-0000-4000-8000-000000000003';
   $$,
-  'the original uploader can transactionally submit version 2 for re-review'
+  'the original uploader can transactionally submit a linked version 2 for re-review'
 );
 select ok(
   (

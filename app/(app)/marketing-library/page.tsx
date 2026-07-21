@@ -188,7 +188,12 @@ export default async function MarketingLibraryPage({ searchParams }: PageProps) 
                           {asset.title}
                         </Link>
                         <p className="mt-1 text-xs text-slate-500">
-                          {asset.asset_type} · {version?.youtube_url ? "YouTube" : version?.original_file_name ?? "No content"}
+                          {asset.asset_type} ·{" "}
+                          {version?.youtube_url
+                            ? "YouTube"
+                            : version?.external_url
+                              ? "Link"
+                              : version?.original_file_name ?? "No content"}
                         </p>
                       </td>
                       <td className="px-4 py-4 text-slate-600">{asset.audience}</td>
