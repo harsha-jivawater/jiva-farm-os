@@ -5,6 +5,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import {
   createMarketingAssetSignedUrl
 } from "@/lib/marketing-assets/storage";
+import { marketingAssetCropLabel } from "@/lib/marketing-assets/crops";
 import type {
   MarketingAsset,
   MarketingAssetVersion
@@ -88,7 +89,7 @@ export default async function SharedMarketingAssetPage({ params }: PageProps) {
         <section className="py-7">
           <p className="text-sm font-semibold text-brand-700">
             {asset.audience} · {asset.sector}
-            {asset.crop ? ` · ${asset.crop}` : ""}
+            {asset.sector === "Agriculture" ? ` · ${marketingAssetCropLabel(asset)}` : ""}
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-950 sm:text-3xl">
             {asset.title}

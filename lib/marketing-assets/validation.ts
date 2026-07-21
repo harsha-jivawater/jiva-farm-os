@@ -18,17 +18,30 @@ function nullableText(formData: FormData, key: string) {
   return text(formData, key) || null;
 }
 
+function stringList(formData: FormData, key: string) {
+  return Array.from(
+    new Set(
+      formData
+        .getAll(key)
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter(Boolean)
+    )
+  );
+}
+
 export function marketingAssetInputFromForm(
   formData: FormData
 ): MarketingAssetFormInput {
   const sector = text(formData, "sector");
+  const selectedCrops = stringList(formData, "crops");
 
   return {
     title: text(formData, "title"),
     description: nullableText(formData, "description"),
     audience: text(formData, "audience"),
     sector,
-    crop: sector === "Agriculture" ? nullableText(formData, "crop") : null,
+    crop: sector === "Agriculture" ? selectedCrops[0] ?? null : null,
+    crops: sector === "Agriculture" ? selectedCrops : [],
     language: text(formData, "language"),
     asset_type: text(formData, "asset_type"),
     delivery_format: text(formData, "delivery_format") || "Digital",
@@ -108,12 +121,14 @@ export function validateMarketingAssetInput(
   if (!optionIncludes(marketingAssetSectorOptions, input.sector)) {
     return "Select a sector.";
   }
+  if (input.sector !== "Agriculture" && input.crops.length > 0) {
+    return "Crop tagging is only available for Agriculture materials.";
+  }
   if (
-    input.crop &&
-    (input.sector !== "Agriculture" ||
-      !optionIncludes(marketingAssetCropOptions, input.crop))
+    input.sector === "Agriculture" &&
+    input.crops.some((crop) => !optionIncludes(marketingAssetCropOptions, crop))
   ) {
-    return "Select a valid Agriculture crop.";
+    return "Select valid Agriculture crops.";
   }
   if (!optionIncludes(marketingAssetLanguageOptions, input.language)) {
     return "Select a language.";

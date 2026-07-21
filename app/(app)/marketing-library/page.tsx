@@ -13,6 +13,7 @@ import {
   marketingAssetTypeOptions,
   optionIncludes
 } from "@/lib/marketing-assets/options";
+import { marketingAssetCropLabel } from "@/lib/marketing-assets/crops";
 import { canManageMarketingLibrary } from "@/lib/marketing-assets/permissions";
 import type {
   MarketingAsset,
@@ -73,7 +74,7 @@ export default async function MarketingLibraryPage({ searchParams }: PageProps) 
     assetsQuery = assetsQuery.eq("sector", sector);
   }
   if (crop && optionIncludes(marketingAssetCropOptions, crop)) {
-    assetsQuery = assetsQuery.eq("crop", crop);
+    assetsQuery = assetsQuery.contains("crops", [crop]);
   }
   if (language && optionIncludes(marketingAssetLanguageOptions, language)) {
     assetsQuery = assetsQuery.eq("language", language);
@@ -199,7 +200,11 @@ export default async function MarketingLibraryPage({ searchParams }: PageProps) 
                       <td className="px-4 py-4 text-slate-600">{asset.audience}</td>
                       <td className="px-4 py-4 text-slate-600">
                         {asset.sector}
-                        {asset.crop ? <span className="block text-xs text-slate-500">{asset.crop}</span> : null}
+                        {asset.sector === "Agriculture" ? (
+                          <span className="block text-xs text-slate-500">
+                            {marketingAssetCropLabel(asset)}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-4 text-slate-600">{asset.language}</td>
                       <td className="px-4 py-4"><AssetStatusPill status={asset.status} /></td>

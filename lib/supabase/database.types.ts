@@ -59,6 +59,7 @@ export type Database = {
           audience: string;
           sector: string;
           crop: string | null;
+          crops: string[];
           language: string;
           asset_type: string;
           delivery_format: string;
@@ -86,6 +87,7 @@ export type Database = {
           audience: string;
           sector: string;
           crop?: string | null;
+          crops?: string[];
           language: string;
           asset_type: string;
           delivery_format?: string;
@@ -113,6 +115,7 @@ export type Database = {
           audience?: string;
           sector?: string;
           crop?: string | null;
+          crops?: string[];
           language?: string;
           asset_type?: string;
           delivery_format?: string;

@@ -16,6 +16,7 @@ import { AccessDenied } from "@/components/access/access-denied";
 import { AssetStatusPill } from "@/components/marketing-assets/asset-status-pill";
 import { ShareManager } from "@/components/marketing-assets/share-manager";
 import { PageHeader } from "@/components/page-header";
+import { marketingAssetCropLabel } from "@/lib/marketing-assets/crops";
 import {
   canManageMarketingLibrary,
   canReviewMarketingAsset
@@ -180,7 +181,7 @@ export default async function MarketingAssetDetailPage({
           <dl className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <Detail label="Audience" value={asset.audience} />
             <Detail label="Sector" value={asset.sector} />
-            <Detail label="Crop" value={asset.crop || (asset.sector === "Agriculture" ? "All crops" : "Not applicable")} />
+            <Detail label="Crops" value={marketingAssetCropLabel(asset)} />
             <Detail label="Language" value={asset.language} />
             <Detail label="Asset type" value={asset.asset_type} />
             <Detail label="Delivery format" value={asset.delivery_format} />

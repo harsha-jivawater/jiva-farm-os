@@ -25,6 +25,7 @@ export type MarketingAssetFormInput = {
   audience: string;
   sector: string;
   crop: string | null;
+  crops: string[];
   language: string;
   asset_type: string;
   delivery_format: string;
