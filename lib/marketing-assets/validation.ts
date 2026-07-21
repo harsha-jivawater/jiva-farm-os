@@ -32,7 +32,10 @@ export function marketingAssetInputFromForm(
     language: text(formData, "language"),
     asset_type: text(formData, "asset_type"),
     delivery_format: text(formData, "delivery_format") || "Digital",
+    content_source:
+      text(formData, "content_source") === "link" ? "link" : "file",
     youtube_url: nullableText(formData, "youtube_url"),
+    external_url: nullableText(formData, "external_url"),
     source_marketing_request_id: nullableText(
       formData,
       "source_marketing_request_id"
@@ -77,6 +80,21 @@ export function youtubeEmbedUrl(value: string | null | undefined) {
   return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : null;
 }
 
+export function externalMaterialUrl(value: string | null | undefined) {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    if (!url.hostname || url.protocol !== "https:" || url.username || url.password) {
+      return null;
+    }
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function validateMarketingAssetInput(
   input: MarketingAssetFormInput,
   hasFile: boolean
@@ -114,10 +132,16 @@ export function validateMarketingAssetInput(
     if (hasFile) {
       return "Videos use YouTube links and cannot include a direct file upload.";
     }
+  } else if (input.content_source === "link") {
+    if (!externalMaterialUrl(input.external_url)) {
+      return "Add a valid HTTPS material link.";
+    }
+    if (hasFile) {
+      return "Choose either a file upload or a link, not both.";
+    }
   } else if (!hasFile) {
-    return "Upload the approved asset file.";
+    return "Upload the approved asset file or choose Insert link.";
   }
 
   return null;
 }
-

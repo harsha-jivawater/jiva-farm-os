@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowLeft, Save, UploadCloud } from "lucide-react";
+import { ArrowLeft, LinkIcon, Save, UploadCloud } from "lucide-react";
 import {
   marketingAssetAudienceOptions,
   marketingAssetCropOptions,
@@ -30,6 +30,7 @@ type MarketingAssetFormProps = {
 };
 
 type Option = { label: string; value: string };
+type ContentSource = "file" | "link";
 
 const inputClassName =
   "h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100";
@@ -114,6 +115,9 @@ export function MarketingAssetForm({
   const [crop, setCrop] = useState(asset?.crop ?? "");
   const [language, setLanguage] = useState(asset?.language ?? "");
   const [assetType, setAssetType] = useState(asset?.asset_type ?? "");
+  const [contentSource, setContentSource] = useState<ContentSource>(
+    version?.external_url ? "link" : "file"
+  );
   const [deliveryFormat, setDeliveryFormat] = useState(
     asset?.delivery_format ?? "Digital"
   );
@@ -122,9 +126,10 @@ export function MarketingAssetForm({
   const rule = uploadRules["marketing-asset"];
   const isVideo = assetType === "Video";
   const hasExistingFile = Boolean(version?.storage_path);
+  const hasExistingLink = Boolean(version?.external_url);
 
   async function prepareDirectUpload(event: React.FormEvent<HTMLFormElement>) {
-    if (bypassUploadRef.current || isVideo) {
+    if (bypassUploadRef.current || isVideo || contentSource === "link") {
       return;
     }
 
@@ -227,6 +232,7 @@ export function MarketingAssetForm({
       <input name="uploaded_original_file_name" type="hidden" />
       <input name="uploaded_mime_type" type="hidden" />
       <input name="uploaded_file_size_bytes" type="hidden" />
+      <input name="content_source" type="hidden" value={isVideo ? "link" : contentSource} />
       <input
         name="source_marketing_request_id"
         type="hidden"
@@ -305,6 +311,7 @@ export function MarketingAssetForm({
             name="asset_type"
             onChange={(value) => {
               setAssetType(value);
+              if (value === "Video") setContentSource("link");
               setUploadError(null);
             }}
             options={marketingAssetTypeOptions}
@@ -367,26 +374,84 @@ export function MarketingAssetForm({
             />
           </div>
         ) : (
-          <div className="mt-4">
-            {hasExistingFile ? (
-              <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                Current file: {version?.original_file_name}. Choose a new file only when replacing it.
-              </p>
-            ) : null}
-            <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center hover:bg-slate-100">
-              <UploadCloud className="h-7 w-7 text-slate-400" aria-hidden="true" />
-              <span className="mt-2 text-sm font-semibold text-slate-800">
-                {hasExistingFile ? "Choose replacement file" : "Choose asset file"}
-              </span>
-              <span className="mt-1 max-w-xl text-xs text-slate-500">{rule.description}</span>
-              <input
-                accept={rule.accept}
-                className="sr-only"
-                onChange={() => setUploadError(null)}
-                ref={fileRef}
-                type="file"
-              />
-            </label>
+          <div className="mt-4 space-y-4">
+            <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
+              <button
+                className={`inline-flex min-h-9 items-center gap-2 rounded px-3 text-sm font-semibold transition ${
+                  contentSource === "file"
+                    ? "bg-white text-slate-950 shadow-sm"
+                    : "text-slate-600 hover:text-slate-950"
+                }`}
+                onClick={() => {
+                  setContentSource("file");
+                  setUploadError(null);
+                }}
+                type="button"
+              >
+                <UploadCloud className="h-4 w-4" aria-hidden="true" />
+                Upload file
+              </button>
+              <button
+                className={`inline-flex min-h-9 items-center gap-2 rounded px-3 text-sm font-semibold transition ${
+                  contentSource === "link"
+                    ? "bg-white text-slate-950 shadow-sm"
+                    : "text-slate-600 hover:text-slate-950"
+                }`}
+                onClick={() => {
+                  setContentSource("link");
+                  setUploadError(null);
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
+                type="button"
+              >
+                <LinkIcon className="h-4 w-4" aria-hidden="true" />
+                Insert link
+              </button>
+            </div>
+
+            {contentSource === "link" ? (
+              <div>
+                {hasExistingLink ? (
+                  <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                    Current link is saved. Update it only when replacing the linked material.
+                  </p>
+                ) : null}
+                <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="external_url">
+                  Material link
+                </label>
+                <input
+                  className={inputClassName}
+                  defaultValue={version?.external_url ?? ""}
+                  id="external_url"
+                  name="external_url"
+                  placeholder="https://..."
+                  required
+                  type="url"
+                />
+              </div>
+            ) : (
+              <div>
+                {hasExistingFile ? (
+                  <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                    Current file: {version?.original_file_name}. Choose a new file only when replacing it.
+                  </p>
+                ) : null}
+                <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center hover:bg-slate-100">
+                  <UploadCloud className="h-7 w-7 text-slate-400" aria-hidden="true" />
+                  <span className="mt-2 text-sm font-semibold text-slate-800">
+                    {hasExistingFile ? "Choose replacement file" : "Choose asset file"}
+                  </span>
+                  <span className="mt-1 max-w-xl text-xs text-slate-500">{rule.description}</span>
+                  <input
+                    accept={rule.accept}
+                    className="sr-only"
+                    onChange={() => setUploadError(null)}
+                    ref={fileRef}
+                    type="file"
+                  />
+                </label>
+              </div>
+            )}
           </div>
         )}
       </section>

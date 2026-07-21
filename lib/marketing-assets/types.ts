@@ -28,8 +28,9 @@ export type MarketingAssetFormInput = {
   language: string;
   asset_type: string;
   delivery_format: string;
+  content_source: "file" | "link";
   youtube_url: string | null;
+  external_url: string | null;
   source_marketing_request_id: string | null;
   change_note: string | null;
 };
-

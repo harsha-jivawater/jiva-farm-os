@@ -266,7 +266,11 @@ export async function createMarketingAssetAction(formData: FormData) {
 
   const input = marketingAssetInputFromForm(formData);
   const metadata = uploadedMetadata(formData);
+  const usesExternalLink =
+    input.asset_type !== "Video" && input.content_source === "link";
   const hasUploadedFile = Boolean(metadata.storagePath);
+  const hasFileSource =
+    input.asset_type !== "Video" && input.content_source === "file";
   const validationError = validateMarketingAssetInput(input, hasUploadedFile);
 
   if (validationError) {
@@ -274,7 +278,7 @@ export async function createMarketingAssetAction(formData: FormData) {
     redirectWithError(errorPath, validationError);
   }
 
-  if (input.asset_type !== "Video") {
+  if (hasFileSource) {
     const uploadError = await verifyStoredUpload(metadata);
     if (uploadError) {
       await cleanupUploadedPath(metadata.storagePath);
@@ -282,8 +286,8 @@ export async function createMarketingAssetAction(formData: FormData) {
     }
   }
 
-  const assetId = input.asset_type === "Video" ? crypto.randomUUID() : metadata.assetId;
-  const versionId = input.asset_type === "Video" ? crypto.randomUUID() : metadata.versionId;
+  const assetId = hasFileSource ? metadata.assetId : crypto.randomUUID();
+  const versionId = hasFileSource ? metadata.versionId : crypto.randomUUID();
   const now = new Date().toISOString();
   const reviewRequiredRole = reviewRoleForUploader(uploaderRole);
   const assetPayload: MarketingAssetInsert = {
@@ -308,13 +312,12 @@ export async function createMarketingAssetAction(formData: FormData) {
     asset_id: assetId,
     version_number: 1,
     is_current: true,
-    storage_path: input.asset_type === "Video" ? null : metadata.storagePath,
+    storage_path: hasFileSource ? metadata.storagePath : null,
     youtube_url: input.asset_type === "Video" ? input.youtube_url : null,
-    original_file_name:
-      input.asset_type === "Video" ? null : metadata.originalFileName,
-    mime_type: input.asset_type === "Video" ? null : metadata.mimeType,
-    file_size_bytes:
-      input.asset_type === "Video" ? null : metadata.fileSizeBytes,
+    external_url: usesExternalLink ? input.external_url : null,
+    original_file_name: hasFileSource ? metadata.originalFileName : null,
+    mime_type: hasFileSource ? metadata.mimeType : null,
+    file_size_bytes: hasFileSource ? metadata.fileSizeBytes : null,
     change_note: input.change_note,
     created_by_user_id: profile.id
   };
@@ -397,14 +400,26 @@ export async function resubmitMarketingAssetAction(
   const existingVersion = currentVersion as MarketingAssetVersion | null;
   const input = marketingAssetInputFromForm(formData);
   const metadata = uploadedMetadata(formData);
-  const hasNewUpload = Boolean(metadata.storagePath);
+  const hasNewUpload =
+    input.asset_type !== "Video" &&
+    input.content_source === "file" &&
+    Boolean(metadata.storagePath);
+  const hasSubmittedUpload = Boolean(metadata.storagePath);
+  const hasExternalLink =
+    input.asset_type !== "Video" && input.content_source === "link";
   const hasCompatibleCurrent =
     input.asset_type === "Video"
       ? Boolean(existingVersion?.youtube_url)
-      : Boolean(existingVersion?.storage_path);
+      : input.content_source === "link"
+        ? Boolean(existingVersion?.external_url)
+        : Boolean(existingVersion?.storage_path);
   const validationError = validateMarketingAssetInput(
     input,
-    input.asset_type === "Video" ? false : hasNewUpload || hasCompatibleCurrent
+    input.asset_type === "Video"
+      ? hasSubmittedUpload
+      : input.content_source === "link"
+        ? hasSubmittedUpload
+        : hasNewUpload || hasCompatibleCurrent
   );
 
   if (validationError) {
@@ -423,7 +438,9 @@ export async function resubmitMarketingAssetAction(
   const contentChanged =
     hasNewUpload ||
     (input.asset_type === "Video" &&
-      input.youtube_url !== existingVersion?.youtube_url);
+      input.youtube_url !== existingVersion?.youtube_url) ||
+    (hasExternalLink && input.external_url !== existingVersion?.external_url) ||
+    (hasExternalLink && Boolean(existingVersion?.storage_path));
 
   const { error: metadataError } = await supabase
     .from("marketing_assets")
@@ -449,12 +466,13 @@ export async function resubmitMarketingAssetAction(
   if (contentChanged) {
     const versionId = hasNewUpload ? metadata.versionId : crypto.randomUUID();
     const { error: versionError } = await supabase.rpc(
-      "replace_marketing_asset_version",
+      "replace_marketing_asset_content_version",
       {
         p_asset_id: assetId,
         p_version_id: versionId,
         p_storage_path: hasNewUpload ? metadata.storagePath : null,
         p_youtube_url: input.asset_type === "Video" ? input.youtube_url : null,
+        p_external_url: hasExternalLink ? input.external_url : null,
         p_original_file_name: hasNewUpload ? metadata.originalFileName : null,
         p_mime_type: hasNewUpload ? metadata.mimeType : null,
         p_file_size_bytes: hasNewUpload ? metadata.fileSizeBytes : null,

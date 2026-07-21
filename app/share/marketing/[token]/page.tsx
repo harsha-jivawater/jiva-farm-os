@@ -136,6 +136,16 @@ export default async function SharedMarketingAssetPage({ params }: PageProps) {
                   <Download className="h-4 w-4" aria-hidden="true" />
                   Open material
                 </a>
+              ) : version.external_url ? (
+                <a
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                  href={version.external_url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  Open material
+                </a>
               ) : null}
             </div>
           )}

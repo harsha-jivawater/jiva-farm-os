@@ -213,6 +213,11 @@ export default async function MarketingAssetDetailPage({
                 <ExternalLink className="h-4 w-4" aria-hidden="true" />
                 Open YouTube
               </a>
+            ) : currentVersion?.external_url ? (
+              <a className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700" href={currentVersion.external_url} rel="noreferrer" target="_blank">
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                Open link
+              </a>
             ) : null}
           </div>
           {embedUrl ? (
@@ -229,8 +234,18 @@ export default async function MarketingAssetDetailPage({
             <div className="mt-4 flex min-h-32 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <FileText className="h-8 w-8 text-slate-400" aria-hidden="true" />
               <div>
-                <p className="font-semibold text-slate-900">{currentVersion?.original_file_name ?? "Content unavailable"}</p>
-                <p className="mt-1 text-sm text-slate-500">{currentVersion ? `${currentVersion.mime_type} · ${fileSize(currentVersion.file_size_bytes)}` : "No current version was found."}</p>
+                <p className="font-semibold text-slate-900">
+                  {currentVersion?.external_url
+                    ? "Linked material"
+                    : currentVersion?.original_file_name ?? "Content unavailable"}
+                </p>
+                <p className="mt-1 break-all text-sm text-slate-500">
+                  {currentVersion?.external_url
+                    ? currentVersion.external_url
+                    : currentVersion
+                      ? `${currentVersion.mime_type} · ${fileSize(currentVersion.file_size_bytes)}`
+                      : "No current version was found."}
+                </p>
               </div>
             </div>
           )}

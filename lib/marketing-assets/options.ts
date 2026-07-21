@@ -65,8 +65,7 @@ export const marketingAssetTypeOptions = [
 export const marketingAssetDeliveryOptions = [
   { value: "Digital", label: "Digital" },
   { value: "Physical", label: "Physical" },
-  { value: "Both", label: "Physical and digital" },
-  { value: "Insert Link", label: "Insert link" }
+  { value: "Both", label: "Physical and digital" }
 ] as const;
 
 export const marketingAssetStatusOptions = [
