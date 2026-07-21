@@ -28,6 +28,7 @@ const validFileInput = {
   audience: "Farmers",
   sector: "Agriculture",
   crop: "Tomato",
+  crops: ["Tomato"],
   language: "English",
   asset_type: "Leaflet",
   delivery_format: "Digital",
@@ -44,20 +45,26 @@ describe("Marketing Library classification", () => {
       form({
         audience: "Farmers",
         sector: "Dairy",
-        crop: "Tomato",
+        crops: "Tomato",
         language: "English"
       })
     );
 
     expect(input.crop).toBeNull();
+    expect(input.crops).toEqual([]);
   });
 
-  it("retains a valid crop for Agriculture", () => {
+  it("retains multiple valid crops for Agriculture", () => {
     const input = marketingAssetInputFromForm(
-      form({ sector: "Agriculture", crop: "Tomato" })
+      form({ sector: "Agriculture", crops: "Tomato" })
     );
+    const formData = form({ sector: "Agriculture", crops: "Tomato" });
+    formData.append("crops", "Garlic");
+    const multiCropInput = marketingAssetInputFromForm(formData);
 
     expect(input.crop).toBe("Tomato");
+    expect(multiCropInput.crop).toBe("Tomato");
+    expect(multiCropInput.crops).toEqual(["Tomato", "Garlic"]);
   });
 
   it("requires files for documents and YouTube links for videos", () => {

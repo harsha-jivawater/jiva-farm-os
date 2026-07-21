@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, LinkIcon, Save, UploadCloud } from "lucide-react";
+import { CropMultiSelect } from "@/components/crops/crop-multi-select";
 import {
   marketingAssetAudienceOptions,
-  marketingAssetCropOptions,
   marketingAssetDeliveryOptions,
   marketingAssetLanguageOptions,
   marketingAssetSectorOptions,
@@ -112,7 +112,9 @@ export function MarketingAssetForm({
   const bypassUploadRef = useRef(false);
   const [audience, setAudience] = useState(asset?.audience ?? "");
   const [sector, setSector] = useState(asset?.sector ?? "");
-  const [crop, setCrop] = useState(asset?.crop ?? "");
+  const [crops, setCrops] = useState<string[]>(
+    asset?.crops?.length ? asset.crops : asset?.crop ? [asset.crop] : []
+  );
   const [language, setLanguage] = useState(asset?.language ?? "");
   const [assetType, setAssetType] = useState(asset?.asset_type ?? "");
   const [contentSource, setContentSource] = useState<ContentSource>(
@@ -247,7 +249,7 @@ export function MarketingAssetForm({
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-slate-950">Library classification</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <SelectField
             label="Audience"
             name="audience"
@@ -261,22 +263,28 @@ export function MarketingAssetForm({
             name="sector"
             onChange={(value) => {
               setSector(value);
-              if (value !== "Agriculture") setCrop("");
+              if (value !== "Agriculture") setCrops([]);
             }}
             options={marketingAssetSectorOptions}
             placeholder="Select sector"
             value={sector}
           />
-          {sector === "Agriculture" ? (
-            <SelectField
-              label="Crop"
-              name="crop"
-              onChange={setCrop}
-              options={marketingAssetCropOptions}
-              placeholder="All crops"
-              required={false}
-              value={crop}
+        </div>
+        {sector === "Agriculture" ? (
+          <div className="mt-4">
+            <CropMultiSelect
+              label="Key crops"
+              name="crops"
+              onChange={setCrops}
+              values={crops}
             />
+          </div>
+        ) : null}
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {sector === "Agriculture" ? (
+            <p className="self-end pb-2 text-sm text-slate-500">
+              Leave crops unselected when the material applies to all crops.
+            </p>
           ) : null}
           <SelectField
             label="Language"
