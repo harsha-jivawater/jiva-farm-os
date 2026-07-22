@@ -37,6 +37,7 @@ type DispatchFormProps = {
   initialDispatchRoute?: string;
   initialFarmerLeadId?: string;
   initialPilotId?: string;
+  canConfirmPayment?: boolean;
   canUseManualException?: boolean;
   mode: "create" | "edit";
   pilots?: DispatchPilotOption[];
@@ -148,6 +149,7 @@ export function DispatchForm({
   initialDispatchRoute,
   initialFarmerLeadId,
   initialPilotId,
+  canConfirmPayment = false,
   canUseManualException = false,
   mode,
   pilots = [],
@@ -272,6 +274,8 @@ export function DispatchForm({
   const isPilotRoute = dispatchRoute === "Free Pilot";
   const isDealerRoute = dispatchRoute === "Dealer Dispatch";
   const isManualRoute = dispatchRoute === "Admin Manual Exception";
+  const paymentConfirmationLocked =
+    isFarmerSaleRoute || isPilotRoute || !canConfirmPayment;
   const submitDisabled = isPilotRoute && Boolean(pilotsLoadError);
   const effectiveDispatchType = isFarmerSaleRoute
     ? "Farmer Sale Dispatch"
@@ -1201,14 +1205,14 @@ export function DispatchForm({
             <input
               className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
               checked={paymentConfirmed}
-              disabled={isFarmerSaleRoute || isPilotRoute || isDealerRoute}
+              disabled={paymentConfirmationLocked}
               name="payment_confirmed"
               onChange={(event) => setPaymentConfirmed(event.target.checked)}
               type="checkbox"
             />
             Payment received
           </label>
-          {isFarmerSaleRoute ? (
+          {paymentConfirmationLocked && paymentConfirmed ? (
             <input name="payment_confirmed" type="hidden" value="on" />
           ) : null}
 
@@ -1222,6 +1226,7 @@ export function DispatchForm({
             <input
               className={inputClassName()}
               defaultValue={dateValue(dispatch?.payment_confirmed_date)}
+              disabled={paymentConfirmationLocked}
               id="payment_confirmed_date"
               name="payment_confirmed_date"
               type="date"

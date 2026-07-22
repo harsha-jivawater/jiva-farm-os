@@ -10,7 +10,7 @@ import type {
 } from "@/lib/dispatches/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { hasAnyRole } from "@/lib/users/permissions";
+import { canConfirmPayment, hasAnyRole } from "@/lib/users/permissions";
 
 type NewDispatchPageProps = {
   searchParams: Promise<{
@@ -130,6 +130,7 @@ export default async function NewDispatchPage({
   const initialDispatchRoute = params.route === "pilot" ? "Free Pilot" : undefined;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
+  const canConfirmDispatchPayment = canConfirmPayment(currentUser);
   const canUseManualException = hasAnyRole(currentUser, ["Admin"]);
   const { data } = await supabase
     .from("devices")
@@ -213,6 +214,7 @@ export default async function NewDispatchPage({
       <DispatchForm
         action={createDispatchAction}
         cancelHref="/dispatches"
+        canConfirmPayment={canConfirmDispatchPayment}
         canUseManualException={canUseManualException}
         dealers={(dealers ?? []) as unknown as DispatchDealerOption[]}
         devices={eligibleDevices}
