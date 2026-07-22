@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { appUrl } from "@/lib/integrations/n8n";
 import {
+  canEditMarketingAssetDetails,
   canCreateMarketingShare,
   canManageMarketingLibrary,
   canReviewMarketingAsset,
   marketingUploaderRole,
-  reviewRoleForUploader
+  reviewRoleForUploader,
+  uploaderCanSelfPublish
 } from "@/lib/marketing-assets/permissions";
 import {
   createMarketingShareToken,
@@ -26,7 +28,8 @@ import type {
 } from "@/lib/marketing-assets/types";
 import {
   marketingAssetInputFromForm,
-  validateMarketingAssetInput
+  validateMarketingAssetInput,
+  validateMarketingAssetMetadataInput
 } from "@/lib/marketing-assets/validation";
 import { createNotification } from "@/lib/notifications/create";
 import { createClient } from "@/lib/supabase/server";
@@ -290,6 +293,7 @@ export async function createMarketingAssetAction(formData: FormData) {
   const versionId = hasFileSource ? metadata.versionId : crypto.randomUUID();
   const now = new Date().toISOString();
   const reviewRequiredRole = reviewRoleForUploader(uploaderRole);
+  const selfPublishes = uploaderCanSelfPublish(uploaderRole);
   const assetPayload: MarketingAssetInsert = {
     id: assetId,
     title: input.title,
@@ -344,7 +348,20 @@ export async function createMarketingAssetAction(formData: FormData) {
 
   const { error: submitError } = await supabase
     .from("marketing_assets")
-    .update({ status: "Pending Review", submitted_at: now })
+    .update(
+      selfPublishes
+        ? {
+            status: "Published",
+            submitted_at: now,
+            reviewed_by_user_id: profile.id,
+            reviewed_at: now,
+            review_note: null,
+            published_by_user_id: profile.id,
+            published_at: now,
+            updated_by_user_id: profile.id
+          }
+        : { status: "Pending Review", submitted_at: now }
+    )
     .eq("id", assetId);
 
   if (submitError) {
@@ -354,19 +371,31 @@ export async function createMarketingAssetAction(formData: FormData) {
   }
 
   await addEvent(supabase, assetId, profile.id, "Created", "Asset uploaded.");
-  await addEvent(
-    supabase,
-    assetId,
-    profile.id,
-    "Submitted",
-    reviewRequiredRole ? `Submitted for ${reviewRequiredRole} review.` : "Submitted by Admin."
-  );
-  await notifyReviewers(supabase, {
-    id: assetId,
-    title: input.title,
-    review_required_role: reviewRequiredRole,
-    created_by_user_id: profile.id
-  });
+  if (selfPublishes) {
+    await addEvent(
+      supabase,
+      assetId,
+      profile.id,
+      "Published",
+      uploaderRole === "Marketing Head"
+        ? "Approved and published by Marketing Head."
+        : "Published by Admin."
+    );
+  } else {
+    await addEvent(
+      supabase,
+      assetId,
+      profile.id,
+      "Submitted",
+      `Submitted for ${reviewRequiredRole} review.`
+    );
+    await notifyReviewers(supabase, {
+      id: assetId,
+      title: input.title,
+      review_required_role: reviewRequiredRole,
+      created_by_user_id: profile.id
+    });
+  }
 
   revalidatePath("/marketing-library");
   redirect(`/marketing-library/${assetId}`);
@@ -488,32 +517,124 @@ export async function resubmitMarketingAssetAction(
     }
   }
 
+  const selfPublishesResubmission =
+    asset.review_required_role === null &&
+    (isAdmin(profile) ||
+      (asset.uploaded_by_role === "Marketing Head" &&
+        asset.created_by_user_id === profile.id));
+  const submittedAt = new Date().toISOString();
   const { error: submitError } = await supabase
     .from("marketing_assets")
-    .update({
-      status: "Pending Review",
-      submitted_at: new Date().toISOString(),
-      reviewed_by_user_id: null,
-      reviewed_at: null,
-      review_note: null,
-      published_by_user_id: null,
-      published_at: null,
-      updated_by_user_id: profile.id
-    })
+    .update(
+      selfPublishesResubmission
+        ? {
+            status: "Published",
+            submitted_at: submittedAt,
+            reviewed_by_user_id: profile.id,
+            reviewed_at: submittedAt,
+            review_note: null,
+            published_by_user_id: profile.id,
+            published_at: submittedAt,
+            updated_by_user_id: profile.id
+          }
+        : {
+            status: "Pending Review",
+            submitted_at: submittedAt,
+            reviewed_by_user_id: null,
+            reviewed_at: null,
+            review_note: null,
+            published_by_user_id: null,
+            published_at: null,
+            updated_by_user_id: profile.id
+          }
+    )
     .eq("id", assetId);
 
   if (submitError) {
     redirectWithError(errorPath, submitError.message);
   }
 
+  if (selfPublishesResubmission) {
+    await addEvent(
+      supabase,
+      assetId,
+      profile.id,
+      "Published",
+      input.change_note ||
+        (asset.uploaded_by_role === "Marketing Head"
+          ? "Approved and published by Marketing Head."
+          : "Published by Admin.")
+    );
+  } else {
+    await addEvent(
+      supabase,
+      assetId,
+      profile.id,
+      "Resubmitted",
+      input.change_note || "Requested changes submitted."
+    );
+    await notifyReviewers(supabase, {
+      ...asset,
+      title: input.title
+    });
+  }
+
+  revalidatePath("/marketing-library");
+  revalidatePath(`/marketing-library/${assetId}`);
+  redirect(`/marketing-library/${assetId}`);
+}
+
+export async function updateMarketingAssetDetailsAction(
+  assetId: string,
+  formData: FormData
+) {
+  const errorPath = `/marketing-library/${assetId}/edit`;
+  const supabase = await createClient();
+  const profile = await getCurrentInternalUser(supabase, errorPath);
+  const asset = await loadAsset(supabase, assetId, errorPath);
+
+  if (!canEditMarketingAssetDetails(profile, asset)) {
+    redirectWithError(
+      errorPath,
+      "Your role cannot edit this Marketing Library asset."
+    );
+  }
+
+  const input = marketingAssetInputFromForm(formData);
+  const validationError = validateMarketingAssetMetadataInput(input);
+
+  if (validationError) {
+    redirectWithError(errorPath, validationError);
+  }
+
+  const { error } = await supabase
+    .from("marketing_assets")
+    .update({
+      title: input.title,
+      description: input.description,
+      audience: input.audience,
+      sector: input.sector,
+      crop: input.crop,
+      crops: input.crops,
+      language: input.language,
+      asset_type: input.asset_type,
+      delivery_format: input.delivery_format,
+      source_marketing_request_id: input.source_marketing_request_id,
+      updated_by_user_id: profile.id
+    })
+    .eq("id", assetId);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
   await addEvent(
     supabase,
     assetId,
     profile.id,
-    "Resubmitted",
-    input.change_note || "Requested changes submitted."
+    "Details Updated",
+    "Asset details updated."
   );
-  await notifyReviewers(supabase, asset);
 
   revalidatePath("/marketing-library");
   revalidatePath(`/marketing-library/${assetId}`);

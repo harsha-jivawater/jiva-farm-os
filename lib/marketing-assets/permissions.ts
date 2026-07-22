@@ -3,6 +3,7 @@ import type { InternalUser } from "@/lib/users/types";
 import {
   getEffectiveRoles,
   hasAnyRole,
+  hasRole,
   isAdmin,
   type UserRole
 } from "@/lib/users/permissions";
@@ -31,9 +32,12 @@ export function marketingUploaderRole(
 export function reviewRoleForUploader(
   role: MarketingUploaderRole
 ): MarketingReviewerRole | null {
-  if (role === "Marketing Head") return "Designer";
   if (role === "Designer") return "Marketing Head";
   return null;
+}
+
+export function uploaderCanSelfPublish(role: MarketingUploaderRole) {
+  return role === "Admin" || role === "Marketing Head";
 }
 
 export function canReviewMarketingAsset(
@@ -54,3 +58,18 @@ export function canCreateMarketingShare(
   return canManageMarketingLibrary(user) && asset.status === "Published";
 }
 
+export function canEditMarketingAssetDetails(
+  user: RoleUser | null | undefined,
+  asset: Pick<MarketingAsset, "created_by_user_id" | "status">
+) {
+  if (!user || !canManageMarketingLibrary(user) || asset.status === "Archived") {
+    return false;
+  }
+
+  if (isAdmin(user) || hasRole(user, "Marketing Head")) return true;
+
+  return (
+    asset.status === "Changes Requested" &&
+    asset.created_by_user_id === user.id
+  );
+}

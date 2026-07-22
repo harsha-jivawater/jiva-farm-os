@@ -423,7 +423,7 @@ select lives_ok(
       'Draft',
       '10000000-0000-0000-0000-000000000003',
       'Marketing Head',
-      'Designer',
+      null,
       '10000000-0000-0000-0000-000000000003',
       null
     );
@@ -448,32 +448,31 @@ select lives_ok(
 
     update public.marketing_assets
     set
-      status = 'Pending Review',
+      status = 'Published',
       submitted_at = now(),
+      reviewed_by_user_id = '10000000-0000-0000-0000-000000000003',
+      reviewed_at = now(),
+      published_by_user_id = '10000000-0000-0000-0000-000000000003',
+      published_at = now(),
       updated_by_user_id = '10000000-0000-0000-0000-000000000003'
     where id = '20000000-0000-4000-8000-000000000001';
   $$,
-  'a Marketing Head can submit a versioned asset for Designer review'
+  'a Marketing Head can self-publish a versioned Marketing Library asset'
 );
 select is(
   (select count(*) from public.marketing_assets),
   1::bigint,
-  'the uploader can read the pending asset'
+  'the Marketing Head can read the self-published asset'
 );
-select throws_ok(
+select lives_ok(
   $$
     update public.marketing_assets
     set
-      status = 'Published',
-      reviewed_by_user_id = '10000000-0000-0000-0000-000000000003',
-      reviewed_at = now(),
-      published_by_user_id = '10000000-0000-0000-0000-000000000003',
-      published_at = now()
+      description = 'Updated after publishing.',
+      updated_by_user_id = '10000000-0000-0000-0000-000000000003'
     where id = '20000000-0000-4000-8000-000000000001'
   $$,
-  'P0001',
-  'This asset must be reviewed by the required counterpart role.',
-  'an uploader cannot approve their own asset'
+  'Marketing Head can edit published Marketing Library asset details'
 );
 select throws_ok(
   $$
@@ -485,6 +484,14 @@ select throws_ok(
   'permission denied for table marketing_asset_versions',
   'saved asset versions cannot be updated outside the controlled revision RPC'
 );
+reset role;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000004","email":"e2e-designer@jivawater.com","role":"authenticated"}',
+  true
+);
+set local role authenticated;
 select lives_ok(
   $$
     insert into public.marketing_assets (
@@ -508,10 +515,10 @@ select lives_ok(
       'English',
       'Pitch Deck',
       'Draft',
-      '10000000-0000-0000-0000-000000000003',
-      'Marketing Head',
+      '10000000-0000-0000-0000-000000000004',
       'Designer',
-      '10000000-0000-0000-0000-000000000003',
+      'Marketing Head',
+      '10000000-0000-0000-0000-000000000004',
       null
     );
 
@@ -530,17 +537,17 @@ select lives_ok(
       'deck.pptx',
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       2048,
-      '10000000-0000-0000-0000-000000000003'
+      '10000000-0000-0000-0000-000000000004'
     );
 
     update public.marketing_assets
     set
       status = 'Pending Review',
       submitted_at = now(),
-      updated_by_user_id = '10000000-0000-0000-0000-000000000003'
+      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
     where id = '20000000-0000-4000-8000-000000000003';
   $$,
-  'a Marketing Head can submit a second asset for revision testing'
+  'a Designer can submit an asset for Marketing Head review'
 );
 reset role;
 
@@ -552,14 +559,14 @@ select set_config(
 set local role authenticated;
 select is(
   (select count(*) from public.marketing_assets),
-  0::bigint,
-  'ordinary internal users cannot read pending Marketing Library assets'
+  1::bigint,
+  'ordinary internal users can read published assets but not pending Marketing Library assets'
 );
 reset role;
 
 select set_config(
   'request.jwt.claims',
-  '{"sub":"10000000-0000-0000-0000-000000000004","email":"e2e-designer@jivawater.com","role":"authenticated"}',
+  '{"sub":"10000000-0000-0000-0000-000000000003","email":"e2e-marketing-head@jivawater.com","role":"authenticated"}',
   true
 );
 set local role authenticated;
@@ -568,38 +575,26 @@ select lives_ok(
     update public.marketing_assets
     set
       status = 'Changes Requested',
-      reviewed_by_user_id = '10000000-0000-0000-0000-000000000004',
+      reviewed_by_user_id = '10000000-0000-0000-0000-000000000003',
       reviewed_at = now(),
       review_note = 'Replace the dealer pricing slide.',
-      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
+      updated_by_user_id = '10000000-0000-0000-0000-000000000003'
     where id = '20000000-0000-4000-8000-000000000003'
   $$,
-  'the required Designer can request changes from the uploader'
-);
-select throws_ok(
-  $$
-    update public.marketing_assets
-    set
-      title = 'Designer-authored title change',
-      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
-    where id = '20000000-0000-4000-8000-000000000003'
-  $$,
-  'P0001',
-  'Only the original uploader can edit asset details after changes are requested.',
-  'the reviewer cannot rewrite the uploader asset metadata'
+  'the Marketing Head reviewer can request changes from the Designer uploader'
 );
 select lives_ok(
   $$
     update public.marketing_assets
     set
-      status = 'Published',
-      reviewed_by_user_id = '10000000-0000-0000-0000-000000000004',
-      reviewed_at = now(),
-      published_by_user_id = '10000000-0000-0000-0000-000000000004',
-      published_at = now(),
-      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
-    where id = '20000000-0000-4000-8000-000000000001';
-
+      title = 'Marketing Head metadata correction',
+      updated_by_user_id = '10000000-0000-0000-0000-000000000003'
+    where id = '20000000-0000-4000-8000-000000000003'
+  $$,
+  'Marketing Head can edit Marketing Library asset metadata during review'
+);
+select lives_ok(
+  $$
     insert into public.marketing_asset_shares (
       asset_id,
       token_hash,
@@ -607,10 +602,10 @@ select lives_ok(
     ) values (
       '20000000-0000-4000-8000-000000000001',
       repeat('a', 64),
-      '10000000-0000-0000-0000-000000000004'
+      '10000000-0000-0000-0000-000000000003'
     );
   $$,
-  'the required Designer can publish and create a revocable share record'
+  'Marketing Head can create a revocable share record for a published asset'
 );
 select throws_ok(
   $$
@@ -632,7 +627,7 @@ select throws_ok(
       reviewed_at = null,
       published_by_user_id = null,
       published_at = null,
-      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
+      updated_by_user_id = '10000000-0000-0000-0000-000000000003'
     where id = '20000000-0000-4000-8000-000000000001'
   $$,
   'P0001',
@@ -643,7 +638,7 @@ reset role;
 
 select set_config(
   'request.jwt.claims',
-  '{"sub":"10000000-0000-0000-0000-000000000003","email":"e2e-marketing-head@jivawater.com","role":"authenticated"}',
+  '{"sub":"10000000-0000-0000-0000-000000000004","email":"e2e-designer@jivawater.com","role":"authenticated"}',
   true
 );
 set local role authenticated;
@@ -668,7 +663,9 @@ select lives_ok(
       reviewed_by_user_id = null,
       reviewed_at = null,
       review_note = null,
-      updated_by_user_id = '10000000-0000-0000-0000-000000000003'
+      published_by_user_id = null,
+      published_at = null,
+      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
     where id = '20000000-0000-4000-8000-000000000003';
   $$,
   'the original uploader can transactionally submit a linked version 2 for re-review'
@@ -685,7 +682,7 @@ reset role;
 
 select set_config(
   'request.jwt.claims',
-  '{"sub":"10000000-0000-0000-0000-000000000004","email":"e2e-designer@jivawater.com","role":"authenticated"}',
+  '{"sub":"10000000-0000-0000-0000-000000000003","email":"e2e-marketing-head@jivawater.com","role":"authenticated"}',
   true
 );
 set local role authenticated;
@@ -694,14 +691,14 @@ select lives_ok(
     update public.marketing_assets
     set
       status = 'Published',
-      reviewed_by_user_id = '10000000-0000-0000-0000-000000000004',
+      reviewed_by_user_id = '10000000-0000-0000-0000-000000000003',
       reviewed_at = now(),
-      published_by_user_id = '10000000-0000-0000-0000-000000000004',
+      published_by_user_id = '10000000-0000-0000-0000-000000000003',
       published_at = now(),
-      updated_by_user_id = '10000000-0000-0000-0000-000000000004'
+      updated_by_user_id = '10000000-0000-0000-0000-000000000003'
     where id = '20000000-0000-4000-8000-000000000003'
   $$,
-  'the required Designer can publish the corrected revision'
+  'the required Marketing Head can publish the corrected revision'
 );
 reset role;
 

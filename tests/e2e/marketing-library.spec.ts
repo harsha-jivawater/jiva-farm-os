@@ -17,7 +17,7 @@ async function signOut(page: Page) {
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
 }
 
-test("Marketing Library upload, review, sharing, and revoke workflow", async ({
+test("Marketing Library upload, publish, sharing, and revoke workflow", async ({
   browser,
   page
 }) => {
@@ -33,11 +33,10 @@ test("Marketing Library upload, review, sharing, and revoke workflow", async ({
   );
   await page.goto("/marketing-library/new");
 
-  await expect(page.getByLabel("Crop")).toHaveCount(0);
   await page.getByLabel("Audience").selectOption("Farmers");
   await page.getByLabel("Sector").selectOption("Agriculture");
-  await expect(page.getByLabel("Crop")).toBeVisible();
-  await page.getByLabel("Crop").selectOption("Tomato");
+  await expect(page.getByText("Key crops")).toBeVisible();
+  await page.getByRole("checkbox", { name: "Tomato" }).check();
   await page.getByLabel("Language").selectOption("English");
   await page.getByLabel("Title").fill(assetTitle);
   await page.getByLabel("Asset type").selectOption("Leaflet");
@@ -48,24 +47,14 @@ test("Marketing Library upload, review, sharing, and revoke workflow", async ({
     mimeType: "application/pdf",
     name: "qa-tomato-leaflet.pdf"
   });
-  await page.getByRole("button", { name: "Submit for review" }).click();
+  await page.getByRole("button", { name: "Publish material" }).click();
   await expect(page).toHaveURL(/\/marketing-library\/[0-9a-f-]+$/i, {
     timeout: 30_000
   });
-  await expect(page.getByText("Pending Review", { exact: true })).toBeVisible();
-  await expect(page.getByText("Designer", { exact: true })).toBeVisible();
-  const assetUrl = page.url();
-
-  await signOut(page);
-  await login(
-    page,
-    process.env.E2E_DESIGNER_EMAIL ?? "designer@jivawater.com"
-  );
-  await page.goto(assetUrl);
-  await page.getByRole("button", { name: "Publish" }).click();
   await expect(
     page.locator("span").filter({ hasText: /^Published$/ }).first()
   ).toBeVisible();
+  const assetUrl = page.url();
 
   await signOut(page);
   await login(page, process.env.E2E_VIEWER_EMAIL ?? "viewer@jivawater.com");
@@ -76,7 +65,7 @@ test("Marketing Library upload, review, sharing, and revoke workflow", async ({
   await signOut(page);
   await login(
     page,
-    process.env.E2E_DESIGNER_EMAIL ?? "designer@jivawater.com"
+    process.env.E2E_MARKETING_HEAD_EMAIL ?? "marketing-head@jivawater.com"
   );
   await page.goto(assetUrl);
   await page.getByRole("button", { name: "Create customer link" }).click();

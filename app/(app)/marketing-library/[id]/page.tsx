@@ -18,6 +18,7 @@ import { ShareManager } from "@/components/marketing-assets/share-manager";
 import { PageHeader } from "@/components/page-header";
 import { marketingAssetCropLabel } from "@/lib/marketing-assets/crops";
 import {
+  canEditMarketingAssetDetails,
   canManageMarketingLibrary,
   canReviewMarketingAsset
 } from "@/lib/marketing-assets/permissions";
@@ -59,6 +60,15 @@ function Detail({ label, value }: { label: string; value: string | null }) {
       <dd className="mt-1 text-sm font-medium text-slate-900">{value || "Not set"}</dd>
     </div>
   );
+}
+
+function reviewRequirementLabel(asset: MarketingAsset) {
+  if (asset.review_required_role) return asset.review_required_role;
+  if (asset.uploaded_by_role === "Marketing Head") {
+    return "Marketing Head self-approved";
+  }
+  if (asset.uploaded_by_role === "Admin") return "Admin published";
+  return "Not required";
 }
 
 export default async function MarketingAssetDetailPage({
@@ -141,9 +151,10 @@ export default async function MarketingAssetDetailPage({
   const canReview =
     asset.status === "Pending Review" &&
     canReviewMarketingAsset(currentUser, asset);
-  const canEdit =
+  const canSubmitRequestedChanges =
     asset.status === "Changes Requested" &&
     (isAdmin(currentUser) || asset.created_by_user_id === currentUser.id);
+  const canEdit = canEditMarketingAssetDetails(currentUser, asset);
 
   return (
     <section>
@@ -164,7 +175,7 @@ export default async function MarketingAssetDetailPage({
           {canEdit ? (
             <Link className="inline-flex min-h-10 items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700" href={`/marketing-library/${id}/edit`}>
               <Pencil className="h-4 w-4" aria-hidden="true" />
-              Submit changes
+              {canSubmitRequestedChanges ? "Submit changes" : "Edit details"}
             </Link>
           ) : null}
         </div>
@@ -186,7 +197,7 @@ export default async function MarketingAssetDetailPage({
             <Detail label="Asset type" value={asset.asset_type} />
             <Detail label="Delivery format" value={asset.delivery_format} />
             <Detail label="Uploaded by" value={userMap.get(asset.created_by_user_id) ?? asset.uploaded_by_role} />
-            <Detail label="Review required from" value={asset.review_required_role || "Admin-controlled"} />
+            <Detail label="Review required from" value={reviewRequirementLabel(asset)} />
           </dl>
           {asset.review_note ? (
             <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
