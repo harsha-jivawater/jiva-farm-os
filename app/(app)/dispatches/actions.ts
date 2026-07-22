@@ -1319,9 +1319,16 @@ export async function updateDispatchAction(id: string, formData: FormData) {
     advancedStatus(payload.dispatch_status) && !existing.approved_by_user_id;
   const shouldMarkDispatched =
     payload.dispatch_status === "Dispatched" && !existing.dispatched_by_user_id;
+  const submittedPaymentDate =
+    payload.payment_confirmed_date ?? existing.payment_confirmed_date ?? null;
+  const paymentConfirmationChanged =
+    payload.payment_confirmed !== existing.payment_confirmed;
+  const paymentConfirmationDateChanged =
+    payload.payment_confirmed &&
+    submittedPaymentDate !== (existing.payment_confirmed_date ?? null);
 
   if (
-    payload.payment_confirmed !== existing.payment_confirmed &&
+    (paymentConfirmationChanged || paymentConfirmationDateChanged) &&
     !canConfirmPayment(profile) &&
     payload.dispatch_type !== "Farmer Sale Dispatch"
   ) {

@@ -12,7 +12,7 @@ import type {
 } from "@/lib/dispatches/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { hasAnyRole } from "@/lib/users/permissions";
+import { canConfirmPayment, hasAnyRole } from "@/lib/users/permissions";
 import { dispatchScope } from "@/lib/users/record-scope";
 
 type EditDispatchPageProps = {
@@ -120,6 +120,7 @@ export default async function EditDispatchPage({
   const query = await searchParams;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
+  const canConfirmDispatchPayment = canConfirmPayment(currentUser);
   const canUseManualException = hasAnyRole(currentUser, ["Admin"]);
   const scope = await dispatchScope(supabase, currentUser);
   let dispatchQuery = supabase
@@ -289,6 +290,7 @@ export default async function EditDispatchPage({
       <DispatchForm
         action={updateAction}
         cancelHref={`/dispatches/${dispatch.id}`}
+        canConfirmPayment={canConfirmDispatchPayment}
         canUseManualException={canUseManualException}
         dealers={dealers}
         devices={devices}
