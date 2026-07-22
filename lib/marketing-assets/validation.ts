@@ -112,6 +112,33 @@ export function validateMarketingAssetInput(
   input: MarketingAssetFormInput,
   hasFile: boolean
 ) {
+  const metadataError = validateMarketingAssetMetadataInput(input);
+  if (metadataError) return metadataError;
+
+  if (input.asset_type === "Video") {
+    if (!youtubeVideoId(input.youtube_url)) {
+      return "Add a valid HTTPS YouTube link for this video.";
+    }
+    if (hasFile) {
+      return "Videos use YouTube links and cannot include a direct file upload.";
+    }
+  } else if (input.content_source === "link") {
+    if (!externalMaterialUrl(input.external_url)) {
+      return "Add a valid HTTPS material link.";
+    }
+    if (hasFile) {
+      return "Choose either a file upload or a link, not both.";
+    }
+  } else if (!hasFile) {
+    return "Upload the approved asset file or choose Insert link.";
+  }
+
+  return null;
+}
+
+export function validateMarketingAssetMetadataInput(
+  input: MarketingAssetFormInput
+) {
   if (input.title.length < 3 || input.title.length > 160) {
     return "Enter a title between 3 and 160 characters.";
   }
@@ -138,24 +165,6 @@ export function validateMarketingAssetInput(
   }
   if (!optionIncludes(marketingAssetDeliveryOptions, input.delivery_format)) {
     return "Select a delivery format.";
-  }
-
-  if (input.asset_type === "Video") {
-    if (!youtubeVideoId(input.youtube_url)) {
-      return "Add a valid HTTPS YouTube link for this video.";
-    }
-    if (hasFile) {
-      return "Videos use YouTube links and cannot include a direct file upload.";
-    }
-  } else if (input.content_source === "link") {
-    if (!externalMaterialUrl(input.external_url)) {
-      return "Add a valid HTTPS material link.";
-    }
-    if (hasFile) {
-      return "Choose either a file upload or a link, not both.";
-    }
-  } else if (!hasFile) {
-    return "Upload the approved asset file or choose Insert link.";
   }
 
   return null;

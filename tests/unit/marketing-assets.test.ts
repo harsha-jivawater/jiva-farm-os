@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  canEditMarketingAssetDetails,
   canReviewMarketingAsset,
   marketingUploaderRole,
-  reviewRoleForUploader
+  reviewRoleForUploader,
+  uploaderCanSelfPublish
 } from "@/lib/marketing-assets/permissions";
 import {
   marketingAssetInputFromForm,
@@ -136,24 +138,39 @@ describe("Marketing Library YouTube links", () => {
 describe("Marketing Library review separation", () => {
   const asset = {
     created_by_user_id: "uploader",
-    review_required_role: "Designer"
+    review_required_role: "Marketing Head"
   };
 
-  it("routes Marketing Head and Designer uploads to each other", () => {
+  it("routes Designer uploads to Marketing Head and lets Marketing Head self-publish", () => {
     expect(marketingUploaderRole(user("one", "Marketing Head"))).toBe(
       "Marketing Head"
     );
-    expect(reviewRoleForUploader("Marketing Head")).toBe("Designer");
+    expect(reviewRoleForUploader("Marketing Head")).toBeNull();
     expect(reviewRoleForUploader("Designer")).toBe("Marketing Head");
+    expect(uploaderCanSelfPublish("Marketing Head")).toBe(true);
+    expect(uploaderCanSelfPublish("Designer")).toBe(false);
   });
 
   it("allows the counterpart and Admin, but not the uploader, to review", () => {
-    expect(canReviewMarketingAsset(user("designer", "Designer"), asset)).toBe(
-      true
-    );
-    expect(canReviewMarketingAsset(user("uploader", "Designer"), asset)).toBe(
-      false
-    );
+    expect(
+      canReviewMarketingAsset(user("marketing", "Marketing Head"), asset)
+    ).toBe(true);
+    expect(
+      canReviewMarketingAsset(user("uploader", "Marketing Head"), asset)
+    ).toBe(false);
     expect(canReviewMarketingAsset(user("admin", "Admin"), asset)).toBe(true);
+  });
+
+  it("lets Marketing Head and Admin edit published asset details", () => {
+    const publishedAsset = {
+      created_by_user_id: "designer",
+      status: "Published"
+    };
+
+    expect(
+      canEditMarketingAssetDetails(user("marketing", "Marketing Head"), publishedAsset)
+    ).toBe(true);
+    expect(canEditMarketingAssetDetails(user("admin", "Admin"), publishedAsset)).toBe(true);
+    expect(canEditMarketingAssetDetails(user("designer", "Designer"), publishedAsset)).toBe(false);
   });
 });

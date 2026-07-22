@@ -2,7 +2,11 @@ import { createMarketingAssetAction } from "@/app/(app)/marketing-library/action
 import { AccessDenied } from "@/components/access/access-denied";
 import { MarketingAssetForm } from "@/components/marketing-assets/marketing-asset-form";
 import { PageHeader } from "@/components/page-header";
-import { canManageMarketingLibrary } from "@/lib/marketing-assets/permissions";
+import {
+  canManageMarketingLibrary,
+  marketingUploaderRole,
+  uploaderCanSelfPublish
+} from "@/lib/marketing-assets/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 
@@ -28,6 +32,8 @@ export default async function NewMarketingAssetPage({ searchParams }: PageProps)
       <AccessDenied message="Access denied. Only Admin, Marketing Head, and Designer can upload Marketing Library assets." />
     );
   }
+  const uploaderRole = marketingUploaderRole(currentUser);
+  const selfPublishes = uploaderRole ? uploaderCanSelfPublish(uploaderRole) : false;
 
   const { data: sourceRequest } = params.requestId
     ? await supabase
@@ -42,12 +48,13 @@ export default async function NewMarketingAssetPage({ searchParams }: PageProps)
       <PageHeader
         eyebrow="Marketing Library"
         title="Upload Material"
-        description="Classify the material, upload the approved file or YouTube link, and send it to the required counterpart for review."
+        description="Classify the material, upload the approved file or YouTube link, and make it available in the library."
       />
       <MarketingAssetForm
         action={createMarketingAssetAction}
         cancelHref="/marketing-library"
         error={params.error}
+        mode={selfPublishes ? "publish" : "create"}
         sourceMarketingRequestId={sourceRequest?.id}
         sourceMarketingRequestLabel={
           sourceRequest
