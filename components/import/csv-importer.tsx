@@ -24,6 +24,7 @@ type CsvImporterProps = {
   templateHref: string;
   columns: ImportColumn[];
   action: (formData: FormData) => Promise<ImportActionState>;
+  submitLabel?: string;
 };
 
 const initialResult: ImportActionState = {
@@ -32,7 +33,10 @@ const initialResult: ImportActionState = {
   importedCount: 0,
   skippedCount: 0,
   errorCount: 0,
-  rowErrors: []
+  rowErrors: [],
+  reviewBatchHref: null,
+  reviewBatchId: null,
+  reviewRowCount: 0
 };
 
 function rowHasRequiredValues(row: CsvRecord, columns: ImportColumn[]) {
@@ -58,7 +62,8 @@ export function CsvImporter({
   instructions,
   templateHref,
   columns,
-  action
+  action,
+  submitLabel = "Confirm import"
 }: CsvImporterProps) {
   const [records, setRecords] = useState<CsvRecord[]>([]);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
@@ -88,9 +93,6 @@ export function CsvImporter({
       ? `Import is limited to ${MAX_IMPORT_ROWS} rows.`
       : null,
     parseErrors.length > 0 ? "Fix the CSV errors above before importing." : null,
-    records.length > 0 && validPreviewRows.length === 0
-      ? "Import is disabled because no valid rows are available."
-      : null,
     records.length > 0 && validPreviewRows.length === 0
       ? "At least one valid row is required."
       : null
@@ -122,6 +124,7 @@ export function CsvImporter({
 
   function handleImport(formData: FormData) {
     formData.set("rows_json", JSON.stringify(records));
+    formData.set("file_name", fileName);
     startTransition(async () => {
       const nextResult = await action(formData);
       setResult(nextResult);
@@ -197,7 +200,7 @@ export function CsvImporter({
             <p className="mt-1 text-sm text-slate-600">
               {validPreviewRows.length} rows have required values.{" "}
               {missingValueCount > 0
-                ? `${missingValueCount} rows are missing required values and will be skipped.`
+                ? `${missingValueCount} rows are missing required values and will be saved for review.`
                 : "No required values are missing."}
             </p>
           </div>
@@ -289,8 +292,8 @@ export function CsvImporter({
           </div>
           {records.length > 10 ? (
             <p className="border-t border-slate-200 p-4 text-sm text-slate-500">
-              Showing the first 10 rows only. All valid rows will be checked on
-              import.
+              Showing the first 10 rows only. Valid rows will import, and rows
+              with issues will stay saved for correction.
             </p>
           ) : null}
         </div>
@@ -316,7 +319,7 @@ export function CsvImporter({
                 Importing...
               </>
             ) : (
-              "Confirm import"
+              submitLabel
             )}
           </button>
           {!canImport && disabledMessages.length > 0 ? (
@@ -348,7 +351,7 @@ export function CsvImporter({
           </div>
           <div className="mt-2 grid gap-2 sm:grid-cols-3">
             <span>Imported: {result.importedCount}</span>
-            <span>Skipped: {result.skippedCount}</span>
+            <span>Saved for review: {result.skippedCount}</span>
             <span>Errors: {result.errorCount}</span>
           </div>
           {result.rowErrors.length > 0 ? (
@@ -357,6 +360,14 @@ export function CsvImporter({
                 <li key={error}>{error}</li>
               ))}
             </ul>
+          ) : null}
+          {result.reviewBatchHref && result.reviewRowCount ? (
+            <a
+              className="mt-4 inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 shadow-sm hover:bg-emerald-50"
+              href={result.reviewBatchHref}
+            >
+              Review and fix {result.reviewRowCount} saved rows
+            </a>
           ) : null}
         </div>
       ) : null}
