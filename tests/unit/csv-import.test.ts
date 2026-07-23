@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { normalizeImportDate, parseCsv } from "@/lib/csv/import-utils";
+import { farmerLeadImportColumns } from "@/lib/farmer-leads/import-columns";
 
 describe("CSV import dates", () => {
   it("normalizes MM-DD-YYYY dates to ISO for Postgres", () => {
@@ -26,6 +29,21 @@ describe("CSV import dates", () => {
 });
 
 describe("CSV import parser", () => {
+  it("keeps business sector in the farmer lead template as optional metadata", () => {
+    const template = readFileSync(
+      join(process.cwd(), "public/templates/farmer-leads-import-template.csv"),
+      "utf8"
+    );
+    const parsed = parseCsv(template);
+    const businessSectorColumn = farmerLeadImportColumns.find(
+      (column) => column.key === "business_sector"
+    );
+
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.headers).toContain("business_sector");
+    expect(businessSectorColumn).not.toHaveProperty("required");
+  });
+
   it("ignores harmless trailing blank header columns", () => {
     const parsed = parseCsv("farmer_name,mobile_number,remarks,\nA,9876543210,ok,\n");
 

@@ -1,6 +1,7 @@
 export const farmerLeadImportColumns = [
   { key: "farmer_name", label: "Farmer Name", required: true },
   { key: "mobile_number", label: "Mobile Number", required: true },
+  { key: "business_sector", label: "Business Sector" },
   { key: "lead_source", label: "Lead Source" },
   { key: "village", label: "Village", required: true },
   { key: "district", label: "District", required: true },
