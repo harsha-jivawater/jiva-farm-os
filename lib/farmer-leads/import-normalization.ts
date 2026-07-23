@@ -1,14 +1,31 @@
 import { cropLibrary } from "@/lib/crops/crop-library";
-import { cropStageOptions } from "@/lib/farmer-leads/options";
+import {
+  cropStageOptions,
+  defaultLeadSource,
+  defaultLeadType,
+  irrigationTypeOptions,
+  leadSourceOptions,
+  leadTypeOptions
+} from "@/lib/farmer-leads/options";
 import { normalizeLocationKey } from "@/lib/locations/normalize";
+import {
+  businessSectorOptions,
+  defaultBusinessSector
+} from "@/lib/sector/options";
 
 const OTHER_CROP = "Other";
 const UNKNOWN_CROP = "Unknown";
+const UNKNOWN_OPTION = "Unknown";
 
 type ImportCropRow = {
   crop_stage?: string | null;
   other_primary_crop?: string | null;
   primary_crop?: string | null;
+};
+
+type ImportOption = {
+  value: string;
+  label: string;
 };
 
 function clean(value: string | null | undefined) {
@@ -22,6 +39,49 @@ function matchesValue(candidate: string, values: Array<string | null | undefined
   return values.some(
     (value) => value && normalizeLocationKey(value) === candidateKey
   );
+}
+
+function normalizeImportOption(
+  value: string | null | undefined,
+  options: ReadonlyArray<ImportOption>,
+  fallback: string
+) {
+  const cleaned = clean(value);
+
+  if (!cleaned) {
+    return fallback;
+  }
+
+  return (
+    options.find((option) => matchesValue(cleaned, [option.value, option.label]))
+      ?.value ?? fallback
+  );
+}
+
+export function normalizeImportBusinessSector(value: string | null | undefined) {
+  return normalizeImportOption(
+    value,
+    businessSectorOptions,
+    defaultBusinessSector
+  );
+}
+
+export function normalizeImportLeadSource(value: string | null | undefined) {
+  const cleaned = clean(value);
+
+  if (!cleaned) {
+    return defaultLeadSource;
+  }
+
+  return normalizeImportOption(cleaned, leadSourceOptions, "Other");
+}
+
+export function normalizeImportLeadType(value: string | null | undefined) {
+  return normalizeImportOption(value, leadTypeOptions, defaultLeadType);
+}
+
+export function normalizeImportIrrigationType(value: string | null | undefined) {
+  return normalizeImportOption(value, irrigationTypeOptions, UNKNOWN_OPTION);
 }
 
 export function normalizeImportPrimaryCrop({
