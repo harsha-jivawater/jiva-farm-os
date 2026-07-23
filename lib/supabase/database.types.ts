@@ -999,6 +999,81 @@ export type Database = {
         };
         Relationships: [];
       };
+      farmer_lead_import_batches: {
+        Row: {
+          id: string;
+          file_name: string | null;
+          uploaded_by_user_id: string;
+          status: string;
+          total_rows: number;
+          imported_count: number;
+          unresolved_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          file_name?: string | null;
+          uploaded_by_user_id: string;
+          status?: string;
+          total_rows?: number;
+          imported_count?: number;
+          unresolved_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          file_name?: string | null;
+          uploaded_by_user_id?: string;
+          status?: string;
+          total_rows?: number;
+          imported_count?: number;
+          unresolved_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      farmer_lead_import_rows: {
+        Row: {
+          id: string;
+          batch_id: string;
+          row_number: number;
+          row_data: Json;
+          error_messages: string[];
+          status: string;
+          imported_farmer_lead_id: string | null;
+          imported_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          batch_id: string;
+          row_number: number;
+          row_data?: Json;
+          error_messages?: string[];
+          status?: string;
+          imported_farmer_lead_id?: string | null;
+          imported_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          batch_id?: string;
+          row_number?: number;
+          row_data?: Json;
+          error_messages?: string[];
+          status?: string;
+          imported_farmer_lead_id?: string | null;
+          imported_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       farmer_leads: {
         Row: {
           id: string;

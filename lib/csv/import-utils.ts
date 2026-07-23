@@ -72,7 +72,14 @@ export function parseCsv(text: string): CsvParseResult {
     return { headers: [], records: [], errors: ["CSV file is empty."] };
   }
 
-  const headers = nonBlankRows[0].map(normalizeCsvHeader);
+  const rawHeaders = nonBlankRows[0].map(normalizeCsvHeader);
+  let lastHeaderIndex = rawHeaders.length - 1;
+
+  while (lastHeaderIndex >= 0 && !rawHeaders[lastHeaderIndex]) {
+    lastHeaderIndex -= 1;
+  }
+
+  const headers = rawHeaders.slice(0, lastHeaderIndex + 1);
 
   if (headers.some((header) => !header)) {
     errors.push("CSV header row has a blank column name.");
