@@ -6,7 +6,7 @@ export const farmerLeadImportColumns = [
   { key: "village", label: "Village", required: true },
   { key: "district", label: "District", required: true },
   { key: "state", label: "State", required: true },
-  { key: "primary_crop", label: "Primary Crop", required: true },
+  { key: "primary_crop", label: "Primary Crop" },
   { key: "other_primary_crop", label: "Other Primary Crop" },
   { key: "lead_type", label: "Lead Type" },
   { key: "irrigation_type", label: "Irrigation Type" },

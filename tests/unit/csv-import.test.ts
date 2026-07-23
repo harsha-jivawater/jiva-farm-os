@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { normalizeImportDate, parseCsv } from "@/lib/csv/import-utils";
 import { farmerLeadImportColumns } from "@/lib/farmer-leads/import-columns";
+import {
+  normalizeImportCropDetails,
+  normalizeImportCropStage,
+  normalizeImportPrimaryCrop
+} from "@/lib/farmer-leads/import-normalization";
 
 describe("CSV import dates", () => {
   it("normalizes MM-DD-YYYY dates to ISO for Postgres", () => {
@@ -29,7 +34,7 @@ describe("CSV import dates", () => {
 });
 
 describe("CSV import parser", () => {
-  it("keeps business sector in the farmer lead template as optional metadata", () => {
+  it("keeps business sector and crop values in the farmer lead template as optional metadata", () => {
     const template = readFileSync(
       join(process.cwd(), "public/templates/farmer-leads-import-template.csv"),
       "utf8"
@@ -38,10 +43,14 @@ describe("CSV import parser", () => {
     const businessSectorColumn = farmerLeadImportColumns.find(
       (column) => column.key === "business_sector"
     );
+    const primaryCropColumn = farmerLeadImportColumns.find(
+      (column) => column.key === "primary_crop"
+    );
 
     expect(parsed.errors).toEqual([]);
     expect(parsed.headers).toContain("business_sector");
     expect(businessSectorColumn).not.toHaveProperty("required");
+    expect(primaryCropColumn).not.toHaveProperty("required");
   });
 
   it("ignores harmless trailing blank header columns", () => {
@@ -62,5 +71,38 @@ describe("CSV import parser", () => {
     const parsed = parseCsv("farmer_name,,mobile_number\nA,,9876543210\n");
 
     expect(parsed.errors).toContain("CSV header row has a blank column name.");
+  });
+});
+
+describe("Farmer lead import crop normalization", () => {
+  it("imports blank crop details without requiring review", () => {
+    expect(normalizeImportCropDetails({})).toEqual({
+      crop_stage: null,
+      other_primary_crop: null,
+      primary_crop: "Unknown"
+    });
+  });
+
+  it("normalizes known crops and stages case-insensitively", () => {
+    expect(
+      normalizeImportPrimaryCrop({
+        primary_crop: "rice paddy"
+      })
+    ).toEqual({
+      other_primary_crop: null,
+      primary_crop: "Paddy"
+    });
+    expect(normalizeImportCropStage("vegetative")).toBe("Vegetative");
+  });
+
+  it("keeps unrecognized crop text as an Other crop instead of rejecting it", () => {
+    expect(
+      normalizeImportPrimaryCrop({
+        primary_crop: "Vegetables"
+      })
+    ).toEqual({
+      other_primary_crop: "Vegetables",
+      primary_crop: "Other"
+    });
   });
 });

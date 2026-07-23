@@ -6,15 +6,11 @@ import {
   defaultIrrigationType,
   defaultLeadSource,
   defaultLeadType,
-  defaultPrimaryCrop,
   leadSourceOptions
 } from "@/lib/farmer-leads/options";
 import { validateFarmerLeadPayload } from "@/lib/farmer-leads/form-data";
 import { normalizeLocationKey } from "@/lib/locations/normalize";
-import {
-  isLegacyCropValue,
-  legacyCropValidationMessage
-} from "@/lib/crops/crop-library";
+import { normalizeImportCropDetails } from "@/lib/farmer-leads/import-normalization";
 import type { FarmerLeadInsert } from "@/lib/farmer-leads/types";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 import type { ImportActionState } from "@/lib/csv/import-types";
@@ -221,7 +217,7 @@ function importBusinessSector(value: string | null | undefined) {
 }
 
 function rowToPayload(row: CsvRecord): FarmerLeadInsert {
-  const primaryCrop = clean(row.primary_crop) ?? defaultPrimaryCrop;
+  const cropDetails = normalizeImportCropDetails(row);
   const nextActionDate = clean(row.next_action_date) ?? todayDate();
   const funnelStage = defaultFunnelStage;
 
@@ -240,10 +236,9 @@ function rowToPayload(row: CsvRecord): FarmerLeadInsert {
     lead_status: deriveLeadStatus({ funnelStage, paymentConfirmed: false }),
     funnel_stage: funnelStage,
     lead_source: clean(row.lead_source) ?? defaultLeadSource,
-    primary_crop: primaryCrop,
-    other_primary_crop:
-      primaryCrop === "Other" ? clean(row.other_primary_crop) : null,
-    crop_stage: clean(row.crop_stage),
+    primary_crop: cropDetails.primary_crop,
+    other_primary_crop: cropDetails.other_primary_crop,
+    crop_stage: cropDetails.crop_stage,
     irrigation_type: clean(row.irrigation_type) ?? defaultIrrigationType,
     land_size_acres: parseNumber(row.land_size_acres),
     crop_area_acres: parseNumber(row.crop_area_acres),
@@ -511,10 +506,6 @@ async function prepareFarmerLeadRows({
 
     if (!validLeadSource(payload.lead_source)) {
       errors.push(leadSourceErrorMessage());
-    }
-
-    if (isLegacyCropValue(payload.primary_crop)) {
-      errors.push(legacyCropValidationMessage(payload.primary_crop));
     }
 
     const validationError = validateFarmerLeadPayload(payload);
