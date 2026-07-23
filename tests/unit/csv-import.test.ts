@@ -4,8 +4,12 @@ import { join } from "node:path";
 import { normalizeImportDate, parseCsv } from "@/lib/csv/import-utils";
 import { farmerLeadImportColumns } from "@/lib/farmer-leads/import-columns";
 import {
+  normalizeImportBusinessSector,
   normalizeImportCropDetails,
   normalizeImportCropStage,
+  normalizeImportIrrigationType,
+  normalizeImportLeadSource,
+  normalizeImportLeadType,
   normalizeImportPrimaryCrop
 } from "@/lib/farmer-leads/import-normalization";
 
@@ -46,11 +50,15 @@ describe("CSV import parser", () => {
     const primaryCropColumn = farmerLeadImportColumns.find(
       (column) => column.key === "primary_crop"
     );
+    const villageColumn = farmerLeadImportColumns.find(
+      (column) => column.key === "village"
+    );
 
     expect(parsed.errors).toEqual([]);
     expect(parsed.headers).toContain("business_sector");
     expect(businessSectorColumn).not.toHaveProperty("required");
     expect(primaryCropColumn).not.toHaveProperty("required");
+    expect(villageColumn).not.toHaveProperty("required");
   });
 
   it("ignores harmless trailing blank header columns", () => {
@@ -104,5 +112,37 @@ describe("Farmer lead import crop normalization", () => {
       other_primary_crop: "Vegetables",
       primary_crop: "Other"
     });
+  });
+
+  it("keeps multi-crop text and ignores numeric crop-stage values from messy imports", () => {
+    expect(
+      normalizeImportCropDetails({
+        crop_stage: "25",
+        primary_crop: "Maize, Coconut"
+      })
+    ).toEqual({
+      crop_stage: null,
+      other_primary_crop: "Maize, Coconut",
+      primary_crop: "Other"
+    });
+  });
+});
+
+describe("Farmer lead import optional option normalization", () => {
+  it("normalizes valid optional dropdown values case-insensitively", () => {
+    expect(normalizeImportBusinessSector("agriculture")).toBe("Agriculture");
+    expect(normalizeImportLeadSource("exhibition stall")).toBe("Exhibition / Stall");
+    expect(normalizeImportLeadType("dealer generated lead")).toBe(
+      "Dealer Generated Lead"
+    );
+    expect(normalizeImportIrrigationType("rain fed")).toBe("Rainfed");
+  });
+
+  it("defaults bad optional dropdown values instead of blocking imports", () => {
+    expect(normalizeImportBusinessSector("Agri")).toBe("Agriculture");
+    expect(normalizeImportLeadSource("Codissia expo")).toBe("Other");
+    expect(normalizeImportLeadType("")).toBe("New Farmer Lead");
+    expect(normalizeImportIrrigationType("Coconut")).toBe("Unknown");
+    expect(normalizeImportIrrigationType("Maize, Coconut")).toBe("Unknown");
   });
 });

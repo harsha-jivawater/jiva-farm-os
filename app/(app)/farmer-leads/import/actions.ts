@@ -1,22 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import {
-  defaultFunnelStage,
-  defaultIrrigationType,
-  defaultLeadSource,
-  defaultLeadType,
-  leadSourceOptions
-} from "@/lib/farmer-leads/options";
+import { defaultFunnelStage } from "@/lib/farmer-leads/options";
 import { validateFarmerLeadPayload } from "@/lib/farmer-leads/form-data";
 import { normalizeLocationKey } from "@/lib/locations/normalize";
-import { normalizeImportCropDetails } from "@/lib/farmer-leads/import-normalization";
+import {
+  normalizeImportBusinessSector,
+  normalizeImportCropDetails,
+  normalizeImportIrrigationType,
+  normalizeImportLeadSource,
+  normalizeImportLeadType
+} from "@/lib/farmer-leads/import-normalization";
 import type { FarmerLeadInsert } from "@/lib/farmer-leads/types";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 import type { ImportActionState } from "@/lib/csv/import-types";
 import {
   MAX_IMPORT_ROWS,
   generateImportCode,
+  normalizeImportDate,
   parseNumber,
   todayDate,
   type CsvRecord
@@ -24,10 +25,6 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Json } from "@/lib/supabase/database.types";
-import {
-  businessSectorOptions,
-  defaultBusinessSector
-} from "@/lib/sector/options";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import { hasAnyRole, hasRole } from "@/lib/users/permissions";
 import { normalizeIndianMobileNumber } from "@/lib/validation/mobile-number";
@@ -173,16 +170,6 @@ function canSelfAssignNewLead(user: { role: string; secondary_role?: string | nu
   return hasAnyRole(user, ["Salesperson", "RSM"]);
 }
 
-function validLeadSource(value: string) {
-  return leadSourceOptions.some((option) => option.value === value);
-}
-
-function leadSourceErrorMessage() {
-  return `Invalid lead_source. Use one of: ${leadSourceOptions
-    .map((option) => option.value)
-    .join(", ")}.`;
-}
-
 function isFarmerLeadMobileUniqueError(error: SupabaseErrorLike | null | undefined) {
   const text = [error?.message, error?.details].filter(Boolean).join(" ");
 
@@ -201,49 +188,39 @@ function canonicalStateName(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
-function importBusinessSector(value: string | null | undefined) {
-  const sector = clean(value);
-
-  if (!sector) {
-    return defaultBusinessSector;
-  }
-
-  return (
-    businessSectorOptions.find(
-      (option) =>
-        normalizeLocationKey(option.value) === normalizeLocationKey(sector)
-    )?.value ?? sector
-  );
-}
-
 function rowToPayload(row: CsvRecord): FarmerLeadInsert {
   const cropDetails = normalizeImportCropDetails(row);
-  const nextActionDate = clean(row.next_action_date) ?? todayDate();
+  const nextActionDate =
+    normalizeImportDate(row.next_action_date, "Next action date").value ??
+    todayDate();
+  const followupDueDate =
+    normalizeImportDate(row.followup_due_date, "Follow-up due date").value ??
+    nextActionDate;
   const funnelStage = defaultFunnelStage;
 
   return {
-    business_sector: importBusinessSector(row.business_sector),
+    business_sector: normalizeImportBusinessSector(row.business_sector),
     lead_code: clean(row.lead_code) ?? generateImportCode("JFD"),
     farmer_name: String(row.farmer_name ?? "").trim(),
     mobile_number:
       normalizeIndianMobileNumber(String(row.mobile_number ?? "").trim()) ?? "",
-    village: String(row.village ?? "").trim(),
+    village: clean(row.village) ?? "Unknown",
     state: String(row.state ?? "").trim(),
     district: String(row.district ?? "").trim(),
     taluk: clean(row.taluk),
     full_address: clean(row.full_address),
-    lead_type: clean(row.lead_type) ?? defaultLeadType,
+    lead_type: normalizeImportLeadType(row.lead_type),
     lead_status: deriveLeadStatus({ funnelStage, paymentConfirmed: false }),
     funnel_stage: funnelStage,
-    lead_source: clean(row.lead_source) ?? defaultLeadSource,
+    lead_source: normalizeImportLeadSource(row.lead_source),
     primary_crop: cropDetails.primary_crop,
     other_primary_crop: cropDetails.other_primary_crop,
     crop_stage: cropDetails.crop_stage,
-    irrigation_type: clean(row.irrigation_type) ?? defaultIrrigationType,
+    irrigation_type: normalizeImportIrrigationType(row.irrigation_type),
     land_size_acres: parseNumber(row.land_size_acres),
     crop_area_acres: parseNumber(row.crop_area_acres),
     next_action_date: nextActionDate,
-    followup_due_date: clean(row.followup_due_date) ?? nextActionDate,
+    followup_due_date: followupDueDate,
     payment_confirmed: false,
     device_dispatched: false,
     installation_completed: false,
@@ -502,10 +479,6 @@ async function prepareFarmerLeadRows({
 
     if (assignmentError) {
       errors.push(assignmentError);
-    }
-
-    if (!validLeadSource(payload.lead_source)) {
-      errors.push(leadSourceErrorMessage());
     }
 
     const validationError = validateFarmerLeadPayload(payload);
