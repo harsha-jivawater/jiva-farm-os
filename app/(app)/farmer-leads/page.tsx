@@ -257,15 +257,15 @@ export default async function FarmerLeadsPage({
     timeAsync("farmer leads list query", () => query),
     timeAsync("farmer leads kpi summary rpc", () =>
       supabase.rpc("get_farmer_leads_page_kpis", {
-        p_q: null,
-        p_lead_status: null,
-        p_funnel_stage: null,
-        p_state: null,
-        p_district: null,
-        p_owner_user_id: null,
-        p_rsm_user_id: null,
-        p_lead_source: null,
-        p_primary_crop: null
+        p_q: cleanedSearch || null,
+        p_lead_status: filters.lead_status || null,
+        p_funnel_stage: filters.funnel_stage || null,
+        p_state: filters.state || null,
+        p_district: filters.district || null,
+        p_owner_user_id: filters.owner_user_id || null,
+        p_rsm_user_id: filters.rsm_user_id || null,
+        p_lead_source: filters.lead_source || null,
+        p_primary_crop: filters.primary_crop || null
       })
     ),
     timeAsync("farmer leads users filter query", () =>
