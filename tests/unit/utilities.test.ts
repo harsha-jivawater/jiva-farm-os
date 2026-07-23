@@ -23,6 +23,7 @@ import {
   normalizeIndianMobileNumber,
   validateIndianMobileNumber
 } from "@/lib/validation/mobile-number";
+import { normalizeLocationKey } from "@/lib/locations/normalize";
 
 describe("authentication input safety", () => {
   it("accepts only safe internal return paths", () => {
@@ -79,6 +80,13 @@ describe("shared workflow utilities", () => {
     expect(formatDisplayDateRange("2026-07-01", "2026-07-17")).toBe(
       "01/07/2026 to 17/07/2026"
     );
+  });
+
+  it("normalizes location names for routing lookups", () => {
+    expect(normalizeLocationKey("Tamil Nadu")).toBe("tamilnadu");
+    expect(normalizeLocationKey(" tamilnadu ")).toBe("tamilnadu");
+    expect(normalizeLocationKey("Bangalore Rural")).toBe("bangalorerural");
+    expect(normalizeLocationKey("Bangalore-Rural")).toBe("bangalorerural");
   });
 
   it("round-trips private storage references", () => {

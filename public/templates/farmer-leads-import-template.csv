@@ -1,2 +1,2 @@
-farmer_name,mobile_number,lead_source,village,district,state,primary_crop,other_primary_crop,lead_type,irrigation_type,crop_stage,land_size_acres,crop_area_acres,next_action_date,followup_due_date,lead_code,remarks
-Sample Import Farmer,9999999999,Exhibition,Sample Village,Bangalore Urban,Karnataka,Paddy,,New Farmer Lead,Drip,Vegetative,2,1.5,2026-07-04,2026-07-04,,Sample row - remove before import
+farmer_name,mobile_number,business_sector,lead_source,village,district,state,primary_crop,other_primary_crop,lead_type,irrigation_type,crop_stage,land_size_acres,crop_area_acres,next_action_date,followup_due_date,lead_code,remarks
+Sample Import Farmer,9999999999,Agriculture,Exhibition,Sample Village,Bangalore Urban,Karnataka,Paddy,,New Farmer Lead,Drip,Vegetative,2,1.5,2026-07-04,2026-07-04,,Sample row - remove before import

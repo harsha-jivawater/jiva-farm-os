@@ -10,6 +10,7 @@ import {
   leadSourceOptions
 } from "@/lib/farmer-leads/options";
 import { validateFarmerLeadPayload } from "@/lib/farmer-leads/form-data";
+import { normalizeLocationKey } from "@/lib/locations/normalize";
 import {
   isLegacyCropValue,
   legacyCropValidationMessage
@@ -25,7 +26,12 @@ import {
   type CsvRecord
 } from "@/lib/csv/import-utils";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { Json } from "@/lib/supabase/database.types";
+import {
+  businessSectorOptions,
+  defaultBusinessSector
+} from "@/lib/sector/options";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import { hasAnyRole, hasRole } from "@/lib/users/permissions";
 import { normalizeIndianMobileNumber } from "@/lib/validation/mobile-number";
@@ -41,8 +47,13 @@ type ImportProfile = {
 
 type RegionOption = {
   id: string;
+  region_name: string;
   state: string;
   rsm_user_id: string | null;
+};
+
+type RegionRecord = RegionOption & {
+  is_active: boolean;
 };
 
 type RsmOption = {
@@ -79,6 +90,9 @@ type ImportRowUpdate = {
   row_data?: Json;
   status?: ImportRowStatus;
 };
+
+const AUTO_REGION_FY_START_DATE = "2026-04-01";
+const AUTO_REGION_FY_END_DATE = "2027-03-31";
 
 function result(state: Partial<ImportActionState>): ImportActionState {
   return {
@@ -187,12 +201,32 @@ function rowErrors(rowNumber: number, errors: string[]) {
   return errors.map((error) => `Row ${rowNumber}: ${error}`);
 }
 
+function canonicalStateName(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function importBusinessSector(value: string | null | undefined) {
+  const sector = clean(value);
+
+  if (!sector) {
+    return defaultBusinessSector;
+  }
+
+  return (
+    businessSectorOptions.find(
+      (option) =>
+        normalizeLocationKey(option.value) === normalizeLocationKey(sector)
+    )?.value ?? sector
+  );
+}
+
 function rowToPayload(row: CsvRecord): FarmerLeadInsert {
   const primaryCrop = clean(row.primary_crop) ?? defaultPrimaryCrop;
   const nextActionDate = clean(row.next_action_date) ?? todayDate();
   const funnelStage = defaultFunnelStage;
 
   return {
+    business_sector: importBusinessSector(row.business_sector),
     lead_code: clean(row.lead_code) ?? generateImportCode("JFD"),
     farmer_name: String(row.farmer_name ?? "").trim(),
     mobile_number:
@@ -254,7 +288,7 @@ function assignLeadOwnership({
     return null;
   }
 
-  const stateKey = payload.state.toLowerCase();
+  const stateKey = normalizeLocationKey(payload.state);
   const region = regionsByState.get(stateKey);
   const rsmId =
     region?.rsm_user_id ?? rsmsByState.get(stateKey)?.id ?? salesHeadId;
@@ -267,10 +301,97 @@ function assignLeadOwnership({
     return `No active region was found for state ${payload.state}.`;
   }
 
+  payload.state = region.state;
   payload.region_id = region.id;
   payload.owner_user_id = rsmId;
   payload.rsm_user_id = rsmId;
   return null;
+}
+
+async function ensureActiveImportRegions({
+  requestedStatesByKey,
+  regionsByState
+}: {
+  requestedStatesByKey: Map<string, string>;
+  regionsByState: Map<string, RegionOption>;
+}) {
+  const missingStateKeys = Array.from(requestedStatesByKey.keys()).filter(
+    (stateKey) => !regionsByState.has(stateKey)
+  );
+
+  if (missingStateKeys.length === 0) {
+    return;
+  }
+
+  const service = createServiceClient();
+  const { data: existingRegions, error: existingError } = await service
+    .from("regions")
+    .select("id, region_name, state, rsm_user_id, is_active");
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  const allRegionsByState = new Map<string, RegionRecord>();
+
+  ((existingRegions ?? []) as RegionRecord[]).forEach((region) => {
+    const stateKey = normalizeLocationKey(region.state);
+
+    if (stateKey && !allRegionsByState.has(stateKey)) {
+      allRegionsByState.set(stateKey, region);
+    }
+  });
+
+  for (const stateKey of missingStateKeys) {
+    const requestedState = requestedStatesByKey.get(stateKey);
+
+    if (!requestedState) {
+      continue;
+    }
+
+    const existingRegion = allRegionsByState.get(stateKey);
+
+    if (existingRegion) {
+      if (!existingRegion.is_active) {
+        const { data: reactivatedRegion, error: reactivateError } = await service
+          .from("regions")
+          .update({ is_active: true })
+          .eq("id", existingRegion.id)
+          .select("id, region_name, state, rsm_user_id")
+          .single();
+
+        if (reactivateError) {
+          throw new Error(reactivateError.message);
+        }
+
+        regionsByState.set(stateKey, reactivatedRegion as RegionOption);
+        continue;
+      }
+
+      regionsByState.set(stateKey, existingRegion);
+      continue;
+    }
+
+    const state = canonicalStateName(requestedState);
+    const { data: createdRegion, error: createError } = await service
+      .from("regions")
+      .insert({
+        annual_device_target: 0,
+        fy_end_date: AUTO_REGION_FY_END_DATE,
+        fy_start_date: AUTO_REGION_FY_START_DATE,
+        is_active: true,
+        region_name: state,
+        state
+      })
+      .select("id, region_name, state, rsm_user_id")
+      .single();
+
+    if (createError) {
+      throw new Error(createError.message);
+    }
+
+    regionsByState.set(stateKey, createdRegion as RegionOption);
+  }
 }
 
 async function prepareFarmerLeadRows({
@@ -282,9 +403,18 @@ async function prepareFarmerLeadRows({
   rows: NumberedCsvRow[];
   supabase: Awaited<ReturnType<typeof createClient>>;
 }) {
-  const states = Array.from(
-    new Set(rows.map(({ row }) => clean(row.state)).filter(Boolean))
-  ) as string[];
+  const requiresStateRouting = !canSelfAssignNewLead(profile);
+  const requestedStatesByKey = new Map<string, string>();
+
+  rows.forEach(({ row }) => {
+    const state = clean(row.state);
+    const stateKey = normalizeLocationKey(state);
+
+    if (state && stateKey && !requestedStatesByKey.has(stateKey)) {
+      requestedStatesByKey.set(stateKey, state);
+    }
+  });
+
   const mobiles = rows
     .map(({ row }) => normalizeIndianMobileNumber(String(row.mobile_number ?? "")))
     .filter((mobile): mobile is string => Boolean(mobile));
@@ -301,20 +431,18 @@ async function prepareFarmerLeadRows({
     { data: existingLeads }
   ] =
     await Promise.all([
-      states.length
+      requiresStateRouting
         ? supabase
             .from("regions")
-            .select("id, state, rsm_user_id")
-            .in("state", states)
+            .select("id, region_name, state, rsm_user_id")
             .eq("is_active", true)
         : Promise.resolve({ data: [] }),
-      states.length
+      requiresStateRouting
         ? supabase
             .from("users")
             .select("id, state")
             .eq("role", "RSM")
             .eq("is_active", true)
-            .in("state", states)
         : Promise.resolve({ data: [] }),
       supabase
         .from("users")
@@ -337,15 +465,23 @@ async function prepareFarmerLeadRows({
 
   const regionsByState = new Map<string, RegionOption>();
   ((regions ?? []) as RegionOption[]).forEach((region) => {
-    if (!regionsByState.has(region.state.toLowerCase())) {
-      regionsByState.set(region.state.toLowerCase(), region);
+    const stateKey = normalizeLocationKey(region.state);
+
+    if (stateKey && !regionsByState.has(stateKey)) {
+      regionsByState.set(stateKey, region);
     }
   });
 
+  if (requiresStateRouting) {
+    await ensureActiveImportRegions({ regionsByState, requestedStatesByKey });
+  }
+
   const rsmsByState = new Map<string, RsmOption>();
   ((rsms ?? []) as RsmOption[]).forEach((rsm) => {
-    if (rsm.state && !rsmsByState.has(rsm.state.toLowerCase())) {
-      rsmsByState.set(rsm.state.toLowerCase(), rsm);
+    const stateKey = normalizeLocationKey(rsm.state);
+
+    if (stateKey && !rsmsByState.has(stateKey)) {
+      rsmsByState.set(stateKey, rsm);
     }
   });
   const salesHeadId =
