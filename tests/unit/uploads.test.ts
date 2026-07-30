@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { canonicalUploadContentType } from "@/lib/uploads/config";
+import {
+  canonicalUploadContentType,
+  isAllowedUploadMimeType,
+  uploadRules
+} from "@/lib/uploads/config";
 import {
   applyUploadedFilesToPayload,
   resolveFileUrls,
@@ -61,6 +65,22 @@ describe("upload validation", () => {
     );
 
     await expect(validateUploadFile(spreadsheet, "sheet")).resolves.toBeNull();
+  });
+
+  it("keeps browser upload checks aligned with server-side MIME allowances", () => {
+    expect(
+      isAllowedUploadMimeType(
+        "application/octet-stream",
+        ".xlsx",
+        uploadRules.sheet
+      )
+    ).toBe(true);
+    expect(
+      isAllowedUploadMimeType("text/plain", ".csv", uploadRules.sheet)
+    ).toBe(true);
+    expect(isAllowedUploadMimeType("text/plain", ".pdf", uploadRules.document)).toBe(
+      false
+    );
   });
 
   it("normalizes potentially unsafe file names", () => {

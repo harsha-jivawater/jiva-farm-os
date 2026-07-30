@@ -2,7 +2,11 @@
 
 import { useRef } from "react";
 import { UploadCloud } from "lucide-react";
-import { uploadRules, type UploadKind } from "@/lib/uploads/config";
+import {
+  isAllowedUploadMimeType,
+  uploadRules,
+  type UploadKind
+} from "@/lib/uploads/config";
 
 type FileUploadFieldProps = {
   currentValue?: string | null;
@@ -73,7 +77,7 @@ export function FileUploadField({
 
             if (
               !rule.extensions.includes(extension) ||
-              (file.type && !rule.mimeTypes.includes(file.type.toLowerCase()))
+              !isAllowedUploadMimeType(file.type, extension, rule)
             ) {
               window.alert("This file type is not supported for this upload.");
               event.target.value = "";

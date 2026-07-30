@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   UPLOAD_BUCKET,
   canonicalUploadContentType,
+  isAllowedUploadMimeType,
   isStorageReference,
   storagePathFromReference,
   storageReferenceFromPath,
@@ -114,12 +115,7 @@ export async function validateUploadFile(file: File, kind: UploadKind) {
     return `Unsupported file extension. Allowed: ${rule.extensions.join(", ")}.`;
   }
 
-  if (
-    mimeType &&
-    mimeType !== "application/octet-stream" &&
-    !(extension === ".csv" && mimeType === "text/plain") &&
-    !rule.mimeTypes.includes(mimeType)
-  ) {
+  if (!isAllowedUploadMimeType(mimeType, extension, rule)) {
     return "Unsupported file type. Please upload the accepted file format shown on the form.";
   }
 
