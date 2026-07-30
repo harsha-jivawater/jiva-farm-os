@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { DeviceStatusPill } from "@/components/devices/device-status-pill";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
+import { NumberedPagination } from "@/components/pagination/numbered-pagination";
 import { PageHeader } from "@/components/page-header";
 import {
   deviceStatusOptions,
@@ -30,6 +31,7 @@ import {
   type DeviceFilters
 } from "@/lib/devices/types";
 import { applyLocationFilter } from "@/lib/filters/location";
+import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -293,6 +295,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
   const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
+  const pagination = getPaginationRange(getPageNumber(params.page));
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/devices");
   const { canWrite, scope } = await timeAsync(
@@ -306,16 +309,15 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
   let listLoadError: string | null = null;
   let summaryLoadError: string | null = null;
   let devices: Device[] = [];
-  let resultCount = 0;
+  let totalCount = 0;
   let inventorySummary = emptyInventorySummary();
 
   let query = supabase
     .from("devices")
-    .select(listSelectColumns)
+    .select(listSelectColumns, { count: "exact" })
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(50);
+    .order("id", { ascending: false });
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -347,6 +349,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
     "current_district",
     filters.current_district
   );
+  query = query.range(pagination.from, pagination.to);
 
   const [listResult, summaryResult] = await Promise.allSettled([
     timeAsync("devices list query", () => query),
@@ -363,7 +366,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
     listLoadError = loadErrorMessage;
   } else {
     devices = (listResult.value.data ?? []) as unknown as Device[];
-    resultCount = devices.length;
+    totalCount = listResult.value.count ?? devices.length;
   }
 
   if (summaryResult.status === "rejected") {
@@ -664,7 +667,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
             Device list
           </h2>
           <p className="text-sm text-slate-500">
-            {resultCount} found
+            {totalCount} found
           </p>
         </div>
 
@@ -825,6 +828,16 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
             </div>
           </>
         )}
+        {!listLoadError ? (
+          <NumberedPagination
+            basePath="/devices"
+            label="devices"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            searchParams={params}
+            totalCount={totalCount}
+          />
+        ) : null}
       </div>
     </section>
   );

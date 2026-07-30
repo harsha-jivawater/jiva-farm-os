@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { DispatchStatusPill } from "@/components/dispatches/dispatch-status-pill";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
+import { NumberedPagination } from "@/components/pagination/numbered-pagination";
 import { PageHeader } from "@/components/page-header";
 import {
   destinationTypeOptions,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/dispatches/types";
 import { applyLocationFilter } from "@/lib/filters/location";
 import { productModelOptions } from "@/lib/devices/options";
+import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -177,6 +179,7 @@ export default async function DispatchesPage({
   const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
+  const pagination = getPaginationRange(getPageNumber(params.page));
   const createdCount = Number(paramValue(params.created_count));
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
@@ -190,7 +193,7 @@ export default async function DispatchesPage({
   const cleanedSearch = searchValue(filters.q);
   let loadError: string | null = null;
   let dispatches: Dispatch[] = [];
-  let resultCount = 0;
+  let totalCount = 0;
   let totalDispatches = 0;
   let pendingPayment = 0;
   let approvedForDispatch = 0;
@@ -201,10 +204,9 @@ export default async function DispatchesPage({
 
   let query = supabase
     .from("dispatches")
-    .select(listSelectColumns)
+    .select(listSelectColumns, { count: "exact" })
     .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false });
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -247,8 +249,10 @@ export default async function DispatchesPage({
     query = query.eq("payment_confirmed", filters.payment_confirmed === "true");
   }
 
+  query = query.range(pagination.from, pagination.to);
+
   try {
-    const { data, error } = await timeAsync("dispatches list query", () =>
+    const { data, error, count } = await timeAsync("dispatches list query", () =>
       withQueryTimeout(query, "dispatches list")
     );
 
@@ -257,8 +261,8 @@ export default async function DispatchesPage({
     }
 
     dispatches = (data ?? []) as unknown as Dispatch[];
-    resultCount = dispatches.length;
-    totalDispatches = dispatches.length;
+    totalCount = count ?? dispatches.length;
+    totalDispatches = totalCount;
     pendingPayment = dispatches.filter(
       (dispatch) =>
         dispatch.dispatch_status === "Pending Payment Confirmation"
@@ -525,7 +529,7 @@ export default async function DispatchesPage({
             Dispatch list
           </h2>
           <p className="text-sm text-slate-500">
-            {resultCount} found
+            {totalCount} found
           </p>
         </div>
 
@@ -706,6 +710,17 @@ export default async function DispatchesPage({
             </div>
           </>
         )}
+        {!loadError ? (
+          <NumberedPagination
+            basePath="/dispatches"
+            excludedParams={["created_count"]}
+            label="dispatches"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            searchParams={params}
+            totalCount={totalCount}
+          />
+        ) : null}
       </div>
     </section>
   );

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { FollowupStatusPill } from "@/components/follow-ups/followup-status-pill";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
+import { NumberedPagination } from "@/components/pagination/numbered-pagination";
 import { PageHeader } from "@/components/page-header";
 import {
   farmerSaleFollowupType,
@@ -34,6 +35,7 @@ import {
   type Installation,
   type UserOption
 } from "@/lib/follow-ups/types";
+import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -115,23 +117,8 @@ function readFilters(
   };
 }
 
-function searchMatch(followup: FollowupWithContext, query: string) {
-  if (!query.trim()) {
-    return true;
-  }
-
-  const needle = query.trim().toLowerCase();
-  const searchableText = [
-    followup.followup_code,
-    followup.farmerName,
-    followup.farmerMobile,
-    followup.followup_summary
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  return searchableText.includes(needle);
+function searchValue(value: string) {
+  return value.replace(/[,%()]/g, " ").trim();
 }
 
 function KpiCard({
@@ -203,6 +190,8 @@ export default async function FollowupsPage({
   const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
+  const pagination = getPaginationRange(getPageNumber(params.page));
+  const cleanedSearch = searchValue(filters.q);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/follow-ups");
   const { canWrite, scope } = await timeAsync(
@@ -223,13 +212,72 @@ export default async function FollowupsPage({
             .eq("is_active", true)
             .order("full_name", { ascending: true })
         ),
-        timeAsync("follow-ups list query", () => {
+        timeAsync("follow-ups list query", async () => {
+          let matchingFarmerLeadIds: string[] = [];
+          let matchingInstallationIds: string[] = [];
+
+          const loadContextMatches = async () => {
+            if (!cleanedSearch) {
+              return;
+            }
+
+            const [farmerLeadSearchResult, installationSearchResult] =
+              await Promise.all([
+                supabase
+                  .from("farmer_leads")
+                  .select("id")
+                  .or(
+                    [
+                      `farmer_name.ilike.%${cleanedSearch}%`,
+                      `mobile_number.ilike.%${cleanedSearch}%`
+                    ].join(",")
+                  )
+                  .limit(1000),
+                supabase
+                  .from("installations")
+                  .select("id")
+                  .or(
+                    [
+                      `farmer_name_snapshot.ilike.%${cleanedSearch}%`,
+                      `farmer_mobile_snapshot.ilike.%${cleanedSearch}%`
+                    ].join(",")
+                  )
+                  .limit(1000)
+              ]);
+
+            if (farmerLeadSearchResult.error) {
+              console.error(
+                "[Follow-ups] Farmer lead search context unavailable",
+                farmerLeadSearchResult.error
+              );
+            } else {
+              matchingFarmerLeadIds = (
+                (farmerLeadSearchResult.data ?? []) as Pick<FarmerLead, "id">[]
+              ).map((lead) => lead.id);
+            }
+
+            if (installationSearchResult.error) {
+              console.error(
+                "[Follow-ups] Installation search context unavailable",
+                installationSearchResult.error
+              );
+            } else {
+              matchingInstallationIds = (
+                (installationSearchResult.data ?? []) as Pick<
+                  Installation,
+                  "id"
+                >[]
+              ).map((installation) => installation.id);
+            }
+          };
+
+          await loadContextMatches();
+
           let query = supabase
             .from("followups")
-            .select(listSelectColumns)
+            .select(listSelectColumns, { count: "exact" })
             .is("deleted_at", null)
-            .order("followup_due_date", { ascending: true })
-            .limit(50);
+            .order("followup_due_date", { ascending: true });
 
           if (scope.noRecords) {
             query = query.is("id", null);
@@ -237,6 +285,27 @@ export default async function FollowupsPage({
 
           if (scope.orFilter) {
             query = query.or(scope.orFilter);
+          }
+
+          if (cleanedSearch) {
+            const searchClauses = [
+              `followup_code.ilike.%${cleanedSearch}%`,
+              `followup_summary.ilike.%${cleanedSearch}%`
+            ];
+
+            if (matchingFarmerLeadIds.length) {
+              searchClauses.push(
+                `farmer_lead_id.in.(${matchingFarmerLeadIds.join(",")})`
+              );
+            }
+
+            if (matchingInstallationIds.length) {
+              searchClauses.push(
+                `installation_id.in.(${matchingInstallationIds.join(",")})`
+              );
+            }
+
+            query = query.or(searchClauses.join(","));
           }
 
           for (const column of filterColumns) {
@@ -261,12 +330,15 @@ export default async function FollowupsPage({
             query = query.eq("escalation_required", false);
           }
 
+          query = query.range(pagination.from, pagination.to);
+
           return query;
         })
       ])
   );
 
   const followups = (followupsResult.data ?? []) as unknown as Followup[];
+  const totalCount = followupsResult.count ?? followups.length;
   const farmerLeadIds = Array.from(
     new Set(followups.map((followup) => followup.farmer_lead_id).filter(Boolean))
   ) as string[];
@@ -327,13 +399,11 @@ export default async function FollowupsPage({
       };
     }
   );
-  const visibleFollowups = followupsWithContext.filter((followup) =>
-    searchMatch(followup, filters.q)
-  );
+  const visibleFollowups = followupsWithContext;
   const usersList = (users ?? []) as UserOption[];
   const interestValues = ["Yes", "Maybe"];
   const kpis = {
-    total: visibleFollowups.length,
+    total: totalCount,
     due: visibleFollowups.filter((followup) => followup.followup_status === "Due")
       .length,
     completed: visibleFollowups.filter(
@@ -625,6 +695,16 @@ export default async function FollowupsPage({
             No post installation follow-ups found. Clear filters or check assigned follow-ups.
           </div>
         ) : null}
+        {!followupsResult.error ? (
+          <NumberedPagination
+            basePath="/follow-ups"
+            label="follow-ups"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            searchParams={params}
+            totalCount={totalCount}
+          />
+        ) : null}
       </div>
 
       <div className="mt-6 grid gap-4 md:hidden">
@@ -660,6 +740,18 @@ export default async function FollowupsPage({
           </div>
         ) : null}
       </div>
+      {!followupsResult.error ? (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white shadow-sm md:hidden">
+          <NumberedPagination
+            basePath="/follow-ups"
+            label="follow-ups"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            searchParams={params}
+            totalCount={totalCount}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
