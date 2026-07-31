@@ -1772,7 +1772,9 @@ export type Database = {
           other_crop: string | null;
           crop_stage_at_start: string | null;
           pilot_area_acres: number;
+          pilot_area_unit: string;
           control_area_acres: number;
+          control_area_unit: string;
           irrigation_type: string;
           water_source: string | null;
           soil_type: string | null;
@@ -1871,7 +1873,9 @@ export type Database = {
           other_crop?: string | null;
           crop_stage_at_start?: string | null;
           pilot_area_acres: number;
+          pilot_area_unit?: string;
           control_area_acres: number;
+          control_area_unit?: string;
           irrigation_type: string;
           water_source?: string | null;
           soil_type?: string | null;
@@ -1970,7 +1974,9 @@ export type Database = {
           other_crop?: string | null;
           crop_stage_at_start?: string | null;
           pilot_area_acres?: number;
+          pilot_area_unit?: string;
           control_area_acres?: number;
+          control_area_unit?: string;
           irrigation_type?: string;
           water_source?: string | null;
           soil_type?: string | null;

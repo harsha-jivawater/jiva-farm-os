@@ -81,6 +81,12 @@ export const productModelOptions = [
   { value: "Dihanga", label: "Dihanga" }
 ] as const;
 
+export const areaUnitOptions = [
+  { value: "Acres", label: "Acres" },
+  { value: "Cents", label: "Cents" },
+  { value: "Guntas", label: "Guntas" }
+] as const;
+
 export const visitTypeOptions = [
   { value: "Baseline Visit", label: "Baseline Visit" },
   { value: "Installation Visit", label: "Installation Visit" },
