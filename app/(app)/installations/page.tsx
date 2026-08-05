@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { InstallationStatusPill } from "@/components/installations/installation-status-pill";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
+import { NumberedPagination } from "@/components/pagination/numbered-pagination";
 import { PageHeader } from "@/components/page-header";
 import { productModelOptions } from "@/lib/devices/options";
 import {
@@ -27,6 +28,7 @@ import {
   type InstallationFilters
 } from "@/lib/installations/types";
 import { applyLocationFilter } from "@/lib/filters/location";
+import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -201,6 +203,7 @@ export default async function InstallationsPage({
   const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
+  const pagination = getPaginationRange(getPageNumber(params.page));
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/installations");
   const { canWrite, scope } = await timeAsync(
@@ -236,8 +239,7 @@ export default async function InstallationsPage({
     .from("installations")
     .select(listSelectColumns, { count: "exact" })
     .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false });
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -267,6 +269,7 @@ export default async function InstallationsPage({
 
   query = applyLocationFilter(query, "state", filters.state);
   query = applyLocationFilter(query, "district", filters.district);
+  query = query.range(pagination.from, pagination.to);
 
   const [listResult, kpiResult] = await Promise.all([
     timeAsync("installations list query", () => query),
@@ -288,6 +291,7 @@ export default async function InstallationsPage({
   ]);
   const { data, error, count } = listResult;
   const installations = (data ?? []) as unknown as Installation[];
+  const totalCount = count ?? installations.length;
 
   if (kpiResult.error) {
     console.error("[Installations] KPI summary RPC unavailable", kpiResult.error);
@@ -556,7 +560,7 @@ export default async function InstallationsPage({
             Installation list
           </h2>
           <p className="text-sm text-slate-500">
-            {count ?? installations.length} found
+            {totalCount} found
           </p>
         </div>
 
@@ -725,6 +729,16 @@ export default async function InstallationsPage({
             </div>
           </>
         )}
+        {!error ? (
+          <NumberedPagination
+            basePath="/installations"
+            label="installations"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            searchParams={params}
+            totalCount={totalCount}
+          />
+        ) : null}
       </div>
     </section>
   );

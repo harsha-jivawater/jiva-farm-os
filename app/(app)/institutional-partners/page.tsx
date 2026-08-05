@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { InstitutionStatusPill } from "@/components/institutions/institution-status-pill";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
+import { NumberedPagination } from "@/components/pagination/numbered-pagination";
 import { PageHeader } from "@/components/page-header";
 import { formatDisplayDateTime } from "@/lib/date-utils";
 import { exportLink } from "@/lib/export/csv";
@@ -37,6 +38,7 @@ import {
   type UserOption
 } from "@/lib/institutions/types";
 import { applyLocationFilter } from "@/lib/filters/location";
+import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -240,6 +242,7 @@ export default async function InstitutionalPartnersPage({
   const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
+  const pagination = getPaginationRange(getPageNumber(params.page));
   const cleanedSearch = searchValue(filters.q);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(
@@ -290,8 +293,7 @@ export default async function InstitutionalPartnersPage({
   let query = supabase
     .from("institutions")
     .select(listSelectColumns, { count: "exact" })
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false });
 
   query =
     recordState === "deleted"
@@ -327,12 +329,14 @@ export default async function InstitutionalPartnersPage({
   }
 
   query = applyLocationFilter(query, "primary_state", filters.primary_state);
+  query = query.range(pagination.from, pagination.to);
 
   const { data, error, count } = await timeAsync(
     "institutional partners list query",
     () => query
   );
   const institutions = (data ?? []) as unknown as Institution[];
+  const totalCount = count ?? institutions.length;
   const usersList = (users ?? []) as UserOption[];
   const userMap = new Map(usersList.map((user) => [user.id, user]));
 
@@ -597,7 +601,7 @@ export default async function InstitutionalPartnersPage({
       <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <p className="text-sm font-semibold text-slate-900">
-            {count ?? institutions.length} institutions
+            {totalCount} institutions
           </p>
           {error ? (
             <p className="text-sm font-medium text-red-600">{error.message}</p>
@@ -714,6 +718,16 @@ export default async function InstitutionalPartnersPage({
             </tbody>
           </table>
         </div>
+        {!error ? (
+          <NumberedPagination
+            basePath="/institutional-partners"
+            label="institutions"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            searchParams={params}
+            totalCount={totalCount}
+          />
+        ) : null}
       </div>
     </section>
   );

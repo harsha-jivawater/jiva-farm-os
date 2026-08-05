@@ -2,7 +2,7 @@ begin;
 
 set local search_path = public, extensions;
 
-select plan(65);
+select plan(68);
 
 select has_table('public', 'users', 'users table exists');
 select has_table('public', 'farmer_leads', 'farmer leads table exists');
@@ -323,6 +323,13 @@ values
     'e2e-designer@jivawater.com',
     'Designer',
     false
+  ),
+  (
+    '10000000-0000-0000-0000-000000000005',
+    'Pilot Research Assistant',
+    'e2e-research-assistant@jivawater.com',
+    'Research Assistant',
+    false
   );
 
 insert into public.sales_payment_links (
@@ -368,6 +375,32 @@ select ok(
 select ok(
   not public.can_write_app_upload('farmer-leads/not-a-uuid/report/file.pdf'),
   'upload writes reject malformed record paths'
+);
+reset role;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000005","email":"e2e-research-assistant@jivawater.com","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+select ok(
+  public.can_write_app_upload(
+    'pilots/10000000-0000-4000-8000-000000000021/soil_report_link/test.pdf'
+  ),
+  'a research assistant can upload files to the Pilots module'
+);
+select ok(
+  public.can_write_app_upload(
+    'pilot-visits/10000000-0000-4000-8000-000000000022/photo_folder_link/test.zip'
+  ),
+  'a research assistant can upload files to pilot visits'
+);
+select ok(
+  public.can_write_app_upload(
+    'visit-reports/10000000-0000-4000-8000-000000000023/report_link/test.pdf'
+  ),
+  'a research assistant can upload files to visit reports'
 );
 reset role;
 

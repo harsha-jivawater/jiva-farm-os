@@ -101,6 +101,7 @@ export const cropStageOptions = [
 export const irrigationTypeOptions = [
   { value: "Drip", label: "Drip" },
   { value: "Flood", label: "Flood" },
+  { value: "Jet", label: "Jet" },
   { value: "Sprinkler", label: "Sprinkler" },
   { value: "Rainfed", label: "Rainfed" },
   { value: "Mixed", label: "Mixed" },

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { DispatchStatusPill } from "@/components/dispatches/dispatch-status-pill";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
+import { NumberedPagination } from "@/components/pagination/numbered-pagination";
 import { PageHeader } from "@/components/page-header";
 import {
   destinationTypeOptions,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/dispatches/types";
 import { applyLocationFilter } from "@/lib/filters/location";
 import { productModelOptions } from "@/lib/devices/options";
+import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -150,16 +152,18 @@ function readFilters(
 }
 
 function KpiCard({
+  href,
   icon: Icon,
   label,
   value
 }: {
+  href?: string;
   icon: LucideIcon;
   label: string;
   value: number;
 }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+  const content = (
+    <>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-slate-500">{label}</p>
         <span className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-600">
@@ -167,8 +171,20 @@ function KpiCard({
         </span>
       </div>
       <p className="mt-3 text-2xl font-semibold text-slate-950">{value}</p>
-    </div>
+    </>
   );
+  const className =
+    "block rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand-200 hover:bg-brand-50/40";
+
+  if (href) {
+    return (
+      <Link className={className} href={href}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
 }
 
 export default async function DispatchesPage({
@@ -177,6 +193,7 @@ export default async function DispatchesPage({
   const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
+  const pagination = getPaginationRange(getPageNumber(params.page));
   const createdCount = Number(paramValue(params.created_count));
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
@@ -190,7 +207,7 @@ export default async function DispatchesPage({
   const cleanedSearch = searchValue(filters.q);
   let loadError: string | null = null;
   let dispatches: Dispatch[] = [];
-  let resultCount = 0;
+  let totalCount = 0;
   let totalDispatches = 0;
   let pendingPayment = 0;
   let approvedForDispatch = 0;
@@ -199,85 +216,177 @@ export default async function DispatchesPage({
   let dealerStockDispatches = 0;
   let pilotDispatches = 0;
 
-  let query = supabase
-    .from("dispatches")
-    .select(listSelectColumns)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  function buildDispatchQuery({
+    columns,
+    head = false,
+    ordered = false
+  }: {
+    columns: string;
+    head?: boolean;
+    ordered?: boolean;
+  }) {
+    let query = supabase
+      .from("dispatches")
+      .select(columns, { count: "exact", head })
+      .is("deleted_at", null);
 
-  if (scope.noRecords) {
-    query = query.is("id", null);
-  }
-
-  if (scope.orFilter) {
-    query = query.or(scope.orFilter);
-  }
-
-  if (cleanedSearch) {
-    query = query.or(
-      [
-        `dispatch_code.ilike.%${cleanedSearch}%`,
-        `serial_number_snapshot.ilike.%${cleanedSearch}%`,
-        `destination_name_snapshot.ilike.%${cleanedSearch}%`,
-        `destination_contact_snapshot.ilike.%${cleanedSearch}%`,
-        `zoho_invoice_reference.ilike.%${cleanedSearch}%`
-      ].join(",")
-    );
-  }
-
-  for (const column of filterColumns) {
-    if (filters[column]) {
-      query = query.eq(column, filters[column]);
+    if (ordered) {
+      query = query.order("created_at", { ascending: false });
     }
+
+    if (scope.noRecords) {
+      query = query.is("id", null);
+    }
+
+    if (scope.orFilter) {
+      query = query.or(scope.orFilter);
+    }
+
+    if (cleanedSearch) {
+      query = query.or(
+        [
+          `dispatch_code.ilike.%${cleanedSearch}%`,
+          `serial_number_snapshot.ilike.%${cleanedSearch}%`,
+          `destination_name_snapshot.ilike.%${cleanedSearch}%`,
+          `destination_contact_snapshot.ilike.%${cleanedSearch}%`,
+          `zoho_invoice_reference.ilike.%${cleanedSearch}%`
+        ].join(",")
+      );
+    }
+
+    for (const column of filterColumns) {
+      if (filters[column]) {
+        query = query.eq(column, filters[column]);
+      }
+    }
+
+    query = applyLocationFilter(
+      query,
+      "destination_state",
+      filters.destination_state
+    );
+    query = applyLocationFilter(
+      query,
+      "destination_district",
+      filters.destination_district
+    );
+
+    if (filters.payment_confirmed) {
+      query = query.eq(
+        "payment_confirmed",
+        filters.payment_confirmed === "true"
+      );
+    }
+
+    return query;
   }
 
-  query = applyLocationFilter(
-    query,
-    "destination_state",
-    filters.destination_state
-  );
-  query = applyLocationFilter(
-    query,
-    "destination_district",
-    filters.destination_district
-  );
+  const query = buildDispatchQuery({
+    columns: listSelectColumns,
+    ordered: true
+  }).range(pagination.from, pagination.to);
 
-  if (filters.payment_confirmed) {
-    query = query.eq("payment_confirmed", filters.payment_confirmed === "true");
-  }
+  const pendingPaymentQuery = buildDispatchQuery({
+    columns: "id",
+    head: true
+  })
+    .eq("dispatch_type", "Dealer Stock Dispatch")
+    .eq("payment_requirement_type", "Payment Required")
+    .neq("dispatch_status", "Cancelled")
+    .eq("payment_confirmed", false);
+
+  const approvedForDispatchQuery = buildDispatchQuery({
+    columns: "id",
+    head: true
+  }).eq("dispatch_status", "Approved for Dispatch");
+
+  const dispatchedCountQuery = buildDispatchQuery({
+    columns: "id",
+    head: true
+  }).eq("dispatch_status", "Dispatched");
+
+  const deliveredQuery = buildDispatchQuery({
+    columns: "id",
+    head: true
+  }).eq("dispatch_status", "Delivered");
+
+  const dealerStockDispatchesQuery = buildDispatchQuery({
+    columns: "id",
+    head: true
+  }).eq("dispatch_type", "Dealer Stock Dispatch");
+
+  const pilotDispatchesQuery = buildDispatchQuery({
+    columns: "id",
+    head: true
+  }).eq("dispatch_type", "Pilot Dispatch");
 
   try {
-    const { data, error } = await timeAsync("dispatches list query", () =>
-      withQueryTimeout(query, "dispatches list")
-    );
+    const [
+      listResult,
+      pendingPaymentResult,
+      approvedForDispatchResult,
+      dispatchedCountResult,
+      deliveredResult,
+      dealerStockDispatchesResult,
+      pilotDispatchesResult
+    ] = await Promise.all([
+      timeAsync("dispatches list query", () =>
+        withQueryTimeout(query, "dispatches list")
+      ),
+      timeAsync("dispatches pending payment count", () =>
+        withQueryTimeout(pendingPaymentQuery, "dispatches pending payment count")
+      ),
+      timeAsync("dispatches approved count", () =>
+        withQueryTimeout(
+          approvedForDispatchQuery,
+          "dispatches approved count"
+        )
+      ),
+      timeAsync("dispatches dispatched count", () =>
+        withQueryTimeout(dispatchedCountQuery, "dispatches dispatched count")
+      ),
+      timeAsync("dispatches delivered count", () =>
+        withQueryTimeout(deliveredQuery, "dispatches delivered count")
+      ),
+      timeAsync("dispatches dealer stock count", () =>
+        withQueryTimeout(
+          dealerStockDispatchesQuery,
+          "dispatches dealer stock count"
+        )
+      ),
+      timeAsync("dispatches pilot count", () =>
+        withQueryTimeout(pilotDispatchesQuery, "dispatches pilot count")
+      )
+    ]);
+    const { data, error, count } = listResult;
 
     if (error) {
       throw error;
     }
 
     dispatches = (data ?? []) as unknown as Dispatch[];
-    resultCount = dispatches.length;
-    totalDispatches = dispatches.length;
-    pendingPayment = dispatches.filter(
-      (dispatch) =>
-        dispatch.dispatch_status === "Pending Payment Confirmation"
-    ).length;
-    approvedForDispatch = dispatches.filter(
-      (dispatch) => dispatch.dispatch_status === "Approved for Dispatch"
-    ).length;
-    dispatchedCount = dispatches.filter(
-      (dispatch) => dispatch.dispatch_status === "Dispatched"
-    ).length;
-    delivered = dispatches.filter(
-      (dispatch) => dispatch.dispatch_status === "Delivered"
-    ).length;
-    dealerStockDispatches = dispatches.filter(
-      (dispatch) => dispatch.dispatch_type === "Dealer Stock Dispatch"
-    ).length;
-    pilotDispatches = dispatches.filter(
-      (dispatch) => dispatch.dispatch_type === "Pilot Dispatch"
-    ).length;
+    totalCount = count ?? dispatches.length;
+    totalDispatches = totalCount;
+
+    for (const result of [
+      pendingPaymentResult,
+      approvedForDispatchResult,
+      dispatchedCountResult,
+      deliveredResult,
+      dealerStockDispatchesResult,
+      pilotDispatchesResult
+    ]) {
+      if (result.error) {
+        throw result.error;
+      }
+    }
+
+    pendingPayment = pendingPaymentResult.count ?? 0;
+    approvedForDispatch = approvedForDispatchResult.count ?? 0;
+    dispatchedCount = dispatchedCountResult.count ?? 0;
+    delivered = deliveredResult.count ?? 0;
+    dealerStockDispatches = dealerStockDispatchesResult.count ?? 0;
+    pilotDispatches = pilotDispatchesResult.count ?? 0;
   } catch (error) {
     logLoadError(error);
     loadError = loadErrorMessage;
@@ -312,8 +421,9 @@ export default async function DispatchesPage({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           <KpiCard icon={Truck} label="Total Dispatches" value={totalDispatches} />
           <KpiCard
+            href="/dispatches?dispatch_type=Dealer%20Stock%20Dispatch&payment_requirement_type=Payment%20Required&payment_confirmed=false"
             icon={CircleDollarSign}
-            label="Pending Payment Confirmation"
+            label="Dealer Payment Pending"
             value={pendingPayment}
           />
           <KpiCard
@@ -525,7 +635,7 @@ export default async function DispatchesPage({
             Dispatch list
           </h2>
           <p className="text-sm text-slate-500">
-            {resultCount} found
+            {totalCount} found
           </p>
         </div>
 
@@ -706,6 +816,17 @@ export default async function DispatchesPage({
             </div>
           </>
         )}
+        {!loadError ? (
+          <NumberedPagination
+            basePath="/dispatches"
+            excludedParams={["created_count"]}
+            label="dispatches"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            searchParams={params}
+            totalCount={totalCount}
+          />
+        ) : null}
       </div>
     </section>
   );
