@@ -25,6 +25,7 @@ import { PilotVisitForm } from "@/components/pilots/pilot-visit-form";
 import { VisitReportForm } from "@/components/pilots/visit-report-form";
 import { FileLink } from "@/components/uploads/file-link";
 import {
+  areaUnitOptions,
   cropOptions,
   labelFor,
   pilotResultStatusOptions,
@@ -105,6 +106,41 @@ function DetailItem({
       </div>
     </div>
   );
+}
+
+function areaUnitValue(value: string | null | undefined): string {
+  if (value && areaUnitOptions.some((option) => option.value === value)) {
+    return value;
+  }
+
+  return "Acres";
+}
+
+function formatAreaValue(value: number) {
+  return Number.isInteger(value)
+    ? String(value)
+    : String(Number(value.toFixed(2)));
+}
+
+function areaDisplay(
+  acres: number | null | undefined,
+  unit: string | null | undefined
+) {
+  if (acres === null || acres === undefined) {
+    return "Not set";
+  }
+
+  const normalizedUnit = areaUnitValue(unit);
+
+  if (normalizedUnit === "Cents") {
+    return `${formatAreaValue(acres * 100)} Cents`;
+  }
+
+  if (normalizedUnit === "Guntas") {
+    return `${formatAreaValue(acres * 40)} Guntas`;
+  }
+
+  return `${formatAreaValue(acres)} Acres`;
 }
 
 function SectionCard({
@@ -1780,10 +1816,13 @@ export default async function PilotDetailPage({
             label="Crop stage at start"
             value={display(pilot.crop_stage_at_start)}
           />
-          <DetailItem label="Pilot Area Acres" value={display(pilot.pilot_area_acres)} />
           <DetailItem
-            label="Control Area Acres"
-            value={display(pilot.control_area_acres)}
+            label="Pilot Area"
+            value={areaDisplay(pilot.pilot_area_acres, pilot.pilot_area_unit)}
+          />
+          <DetailItem
+            label="Control Area"
+            value={areaDisplay(pilot.control_area_acres, pilot.control_area_unit)}
           />
           <DetailItem label="Irrigation type" value={display(pilot.irrigation_type)} />
           <DetailItem label="Water source" value={display(pilot.water_source)} />

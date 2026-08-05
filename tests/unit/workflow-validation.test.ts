@@ -120,6 +120,23 @@ describe("pilot and monitoring workflow validation", () => {
     expect(validatePilotPayload(payload)).toBeNull();
   });
 
+  it("accepts Jet irrigation and converts selected area units to acres", () => {
+    const payload = validPilot({
+      control_area_unit: "Cents",
+      control_area_value: "25",
+      irrigation_type: "Jet",
+      pilot_area_unit: "Guntas",
+      pilot_area_value: "3"
+    });
+
+    expect(payload.irrigation_type).toBe("Jet");
+    expect(payload.pilot_area_acres).toBe(0.075);
+    expect(payload.pilot_area_unit).toBe("Guntas");
+    expect(payload.control_area_acres).toBe(0.25);
+    expect(payload.control_area_unit).toBe("Cents");
+    expect(validatePilotPayload(payload)).toBeNull();
+  });
+
   it("requires the linked institution for an Institution Pilot", () => {
     const payload = validPilot({ pilot_type: "Institution Pilot" });
 

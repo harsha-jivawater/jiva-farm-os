@@ -16,6 +16,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
+import { NumberedPagination } from "@/components/pagination/numbered-pagination";
 import { StatusPill } from "@/components/farmer-leads/status-pill";
 import { exportLink } from "@/lib/export/csv";
 import {
@@ -42,6 +43,7 @@ import {
   perfStart,
   timeAsync
 } from "@/lib/perf";
+import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
@@ -98,17 +100,6 @@ const defaultKpis: FarmerLeadKpis = {
   paymentConfirmed: 0,
   deviceInstalled: 0
 };
-
-const leadFilterRoles = ["Sales Head", "RSM", "Salesperson", "Admin"];
-
-function userRoleFilter(roles: string[]) {
-  return roles
-    .flatMap((role) => [
-      `role.eq.${role}`,
-      `secondary_role.eq.${role}`
-    ])
-    .join(",");
-}
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -209,6 +200,7 @@ export default async function FarmerLeadsPage({
   const filters = readFilters(params);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/farmer-leads");
+  const pagination = getPaginationRange(getPageNumber(params.page));
   const { canWrite, scope } = await timeAsync(
     "farmer leads role/permission resolution",
     async () => ({
@@ -222,8 +214,7 @@ export default async function FarmerLeadsPage({
     .from("farmer_leads")
     .select(listSelectColumns, { count: "exact" })
     .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(50);
+    .order("id", { ascending: false });
 
   if (scope.noRecords) {
     query = query.is("id", null);
@@ -252,6 +243,7 @@ export default async function FarmerLeadsPage({
 
   query = applyLocationFilter(query, "state", filters.state);
   query = applyLocationFilter(query, "district", filters.district);
+  query = query.range(pagination.from, pagination.to);
 
   const [listResult, kpiResult, usersResult] = await Promise.all([
     timeAsync("farmer leads list query", () => query),
@@ -273,16 +265,14 @@ export default async function FarmerLeadsPage({
         .from("users")
         .select("id, full_name, email, role, secondary_role")
         .eq("is_active", true)
-        .or(userRoleFilter(leadFilterRoles))
         .order("full_name", { ascending: true })
     )
   ]);
   const { data, error, count } = listResult;
   const leads = (data ?? []) as unknown as FarmerLead[];
+  const totalCount = count ?? leads.length;
   const users = (usersResult.data ?? []) as UserSearchOption[];
-  const ownerUsers = users.filter((user) =>
-    hasAnyRole(user, ["Sales Head", "RSM", "Salesperson", "Admin"])
-  );
+  const ownerUsers = users;
   const rsmUsers = users.filter((user) =>
     hasAnyRole(user, ["RSM", "Sales Head", "Admin"])
   );
@@ -504,7 +494,7 @@ export default async function FarmerLeadsPage({
       <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <h2 className="text-base font-semibold text-slate-950">Lead list</h2>
-          <p className="text-sm text-slate-500">{count ?? leads.length} found</p>
+          <p className="text-sm text-slate-500">{totalCount} found</p>
         </div>
 
         {error ? (
@@ -658,6 +648,16 @@ export default async function FarmerLeadsPage({
             </div>
           </>
         )}
+        {!error ? (
+          <NumberedPagination
+            basePath="/farmer-leads"
+            label="leads"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            searchParams={params}
+            totalCount={totalCount}
+          />
+        ) : null}
       </div>
     </section>
   );

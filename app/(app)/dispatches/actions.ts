@@ -980,7 +980,7 @@ export async function createDispatchAction(formData: FormData) {
 
   if (dealerDispatch) {
     applyDealerDispatchSnapshot(payload, dealerDispatch);
-    payload.dispatch_status = "Dispatch Requested";
+    payload.dispatch_status = "Pending Payment Confirmation";
     payload.dispatch_date = null;
   }
 

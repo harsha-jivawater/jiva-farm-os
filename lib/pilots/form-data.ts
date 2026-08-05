@@ -29,7 +29,8 @@ import {
   reportTypeOptions,
   visitStatusOptions,
   visitTypeOptions,
-  waterSourceOptions
+  waterSourceOptions,
+  areaUnitOptions
 } from "@/lib/pilots/options";
 import {
   defaultPlannedVisitStatus,
@@ -81,12 +82,54 @@ function getBoolean(formData: FormData, key: string, defaultValue = false) {
   return value === "true" || value === "on";
 }
 
-function hasAtMostTwoDecimalPlaces(value: number | null | undefined) {
+function hasAtMostFourDecimalPlaces(value: number | null | undefined) {
   if (value === null || value === undefined) {
     return true;
   }
 
-  return Number.isInteger(Math.round(value * 100) - value * 100);
+  return Number.isInteger(Math.round(value * 10000) - value * 10000);
+}
+
+function getAreaUnit(formData: FormData, key: string): string {
+  const value = getText(formData, key);
+
+  if (value && areaUnitOptions.some((option) => option.value === value)) {
+    return value;
+  }
+
+  return "Acres";
+}
+
+function roundAreaAcres(value: number) {
+  return Math.round(value * 10000) / 10000;
+}
+
+function convertAreaToAcres(value: number, unit: string) {
+  if (unit === "Cents") {
+    return roundAreaAcres(value / 100);
+  }
+
+  if (unit === "Guntas") {
+    return roundAreaAcres(value / 40);
+  }
+
+  return roundAreaAcres(value);
+}
+
+function getAreaAcres(
+  formData: FormData,
+  valueKey: string,
+  legacyAcresKey: string,
+  unit: string,
+  defaultValue = 0
+) {
+  const value = getNumber(formData, valueKey);
+
+  if (value !== null && value !== undefined) {
+    return convertAreaToAcres(value, unit);
+  }
+
+  return getNumber(formData, legacyAcresKey, defaultValue) ?? defaultValue;
 }
 
 function getAllText(formData: FormData, key: string) {
@@ -197,6 +240,8 @@ export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
     getText(formData, "comparison_method") ?? defaultComparisonMethod;
   const comparisonValues = comparisonControlValues(comparisonMethod);
   const trialDescription = getText(formData, "baseline_notes") ?? "";
+  const pilotAreaUnit = getAreaUnit(formData, "pilot_area_unit");
+  const controlAreaUnit = getAreaUnit(formData, "control_area_unit");
 
   return {
     business_sector: getText(formData, "business_sector") ?? defaultBusinessSector,
@@ -237,8 +282,20 @@ export function pilotPayloadFromForm(formData: FormData): PilotFormPayload {
     crop: getText(formData, "crop") ?? defaultCrop,
     other_crop: getText(formData, "other_crop"),
     crop_stage_at_start: getText(formData, "crop_stage_at_start"),
-    pilot_area_acres: getNumber(formData, "pilot_area_acres", 0) ?? 0,
-    control_area_acres: getNumber(formData, "control_area_acres", 0) ?? 0,
+    pilot_area_acres: getAreaAcres(
+      formData,
+      "pilot_area_value",
+      "pilot_area_acres",
+      pilotAreaUnit
+    ),
+    pilot_area_unit: pilotAreaUnit,
+    control_area_acres: getAreaAcres(
+      formData,
+      "control_area_value",
+      "control_area_acres",
+      controlAreaUnit
+    ),
+    control_area_unit: controlAreaUnit,
     irrigation_type:
       getText(formData, "irrigation_type") ?? defaultIrrigationType,
     water_source: getText(formData, "water_source"),
@@ -387,17 +444,23 @@ export function validatePilotPayload(payload: PilotFormPayload) {
   if (payload.pilot_area_acres < 0) {
     return "Pilot area acres cannot be negative.";
   }
-  if (!hasAtMostTwoDecimalPlaces(payload.pilot_area_acres)) {
-    return "Pilot area acres can have up to 2 decimal places.";
+  if (!hasAtMostFourDecimalPlaces(payload.pilot_area_acres)) {
+    return "Pilot area can have up to 4 decimal places after conversion to acres.";
+  }
+  if (!isOptionValue(payload.pilot_area_unit, areaUnitOptions)) {
+    return "Pilot area unit is not valid.";
   }
   if (payload.control_area_acres === undefined) {
-    return "Control area acres must be a valid number.";
+    return "Control area must be a valid number.";
   }
   if (payload.control_area_acres < 0) {
-    return "Control area acres cannot be negative.";
+    return "Control area cannot be negative.";
   }
-  if (!hasAtMostTwoDecimalPlaces(payload.control_area_acres)) {
-    return "Control area acres can have up to 2 decimal places.";
+  if (!hasAtMostFourDecimalPlaces(payload.control_area_acres)) {
+    return "Control area can have up to 4 decimal places after conversion to acres.";
+  }
+  if (!isOptionValue(payload.control_area_unit, areaUnitOptions)) {
+    return "Control area unit is not valid.";
   }
   if (!payload.irrigation_type) return "Irrigation type is required.";
   if (!payload.treatment_plot_description) {

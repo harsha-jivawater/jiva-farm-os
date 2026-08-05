@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { DealerStatusPill } from "@/components/dealers/dealer-status-pill";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
+import { NumberedPagination } from "@/components/pagination/numbered-pagination";
 import { PageHeader } from "@/components/page-header";
 import { exportLink } from "@/lib/export/csv";
 import {
@@ -50,6 +51,7 @@ import {
 } from "@/lib/dealers/performance";
 import { applyLocationFilter } from "@/lib/filters/location";
 import { formatDisplayDateTime } from "@/lib/date-utils";
+import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 import { timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -229,6 +231,7 @@ function ActionButtons({
 export default async function DealersPage({ searchParams }: DealersPageProps) {
   const params = await searchParams;
   const filters = readFilters(params);
+  const pagination = getPaginationRange(getPageNumber(params.page));
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dealers");
   const canWrite = canWriteModule(currentUser, "dealers");
@@ -264,8 +267,7 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
   let query = supabase
     .from("dealers")
     .select(listSelectColumns, { count: "exact" })
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false });
 
   query =
     recordState === "deleted"
@@ -317,11 +319,14 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
     );
   }
 
+  query = query.range(pagination.from, pagination.to);
+
   const { data, error, count } = await timeAsync(
     "dealers list query",
     () => query
   );
   const dealers = (data ?? []) as unknown as Dealer[];
+  const totalCount = count ?? dealers.length;
   const dealerIds = dealers.map((dealer) => dealer.id);
   const monthStart = new Date();
   monthStart.setDate(1);
@@ -741,7 +746,7 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
             Dealer list
           </h2>
           <p className="text-sm text-slate-500">
-            {count ?? dealerRows.length} found
+            {totalCount} found
           </p>
         </div>
 
@@ -892,6 +897,16 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
             </div>
           </>
         )}
+        {!error ? (
+          <NumberedPagination
+            basePath="/dealers"
+            label="dealers"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            searchParams={params}
+            totalCount={totalCount}
+          />
+        ) : null}
       </div>
     </section>
   );

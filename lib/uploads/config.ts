@@ -157,6 +157,21 @@ export const uploadRules = {
   }
 } satisfies Record<UploadKind, UploadRule>;
 
+export function isAllowedUploadMimeType(
+  mimeType: string | null | undefined,
+  extension: string,
+  rule: UploadRule
+) {
+  const normalizedMimeType = mimeType?.toLowerCase() ?? "";
+
+  return (
+    !normalizedMimeType ||
+    normalizedMimeType === "application/octet-stream" ||
+    (extension === ".csv" && normalizedMimeType === "text/plain") ||
+    rule.mimeTypes.includes(normalizedMimeType)
+  );
+}
+
 export function canonicalUploadContentType(
   fileName: string,
   fallback = "application/octet-stream"

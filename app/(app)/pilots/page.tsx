@@ -22,6 +22,7 @@ import { PageHeader } from "@/components/page-header";
 import { CropFilterSelect } from "@/components/crops/crop-filter-select";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { HardNavigationLink } from "@/components/navigation/hard-navigation-link";
+import { NumberedPagination } from "@/components/pagination/numbered-pagination";
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
 import { formatDisplayDateTime } from "@/lib/date-utils";
 import { exportLink } from "@/lib/export/csv";
@@ -52,6 +53,7 @@ import {
   DISTRICTS_BY_STATE,
   INDIAN_STATES_AND_UTS
 } from "@/src/lib/india-locations";
+import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 
 type PilotsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -250,6 +252,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   const startedAt = perfStart();
   const params = await searchParams;
   const filters = readFilters(params);
+  const pagination = getPaginationRange(getPageNumber(params.page));
   const cleanedSearch = searchValue(filters.q);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/pilots");
@@ -327,8 +330,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   let query = supabase
     .from("pilots")
     .select(listSelectColumns, { count: "exact" })
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false });
 
   query =
     recordState === "deleted"
@@ -371,11 +373,14 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
     query = query.eq("scale_up_recommended", false);
   }
 
+  query = query.range(pagination.from, pagination.to);
+
   const { data, error, count } = await timeAsync(
     "pilots list query",
     () => query
   );
   const pilots = (data ?? []) as unknown as Pilot[];
+  const totalCount = count ?? pilots.length;
   const usersList = (users ?? []) as UserOption[];
   const institutionsList = (institutions ?? []) as PilotInstitutionOption[];
   const dealersList = (dealers ?? []) as PilotDealerOption[];
@@ -627,7 +632,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
       <div className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <p className="text-sm font-semibold text-slate-900">
-            {count ?? pilots.length} pilots
+            {totalCount} pilots
           </p>
           {error ? (
             <p className="text-sm font-medium text-red-600">{error.message}</p>
@@ -734,6 +739,16 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
             </tbody>
           </table>
         </div>
+        {!error ? (
+          <NumberedPagination
+            basePath="/pilots"
+            label="pilots"
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            searchParams={params}
+            totalCount={totalCount}
+          />
+        ) : null}
       </div>
     </section>
   );

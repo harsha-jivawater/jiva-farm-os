@@ -11,6 +11,7 @@ import { FileUploadField } from "@/components/uploads/file-upload-field";
 import { SectorSelect } from "@/components/sector/sector-select";
 import { formatDisplayDate } from "@/lib/date-utils";
 import {
+  areaUnitOptions,
   comparisonMethodOptions,
   cropStageOptions,
   defaultComparisonMethod,
@@ -83,6 +84,38 @@ function booleanValue(value: boolean | null | undefined, defaultValue = false) {
   return (value ?? defaultValue) ? "true" : "false";
 }
 
+function areaUnitValue(value: string | null | undefined): string {
+  if (value && areaUnitOptions.some((option) => option.value === value)) {
+    return value;
+  }
+
+  return "Acres";
+}
+
+function formatAreaValue(value: number) {
+  return Number.isInteger(value)
+    ? String(value)
+    : String(Number(value.toFixed(2)));
+}
+
+function areaValueFromAcres(
+  acres: number | null | undefined,
+  unit: string | null | undefined
+) {
+  const numericAcres = acres ?? 0;
+  const normalizedUnit = areaUnitValue(unit);
+
+  if (normalizedUnit === "Cents") {
+    return formatAreaValue(numericAcres * 100);
+  }
+
+  if (normalizedUnit === "Guntas") {
+    return formatAreaValue(numericAcres * 40);
+  }
+
+  return formatAreaValue(numericAcres);
+}
+
 function SubmitButton() {
   const { pending } = useFormStatus();
 
@@ -145,6 +178,60 @@ function Field({
       {helperText ? (
         <p className="mt-1 text-xs leading-5 text-slate-500">{helperText}</p>
       ) : null}
+    </div>
+  );
+}
+
+function AreaField({
+  acresValue,
+  label,
+  required = false,
+  unitName,
+  unitValue,
+  valueName
+}: {
+  acresValue?: number | null;
+  label: string;
+  required?: boolean;
+  unitName: string;
+  unitValue?: string | null;
+  valueName: string;
+}) {
+  const normalizedUnit = areaUnitValue(unitValue);
+
+  return (
+    <div>
+      <label
+        className="mb-1.5 block text-sm font-medium text-slate-700"
+        htmlFor={valueName}
+      >
+        {label}
+      </label>
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem]">
+        <input
+          className={inputClassName()}
+          defaultValue={areaValueFromAcres(acresValue, normalizedUnit)}
+          id={valueName}
+          min={0}
+          name={valueName}
+          required={required}
+          step="0.01"
+          type="number"
+        />
+        <select
+          aria-label={`${label} unit`}
+          className={inputClassName()}
+          defaultValue={normalizedUnit}
+          name={unitName}
+          required={required}
+        >
+          {areaUnitOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
@@ -881,21 +968,21 @@ export function PilotForm({
             placeholder="Select crop stage"
             value={cropStage}
           />
-          <Field
-            defaultValue={pilot?.pilot_area_acres ?? initialFarmer?.crop_area_acres ?? 0}
-            label="Pilot Area Acres"
-            name="pilot_area_acres"
+          <AreaField
+            acresValue={pilot?.pilot_area_acres ?? initialFarmer?.crop_area_acres ?? 0}
+            label="Pilot Area"
+            unitName="pilot_area_unit"
+            unitValue={pilot?.pilot_area_unit}
+            valueName="pilot_area_value"
             required
-            step="0.01"
-            type="number"
           />
-          <Field
-            defaultValue={pilot?.control_area_acres ?? 0}
-            label="Control Area Acres"
-            name="control_area_acres"
+          <AreaField
+            acresValue={pilot?.control_area_acres ?? 0}
+            label="Control Area"
+            unitName="control_area_unit"
+            unitValue={pilot?.control_area_unit}
+            valueName="control_area_value"
             required
-            step="0.01"
-            type="number"
           />
           <SelectField
             label="Irrigation type"
