@@ -1,6 +1,6 @@
 # Jiva Farm OS
 
-Internal operating system for managing Jiva Water farmer leads, dealers, institutional partners, pilots, devices, dispatches, installations, follow-ups, users, regions, and KPIs.
+Internal operating system for managing Jiva Water farmer leads, dealers, institutional partners, pilots, inventory, dispatches, installations, follow-ups, marketing material, users, regions, daily work, operations control, and KPIs.
 
 ## Project documentation
 
@@ -15,7 +15,7 @@ Internal operating system for managing Jiva Water farmer leads, dealers, institu
 - Supabase authentication and database structure
 - Protected dashboard area
 - Responsive sidebar navigation
-- Production modules for sales, operations, pilots, devices, follow-ups, internal users, regions, and reporting
+- Production modules for sales, operations, pilots, inventory, follow-ups, marketing workflows, internal users, regions, reporting, and management control
 - Production deployment on Vercel with Supabase Auth, Database, RLS, and Storage
 
 ## Local setup
@@ -49,18 +49,29 @@ Internal operating system for managing Jiva Water farmer leads, dealers, institu
 ## Routes
 
 - `/login`
-- `/dashboard`
+- `/my-pending-work`
+- `/my-visits`
+- `/notifications`
 - `/farmer-leads`
+- `/farmer-leads/import`
 - `/dealers`
 - `/institutional-partners`
+- `/payment-links`
 - `/pilots`
-- `/my-visits`
 - `/devices`
+- `/devices/import`
 - `/dispatches`
 - `/installations`
 - `/follow-ups`
+- `/marketing-requests`
+- `/marketing-library`
 - `/kpi-dashboard`
+- `/operations-control`
+- `/data-quality`
+- `/system-health`
 - `/regions`
 - `/internal-users`
 - `/help`
 - `/account/password`
+- `/dashboard` redirects to `/my-pending-work` for compatibility
+- `/inventory` redirects to `/devices` for compatibility

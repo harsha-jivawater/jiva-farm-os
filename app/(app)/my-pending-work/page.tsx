@@ -42,6 +42,7 @@ import {
   dispatchScope,
   dealerScope,
   deviceScope,
+  farmerLeadScope,
   followupScope,
   installationScope,
   institutionScope,
@@ -157,6 +158,15 @@ type FarmerLeadWorkItemRow = {
   source_table: FarmerLeadWorkItemSourceTable;
   status: FarmerLeadWorkItemStatus;
   ui_payload: Json;
+};
+type FarmerLeadDueFollowupRow = {
+  created_at: string;
+  farmer_name: string | null;
+  id: string;
+  lead_code: string | null;
+  next_action_date: string | null;
+  owner_user_id: string | null;
+  rsm_user_id: string | null;
 };
 type FarmerLeadWorkItemsResult = {
   items: PendingWorkItem[];
@@ -386,6 +396,14 @@ function numberValue(value: unknown) {
 
 function formatCount(value: number | null) {
   return value === null ? "Unavailable" : value.toLocaleString("en-IN");
+}
+
+function sumAvailableCounts(results: CountLoadResult[]) {
+  if (results.some((result) => result.unavailable)) {
+    return null;
+  }
+
+  return results.reduce((sum, result) => sum + (result.value ?? 0), 0);
 }
 
 function itemCount(groups: PendingWorkGroup[]) {
@@ -950,18 +968,49 @@ async function loadDashboardKpiCounts({
 
   if (includeFarmerLeads) {
     loaderTasks.push(
-      loadExactCount({
-        label: "my work KPI leads needing follow-up count",
-        task: () =>
-          supabase
+      safeCountLoader({
+        fallback: {
+          dispatchReady: { unavailable: true, value: null },
+          dueFollowups: { unavailable: true, value: null }
+        },
+        label: "my work KPI lead action counts loader",
+        task: async () => {
+          const scope = await farmerLeadScope(supabase, currentUser);
+          let dueFollowupQuery = supabase
+            .from("farmer_leads")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .lte("next_action_date", today)
+            .not("lead_status", "in", "(Won,Lost,Parked)")
+            .not("funnel_stage", "in", "(Won,Lost,Parked)");
+          dueFollowupQuery = applyScope(dueFollowupQuery, scope);
+
+          const dispatchReadyQuery = supabase
             .from("work_items")
             .select("id", { count: "exact", head: true })
             .eq("source_table", "farmer_leads")
             .eq("status", "Open")
             .eq("category", "sales")
-            .eq("action_type", "follow_up")
+            .eq("action_type", "dispatch_ready");
+
+          const [dueFollowups, dispatchReady] = await Promise.all([
+            loadExactCount({
+              label: "my work KPI lead follow-ups due count",
+              task: () => dueFollowupQuery
+            }),
+            loadExactCount({
+              label: "my work KPI lead dispatch-ready count",
+              task: () => dispatchReadyQuery
+            })
+          ]);
+
+          return { dispatchReady, dueFollowups };
+        }
       }).then((result) => {
-        counts.leadsNeedingFollowup = result.value;
+        counts.leadsNeedingFollowup = sumAvailableCounts([
+          result.dueFollowups,
+          result.dispatchReady
+        ]);
       })
     );
   }
@@ -977,6 +1026,9 @@ async function loadDashboardKpiCounts({
             .from("dispatches")
             .select("id", { count: "exact", head: true })
             .is("deleted_at", null)
+            .eq("dispatch_type", "Dealer Stock Dispatch")
+            .eq("payment_requirement_type", "Payment Required")
+            .neq("dispatch_status", "Cancelled")
             .eq("payment_confirmed", false);
           pendingPaymentQuery = applyScope(pendingPaymentQuery, dispatchScopeValue);
 
@@ -1314,28 +1366,54 @@ async function loadDashboardCards({
 
 async function loadFarmerLeadGroupedSalesCount({
   currentUser,
-  supabase
+  supabase,
+  today
 }: {
   currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
   supabase: Awaited<ReturnType<typeof createClient>>;
+  today: string;
 }) {
-  let farmerLeadWorkQuery = supabase
+  const scope = await farmerLeadScope(supabase, currentUser);
+  let dueFollowupQuery = supabase
+    .from("farmer_leads")
+    .select("id", { count: "exact", head: true })
+    .is("deleted_at", null)
+    .lte("next_action_date", today)
+    .not("lead_status", "in", "(Won,Lost,Parked)")
+    .not("funnel_stage", "in", "(Won,Lost,Parked)");
+  dueFollowupQuery = applyScope(dueFollowupQuery, scope);
+  dueFollowupQuery = excludeCurrentUserFromColumns(
+    dueFollowupQuery,
+    currentUser,
+    ["owner_user_id", "rsm_user_id"]
+  );
+
+  let dispatchReadyQuery = supabase
     .from("work_items")
     .select("id", { count: "exact", head: true })
     .eq("source_table", "farmer_leads")
     .eq("status", "Open")
     .eq("category", "sales")
-    .in("action_type", ["follow_up", "dispatch_ready"]);
-  farmerLeadWorkQuery = excludeCurrentUserFromColumns(
-    farmerLeadWorkQuery,
+    .eq("action_type", "dispatch_ready");
+  dispatchReadyQuery = excludeCurrentUserFromColumns(
+    dispatchReadyQuery,
     currentUser,
     ["assignee_user_id", "rsm_user_id"]
   );
 
-  return loadExactCount({
-    label: "my work grouped sales farmer lead work_items count",
-    task: () => farmerLeadWorkQuery
-  });
+  const [dueFollowups, dispatchReady] = await Promise.all([
+    loadExactCount({
+      label: "my work grouped sales lead follow-ups due count",
+      task: () => dueFollowupQuery
+    }),
+    loadExactCount({
+      label: "my work grouped sales lead dispatch-ready count",
+      task: () => dispatchReadyQuery
+    })
+  ]);
+  const total = sumAvailableCounts([dueFollowups, dispatchReady]);
+
+  return { unavailable: total === null, value: total };
 }
 
 async function loadGroupedWorkCounts({
@@ -1360,7 +1438,8 @@ async function loadGroupedWorkCounts({
       await safeCountLoader({
         fallback: { unavailable: true, value: null },
         label: "my work grouped sales count loader",
-        task: () => loadFarmerLeadGroupedSalesCount({ currentUser, supabase })
+        task: () =>
+          loadFarmerLeadGroupedSalesCount({ currentUser, supabase, today })
       })
     ).value;
   }
@@ -1456,6 +1535,40 @@ function mapFarmerLeadWorkItem({
     subtitle: leadCode,
     title: `Paid lead ready for dispatch: ${farmerName}`
   };
+}
+
+function mapFarmerLeadDueFollowupItem(
+  lead: FarmerLeadDueFollowupRow
+): PendingWorkItem {
+  const farmerName = lead.farmer_name ?? "Farmer";
+  const leadCode = lead.lead_code ?? "Lead";
+
+  return {
+    assignmentUserIds: [lead.owner_user_id, lead.rsm_user_id].filter(
+      (id): id is string => Boolean(id)
+    ),
+    businessKey: `farmer-lead:${lead.id}:follow-up`,
+    dueDate: lead.next_action_date,
+    href: `/farmer-leads/${lead.id}`,
+    id: `lead-followup-${lead.id}`,
+    nextAction: "Follow up with the farmer and update lead progress.",
+    ownerUserId: lead.owner_user_id,
+    status: "Follow-up due",
+    subtitle: leadCode,
+    title: `Lead follow-up: ${farmerName}`
+  };
+}
+
+function sortPendingWorkItems(items: PendingWorkItem[]) {
+  return [...items].sort((left, right) => {
+    if (left.dueDate !== right.dueDate) {
+      if (!left.dueDate) return 1;
+      if (!right.dueDate) return -1;
+      return left.dueDate.localeCompare(right.dueDate);
+    }
+
+    return left.title.localeCompare(right.title);
+  });
 }
 
 function readTextPayloadValue(value: Json | undefined) {
@@ -1710,55 +1823,108 @@ async function loadFarmerLeadWorkItems({
   presentation: FarmerLeadWorkItemPresentation;
   supabase: Awaited<ReturnType<typeof createClient>>;
 }): Promise<FarmerLeadWorkItemsResult> {
-  const actionTypes: FarmerLeadWorkItemAction[] =
-    presentation === "dispatch" ? ["dispatch_ready"] : ["follow_up", "dispatch_ready"];
   const listLimit = itemLimit ?? 8;
-  const results = await timeAsync(
-    "my work farmer lead work_items loader",
-    () =>
-      Promise.all(
-        actionTypes.map((actionType) => {
-          const baseQuery = supabase
-            .from("work_items")
-            .select(
-              "id, source_table, source_id, action_type, business_key, status, assignee_user_id, rsm_user_id, due_at, ui_payload, created_at"
-            )
-            .eq("source_table", "farmer_leads")
-            .eq("status", "Open")
-            .eq("category", "sales")
-            .eq("action_type", actionType)
-            .order("due_at", { ascending: true, nullsFirst: false })
-            .order("created_at", { ascending: false })
-            .limit(listLimit);
+  const dueFollowups =
+    presentation === "dispatch"
+      ? { items: [], unavailable: false }
+      : await loadFarmerLeadDueFollowupItems({
+          currentUser,
+          itemLimit: listLimit,
+          personalOnly,
+          supabase
+        });
+  let dispatchReadyQuery = supabase
+    .from("work_items")
+    .select(
+      "id, source_table, source_id, action_type, business_key, status, assignee_user_id, rsm_user_id, due_at, ui_payload, created_at"
+    )
+    .eq("source_table", "farmer_leads")
+    .eq("status", "Open")
+    .eq("category", "sales")
+    .eq("action_type", "dispatch_ready")
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(listLimit);
 
-          return personalOnly
-            ? baseQuery.or(
-                `assignee_user_id.eq.${currentUser.id},rsm_user_id.eq.${currentUser.id}`
-              )
-            : baseQuery;
-        })
-      )
+  if (personalOnly) {
+    dispatchReadyQuery = dispatchReadyQuery.or(
+      `assignee_user_id.eq.${currentUser.id},rsm_user_id.eq.${currentUser.id}`
+    );
+  }
+
+  const dispatchReadyResult = await timeAsync(
+    "my work farmer lead dispatch-ready work_items loader",
+    () => dispatchReadyQuery
   );
-  const errors = results.flatMap((result) => (result.error ? [result.error] : []));
-  errors.forEach((error) =>
-    logSupabaseError("my work farmer lead work_items loader", error)
-  );
+  if (dispatchReadyResult.error) {
+    logSupabaseError(
+      "my work farmer lead dispatch-ready work_items loader",
+      dispatchReadyResult.error
+    );
+  }
 
-  const rows = results
-    .flatMap((result) => (result.data ?? []) as FarmerLeadWorkItemRow[])
-    .sort((left, right) => {
-      if (left.due_at !== right.due_at) {
-        if (!left.due_at) return 1;
-        if (!right.due_at) return -1;
-        return left.due_at.localeCompare(right.due_at);
-      }
-
-      return right.created_at.localeCompare(left.created_at);
-    });
+  const dispatchReadyItems = (
+    (dispatchReadyResult.data ?? []) as FarmerLeadWorkItemRow[]
+  ).map((item) => mapFarmerLeadWorkItem({ item, presentation }));
 
   return {
-    items: rows.map((item) => mapFarmerLeadWorkItem({ item, presentation })),
-    unavailable: errors.length > 0
+    items: sortPendingWorkItems([
+      ...dueFollowups.items,
+      ...dispatchReadyItems
+    ]),
+    unavailable: dueFollowups.unavailable || Boolean(dispatchReadyResult.error)
+  };
+}
+
+async function loadFarmerLeadDueFollowupItems({
+  currentUser,
+  itemLimit,
+  personalOnly = false,
+  supabase
+}: {
+  currentUser: Awaited<ReturnType<typeof getCurrentInternalUser>>;
+  itemLimit: number;
+  personalOnly?: boolean;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}): Promise<FarmerLeadWorkItemsResult> {
+  const today = todayDate();
+  const result = await timeAsync(
+    "my work farmer lead due follow-ups loader",
+    async () => {
+      const scope = await farmerLeadScope(supabase, currentUser);
+      let query = supabase
+        .from("farmer_leads")
+        .select(
+          "id, lead_code, farmer_name, owner_user_id, rsm_user_id, next_action_date, created_at"
+        )
+        .is("deleted_at", null)
+        .lte("next_action_date", today)
+        .not("lead_status", "in", "(Won,Lost,Parked)")
+        .not("funnel_stage", "in", "(Won,Lost,Parked)");
+      query = applyScope(query, scope);
+
+      if (personalOnly) {
+        query = query.or(
+          `owner_user_id.eq.${currentUser.id},rsm_user_id.eq.${currentUser.id}`
+        );
+      }
+
+      return query
+        .order("next_action_date", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(itemLimit);
+    }
+  );
+
+  if (result.error) {
+    logSupabaseError("my work farmer lead due follow-ups loader", result.error);
+  }
+
+  return {
+    items: ((result.data ?? []) as FarmerLeadDueFollowupRow[]).map(
+      mapFarmerLeadDueFollowupItem
+    ),
+    unavailable: Boolean(result.error)
   };
 }
 

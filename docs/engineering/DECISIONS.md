@@ -1,6 +1,6 @@
 # Jiva Farm OS Engineering Decisions
 
-_Last updated: 2026-07-11_
+_Last updated: 2026-08-05_
 
 This file records accepted engineering decisions. Add a new entry only when a decision changes architecture, delivery safety, permissions, or performance strategy.
 
@@ -159,3 +159,57 @@ Strict validation remains required:
 - `ui_payload` is source/action-aware and must remain a JSON object
 
 Integrity is enforced by stable business keys, `unique (source_table, source_id, action_type)`, projector functions, reconciliation functions, and future source-table synchronization triggers. Operational source tables remain the source of truth.
+
+---
+
+## ADR-012 — CSV imports should move valid operational rows forward
+
+**Status:** Accepted
+
+Farmer Lead CSV import should not block an entire file because some rows need
+cleanup. The app imports valid rows immediately and saves invalid rows to a
+review batch for correction.
+
+Blocking conditions remain limited to issues that prevent a trustworthy record,
+such as missing required identity fields, invalid mobile numbers, duplicates, or
+database write failures. Optional messy metadata is normalized where possible.
+
+---
+
+## ADR-013 — Farmer Lead import creates region shells for new states
+
+**Status:** Accepted
+
+The importer normalizes state names for routing and may create an active region
+shell when an authorized import encounters a new state. This prevents harmless
+spelling/spacing differences from blocking valid sales leads while preserving
+Sales Head fallback ownership until the region can be assigned properly.
+
+Region creation remains server-side only and does not give ordinary users broad
+region management UI access.
+
+---
+
+## ADR-014 — Operations Control is a read-only triage layer
+
+**Status:** Accepted
+
+Operations Control summarizes work, bottlenecks, and cleanup queues for Admin,
+Management, and Sales Head. It is not a new source of truth and does not create
+new workflow authority.
+
+All corrections still happen in the source modules: Farmer Leads, Dispatches,
+Pilots, Marketing Library, or CSV Import Review.
+
+---
+
+## ADR-015 — Marketing Head/Admin can directly publish library material
+
+**Status:** Accepted
+
+Marketing Head and Admin can publish Marketing Library material directly with
+review/publish attribution. Designer uploads still require Marketing Head
+review.
+
+This matches the operating rule that the Marketing Head owns final marketing
+quality, while keeping Designer submissions under a separate approval path.

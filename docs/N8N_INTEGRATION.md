@@ -3,6 +3,18 @@
 Status: Phase 1 and Phase 2 ready for environment configuration  
 Direction: Jiva Farm OS sends selected events to n8n, and n8n can pull a read-only daily summary.
 
+## Importable Workflow
+
+- Daily management digest workflow file:
+  `n8n-workflows/jiva-daily-management-digest.workflow.json`
+- The workflow includes a manual test trigger, a daily 8 AM IST schedule, a
+  Daily Summary API fetch, digest formatting, and a disabled email-send node.
+- Replace `REPLACE_WITH_N8N_SUMMARY_SECRET` with the same value configured as
+  `N8N_SUMMARY_SECRET` in Vercel Production.
+- Configure a delivery channel before enabling sending. The bundled email node
+  stays disabled by default so importing the workflow cannot accidentally send
+  notifications.
+
 ## Integration Rules
 
 - n8n does not write back to Jiva Farm OS in this phase.

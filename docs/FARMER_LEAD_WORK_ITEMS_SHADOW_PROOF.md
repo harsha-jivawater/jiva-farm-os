@@ -141,4 +141,19 @@ The proof passes only when all of these hold:
 - no `57014` timeout
 - at least 70% measured read-latency reduction for the Farmer Lead My Work path
 
-The proof passed. Production My Work has **not** yet been switched to `work_items`; operational tables remain the source of truth until a separate approval.
+The proof passed. Production My Work has since been switched to the proven
+Farmer Lead `work_items` path for dispatch-ready actions, while due follow-ups
+also use direct Farmer Lead source-table checks where that is the more accurate
+daily operating signal.
+
+## Current Addendum - 05 August 2026
+
+- Farmer Lead list KPI cards follow the active search/filter state.
+- Lead Owner filtering can include all active internal users.
+- Farmer Lead CSV import is preview-first and imports valid rows while saving
+  problem rows for correction.
+- Farmer Lead import now tolerates blank unnamed CSV header columns.
+- Crop, crop stage, irrigation, village, and acre details are optional for CSV
+  import and are normalized instead of blocking otherwise valid rows.
+- State names are normalized for routing, and authorized imports can create an
+  active region shell for new state names.

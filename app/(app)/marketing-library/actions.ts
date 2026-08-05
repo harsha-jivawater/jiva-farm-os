@@ -29,6 +29,7 @@ import type {
 import {
   marketingAssetInputFromForm,
   validateMarketingAssetInput,
+  validateMarketingAssetMetadataContentCompatibility,
   validateMarketingAssetMetadataInput
 } from "@/lib/marketing-assets/validation";
 import { createNotification } from "@/lib/notifications/create";
@@ -605,6 +606,29 @@ export async function updateMarketingAssetDetailsAction(
 
   if (validationError) {
     redirectWithError(errorPath, validationError);
+  }
+
+  const { data: currentVersionData, error: currentVersionError } =
+    await supabase
+      .from("marketing_asset_versions")
+      .select("youtube_url")
+      .eq("asset_id", assetId)
+      .eq("is_current", true)
+      .maybeSingle();
+
+  if (currentVersionError) {
+    redirectWithError(errorPath, currentVersionError.message);
+  }
+
+  const contentCompatibilityError =
+    validateMarketingAssetMetadataContentCompatibility(
+      input,
+      currentVersionData as Pick<MarketingAssetVersion, "youtube_url"> | null,
+      asset.asset_type
+    );
+
+  if (contentCompatibilityError) {
+    redirectWithError(errorPath, contentCompatibilityError);
   }
 
   const { error } = await supabase

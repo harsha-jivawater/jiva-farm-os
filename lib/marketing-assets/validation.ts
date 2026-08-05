@@ -7,7 +7,10 @@ import {
   marketingAssetTypeOptions,
   optionIncludes
 } from "@/lib/marketing-assets/options";
-import type { MarketingAssetFormInput } from "@/lib/marketing-assets/types";
+import type {
+  MarketingAssetFormInput,
+  MarketingAssetVersion
+} from "@/lib/marketing-assets/types";
 
 function text(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -165,6 +168,22 @@ export function validateMarketingAssetMetadataInput(
   }
   if (!optionIncludes(marketingAssetDeliveryOptions, input.delivery_format)) {
     return "Select a delivery format.";
+  }
+
+  return null;
+}
+
+export function validateMarketingAssetMetadataContentCompatibility(
+  input: MarketingAssetFormInput,
+  currentVersion: Pick<MarketingAssetVersion, "youtube_url"> | null | undefined,
+  currentAssetType: string
+) {
+  if (
+    input.asset_type === "Video" &&
+    currentAssetType !== "Video" &&
+    !youtubeVideoId(currentVersion?.youtube_url)
+  ) {
+    return "To mark this material as Video, submit a revised YouTube link.";
   }
 
   return null;

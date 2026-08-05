@@ -1,4 +1,5 @@
 import {
+  Activity,
   BarChart3,
   Building2,
   CalendarCheck2,
@@ -147,6 +148,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/kpi-dashboard",
         module: "kpi-dashboard",
         icon: BarChart3
+      },
+      {
+        label: "Operations Control",
+        href: "/operations-control",
+        module: "operations-control",
+        icon: Activity
       },
       {
         label: "Data Quality",

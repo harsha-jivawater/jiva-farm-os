@@ -72,18 +72,13 @@ export function parseCsv(text: string): CsvParseResult {
     return { headers: [], records: [], errors: ["CSV file is empty."] };
   }
 
-  const rawHeaders = nonBlankRows[0].map(normalizeCsvHeader);
-  let lastHeaderIndex = rawHeaders.length - 1;
-
-  while (lastHeaderIndex >= 0 && !rawHeaders[lastHeaderIndex]) {
-    lastHeaderIndex -= 1;
-  }
-
-  const headers = rawHeaders.slice(0, lastHeaderIndex + 1);
-
-  if (headers.some((header) => !header)) {
-    errors.push("CSV header row has a blank column name.");
-  }
+  const headerEntries = nonBlankRows[0]
+    .map((header, index) => ({
+      header: normalizeCsvHeader(header),
+      index
+    }))
+    .filter((entry) => Boolean(entry.header));
+  const headers = headerEntries.map((entry) => entry.header);
 
   const duplicateHeaders = headers.filter(
     (header, index) => headers.indexOf(header) !== index
@@ -98,7 +93,7 @@ export function parseCsv(text: string): CsvParseResult {
   const records = nonBlankRows.slice(1).map((values) => {
     const record: CsvRecord = {};
 
-    headers.forEach((header, index) => {
+    headerEntries.forEach(({ header, index }) => {
       record[header] = values[index]?.trim() ?? "";
     });
 

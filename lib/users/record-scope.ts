@@ -41,6 +41,7 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "HR & Legal",
     "Viewer"
   ],
+  "operations-control": ["Admin", "Management", "Sales Head"],
   "data-quality": ["Admin", "Management"],
   "system-health": ["Admin", "Management"],
   "farmer-leads": [
