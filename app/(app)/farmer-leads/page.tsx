@@ -101,17 +101,6 @@ const defaultKpis: FarmerLeadKpis = {
   deviceInstalled: 0
 };
 
-const leadFilterRoles = ["Sales Head", "RSM", "Salesperson", "Admin"];
-
-function userRoleFilter(roles: string[]) {
-  return roles
-    .flatMap((role) => [
-      `role.eq.${role}`,
-      `secondary_role.eq.${role}`
-    ])
-    .join(",");
-}
-
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -276,7 +265,6 @@ export default async function FarmerLeadsPage({
         .from("users")
         .select("id, full_name, email, role, secondary_role")
         .eq("is_active", true)
-        .or(userRoleFilter(leadFilterRoles))
         .order("full_name", { ascending: true })
     )
   ]);
@@ -284,9 +272,7 @@ export default async function FarmerLeadsPage({
   const leads = (data ?? []) as unknown as FarmerLead[];
   const totalCount = count ?? leads.length;
   const users = (usersResult.data ?? []) as UserSearchOption[];
-  const ownerUsers = users.filter((user) =>
-    hasAnyRole(user, ["Sales Head", "RSM", "Salesperson", "Admin"])
-  );
+  const ownerUsers = users;
   const rsmUsers = users.filter((user) =>
     hasAnyRole(user, ["RSM", "Sales Head", "Admin"])
   );
