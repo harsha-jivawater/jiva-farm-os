@@ -84,9 +84,13 @@ Never deploy code that depends on unapplied SQL.
 - All active internal users can read published Marketing Library material.
 - Only Admin, Marketing Head, and Designer can upload, review, publish, archive,
   create customer links, or revoke customer links.
-- Marketing Head and Designer approve each other's uploads. A non-Admin uploader
-  cannot approve their own material; this is enforced in PostgreSQL as well as
-  the UI.
+- Marketing Head and Admin can publish material directly. Designer uploads
+  require Marketing Head review. This is enforced in PostgreSQL as well as the
+  UI.
+- Allowed marketing managers can edit published metadata such as title,
+  description, classification, and notes. Metadata-only edits cannot relabel an
+  existing non-video file as Video unless the current version has a valid
+  YouTube link.
 - Direct file uploads use a short-lived signed upload authorization and bypass
   the Vercel request-body path. Never replace this with a public bucket or put
   `SUPABASE_SERVICE_ROLE_KEY` in browser code.
@@ -114,6 +118,61 @@ Release order for migration `20260717064803_marketing_library.sql`:
 4. Verify the private bucket, table grants, RLS policies, and public-share RPC.
 5. Merge the application pull request and run authenticated and anonymous smoke
    checks.
+
+Recent related migrations:
+
+- `20260722084908_marketing_library_marketing_head_self_publish.sql` allows
+  Marketing Head/Admin direct publish and keeps Designer submissions routed to
+  Marketing Head review.
+- `20260731021826_pilot_area_units_and_jet_irrigation.sql` adds Jet irrigation
+  and Pilot/Control Area unit fields.
+
+## Operations Control
+
+- Operations Control is a read-only management page at `/operations-control`.
+- Visible roles: Admin, Management, and Sales Head.
+- It summarizes open `work_items`, overdue work, due-today work, unassigned
+  work, sales actions, dealer payment pending, dealer dispatch ready, approved
+  dispatches waiting, dispatch delivery aging, pilot visit reports due, visit
+  reports needing review, CSV import rows needing cleanup, and Marketing Library
+  review.
+- Use it as a daily management triage page. It does not replace source modules:
+  users still complete work in Farmer Leads, Dispatches, Pilots, Marketing
+  Library, or the saved CSV import review grid.
+
+## Farmer Lead CSV Import
+
+- The Farmer Lead CSV importer is preview-first. Users should upload the file,
+  review the preview, and click `Import valid rows`.
+- Required CSV fields are `farmer_name`, `mobile_number`, `state`, and
+  `district`.
+- `business_sector` is included in the template and defaults to Agriculture if
+  blank.
+- Village, primary crop, other crop, crop stage, irrigation type, land size, and
+  crop area are optional in CSV import. If blank or unrecognized, the importer
+  normalizes them to safe internal values instead of blocking the row.
+- Blank unnamed CSV columns are ignored. Duplicate named headers still block the
+  file because the app cannot safely know which column should win.
+- Valid rows import immediately. Rows with missing required identity fields,
+  duplicate mobile numbers, or other blocking issues are saved into the Farm OS
+  review grid for correction.
+- State routing normalizes spacing, punctuation, and common naming differences.
+  For authorized importer roles, a new active region shell is created when a
+  state has no matching active region, and ownership falls back to the default
+  Sales Head until the region is assigned.
+
+## Dispatch And Inventory Integrity
+
+- Dispatch create/edit treats `Dispatched`, `Delivered`, `Installation Pending`,
+  and `Installed` as statuses that move a serial-numbered device out of
+  warehouse stock.
+- When a device is moved, Inventory holder fields are updated from the dispatch
+  destination. Dealer deliveries become `With Dealer`; farmer deliveries become
+  `With Farmer`; installed pilots become `Installed for Pilot`.
+- Accounts can confirm dealer stock dispatch payments. Customer Service / Stock
+  Dispatch moves paid dispatches through the logistics statuses.
+- Dealer stock dispatches that require payment should start or remain visible as
+  payment pending until Accounts confirms payment.
 
 ## Environment Boundaries
 
@@ -224,6 +283,7 @@ After Vercel deploys, verify:
 Admin smoke test:
 
 - My Work opens as the home page
+- Operations Control opens for Admin/Management/Sales Head
 - Sidebar renders correctly
 - Action Center opens Notifications
 - Farmer Leads opens
@@ -238,6 +298,14 @@ Admin smoke test:
 - Internal Users opens for Admin
 - Regions opens for Admin/Sales Head as permitted
 - Help/SOP opens
+
+CSV import smoke tests:
+
+- Farmer Lead template downloads with Business Sector and without default
+  village/crop/acre fields.
+- A file with a blank unnamed column still previews and imports valid rows.
+- A file with valid required fields and blank crop/irrigation/village values
+  imports, while bad mobile numbers or duplicates are saved for review.
 
 Limited-role smoke tests when permissions are touched:
 

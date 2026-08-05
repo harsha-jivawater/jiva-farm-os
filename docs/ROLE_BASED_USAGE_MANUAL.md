@@ -1,8 +1,8 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.18
+Version: v0.19
 Status: Draft  
-Last updated: 17 Jul 2026
+Last updated: 05 Aug 2026
 Owner: Jiva Farm OS Admin / Management  
 Audience: Internal Jiva Farm OS users  
 
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.19 | 05 Aug 2026 | Draft | Adds Operations Control, 50-row pagination, filtered Farmer Lead KPIs, safer Farmer Lead CSV import, dealer payment handoff notes, Pilot area units, Jet irrigation, and Marketing Head direct publish. |
 | v0.18 | 17 Jul 2026 | Draft | Adds Marketing Library browsing, cross-role approval, private file/YouTube content, and manually revocable customer links. |
 | v0.17 | 10 Jul 2026 | Draft | Adds My Work as home, Action Center sidebar placement, Inventory lifecycle cards, Dispatch and Free Pilot corrections, Installation auto-linking, Marketing completion tracking, and current operating guidance. |
 | v0.16 | 10 Jul 2026 | Draft | Merges Home/Dashboard into My Work as the primary signed-in landing page while keeping Notifications separate. |
@@ -54,7 +55,7 @@ Use it when:
 | Agronomist | Agronomy / technical | Pilot visibility, technical oversight, visit/report review, field guidance |
 | Research Assistant | Field research | My Visits, visit reports, pilot observations, field evidence |
 | R&D Head | R&D leadership | Pilot review, R&D approval, reports, agronomy performance |
-| Marketing Head | Marketing leadership | Review and deliver Marketing Requests; upload material and publish Designer submissions |
+| Marketing Head | Marketing leadership | Review and deliver Marketing Requests; upload and directly publish marketing material; publish Designer submissions |
 | Designer | Marketing execution | Complete Marketing Requests; upload material and publish Marketing Head submissions |
 | Accounts | Finance | Payment confirmation, device/dispatch finance checks |
 | Stock / Dispatch | Customer Service Team | Inventory/device records, dispatches, operational installation support |
@@ -95,8 +96,8 @@ Notes:
 | Sales & Partners | Farmer Leads; Dealers; Institutional Partners | Contacts and meetings are managed inside Institutional Partner detail where available. |
 | R&D | Pilots | Pilots stay under R&D only. |
 | Operations | Inventory; Dispatches; Installations; Post Installation Follow-ups | Inventory/device records, dispatch, installation, and after-installation work stay under Operations only. |
-| Team Workflows | Marketing Requests | Creative request workflow for briefs, deadlines, draft links, comments, and final OneDrive links. |
-| Management | Data Quality; System Health; Regions; Internal Users | Visibility is role-controlled; most items are Admin/Management-only. My Work carries role KPI cards and oversight. |
+| Team Workflows | Marketing Requests; Marketing Library | Creative request workflow plus approved material library for customer/internal use. |
+| Management | KPI Dashboard; Operations Control; Data Quality; System Health; Regions; Internal Users | Visibility is role-controlled; most items are Admin/Management/Sales Head only. My Work carries role KPI cards and oversight. |
 | Support | Help / SOP; Change Password | Support items are available to signed-in users; Change Password remains available during forced first-login password change. |
 
 ### In-App Help / SOP Training Guide
@@ -203,9 +204,12 @@ Operating rules:
 
 - Every active internal role can browse published material.
 - Admin, Marketing Head, and Designer can upload and manage material.
-- Marketing Head uploads go to Designer for review.
+- Marketing Head uploads can be published directly by the Marketing Head.
 - Designer uploads go to Marketing Head for review.
-- A non-Admin uploader cannot publish their own submission.
+- Admin can publish directly.
+- Published metadata can be edited by allowed marketing managers.
+- Do not change an existing file asset to Video unless a valid YouTube link is
+  submitted as a new version.
 - Videos use YouTube links. Other digital material uses the private file upload.
 - A customer link works without login and never expires automatically.
 - Treat customer links as confidential bearer links and send them only to the
@@ -216,6 +220,48 @@ Operating rules:
   approved. Archiving the material revokes all its active links.
 - Use a Marketing Request's `Add to Marketing Library` action after the request
   is completed when the final output should become reusable approved material.
+
+### Operations Control
+
+Operations Control is a management triage page for Admin, Management, and Sales
+Head.
+
+Use it to check:
+
+- open work across Sales, Dispatch, and Pilots
+- overdue, due-today, and unassigned actions
+- dealer payments waiting for Accounts confirmation
+- dealer dispatches ready for Customer Service action
+- dispatch delivery aging
+- pilot visit reports due and submitted reports awaiting review
+- Farmer Lead CSV import rows still needing cleanup
+- Marketing Library material awaiting review
+
+Operations Control is read-only. Users still complete the work inside the source
+module such as Farmer Leads, Dispatches, Pilots, Marketing Library, or CSV
+Import Review.
+
+### Farmer Lead CSV Import
+
+Farmer Lead import now works in two stages:
+
+1. Upload and preview the CSV.
+2. Click `Import valid rows`.
+
+Required fields are:
+
+- farmer_name
+- mobile_number
+- state
+- district
+
+Business Sector is included in the template and defaults to Agriculture when
+blank. Village, crop, crop stage, irrigation type, and acre values are optional
+for CSV imports. Valid rows import immediately. Problem rows stay saved in Farm
+OS for correction.
+
+Blank unnamed CSV columns are ignored. Duplicate named columns still need to be
+fixed before import.
 
 ### Operations Menus
 

@@ -1,0 +1,197 @@
+{
+  "name": "Jiva Daily Management Digest",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "9a2512d7-8a23-4ca1-b51a-4d3e8484024b",
+      "name": "Manual Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        120
+      ],
+      "notesInFlow": true,
+      "notes": "Use this to test the digest before activating the daily schedule."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "0ba9d197-98ce-4ed6-a07b-2ef93d5af9a4",
+      "name": "Daily 8 AM IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -620,
+        320
+      ],
+      "notesInFlow": true,
+      "notes": "Runs every day at 8:00 AM using the workflow timezone in Settings."
+    },
+    {
+      "parameters": {
+        "url": "https://www.jivawater.org/api/integrations/n8n/daily-summary",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Jiva-N8N-Summary-Secret",
+              "value": "REPLACE_WITH_N8N_SUMMARY_SECRET"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "8b171573-a5f8-4d4c-b50f-323df21c1027",
+      "name": "Fetch Jiva Daily Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -300,
+        220
+      ],
+      "notesInFlow": true,
+      "notes": "Before running, replace the placeholder header value with the same N8N_SUMMARY_SECRET configured in Jiva/Vercel."
+    },
+    {
+      "parameters": {
+        "jsCode": "const summary = $input.first().json || {};\nconst counts = summary.counts || {};\nconst items = Array.isArray(summary.highPriorityItems) ? summary.highPriorityItems : [];\nconst countLabels = [\n  ['paidLeadsReadyForDispatch', 'Paid leads ready for dispatch'],\n  ['pilotDispatchesToCreate', 'Pilot dispatches to create'],\n  ['dispatchesNeedingAction', 'Dispatches needing action'],\n  ['dispatchesOlderThanTwoDays', 'Dispatches older than 2 days'],\n  ['dispatchesOlderThanSevenDays', 'Dispatches older than 7 days'],\n  ['visitsNeedingReports', 'Visits needing reports'],\n  ['visitReportsNeedingReview', 'Visit reports needing review'],\n  ['marketingAwaitingReview', 'Marketing awaiting review'],\n  ['marketingOverdue', 'Marketing overdue'],\n  ['systemHealthAlerts', 'System health alerts']\n];\nconst generatedAt = summary.generatedAt ? new Date(summary.generatedAt) : new Date();\nconst summaryDate = summary.summaryDate || generatedAt.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });\nconst totalOpenSignals = countLabels.reduce((total, [key]) => total + Number(counts[key] || 0), 0);\nconst severityRank = { Critical: 3, Warning: 2, Review: 1 };\nconst topItems = [...items]\n  .sort((a, b) => (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0))\n  .slice(0, 20);\nconst countLines = countLabels\n  .map(([key, label]) => `${label}: ${Number(counts[key] || 0)}`)\n  .join('\\n');\nconst itemLines = topItems.length\n  ? topItems.map((item, index) => {\n      const status = item.status ? ` | Status: ${item.status}` : '';\n      const dueDate = item.dueDate ? ` | Due: ${item.dueDate}` : '';\n      const url = item.url ? `\\n   Open: ${item.url}` : '';\n      return `${index + 1}. [${item.severity || 'Review'}] ${item.category || 'General'} - ${item.title || 'Untitled'}${status}${dueDate}\\n   Next: ${item.nextAction || 'Review in Jiva Farm OS.'}${url}`;\n    }).join('\\n\\n')\n  : 'No high-priority items returned by Jiva today.';\nconst subject = `Jiva Daily Management Digest - ${summaryDate} - ${totalOpenSignals} open signals`;\nconst plainText = `Jiva Daily Management Digest\\nDate: ${summaryDate}\\nGenerated: ${generatedAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}\\nEnvironment: ${summary.appEnvironment || 'unknown'}\\n\\nOperating Counts\\n${countLines}\\n\\nTop Priority Items\\n${itemLines}\\n\\nOpen Jiva Farm OS: https://www.jivawater.org/my-pending-work`;\nconst escapeHtml = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst html = `<div style='font-family: Arial, sans-serif; color: #111827; line-height: 1.45;'><h2 style='margin-bottom: 4px;'>Jiva Daily Management Digest</h2><p style='margin-top: 0;'>${escapeHtml(summaryDate)} · ${totalOpenSignals} open signals</p><pre style='white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;'>${escapeHtml(plainText)}</pre></div>`;\nreturn [{ json: { subject, plainText, markdown: plainText, html, summaryDate, totalOpenSignals, counts, highPriorityItems: topItems, rawSummary: summary } }];"
+      },
+      "id": "3437de0a-605e-442c-840f-94b5d19d0c7f",
+      "name": "Format Management Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        40,
+        220
+      ],
+      "notesInFlow": true,
+      "notes": "Produces subject, plainText, markdown, and html fields. Connect any delivery channel after this node."
+    },
+    {
+      "parameters": {
+        "fromEmail": "REPLACE_WITH_FROM_EMAIL",
+        "toEmail": "REPLACE_WITH_RECIPIENT_EMAILS",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "3a93b187-24ad-49a1-99fa-d99a7a695a45",
+      "name": "Send Email Digest (configure)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        380,
+        220
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Disabled by default. Configure SMTP/email credentials, replace sender and recipients, then enable this node. You can also replace it with Slack, WhatsApp, Teams, or Google Sheets."
+    },
+    {
+      "parameters": {},
+      "id": "8f44cd5b-b425-4abf-9c36-41e5d8954bfc",
+      "name": "Digest Ready",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        380,
+        420
+      ],
+      "notesInFlow": true,
+      "notes": "The formatted digest is available in the previous node output even if no delivery channel is configured yet."
+    },
+    {
+      "parameters": {
+        "content": "Setup checklist after import:\\n\\n1. Open Fetch Jiva Daily Summary. Replace REPLACE_WITH_N8N_SUMMARY_SECRET with the shared secret configured in Jiva/Vercel.\\n\\n2. Run Manual Test once. The Format Management Digest node should output subject, plainText, markdown, and html.\\n\\n3. Configure a delivery channel. The email node is disabled by default so this workflow cannot send anything accidentally. Configure SMTP and recipients, then enable it, or replace it with WhatsApp/Slack/Teams/Google Sheets.\\n\\n4. Confirm workflow Settings timezone is Asia/Kolkata.\\n\\n5. Activate the workflow when the test output looks right.",
+        "height": 360,
+        "width": 520,
+        "color": 5
+      },
+      "id": "a0ed507d-04d1-4c4a-9b36-2e20c1d5cbdb",
+      "name": "Import Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        -240
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Test": {
+      "main": [
+        [
+          {
+            "node": "Fetch Jiva Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 8 AM IST": {
+      "main": [
+        [
+          {
+            "node": "Fetch Jiva Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Jiva Daily Summary": {
+      "main": [
+        [
+          {
+            "node": "Format Management Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Management Digest": {
+      "main": [
+        [
+          {
+            "node": "Send Email Digest (configure)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Digest Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "versionId": "d4ac6b3a-f6c8-4874-b21b-d6c810961f4c",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -75,10 +75,17 @@ describe("CSV import parser", () => {
     ]);
   });
 
-  it("still rejects blank headers between named columns", () => {
+  it("ignores blank headers between named columns", () => {
     const parsed = parseCsv("farmer_name,,mobile_number\nA,,9876543210\n");
 
-    expect(parsed.errors).toContain("CSV header row has a blank column name.");
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.headers).toEqual(["farmer_name", "mobile_number"]);
+    expect(parsed.records).toEqual([
+      {
+        farmer_name: "A",
+        mobile_number: "9876543210"
+      }
+    ]);
   });
 });
 

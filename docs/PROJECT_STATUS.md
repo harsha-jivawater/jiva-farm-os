@@ -38,6 +38,44 @@ Action Center is the global notification entry directly below the logo. Daily Wo
   an up-to-date branch, and resolved conversations are enforced; force pushes
   and branch deletion are blocked.
 
+## Current Release Update - 05 August 2026
+
+- Farmer Lead CSV import is preview-first: users can import valid rows while
+  rows with missing or conflicting values are saved for correction in Farm OS.
+- Farmer Lead import requires only `farmer_name`, `mobile_number`, `state`, and
+  `district`. Business sector is included in the template and defaults to
+  Agriculture. Village, crop, crop stage, irrigation, and acre values are
+  optional for CSV import.
+- CSV files with blank unnamed columns no longer block import; blank headers are
+  ignored while named columns continue to map normally.
+- State matching is normalized for routing, so values such as `Tamilnadu` can
+  match the active database state `Tamil Nadu`. New state names create an active
+  region shell for Sales Head routing when imported by an authorized role.
+- Farmer Lead KPI cards follow the active list filters, and the Lead Owner
+  filter can include all active internal users.
+- Searchable operational lists use 50-row pages with numbered pagination across
+  Farmer Leads, Dealers, Institutional Partners, Pilots, Inventory, Dispatches,
+  Installations, and Post Installation Follow-ups.
+- Operations Control is available for Admin, Management, and Sales Head to scan
+  open work, overdue items, unassigned actions, payment bottlenecks, dispatch
+  aging, pilot visit/report follow-up, import cleanup, and marketing review.
+- Dispatch create/edit now treats `Dispatched`, `Delivered`, `Installation
+  Pending`, and `Installed` as stock-moving statuses. Inventory holder state is
+  updated accordingly instead of leaving moved devices in warehouse status.
+- Dealer Stock Dispatch payment-pending records are visible to Accounts, and My
+  Work payment counts are limited to dealer stock dispatches that actually
+  require payment confirmation.
+- Pilot creation supports `Jet` irrigation and area value/unit entry for Acres,
+  Cents, and Guntas. Research Assistant pilot/visit upload permissions are
+  covered by database regression tests.
+- Marketing Library now allows Marketing Head/Admin direct publish while
+  Designer submissions still route to Marketing Head. Published metadata can be
+  edited by allowed marketing managers, and metadata-only edits cannot relabel a
+  non-video file as Video without a YouTube link.
+- `n8n-workflows/jiva-daily-management-digest.workflow.json` contains the
+  importable daily management digest workflow. The email node is disabled by
+  default until delivery credentials are configured.
+
 ## Production Hardening Release - 17 July 2026
 
 - Phases 1-6 are complete: reproducible schema,
@@ -80,6 +118,7 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 - Installations
 - Post-installation Follow-ups
 - Action Center / Notifications
+- Operations Control
 - System Health
 - Data Quality
 - Marketing Requests with completion tracking
@@ -87,6 +126,7 @@ Action Center is the global notification entry directly below the logo. Daily Wo
   approved YouTube videos, and revocable no-login customer links
 - Regions
 - Internal Users
+- Payment Links for Sales Head, RSM, and Salesperson
 - Help/SOP
 - Auth/password routes
 - Password change/reset
@@ -100,9 +140,8 @@ Action Center is the global notification entry directly below the logo. Daily Wo
   Head, and Designer can upload and manage material.
 - Upload and filter classification is ordered Audience, Sector, Agriculture-only
   Crop, then Language. Crop is absent until Agriculture is selected.
-- Marketing Head uploads require Designer review; Designer uploads require
-  Marketing Head review. Admin can override. The database enforces separation
-  of uploader and reviewer for non-Admin users.
+- Marketing Head and Admin uploads can be published directly with review
+  attribution. Designer uploads require Marketing Head review.
 - File assets upload directly to the private `marketing-assets` Supabase Storage
   bucket through short-lived signed upload authorization. Stored bytes are
   verified before the database record is submitted for review.
@@ -119,8 +158,8 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.17 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
-- Marketing Library guidance is included in v0.18.
+- Role-based usage manual updated to v0.19 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- Marketing Library guidance is included in v0.18 and v0.19.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.

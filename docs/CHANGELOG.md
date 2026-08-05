@@ -2,6 +2,48 @@
 
 Simple reverse chronological record of major Jiva Farm OS work.
 
+## 2026-08-05
+
+### Operations and management
+
+- Added Operations Control for Admin, Management, and Sales Head to review open
+  work, overdue items, unassigned actions, dealer payment bottlenecks, dispatch
+  aging, pilot visit/report follow-up, CSV import cleanup, and Marketing Library
+  review from one management page.
+- Added 50-row numbered pagination to searchable list pages so filtered records
+  remain navigable across Farmer Leads, Dealers, Institutional Partners,
+  Pilots, Inventory, Dispatches, Installations, and Post Installation Follow-ups.
+- Updated My Work counts so Farmer Lead follow-ups include due lead records plus
+  dispatch-ready work, and pending payment confirmation focuses on dealer stock
+  dispatches that require payment.
+
+### Farmer Lead import
+
+- Added Business Sector to the Farmer Lead CSV template.
+- Simplified the downloadable Farmer Lead template so crop, acre, irrigation,
+  and village details are not requested by default.
+- Kept crop, crop stage, irrigation, village, and acre columns optional when
+  present in uploaded files.
+- Ignored blank unnamed CSV header columns instead of blocking the import.
+- Normalized state matching for routing and allowed authorized imports to create
+  active region shells for new state names.
+
+### Dispatch, pilots, and marketing
+
+- Updated dispatch side effects so Delivered, Installation Pending, and
+  Installed records move devices out of warehouse stock with the correct holder
+  status.
+- Added Jet irrigation and Pilot/Control Area value-unit support for Acres,
+  Cents, and Guntas.
+- Confirmed Research Assistant pilot and visit upload access through database
+  regression coverage.
+- Updated Marketing Library so Marketing Head/Admin can directly publish, while
+  Designer submissions still route to Marketing Head review.
+- Added a metadata guard so an existing non-video material cannot be changed to
+  Video unless the current version has a valid YouTube link.
+- Added an importable n8n daily management digest workflow with email delivery
+  disabled until credentials are configured.
+
 ## 2026-07-17
 
 ### Marketing Library

@@ -405,6 +405,32 @@ function hasMovedDeviceFromWarehouse(status: string | null | undefined) {
   return (movedDispatchStatuses as readonly string[]).includes(status ?? "");
 }
 
+function deviceStatusForMovedDispatch(
+  dispatchStatus: string | null | undefined,
+  destinationType: string | null | undefined
+) {
+  if (dispatchStatus === "Installed") {
+    return destinationType === "Pilot"
+      ? "Installed for Pilot"
+      : "Installed at Farmer Site";
+  }
+
+  if (
+    dispatchStatus === "Delivered" ||
+    dispatchStatus === "Installation Pending"
+  ) {
+    if (destinationType === "Dealer") {
+      return "With Dealer";
+    }
+
+    if (destinationType === "Farmer") {
+      return "With Farmer";
+    }
+  }
+
+  return "Dispatched";
+}
+
 function validateOutboundDispatchDeviceEligibility({
   device,
   errorPath,
@@ -836,7 +862,10 @@ async function applyDispatchedSideEffects({
       ? destinationSnapshot.locationText
       : locationText(payload);
   const devicePayload: DeviceUpdate = {
-    device_status: "Dispatched",
+    device_status: deviceStatusForMovedDispatch(
+      payload.dispatch_status,
+      payload.destination_type
+    ),
     linked_dispatch_id: dispatchId,
     dispatch_date: movementDate,
     last_movement_date: movementDate,
@@ -1104,10 +1133,13 @@ export async function createDispatchAction(formData: FormData) {
     );
   }
 
-  if (payload.dispatch_status === "Dispatched" && !canManageDispatch(profile)) {
+  if (
+    hasMovedDeviceFromWarehouse(payload.dispatch_status) &&
+    !canManageDispatch(profile)
+  ) {
     redirectWithError(
       "/dispatches/new",
-      "Only Customer Service Team or Admin can mark a dispatch as Dispatched."
+      "Only Customer Service Team or Admin can move a dispatch out of warehouse stock."
     );
   }
 
@@ -1121,8 +1153,9 @@ export async function createDispatchAction(formData: FormData) {
     quantity: 1,
     created_by_user_id: profile.id,
     approved_by_user_id: shouldMarkApproved ? profile.id : null,
-    dispatched_by_user_id:
-      payload.dispatch_status === "Dispatched" ? profile.id : null,
+    dispatched_by_user_id: hasMovedDeviceFromWarehouse(payload.dispatch_status)
+      ? profile.id
+      : null,
     payment_confirmed_by_user_id: payload.payment_confirmed
       ? (payload.payment_confirmed_by_user_id ?? profile.id)
       : null,
@@ -1148,7 +1181,7 @@ export async function createDispatchAction(formData: FormData) {
     redirectWithError("/dispatches/new", dispatchWriteErrorMessage(error));
   }
 
-  if (insertPayload.dispatch_status === "Dispatched") {
+  if (hasMovedDeviceFromWarehouse(insertPayload.dispatch_status)) {
     await applyDispatchedSideEffects({
       supabase,
       profileId: profile.id,
@@ -1317,8 +1350,11 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   const now = todayDate();
   const shouldMarkApproved =
     advancedStatus(payload.dispatch_status) && !existing.approved_by_user_id;
+  const movingDeviceFromWarehouse =
+    !existingDispatchMovedDevice &&
+    hasMovedDeviceFromWarehouse(payload.dispatch_status);
   const shouldMarkDispatched =
-    payload.dispatch_status === "Dispatched" && !existing.dispatched_by_user_id;
+    movingDeviceFromWarehouse && !existing.dispatched_by_user_id;
   const submittedPaymentDate =
     payload.payment_confirmed_date ?? existing.payment_confirmed_date ?? null;
   const paymentConfirmationChanged =
@@ -1339,13 +1375,12 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   }
 
   if (
-    existing.dispatch_status !== "Dispatched" &&
-    payload.dispatch_status === "Dispatched" &&
+    movingDeviceFromWarehouse &&
     !canManageDispatch(profile)
   ) {
     redirectWithError(
       `/dispatches/${id}/edit`,
-      "Only Customer Service Team or Admin can mark a dispatch as Dispatched."
+      "Only Customer Service Team or Admin can move a dispatch out of warehouse stock."
     );
   }
 
@@ -1394,7 +1429,7 @@ export async function updateDispatchAction(id: string, formData: FormData) {
 
   if (
     !existingDispatchMovedDevice &&
-    updatePayload.dispatch_status === "Dispatched"
+    hasMovedDeviceFromWarehouse(updatePayload.dispatch_status)
   ) {
     await applyDispatchedSideEffects({
       supabase,
@@ -1415,7 +1450,7 @@ export async function updateDispatchAction(id: string, formData: FormData) {
         errorPath: `/dispatches/${id}/edit`
       });
     }
-  } else if (updatePayload.dispatch_status === "Dispatched") {
+  } else if (hasMovedDeviceFromWarehouse(updatePayload.dispatch_status)) {
     await applyDispatchedSideEffects({
       supabase,
       profileId: profile.id,

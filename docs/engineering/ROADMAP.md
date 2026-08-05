@@ -1,89 +1,78 @@
 # Jiva Farm OS Engineering Roadmap
 
-_Last updated: 2026-07-12_
+_Last updated: 2026-08-05_
 
-## Current Priority
+## Completed In Production
 
-### Dispatch Work Items
+### Production hardening
 
-Goal: move Dispatch actions from direct operational-table reconstruction into the `work_items` read model.
+- [x] Reproducible production schema baseline
+- [x] Migration ledger reconciliation and migration-order checks
+- [x] Local database/RLS regression tests
+- [x] Pull-request quality and integration gates
+- [x] Vercel/Supabase environment separation
+- [x] Health and smoke checks
+- [x] Branch protection for `main`
 
-Required stages:
+### Core operations
 
-- [x] inspect current Dispatch My Work rules
-- [x] define exact Dispatch action types
-- [x] define stable business keys
-- [x] create Stage A projection function draft for controlled review
-- [x] create Stage A bounded backfill draft for controlled review
-- [x] create Stage A reconciliation draft for controlled review
-- [x] apply and reconcile Stage A
-- [x] validate RLS by representative role
-- [x] prepare Stage B guarded triggers for controlled review
-- [x] apply and test Stage B guarded triggers
-- [ ] prove performance
-- [x] cut over one consumer
-- [ ] validate production
-- [x] update engineering documentation
+- [x] My Work as signed-in home
+- [x] Farmer Leads, Dealers, Institutional Partners, Pilots, Inventory,
+      Dispatches, Installations, and Post Installation Follow-ups
+- [x] 50-row pagination on searchable list pages
+- [x] Farmer Lead filtered KPI cards
+- [x] Lead Owner filter covering all active internal users
+- [x] Payment Links for Sales Head, RSM, and Salesperson
+- [x] Operations Control for Admin, Management, and Sales Head
 
-## Completed
+### Work Items read model
 
-### Farmer Lead Read Model
+- [x] Farmer Lead projection, triggers, reconciliation, and My Work cutover
+- [x] Dispatch projection, triggers, reconciliation, and selected My Work
+      consumer cutover
+- [x] Pilot/Visit projection, triggers, reconciliation, and My Work cutover
+- [x] Database regression coverage for representative roles
 
-- [x] create `work_items`
-- [x] add indexes
-- [x] add RLS
-- [x] create Farmer Lead candidate and projection functions
-- [x] run bounded backfill
-- [x] reconcile to zero discrepancies
-- [x] add Farmer Lead and Dispatch triggers
-- [x] test role parity
-- [x] test automatic synchronization
-- [x] cut My Work Farmer Lead actions over to `work_items`
-- [x] confirm production behavior
+### Import and data cleanup
 
-### My Work Performance Stabilization
+- [x] Preview-first Farmer Lead import
+- [x] Import-valid-rows flow with saved review rows
+- [x] Optional/defaulted Farmer Lead crop, village, irrigation, and acre import
+      fields
+- [x] Business Sector in Farmer Lead CSV template
+- [x] State normalization and authorized auto-region shell creation
+- [x] Blank unnamed CSV column tolerance
 
-- [x] lazy-load grouped sections
-- [x] remove broad timeout-prone aggregate RPCs
-- [x] isolate KPI failures
-- [x] enforce a bounded initial query budget
-- [x] display `View` for unloaded legacy categories
-- [x] preserve server-driven section URLs and paging
-- [x] confirm production is working
+### Marketing
 
-## Next
+- [x] Marketing Requests with completion tracking
+- [x] Marketing Library with private files, YouTube links, immutable versions,
+      customer links, and revoke flow
+- [x] Marketing Head/Admin direct publish
+- [x] Designer to Marketing Head review
+- [x] Metadata editing with video/content compatibility guard
 
-### Pilots and Visits Read Model
+## Current Next Candidates
 
-- [x] define action types
-- [x] prepare projection and reconciliation
-- [x] migrate My Work consumer locally
-- [x] restore lightweight collapsed count locally
-- [x] apply production migrations
-- [x] validate production
+These are planned candidates, not shipped behavior:
 
-### Marketing Read Model
-
-- [ ] define review and overdue action types
-- [ ] establish projection and reconciliation
-- [ ] migrate My Work consumer
-- [ ] restore lightweight collapsed count
-
-## Future
-
-- [ ] Dealer review work items
-- [ ] Institution review work items
-- [ ] Installation work items
-- [ ] Notification persistence and event generation
-- [ ] broader observability cleanup
-- [ ] automated performance regression checks
+- [ ] Razorpay/Zoho payment visibility page for recent received payments
+- [ ] Zoho Books estimate/billing integration planning and implementation
+- [ ] Monthly RSM targets by Direct, Dealer, and Institutional sales channels
+- [ ] Sector-aware target and achievement reporting across Agriculture,
+      Poultry, and Dairy
+- [ ] Marketing Library usage analytics by asset, audience, and user
+- [ ] More automated operations alerts from Operations Control signals
 
 ## Delivery Rules
 
 A roadmap item is complete only after:
 
-- code validation passes
-- permissions are verified
-- production behavior is confirmed
-- performance is measured where relevant
+- the code path is implemented
+- permissions and RLS are verified
+- production-relevant checks pass
+- deployment/preview behavior is confirmed
 - documentation is updated
+
+Keep production SQL changes migration-led, reviewed, and ordered. Keep feature
+work on branches and merge through protected pull requests.

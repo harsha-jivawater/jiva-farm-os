@@ -9,6 +9,7 @@ import {
 import {
   marketingAssetInputFromForm,
   validateMarketingAssetInput,
+  validateMarketingAssetMetadataContentCompatibility,
   youtubeEmbedUrl,
   youtubeVideoId
 } from "@/lib/marketing-assets/validation";
@@ -110,6 +111,30 @@ describe("Marketing Library classification", () => {
         false
       )
     ).toMatch(/https/i);
+  });
+
+  it("prevents metadata-only edits from marking non-video content as Video", () => {
+    expect(
+      validateMarketingAssetMetadataContentCompatibility(
+        { ...validFileInput, asset_type: "Video" },
+        { youtube_url: null },
+        "Leaflet"
+      )
+    ).toMatch(/youtube/i);
+    expect(
+      validateMarketingAssetMetadataContentCompatibility(
+        { ...validFileInput, asset_type: "Video" },
+        { youtube_url: "https://youtu.be/dQw4w9WgXcQ" },
+        "Leaflet"
+      )
+    ).toBeNull();
+    expect(
+      validateMarketingAssetMetadataContentCompatibility(
+        { ...validFileInput, asset_type: "Video" },
+        { youtube_url: null },
+        "Video"
+      )
+    ).toBeNull();
   });
 });
 

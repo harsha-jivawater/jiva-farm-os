@@ -627,3 +627,14 @@ Validation status:
 - production deployment for `c3036e1` reached READY on Vercel
 - production `/my-pending-work` route is reachable and redirects to Vercel SSO before authentication
 - full production UI verification remains required before declaring Stage C complete
+
+## Current Addendum - 05 August 2026
+
+- Dealer Stock Dispatch payment-pending visibility is aligned for Accounts/Admin.
+- My Work pending payment confirmation counts only Dealer Stock Dispatch rows
+  with `Payment Required`, `payment_confirmed = false`, not cancelled, and not
+  soft-deleted.
+- Dispatch create/edit now treats `Dispatched`, `Delivered`, `Installation
+  Pending`, and `Installed` as stock-moving statuses.
+- Inventory holder/status side effects are applied for every stock-moving
+  dispatch status, not only the first `Dispatched` status.

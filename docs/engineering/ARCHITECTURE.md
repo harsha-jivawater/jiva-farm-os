@@ -1,6 +1,6 @@
 # Jiva Farm OS Architecture
 
-_Last updated: 2026-07-11_
+_Last updated: 2026-08-05_
 
 ## 1. System Overview
 
@@ -14,7 +14,9 @@ Jiva Farm OS is an internal operational system for Jiva Water Farm Devices. It c
 - Pilots and Visits
 - Post-installation Follow-ups
 - Marketing Requests
+- Marketing Library
 - My Work
+- Operations Control
 - Notifications
 - Role-based access and reporting
 
@@ -44,6 +46,11 @@ My Work
 ```
 
 The `work_items` table is a lightweight read model for action-oriented records. It does not replace operational tables.
+
+Management summary pages such as Operations Control may combine `work_items`
+with narrow source-table counts where the source table is the more accurate
+operational truth, for example CSV import review rows or dealer payment
+confirmation state.
 
 ## 4. My Work Architecture
 
@@ -179,13 +186,15 @@ Production SQL changes must be:
 - reconciled
 - recorded in migration history where required
 
-## 10. Target Read-model Migration Order
+## 10. Read-model Migration Status
 
 1. Farmer Leads — complete
-2. Dispatches — next
-3. Pilots and Visits
-4. Marketing
-5. Dealer and Institution reviews, if still required
+2. Dispatches — complete for proven My Work action paths
+3. Pilots and Visits — complete for proven My Work action paths
+4. Marketing — Marketing Requests completion tracking and Marketing Library
+   review status are available; a dedicated Marketing `work_items` projection
+   can still be added if the action volume requires it
+5. Dealer and Institution reviews — still direct source-table logic where used
 
 Each module should follow:
 
@@ -199,3 +208,32 @@ define actions
 → performance proof
 → production cutover
 ```
+
+## 11. Import Architecture
+
+Farmer Lead import is preview-first:
+
+- browser parses CSV and shows required-field feedback
+- users click `Import valid rows`
+- server normalizes optional values before strict record validation
+- valid rows insert immediately
+- invalid rows save to `farmer_lead_import_batches` and
+  `farmer_lead_import_rows`
+- saved rows can be edited and re-imported later
+
+The importer ignores blank unnamed CSV columns and keeps duplicate named headers
+as blocking errors.
+
+## 12. Marketing Library Architecture
+
+Marketing Library uses:
+
+- `marketing_assets` for logical material records
+- `marketing_asset_versions` for immutable file/YouTube versions
+- private Supabase Storage for file assets
+- YouTube links for video assets
+- share records with stored token hashes for no-login customer links
+- database guards for workflow state, publish attribution, and reviewer rules
+
+Marketing Head/Admin direct publish is allowed. Designer submissions require
+Marketing Head review.

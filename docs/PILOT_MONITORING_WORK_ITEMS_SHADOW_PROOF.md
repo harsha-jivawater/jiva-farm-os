@@ -159,3 +159,12 @@ Local validation:
 - `npm run lint` passed after removing an obsolete import
 - `npm run build` passed
 - `git diff --check` passed
+
+## Current Addendum - 05 August 2026
+
+- Research Assistant pilot, pilot visit, and visit report upload access is
+  covered by database regression tests.
+- New Pilot creation supports `Jet` as an irrigation type.
+- Pilot area and control area are captured as value plus unit: Acres, Cents, or
+  Guntas. The app stores canonical acres for reporting while retaining the
+  selected unit/value for the form experience.
