@@ -3,13 +3,14 @@ import { DispatchForm } from "@/components/dispatches/dispatch-form";
 import { PageHeader } from "@/components/page-header";
 import { updateDispatchAction } from "@/app/(app)/dispatches/actions";
 import { preferredDispatchDeviceStatuses } from "@/lib/dispatches/options";
-import type {
-  Dispatch,
-  DispatchDealerOption,
-  DispatchDeviceOption,
-  DispatchFarmerLeadOption,
-  DispatchInstitutionSaleLineOption,
-  DispatchPilotOption
+import {
+  mergeFarmerLeadOptions,
+  type Dispatch,
+  type DispatchDealerOption,
+  type DispatchDeviceOption,
+  type DispatchFarmerLeadOption,
+  type DispatchInstitutionSaleLineOption,
+  type DispatchPilotOption
 } from "@/lib/dispatches/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -73,6 +74,7 @@ const farmerLeadSelectColumns = [
   "village",
   "district",
   "state",
+  "funnel_stage",
   "product_recommended",
   "payment_confirmed",
   "device_dispatched",
@@ -179,8 +181,18 @@ export default async function EditDispatchPage({
     .eq("device_dispatched", false)
     .order("created_at", { ascending: false })
     .limit(200);
+  const { data: pilotAgreedLeads } = await supabase
+    .from("farmer_leads")
+    .select(farmerLeadSelectColumns)
+    .is("deleted_at", null)
+    .eq("funnel_stage", "Pilot Agreed")
+    .order("farmer_name", { ascending: true })
+    .order("lead_code", { ascending: true })
+    .limit(500);
   let farmerLeads =
     (eligibleLeads ?? []) as unknown as DispatchFarmerLeadOption[];
+  let institutionFarmerLeads =
+    (pilotAgreedLeads ?? []) as unknown as DispatchFarmerLeadOption[];
   const selectedLeadId =
     dispatch.destination_farmer_lead_id ?? dispatch.linked_farmer_lead_id;
 
@@ -320,18 +332,12 @@ export default async function EditDispatchPage({
             .maybeSingle()
         ]);
 
-      const farmerLead = lead as unknown as
-        | {
-            lead_code: string;
-            farmer_name: string;
-            mobile_number: string;
-            village: string;
-            district: string;
-            state: string;
-          }
-        | null;
+      const farmerLead = lead as unknown as DispatchFarmerLeadOption | null;
 
       if (order && institution && farmerLead) {
+        institutionFarmerLeads = mergeFarmerLeadOptions(institutionFarmerLeads, [
+          farmerLead
+        ]);
         institutionSaleLines = [
           {
             id: saleLine.id,
@@ -373,6 +379,7 @@ export default async function EditDispatchPage({
         dispatch={dispatch}
         error={query.error}
         farmerLeads={farmerLeads}
+        institutionFarmerLeads={institutionFarmerLeads}
         institutionSaleLines={institutionSaleLines}
         mode="edit"
         pilots={pilots}

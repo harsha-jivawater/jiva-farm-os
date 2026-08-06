@@ -35,6 +35,7 @@ type DispatchFormProps = {
   devices: DispatchDeviceOption[];
   error?: string | null;
   farmerLeads?: DispatchFarmerLeadOption[];
+  institutionFarmerLeads?: DispatchFarmerLeadOption[];
   institutionSaleLines?: DispatchInstitutionSaleLineOption[];
   initialDispatchRoute?: string;
   initialFarmerLeadId?: string;
@@ -97,6 +98,19 @@ function institutionSaleLineLabel(line: DispatchInstitutionSaleLineOption) {
   return `${line.order_code} · ${line.organization_name} pays · ${line.farmer_name}, ${line.district}`;
 }
 
+function institutionSalePayerLabel(
+  institution: { id: string; organization_name: string },
+  institutionSaleLines: DispatchInstitutionSaleLineOption[]
+) {
+  const allocationCount = institutionSaleLines.filter(
+    (line) => line.institution_id === institution.id
+  ).length;
+
+  return `${institution.organization_name} (${allocationCount} ready allocation${
+    allocationCount === 1 ? "" : "s"
+  })`;
+}
+
 function isWarehouseDispatchDevice(device: DispatchDeviceOption) {
   return (
     ["In Warehouse", "Reserved"].includes(device.device_status) &&
@@ -157,6 +171,7 @@ export function DispatchForm({
   devices,
   error,
   farmerLeads = [],
+  institutionFarmerLeads = [],
   institutionSaleLines = [],
   initialDispatchRoute,
   initialFarmerLeadId,
@@ -260,6 +275,12 @@ export function DispatchForm({
         initialInstitutionSaleLine?.id ??
         ""
     );
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState(
+    initialInstitutionSaleLine?.institution_id ??
+      dispatch?.destination_institution_id ??
+      dispatch?.linked_institution_id ??
+      ""
+  );
   const [destinationName, setDestinationName] = useState(
     initialLead?.farmer_name ??
       initialPilot?.pilot_name ??
@@ -394,6 +415,34 @@ export function DispatchForm({
   const selectedInstitutionSaleLine = institutionSaleLines.find(
     (line) => line.id === selectedInstitutionSaleLineId
   );
+  const selectedInstitutionFarmerLead = institutionFarmerLeads.find(
+    (lead) => lead.id === selectedLeadId
+  );
+  const institutionSalePayers = useMemo(() => {
+    const payers = new Map<string, { id: string; organization_name: string }>();
+
+    for (const line of institutionSaleLines) {
+      if (!payers.has(line.institution_id)) {
+        payers.set(line.institution_id, {
+          id: line.institution_id,
+          organization_name: line.organization_name
+        });
+      }
+    }
+
+    return Array.from(payers.values()).sort((first, second) =>
+      first.organization_name.localeCompare(second.organization_name)
+    );
+  }, [institutionSaleLines]);
+  const filteredInstitutionSaleLines = selectedInstitutionId
+    ? institutionSaleLines.filter(
+        (line) =>
+          line.institution_id === selectedInstitutionId &&
+          (!selectedLeadId || line.farmer_lead_id === selectedLeadId)
+      )
+    : institutionSaleLines.filter(
+        (line) => !selectedLeadId || line.farmer_lead_id === selectedLeadId
+      );
   const visibleDealerDeviceIds = visibleDealerDispatchDevices.map(
     (device) => device.id
   );
@@ -440,6 +489,7 @@ export function DispatchForm({
     }
 
     setDestinationType("Farmer");
+    setSelectedInstitutionId(line.institution_id);
     setSelectedLeadId(line.farmer_lead_id);
     setDestinationName(line.farmer_name);
     setDestinationContact(line.mobile_number);
@@ -447,6 +497,68 @@ export function DispatchForm({
     setDistrictValue(line.district);
     setDestinationAddress(line.village);
     setPaymentConfirmed(true);
+  }
+
+  function applyInstitutionPayer(institutionId: string) {
+    setSelectedInstitutionId(institutionId);
+
+    const selectedLine = institutionSaleLines.find(
+      (line) => line.id === selectedInstitutionSaleLineId
+    );
+    const matchingLines = institutionSaleLines.filter(
+      (line) =>
+        line.institution_id === institutionId &&
+        (!selectedLeadId || line.farmer_lead_id === selectedLeadId)
+    );
+
+    if (selectedLeadId && matchingLines.length === 1) {
+      applyInstitutionSaleLine(matchingLines[0].id);
+      return;
+    }
+
+    if (!selectedLine || selectedLine.institution_id === institutionId) {
+      return;
+    }
+
+    setSelectedInstitutionSaleLineId("");
+    setPaymentConfirmed(false);
+  }
+
+  function applyInstitutionFarmerLead(leadId: string) {
+    setSelectedLeadId(leadId);
+
+    const matchingLines = institutionSaleLines.filter(
+      (line) =>
+        line.farmer_lead_id === leadId &&
+        (!selectedInstitutionId || line.institution_id === selectedInstitutionId)
+    );
+
+    if (leadId && matchingLines.length === 1) {
+      applyInstitutionSaleLine(matchingLines[0].id);
+      return;
+    }
+
+    setSelectedInstitutionSaleLineId("");
+
+    const lead = institutionFarmerLeads.find((option) => option.id === leadId);
+
+    if (!lead) {
+      setDestinationName("");
+      setDestinationContact("");
+      setStateValue("");
+      setDistrictValue("");
+      setDestinationAddress("");
+      setPaymentConfirmed(false);
+      return;
+    }
+
+    setDestinationType("Farmer");
+    setDestinationName(lead.farmer_name);
+    setDestinationContact(lead.mobile_number);
+    setStateValue(lead.state);
+    setDistrictValue(lead.district);
+    setDestinationAddress(lead.village);
+    setPaymentConfirmed(false);
   }
 
   function applyPilot(pilotId: string) {
@@ -504,6 +616,7 @@ export function DispatchForm({
     setSelectedPilotId("");
     setSelectedDealerId("");
     setSelectedInstitutionSaleLineId("");
+    setSelectedInstitutionId("");
     setDeviceSearch("");
     setSelectedDealerDeviceIds([]);
     setDealerDeviceSearch("");
@@ -988,28 +1101,120 @@ export function DispatchForm({
               </p>
             </div>
           ) : isInstitutionSaleRoute ? (
-            <div className="md:col-span-2">
-              <label
-                className="mb-1.5 block text-sm font-medium text-slate-700"
-                htmlFor="institution_sale_order_line_id"
-              >
-                Institution-paid farmer allocation
-              </label>
-              <select
-                className={inputClassName()}
-                id="institution_sale_order_line_id"
-                name="institution_sale_order_line_id"
-                onChange={(event) => applyInstitutionSaleLine(event.target.value)}
-                required
-                value={selectedInstitutionSaleLineId}
-              >
-                <option value="">Select paid institution allocation</option>
-                {institutionSaleLines.map((line) => (
-                  <option key={line.id} value={line.id}>
-                    {institutionSaleLineLabel(line)}
+            <>
+              <div>
+                <label
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  htmlFor="destination_institution_filter_id"
+                >
+                  Institution payer
+                </label>
+                <select
+                  className={inputClassName()}
+                  id="destination_institution_filter_id"
+                  onChange={(event) => applyInstitutionPayer(event.target.value)}
+                  required
+                  value={selectedInstitutionId}
+                >
+                  <option value="">Select institution payer</option>
+                  {institutionSalePayers.map((institution) => (
+                    <option key={institution.id} value={institution.id}>
+                      {institutionSalePayerLabel(institution, institutionSaleLines)}
+                    </option>
+                  ))}
+                </select>
+                {institutionSalePayers.length === 0 ? (
+                  <p className="mt-1 text-xs leading-5 text-amber-700">
+                    No confirmed institution-paid farmer allocations are ready
+                    for dispatch.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Only institutions with confirmed, undispatched farmer
+                    allocations appear here.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  htmlFor="institution_farmer_lead_filter_id"
+                >
+                  Farmer lead
+                </label>
+                <select
+                  className={inputClassName()}
+                  id="institution_farmer_lead_filter_id"
+                  onChange={(event) =>
+                    applyInstitutionFarmerLead(event.target.value)
+                  }
+                  required
+                  value={selectedLeadId}
+                >
+                  <option value="">Select Pilot Agreed farmer lead</option>
+                  {institutionFarmerLeads.map((lead) => (
+                    <option key={lead.id} value={lead.id}>
+                      {leadLabel(lead)}
+                    </option>
+                  ))}
+                </select>
+                {institutionFarmerLeads.length === 0 ? (
+                  <p className="mt-1 text-xs leading-5 text-amber-700">
+                    No farmer leads are currently in the Pilot Agreed funnel
+                    stage.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Choose the farmer receiving the institution-funded device.
+                  </p>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  htmlFor="institution_sale_order_line_id"
+                >
+                  Institution-paid farmer allocation
+                </label>
+                <select
+                  className={inputClassName()}
+                  disabled={!selectedInstitutionId || !selectedLeadId}
+                  id="institution_sale_order_line_id"
+                  name="institution_sale_order_line_id"
+                  onChange={(event) =>
+                    applyInstitutionSaleLine(event.target.value)
+                  }
+                  required
+                  value={selectedInstitutionSaleLineId}
+                >
+                  <option value="">
+                    {selectedInstitutionId && selectedLeadId
+                      ? "Select paid institution allocation"
+                      : "Select institution and farmer lead first"}
                   </option>
-                ))}
-              </select>
+                  {filteredInstitutionSaleLines.map((line) => (
+                    <option key={line.id} value={line.id}>
+                      {institutionSaleLineLabel(line)}
+                    </option>
+                  ))}
+                </select>
+                {selectedInstitutionId &&
+                selectedLeadId &&
+                filteredInstitutionSaleLines.length === 0 ? (
+                  <p className="mt-1 text-xs leading-5 text-amber-700">
+                    This institution and farmer lead do not have a confirmed
+                    allocation ready for dispatch.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Accounts must confirm institution payment before an
+                    allocation appears here.
+                  </p>
+                )}
+              </div>
+
               <input
                 name="institution_sale_order_id"
                 type="hidden"
@@ -1018,18 +1223,19 @@ export function DispatchForm({
               <input
                 name="destination_institution_id"
                 type="hidden"
-                value={selectedInstitutionSaleLine?.institution_id ?? ""}
+                value={
+                  selectedInstitutionSaleLine?.institution_id ??
+                  selectedInstitutionId
+                }
               />
               <input
                 name="destination_farmer_lead_id"
                 type="hidden"
-                value={selectedInstitutionSaleLine?.farmer_lead_id ?? ""}
+                value={
+                  selectedInstitutionSaleLine?.farmer_lead_id ?? selectedLeadId
+                }
               />
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                Accounts must confirm institution payment before this allocation
-                appears here.
-              </p>
-            </div>
+            </>
           ) : (
             <input name="destination_farmer_lead_id" type="hidden" value="" />
           )}
@@ -1180,6 +1386,18 @@ export function DispatchForm({
                       <dt className="text-slate-500">Payer</dt>
                       <dd className="mt-1 font-semibold text-slate-950">
                         {selectedInstitutionSaleLine?.organization_name ?? "Not set"}
+                      </dd>
+                    </div>
+                  ) : null}
+                  {isInstitutionSaleRoute ? (
+                    <div>
+                      <dt className="text-slate-500">Farmer lead</dt>
+                      <dd className="mt-1 font-semibold text-slate-950">
+                        {selectedInstitutionSaleLine
+                          ? `${selectedInstitutionSaleLine.lead_code} · ${selectedInstitutionSaleLine.farmer_name}`
+                          : selectedInstitutionFarmerLead
+                            ? `${selectedInstitutionFarmerLead.lead_code} · ${selectedInstitutionFarmerLead.farmer_name}`
+                            : "Not set"}
                       </dd>
                     </div>
                   ) : null}
