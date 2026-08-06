@@ -43,6 +43,24 @@ export type DispatchFarmerLeadOption = {
   owner_user_id: string;
   rsm_user_id: string;
   region_id: string;
+  linked_institution_id?: string | null;
+};
+
+export type DispatchInstitutionSaleLineOption = {
+  id: string;
+  order_id: string;
+  order_code: string;
+  institution_id: string;
+  organization_name: string;
+  farmer_lead_id: string;
+  lead_code: string;
+  farmer_name: string;
+  mobile_number: string;
+  village: string;
+  district: string;
+  state: string;
+  product_model: string | null;
+  payment_received_date: string | null;
 };
 
 export type DispatchPilotOption = {

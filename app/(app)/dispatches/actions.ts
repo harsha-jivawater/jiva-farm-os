@@ -16,6 +16,7 @@ import type {
   DispatchUpdate
 } from "@/lib/dispatches/types";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
+import { rollupInstitutionSaleOrderStatus } from "@/lib/institutions/sale-orders";
 import { appSearchUrl, sendN8nEvent } from "@/lib/integrations/n8n";
 import { createClient } from "@/lib/supabase/server";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
@@ -77,6 +78,37 @@ type DealerDispatchSource = {
   dealer_address: string | null;
 };
 
+type InstitutionSaleDispatchSource = {
+  line: {
+    id: string;
+    order_id: string;
+    institution_id: string;
+    farmer_lead_id: string;
+    product_model: string | null;
+    allocation_status: string;
+    dispatch_id: string | null;
+    assigned_device_id: string | null;
+  };
+  order: {
+    id: string;
+    order_code: string;
+    institution_id: string;
+    business_sector: string;
+    payment_status: string;
+    payment_received_date: string | null;
+    payment_confirmed_by_user_id: string | null;
+    product_model: string | null;
+  };
+  institution: {
+    id: string;
+    organization_name: string;
+  };
+  lead: FarmerSaleDispatchLead & {
+    linked_institution_id: string | null;
+    product_recommended: string | null;
+  };
+};
+
 type DealerDispatchPaymentState = Pick<
   Dispatch,
   "payment_confirmed" | "payment_confirmed_by_user_id" | "payment_confirmed_date"
@@ -110,6 +142,7 @@ function getDispatchRoute(formData: FormData) {
 
   if (
     route === "Paid Farmer Sale" ||
+    route === "Institution Funded Farmer Sale" ||
     route === "Free Pilot" ||
     route === "Dealer Dispatch" ||
     route === "Admin Manual Exception"
@@ -124,7 +157,10 @@ function routeFromPayloadFallback(
   route: string,
   payload: Pick<
     DispatchInsert | DispatchUpdate,
-    "dispatch_type" | "destination_dealer_id" | "linked_dealer_id"
+    | "dispatch_type"
+    | "destination_dealer_id"
+    | "institution_sale_order_line_id"
+    | "linked_dealer_id"
   >
 ) {
   if (route) {
@@ -133,6 +169,13 @@ function routeFromPayloadFallback(
 
   if (payload.dispatch_type === "Farmer Sale Dispatch") {
     return "Paid Farmer Sale";
+  }
+
+  if (
+    payload.dispatch_type === "Institution Dispatch" ||
+    payload.institution_sale_order_line_id
+  ) {
+    return "Institution Funded Farmer Sale";
   }
 
   if (payload.dispatch_type === "Pilot Dispatch") {
@@ -709,6 +752,121 @@ async function getDealerForDispatch(
   return data as unknown as DealerDispatchSource;
 }
 
+async function getInstitutionSaleForDispatch(
+  supabase: SupabaseClient,
+  lineId: string | null | undefined,
+  errorPath: string,
+  existingDispatchId?: string
+) {
+  if (!lineId) {
+    redirectWithError(
+      errorPath,
+      "Select an institution-funded farmer allocation before dispatch."
+    );
+  }
+
+  const { data: line, error: lineError } = await supabase
+    .from("institution_sale_order_lines")
+    .select(
+      "id, order_id, institution_id, farmer_lead_id, product_model, allocation_status, dispatch_id, assigned_device_id"
+    )
+    .eq("id", lineId)
+    .is("deleted_at", null)
+    .single();
+
+  if (lineError || !line) {
+    redirectWithError(errorPath, "Institution-funded farmer allocation was not found.");
+  }
+
+  if (
+    line.dispatch_id &&
+    (!existingDispatchId || line.dispatch_id !== existingDispatchId)
+  ) {
+    redirectWithError(
+      errorPath,
+      "This institution-funded farmer allocation already has a dispatch."
+    );
+  }
+
+  const [{ data: order }, { data: institution }, { data: lead }] =
+    await Promise.all([
+      supabase
+        .from("institution_sale_orders")
+        .select(
+          "id, order_code, institution_id, business_sector, payment_status, payment_received_date, payment_confirmed_by_user_id, product_model"
+        )
+        .eq("id", line.order_id)
+        .eq("institution_id", line.institution_id)
+        .is("deleted_at", null)
+        .single(),
+      supabase
+        .from("institutions")
+        .select("id, organization_name")
+        .eq("id", line.institution_id)
+        .is("deleted_at", null)
+        .single(),
+      supabase
+        .from("farmer_leads")
+        .select(
+          [
+            "id",
+            "business_sector",
+            "lead_code",
+            "farmer_name",
+            "mobile_number",
+            "village",
+            "district",
+            "state",
+            "funnel_stage",
+            "lead_status",
+            "payment_confirmed",
+            "payment_confirmed_by_user_id",
+            "payment_confirmed_date",
+            "device_dispatched",
+            "linked_dispatch_id",
+            "linked_institution_id",
+            "product_recommended"
+          ].join(",")
+        )
+        .eq("id", line.farmer_lead_id)
+        .is("deleted_at", null)
+        .single()
+    ]);
+
+  if (!order || !institution || !lead) {
+    redirectWithError(
+      errorPath,
+      "Institution order, institution, or farmer lead was not found."
+    );
+  }
+
+  if (!["Confirmed", "Waived", "Not Required"].includes(order.payment_status)) {
+    redirectWithError(
+      errorPath,
+      "Accounts must confirm the institution payment before dispatch."
+    );
+  }
+
+  const typedLead = lead as unknown as InstitutionSaleDispatchSource["lead"];
+
+  if (
+    typedLead.linked_institution_id &&
+    typedLead.linked_institution_id !== line.institution_id
+  ) {
+    redirectWithError(
+      errorPath,
+      "This farmer lead is linked to a different institution."
+    );
+  }
+
+  return {
+    line,
+    order,
+    institution,
+    lead: typedLead
+  } as unknown as InstitutionSaleDispatchSource;
+}
+
 function applyPilotDispatchSnapshot(
   payload: DispatchInsert | DispatchUpdate,
   pilot: PilotDispatchSource
@@ -756,6 +914,40 @@ function applyDealerDispatchSnapshot(
   payload.payment_confirmed_date = paymentState?.payment_confirmed_date ?? null;
 }
 
+function applyInstitutionSaleDispatchSnapshot(
+  payload: DispatchInsert | DispatchUpdate,
+  source: InstitutionSaleDispatchSource
+) {
+  payload.dispatch_type = "Institution Dispatch";
+  payload.destination_type = "Farmer";
+  payload.destination_farmer_lead_id = source.lead.id;
+  payload.destination_institution_id = source.institution.id;
+  payload.linked_farmer_lead_id = source.lead.id;
+  payload.linked_institution_id = source.institution.id;
+  payload.destination_dealer_id = null;
+  payload.linked_dealer_id = null;
+  payload.destination_pilot_id = null;
+  payload.linked_pilot_id = null;
+  payload.destination_name_snapshot = source.lead.farmer_name;
+  payload.destination_contact_snapshot = source.lead.mobile_number;
+  payload.destination_address = source.lead.village;
+  payload.destination_state = source.lead.state;
+  payload.destination_district = source.lead.district;
+  payload.business_sector = source.order.business_sector;
+  payload.product_model =
+    source.line.product_model ??
+    source.order.product_model ??
+    source.lead.product_recommended ??
+    payload.product_model;
+  payload.payment_requirement_type = "Payment Required";
+  payload.payment_confirmed = true;
+  payload.payment_confirmed_by_user_id =
+    source.order.payment_confirmed_by_user_id;
+  payload.payment_confirmed_date = source.order.payment_received_date;
+  payload.institution_sale_order_id = source.order.id;
+  payload.institution_sale_order_line_id = source.line.id;
+}
+
 function isDealerDispatch(dispatch: Pick<Dispatch, "dispatch_type">) {
   return dispatch.dispatch_type === "Dealer Stock Dispatch";
 }
@@ -777,6 +969,16 @@ function validateDevicePoolForRoute({
     redirectWithError(
       errorPath,
       "Paid farmer dispatches can use Fresh Sale devices only."
+    );
+  }
+
+  if (
+    route === "Institution Funded Farmer Sale" &&
+    device.inventory_pool !== "Fresh Sale"
+  ) {
+    redirectWithError(
+      errorPath,
+      "Institution-funded farmer dispatches can use Fresh Sale devices only."
     );
   }
 
@@ -822,6 +1024,104 @@ async function markFarmerSaleLeadDispatched({
       })
     })
     .eq("id", lead.id);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+}
+
+async function updateInstitutionSaleOrderRollup(
+  supabase: SupabaseClient,
+  orderId: string
+) {
+  const [{ data: order }, { data: lines }] = await Promise.all([
+    supabase
+      .from("institution_sale_orders")
+      .select("id, payment_status")
+      .eq("id", orderId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .from("institution_sale_order_lines")
+      .select("allocation_status")
+      .eq("order_id", orderId)
+      .is("deleted_at", null)
+  ]);
+
+  if (!order) {
+    return;
+  }
+
+  const orderStatus = rollupInstitutionSaleOrderStatus({
+    lineStatuses: (lines ?? []).map((line) => line.allocation_status),
+    paymentStatus: order.payment_status
+  });
+
+  await supabase
+    .from("institution_sale_orders")
+    .update({ order_status: orderStatus })
+    .eq("id", orderId);
+}
+
+async function markInstitutionSaleLineDispatchState({
+  supabase,
+  dispatchId,
+  line,
+  deviceId,
+  moved,
+  errorPath
+}: {
+  supabase: SupabaseClient;
+  dispatchId: string;
+  line: InstitutionSaleDispatchSource["line"];
+  deviceId: string;
+  moved: boolean;
+  errorPath: string;
+}) {
+  const { error } = await supabase
+    .from("institution_sale_order_lines")
+    .update({
+      assigned_device_id: deviceId,
+      allocation_status: moved ? "Dispatched" : "Dispatch Requested",
+      dispatch_id: dispatchId
+    })
+    .eq("id", line.id);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  await updateInstitutionSaleOrderRollup(supabase, line.order_id);
+}
+
+async function markInstitutionSaleLeadDispatched({
+  supabase,
+  dispatchId,
+  source,
+  errorPath
+}: {
+  supabase: SupabaseClient;
+  dispatchId: string;
+  source: InstitutionSaleDispatchSource;
+  errorPath: string;
+}) {
+  const nextFunnelStage =
+    source.lead.lead_status === "Lost" || source.lead.lead_status === "Parked"
+      ? source.lead.funnel_stage
+      : "Device Dispatched";
+  const { error } = await supabase
+    .from("farmer_leads")
+    .update({
+      device_dispatched: true,
+      linked_dispatch_id: dispatchId,
+      linked_institution_id: source.institution.id,
+      funnel_stage: nextFunnelStage,
+      lead_status: deriveLeadStatus({
+        funnelStage: nextFunnelStage,
+        paymentConfirmed: true
+      })
+    })
+    .eq("id", source.lead.id);
 
   if (error) {
     redirectWithError(errorPath, error.message);
@@ -880,6 +1180,13 @@ async function applyDispatchedSideEffects({
   if (payload.destination_type === "Dealer") {
     devicePayload.linked_dealer_id =
       payload.destination_dealer_id ?? payload.linked_dealer_id ?? null;
+  }
+
+  if (payload.destination_type === "Farmer") {
+    devicePayload.linked_farmer_lead_id =
+      payload.destination_farmer_lead_id ?? payload.linked_farmer_lead_id ?? null;
+    devicePayload.linked_institution_id =
+      payload.destination_institution_id ?? payload.linked_institution_id ?? null;
   }
 
   if (payload.destination_type === "Pilot") {
@@ -942,6 +1249,24 @@ function pilotDeviceDestinationSnapshot(
   };
 }
 
+function institutionSaleDestinationSnapshot(
+  source: InstitutionSaleDispatchSource | null
+): DispatchedDestinationSnapshot | undefined {
+  if (!source) {
+    return undefined;
+  }
+
+  return {
+    holderId: source.lead.id,
+    holderName: source.lead.farmer_name,
+    locationText: compactLocation(
+      source.lead.village,
+      source.lead.district,
+      source.lead.state
+    )
+  };
+}
+
 export async function createDispatchAction(formData: FormData) {
   const supabase = await createClient();
   const route = getDispatchRoute(formData);
@@ -972,6 +1297,14 @@ export async function createDispatchAction(formData: FormData) {
           "/dispatches/new"
         )
       : null;
+  const institutionSaleDispatch =
+    effectiveRoute === "Institution Funded Farmer Sale"
+      ? await getInstitutionSaleForDispatch(
+          supabase,
+          payload.institution_sale_order_line_id,
+          "/dispatches/new"
+        )
+      : null;
   const pilotDispatch =
     effectiveRoute === "Free Pilot"
       ? await getPilotForDispatch(
@@ -996,6 +1329,15 @@ export async function createDispatchAction(formData: FormData) {
       errorPath: "/dispatches/new"
     });
     applyFarmerSaleLeadSnapshot(payload, farmerSaleLead);
+  }
+
+  if (institutionSaleDispatch) {
+    await ensureNoOpenDispatchForFarmerLead({
+      supabase,
+      farmerLeadId: institutionSaleDispatch.lead.id,
+      errorPath: "/dispatches/new"
+    });
+    applyInstitutionSaleDispatchSnapshot(payload, institutionSaleDispatch);
   }
 
   if (pilotDispatch) {
@@ -1125,7 +1467,8 @@ export async function createDispatchAction(formData: FormData) {
   if (
     payload.payment_confirmed &&
     !canConfirmPayment(profile) &&
-    payload.dispatch_type !== "Farmer Sale Dispatch"
+    payload.dispatch_type !== "Farmer Sale Dispatch" &&
+    payload.dispatch_type !== "Institution Dispatch"
   ) {
     redirectWithError(
       "/dispatches/new",
@@ -1181,6 +1524,17 @@ export async function createDispatchAction(formData: FormData) {
     redirectWithError("/dispatches/new", dispatchWriteErrorMessage(error));
   }
 
+  if (institutionSaleDispatch) {
+    await markInstitutionSaleLineDispatchState({
+      supabase,
+      dispatchId,
+      line: institutionSaleDispatch.line,
+      deviceId: device.id,
+      moved: hasMovedDeviceFromWarehouse(insertPayload.dispatch_status),
+      errorPath: `/dispatches/${dispatchId}/edit`
+    });
+  }
+
   if (hasMovedDeviceFromWarehouse(insertPayload.dispatch_status)) {
     await applyDispatchedSideEffects({
       supabase,
@@ -1189,7 +1543,9 @@ export async function createDispatchAction(formData: FormData) {
       payload: insertPayload,
       device,
       createMovement: true,
-      destinationSnapshot: pilotDeviceDestinationSnapshot(pilotDispatch),
+      destinationSnapshot:
+        institutionSaleDestinationSnapshot(institutionSaleDispatch) ??
+        pilotDeviceDestinationSnapshot(pilotDispatch),
       errorPath: `/dispatches/${dispatchId}/edit`
     });
 
@@ -1198,6 +1554,15 @@ export async function createDispatchAction(formData: FormData) {
         supabase,
         dispatchId,
         lead: farmerSaleLead,
+        errorPath: `/dispatches/${dispatchId}/edit`
+      });
+    }
+
+    if (institutionSaleDispatch) {
+      await markInstitutionSaleLeadDispatched({
+        supabase,
+        dispatchId,
+        source: institutionSaleDispatch,
         errorPath: `/dispatches/${dispatchId}/edit`
       });
     }
@@ -1220,6 +1585,12 @@ export async function createDispatchAction(formData: FormData) {
   if (farmerSaleLead) {
     revalidatePath("/farmer-leads");
     revalidatePath(`/farmer-leads/${farmerSaleLead.id}`);
+  }
+  if (institutionSaleDispatch) {
+    revalidatePath("/institutional-partners");
+    revalidatePath(`/institutional-partners/${institutionSaleDispatch.institution.id}`);
+    revalidatePath("/farmer-leads");
+    revalidatePath(`/farmer-leads/${institutionSaleDispatch.lead.id}`);
   }
   if (pilotDispatch) {
     revalidatePath("/pilots");
@@ -1288,6 +1659,15 @@ export async function updateDispatchAction(id: string, formData: FormData) {
           id
         )
       : null;
+  const institutionSaleDispatch =
+    effectiveRoute === "Institution Funded Farmer Sale"
+      ? await getInstitutionSaleForDispatch(
+          supabase,
+          payload.institution_sale_order_line_id,
+          `/dispatches/${id}/edit`,
+          id
+        )
+      : null;
   const pilotDispatch =
     effectiveRoute === "Free Pilot"
       ? await getPilotForDispatch(
@@ -1313,6 +1693,16 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       existingDispatchId: id
     });
     applyFarmerSaleLeadSnapshot(payload, farmerSaleLead);
+  }
+
+  if (institutionSaleDispatch) {
+    await ensureNoOpenDispatchForFarmerLead({
+      supabase,
+      farmerLeadId: institutionSaleDispatch.lead.id,
+      errorPath: `/dispatches/${id}/edit`,
+      existingDispatchId: id
+    });
+    applyInstitutionSaleDispatchSnapshot(payload, institutionSaleDispatch);
   }
 
   if (pilotDispatch) {
@@ -1366,7 +1756,8 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   if (
     (paymentConfirmationChanged || paymentConfirmationDateChanged) &&
     !canConfirmPayment(profile) &&
-    payload.dispatch_type !== "Farmer Sale Dispatch"
+    payload.dispatch_type !== "Farmer Sale Dispatch" &&
+    payload.dispatch_type !== "Institution Dispatch"
   ) {
     redirectWithError(
       `/dispatches/${id}/edit`,
@@ -1427,6 +1818,17 @@ export async function updateDispatchAction(id: string, formData: FormData) {
     );
   }
 
+  if (institutionSaleDispatch) {
+    await markInstitutionSaleLineDispatchState({
+      supabase,
+      dispatchId: id,
+      line: institutionSaleDispatch.line,
+      deviceId: device.id,
+      moved: hasMovedDeviceFromWarehouse(updatePayload.dispatch_status),
+      errorPath: `/dispatches/${id}/edit`
+    });
+  }
+
   if (
     !existingDispatchMovedDevice &&
     hasMovedDeviceFromWarehouse(updatePayload.dispatch_status)
@@ -1438,7 +1840,9 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       payload: updatePayload,
       device,
       createMovement: true,
-      destinationSnapshot: pilotDeviceDestinationSnapshot(pilotDispatch),
+      destinationSnapshot:
+        institutionSaleDestinationSnapshot(institutionSaleDispatch) ??
+        pilotDeviceDestinationSnapshot(pilotDispatch),
       errorPath: `/dispatches/${id}/edit`
     });
 
@@ -1447,6 +1851,15 @@ export async function updateDispatchAction(id: string, formData: FormData) {
         supabase,
         dispatchId: id,
         lead: farmerSaleLead,
+        errorPath: `/dispatches/${id}/edit`
+      });
+    }
+
+    if (institutionSaleDispatch) {
+      await markInstitutionSaleLeadDispatched({
+        supabase,
+        dispatchId: id,
+        source: institutionSaleDispatch,
         errorPath: `/dispatches/${id}/edit`
       });
     }
@@ -1458,7 +1871,9 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       payload: updatePayload,
       device,
       createMovement: false,
-      destinationSnapshot: pilotDeviceDestinationSnapshot(pilotDispatch),
+      destinationSnapshot:
+        institutionSaleDestinationSnapshot(institutionSaleDispatch) ??
+        pilotDeviceDestinationSnapshot(pilotDispatch),
       errorPath: `/dispatches/${id}/edit`
     });
 
@@ -1470,6 +1885,15 @@ export async function updateDispatchAction(id: string, formData: FormData) {
         errorPath: `/dispatches/${id}/edit`
       });
     }
+
+    if (institutionSaleDispatch) {
+      await markInstitutionSaleLeadDispatched({
+        supabase,
+        dispatchId: id,
+        source: institutionSaleDispatch,
+        errorPath: `/dispatches/${id}/edit`
+      });
+    }
   }
 
   revalidatePath("/dispatches");
@@ -1478,6 +1902,12 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   if (farmerSaleLead) {
     revalidatePath("/farmer-leads");
     revalidatePath(`/farmer-leads/${farmerSaleLead.id}`);
+  }
+  if (institutionSaleDispatch) {
+    revalidatePath("/institutional-partners");
+    revalidatePath(`/institutional-partners/${institutionSaleDispatch.institution.id}`);
+    revalidatePath("/farmer-leads");
+    revalidatePath(`/farmer-leads/${institutionSaleDispatch.lead.id}`);
   }
   if (pilotDispatch) {
     revalidatePath("/pilots");

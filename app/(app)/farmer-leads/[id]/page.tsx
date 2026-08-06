@@ -24,6 +24,7 @@ import {
 } from "@/lib/farmer-leads/types";
 import { formatDisplayDate } from "@/lib/date-utils";
 import {
+  farmerLeadInteractionTypeOptions,
   funnelStageOptions,
   labelFor,
   leadSourceOptions
@@ -427,6 +428,7 @@ export default async function FarmerLeadDetailPage({
           "farmer_lead_id",
           "followed_up_by_user_id",
           "followup_date",
+          "interaction_type",
           "priority",
           "interaction_note",
           "concern_or_blocker",
@@ -805,6 +807,24 @@ export default async function FarmerLeadDetailPage({
                 </label>
                 <label>
                   <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Interaction type
+                  </span>
+                  <select
+                    className={formFieldClassName()}
+                    defaultValue=""
+                    name="interaction_type"
+                    required
+                  >
+                    <option value="">Select interaction type</option>
+                    {farmerLeadInteractionTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
                     Next follow-up date
                   </span>
                   <input
@@ -963,6 +983,14 @@ export default async function FarmerLeadDetailPage({
                           </dt>
                           <dd className="mt-1 font-medium text-slate-700">
                             {display(followup.priority)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Interaction type
+                          </dt>
+                          <dd className="mt-1 font-medium text-slate-700">
+                            {display(followup.interaction_type)}
                           </dd>
                         </div>
                         <div>

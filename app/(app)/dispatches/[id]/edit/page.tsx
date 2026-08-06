@@ -8,6 +8,7 @@ import type {
   DispatchDealerOption,
   DispatchDeviceOption,
   DispatchFarmerLeadOption,
+  DispatchInstitutionSaleLineOption,
   DispatchPilotOption
 } from "@/lib/dispatches/types";
 import { createClient } from "@/lib/supabase/server";
@@ -77,7 +78,8 @@ const farmerLeadSelectColumns = [
   "device_dispatched",
   "owner_user_id",
   "rsm_user_id",
-  "region_id"
+  "region_id",
+  "linked_institution_id"
 ].join(",");
 
 const dealerSelectColumns = [
@@ -278,6 +280,80 @@ export default async function EditDispatchPage({
     }
   }
 
+  let institutionSaleLines: DispatchInstitutionSaleLineOption[] = [];
+
+  if (dispatch.institution_sale_order_line_id) {
+    const { data: line } = await supabase
+      .from("institution_sale_order_lines")
+      .select("id, order_id, institution_id, farmer_lead_id, product_model")
+      .eq("id", dispatch.institution_sale_order_line_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    const saleLine = line as
+      | {
+          id: string;
+          order_id: string;
+          institution_id: string;
+          farmer_lead_id: string;
+          product_model: string | null;
+        }
+      | null;
+
+    if (saleLine) {
+      const [{ data: order }, { data: institution }, { data: lead }] =
+        await Promise.all([
+          supabase
+            .from("institution_sale_orders")
+            .select("id, order_code, payment_received_date")
+            .eq("id", saleLine.order_id)
+            .maybeSingle(),
+          supabase
+            .from("institutions")
+            .select("id, organization_name")
+            .eq("id", saleLine.institution_id)
+            .maybeSingle(),
+          supabase
+            .from("farmer_leads")
+            .select(farmerLeadSelectColumns)
+            .eq("id", saleLine.farmer_lead_id)
+            .maybeSingle()
+        ]);
+
+      const farmerLead = lead as unknown as
+        | {
+            lead_code: string;
+            farmer_name: string;
+            mobile_number: string;
+            village: string;
+            district: string;
+            state: string;
+          }
+        | null;
+
+      if (order && institution && farmerLead) {
+        institutionSaleLines = [
+          {
+            id: saleLine.id,
+            order_id: saleLine.order_id,
+            order_code: order.order_code,
+            institution_id: saleLine.institution_id,
+            organization_name: institution.organization_name,
+            farmer_lead_id: saleLine.farmer_lead_id,
+            lead_code: farmerLead.lead_code,
+            farmer_name: farmerLead.farmer_name,
+            mobile_number: farmerLead.mobile_number,
+            village: farmerLead.village,
+            district: farmerLead.district,
+            state: farmerLead.state,
+            product_model: saleLine.product_model,
+            payment_received_date: order.payment_received_date
+          }
+        ];
+      }
+    }
+  }
+
   const updateAction = updateDispatchAction.bind(null, dispatch.id);
 
   return (
@@ -297,6 +373,7 @@ export default async function EditDispatchPage({
         dispatch={dispatch}
         error={query.error}
         farmerLeads={farmerLeads}
+        institutionSaleLines={institutionSaleLines}
         mode="edit"
         pilots={pilots}
         pilotsLoadError={pilotsLoadError}

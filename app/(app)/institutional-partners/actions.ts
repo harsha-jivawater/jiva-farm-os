@@ -5,28 +5,43 @@ import { redirect } from "next/navigation";
 import {
   contactPayloadFromForm,
   institutionPayloadFromForm,
+  institutionSaleOrderLinePayloadFromForm,
+  institutionSaleOrderPayloadFromForm,
   meetingPayloadFromForm,
   shouldUpdateMainContact,
   validateContactPayload,
   validateInstitutionPayload,
+  validateInstitutionSaleOrderLinePayload,
+  validateInstitutionSaleOrderPayload,
   validateMeetingPayload
 } from "@/lib/institutions/form-data";
+import {
+  isInstitutionSalePaymentReady,
+  rollupInstitutionSaleOrderStatus
+} from "@/lib/institutions/sale-orders";
 import type {
   ContactFormPayload,
+  Institution,
   InstitutionContactInsert,
   InstitutionContactUpdate,
   InstitutionInsert,
   InstitutionMeetingInsert,
   InstitutionMeetingUpdate,
   InstitutionReviewInsert,
+  InstitutionSaleOrderInsert,
+  InstitutionSaleOrderLineInsert,
+  InstitutionSaleOrderUpdate,
   InstitutionUpdate
 } from "@/lib/institutions/types";
 import { createClient } from "@/lib/supabase/server";
 import { applyUploadedFilesToPayload } from "@/lib/uploads/server";
+import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   canApproveLegalDocuments,
+  canConfirmPayment,
   canManageInstitutionProfile,
   canSoftDeleteInstitution,
+  hasAnyRole,
   hasRole,
   isAdmin
 } from "@/lib/users/permissions";
@@ -63,6 +78,18 @@ function assertCanManageInstitutionProfile(
     redirectWithError(
       errorPath,
       "HR & Legal can approve institutional documents but cannot change institution profile details."
+    );
+  }
+}
+
+function assertCanManageInstitutionSales(
+  profile: Awaited<ReturnType<typeof getCurrentProfile>>,
+  errorPath: string
+) {
+  if (!hasAnyRole(profile, ["Admin", "Sales Head", "RSM"])) {
+    redirectWithError(
+      errorPath,
+      "Only Admin, Sales Head, or RSM can manage institution-funded sales."
     );
   }
 }
@@ -111,6 +138,77 @@ async function updateMeetingRollup(
     .from("institutions")
     .update(updatePayload)
     .eq("id", institutionId);
+}
+
+async function updateInstitutionSaleOrderRollup(
+  supabase: SupabaseClient,
+  orderId: string
+) {
+  const [{ data: order }, { data: lines }] = await Promise.all([
+    supabase
+      .from("institution_sale_orders")
+      .select("id, payment_status")
+      .eq("id", orderId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .from("institution_sale_order_lines")
+      .select("allocation_status")
+      .eq("order_id", orderId)
+      .is("deleted_at", null)
+  ]);
+
+  if (!order) {
+    return;
+  }
+
+  const orderStatus = rollupInstitutionSaleOrderStatus({
+    lineStatuses: (lines ?? []).map((line) => line.allocation_status),
+    paymentStatus: order.payment_status
+  });
+
+  await supabase
+    .from("institution_sale_orders")
+    .update({ order_status: orderStatus })
+    .eq("id", orderId);
+}
+
+async function getInstitutionForSaleOrder(
+  supabase: SupabaseClient,
+  institutionId: string,
+  errorPath: string
+) {
+  const { data, error } = await supabase
+    .from("institutions")
+    .select(
+      [
+        "id",
+        "business_sector",
+        "account_owner_user_id",
+        "rsm_user_id",
+        "sales_head_user_id"
+      ].join(",")
+    )
+    .eq("id", institutionId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !data) {
+    redirectWithError(errorPath, "Institution was not found.");
+  }
+
+  return data as unknown as Pick<
+    Institution,
+    | "id"
+    | "business_sector"
+    | "account_owner_user_id"
+    | "rsm_user_id"
+    | "sales_head_user_id"
+  >;
+}
+
+function institutionSalePaymentStatusFromForm(formData: FormData) {
+  return String(formData.get("payment_status") ?? "Confirmed").trim();
 }
 
 export async function createInstitutionAction(formData: FormData) {
@@ -328,7 +426,7 @@ export async function updateInstitutionReviewAction(
   const supabase = await createClient();
   const errorPath = `/institutional-partners/${institutionId}`;
   const profile = await getCurrentProfile(supabase, errorPath);
-  assertCanManageInstitutionProfile(profile, errorPath);
+  assertCanManageInstitutionSales(profile, errorPath);
 
   const priority = textValue(formData, "priority");
   const nextActionDate = textValue(formData, "next_action_date");
@@ -385,6 +483,251 @@ export async function updateInstitutionReviewAction(
 
   await revalidateInstitution(institutionId);
   redirect(`/institutional-partners/${institutionId}?saved=review`);
+}
+
+export async function createInstitutionSaleOrderAction(
+  institutionId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const errorPath = `/institutional-partners/${institutionId}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+  assertCanManageInstitutionSales(profile, errorPath);
+
+  const institution = await getInstitutionForSaleOrder(
+    supabase,
+    institutionId,
+    errorPath
+  );
+  const payload = institutionSaleOrderPayloadFromForm(formData);
+  const validationError = validateInstitutionSaleOrderPayload(payload);
+
+  if (validationError) {
+    redirectWithError(errorPath, validationError);
+  }
+
+  const paymentStatus = payload.payment_status ?? "Pending";
+  const insertPayload: InstitutionSaleOrderInsert = {
+    ...payload,
+    institution_id: institution.id,
+    business_sector: institution.business_sector ?? "Agriculture",
+    owner_user_id:
+      institution.account_owner_user_id ??
+      institution.sales_head_user_id ??
+      profile.id,
+    rsm_user_id: institution.rsm_user_id ?? null,
+    payment_status: paymentStatus,
+    payment_received_date: isInstitutionSalePaymentReady(paymentStatus)
+      ? localDateValue()
+      : null,
+    payment_confirmed_by_user_id: isInstitutionSalePaymentReady(paymentStatus)
+      ? profile.id
+      : null,
+    order_status: isInstitutionSalePaymentReady(paymentStatus)
+      ? "Payment Confirmed"
+      : "Pending Payment",
+    created_by_user_id: profile.id
+  };
+
+  if (
+    isInstitutionSalePaymentReady(insertPayload.payment_status) &&
+    !canConfirmPayment(profile)
+  ) {
+    redirectWithError(
+      errorPath,
+      "Only Accounts or Admin can create an order as payment confirmed."
+    );
+  }
+
+  const { data: order, error } = await supabase
+    .from("institution_sale_orders")
+    .insert(insertPayload)
+    .select("id")
+    .single();
+
+  if (error || !order) {
+    redirectWithError(errorPath, error?.message ?? "Institution order was not saved.");
+  }
+
+  await updateInstitutionSaleOrderRollup(supabase, order.id);
+  await revalidateInstitution(institutionId);
+  revalidatePath("/my-pending-work");
+  redirect(`${errorPath}?saved=institution_sale_order`);
+}
+
+export async function confirmInstitutionSaleOrderPaymentAction(
+  institutionId: string,
+  orderId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const errorPath = `/institutional-partners/${institutionId}`;
+  const profile = await getCurrentInternalUser(supabase, errorPath);
+
+  if (!canConfirmPayment(profile)) {
+    redirectWithError(
+      errorPath,
+      "Only Accounts or Admin can confirm institution payments."
+    );
+  }
+
+  const { data: order, error } = await supabase
+    .from("institution_sale_orders")
+    .select("id, payment_status")
+    .eq("id", orderId)
+    .eq("institution_id", institutionId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !order) {
+    redirectWithError(errorPath, "Institution sale order was not found.");
+  }
+
+  const paymentStatus = institutionSalePaymentStatusFromForm(formData);
+  const paymentDate = textValue(formData, "payment_received_date") ?? localDateValue();
+  const updatePayload: InstitutionSaleOrderUpdate = {
+    payment_status: paymentStatus,
+    payment_received_date: isInstitutionSalePaymentReady(paymentStatus)
+      ? paymentDate
+      : null,
+    payment_confirmed_by_user_id: isInstitutionSalePaymentReady(paymentStatus)
+      ? profile.id
+      : null
+  };
+
+  const { error: updateError } = await supabase
+    .from("institution_sale_orders")
+    .update(updatePayload)
+    .eq("id", orderId)
+    .eq("institution_id", institutionId)
+    .is("deleted_at", null);
+
+  if (updateError) {
+    redirectWithError(errorPath, updateError.message);
+  }
+
+  await updateInstitutionSaleOrderRollup(supabase, orderId);
+  await revalidateInstitution(institutionId);
+  revalidatePath("/dispatches");
+  revalidatePath("/my-pending-work");
+  redirect(`${errorPath}?saved=institution_payment`);
+}
+
+export async function createInstitutionSaleOrderLineAction(
+  institutionId: string,
+  orderId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const errorPath = `/institutional-partners/${institutionId}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+  assertCanManageInstitutionProfile(profile, errorPath);
+  const payload = institutionSaleOrderLinePayloadFromForm(formData);
+  const validationError = validateInstitutionSaleOrderLinePayload(payload);
+
+  if (validationError) {
+    redirectWithError(errorPath, validationError);
+  }
+
+  const { data: order, error: orderError } = await supabase
+    .from("institution_sale_orders")
+    .select("id, institution_id, product_model, ordered_quantity")
+    .eq("id", orderId)
+    .eq("institution_id", institutionId)
+    .is("deleted_at", null)
+    .single();
+
+  if (orderError || !order) {
+    redirectWithError(errorPath, "Institution sale order was not found.");
+  }
+
+  const [{ count: activeLineCount }, { data: farmerLead }, { data: existingLine }] =
+    await Promise.all([
+      supabase
+        .from("institution_sale_order_lines")
+        .select("id", { count: "exact", head: true })
+        .eq("order_id", orderId)
+        .is("deleted_at", null)
+        .neq("allocation_status", "Cancelled"),
+      supabase
+        .from("farmer_leads")
+        .select("id, farmer_name, lead_code, linked_institution_id, product_recommended")
+        .eq("id", payload.farmer_lead_id ?? "")
+        .is("deleted_at", null)
+        .single(),
+      supabase
+        .from("institution_sale_order_lines")
+        .select("id")
+        .eq("order_id", orderId)
+        .eq("farmer_lead_id", payload.farmer_lead_id ?? "")
+        .is("deleted_at", null)
+        .neq("allocation_status", "Cancelled")
+        .maybeSingle()
+    ]);
+
+  if ((activeLineCount ?? 0) >= order.ordered_quantity) {
+    redirectWithError(
+      errorPath,
+      "This order already has allocations equal to its ordered quantity."
+    );
+  }
+
+  if (!farmerLead) {
+    redirectWithError(errorPath, "Selected farmer lead was not found.");
+  }
+
+  if (existingLine) {
+    redirectWithError(
+      errorPath,
+      "This farmer is already allocated under this institution sale order."
+    );
+  }
+
+  if (
+    farmerLead.linked_institution_id &&
+    farmerLead.linked_institution_id !== institutionId
+  ) {
+    redirectWithError(
+      errorPath,
+      "This farmer lead is already linked to a different institution."
+    );
+  }
+
+  if (!farmerLead.linked_institution_id) {
+    const { error: leadUpdateError } = await supabase
+      .from("farmer_leads")
+      .update({ linked_institution_id: institutionId })
+      .eq("id", farmerLead.id);
+
+    if (leadUpdateError) {
+      redirectWithError(errorPath, leadUpdateError.message);
+    }
+  }
+
+  const insertPayload: InstitutionSaleOrderLineInsert = {
+    ...payload,
+    order_id: order.id,
+    institution_id: institutionId,
+    farmer_lead_id: payload.farmer_lead_id ?? "",
+    product_model:
+      payload.product_model ?? order.product_model ?? farmerLead.product_recommended,
+    allocation_status: "Ready for Dispatch",
+    created_by_user_id: profile.id
+  };
+  const { error } = await supabase
+    .from("institution_sale_order_lines")
+    .insert(insertPayload);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  await updateInstitutionSaleOrderRollup(supabase, orderId);
+  await revalidateInstitution(institutionId);
+  revalidatePath("/farmer-leads");
+  revalidatePath(`/farmer-leads/${farmerLead.id}`);
+  revalidatePath("/dispatches");
+  redirect(`${errorPath}?saved=institution_sale_line`);
 }
 
 export async function deleteInstitutionAction(id: string, formData: FormData) {

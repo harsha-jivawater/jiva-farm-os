@@ -72,6 +72,11 @@ export function installationPayloadFromForm(
     farmer_lead_id: getRequiredText(formData, "farmer_lead_id"),
     device_id: getRequiredText(formData, "device_id"),
     dispatch_id: getText(formData, "dispatch_id"),
+    institution_sale_order_id: getText(formData, "institution_sale_order_id"),
+    institution_sale_order_line_id: getText(
+      formData,
+      "institution_sale_order_line_id"
+    ),
     dealer_id: getText(formData, "dealer_id"),
     institution_id: getText(formData, "institution_id"),
     pilot_id: getText(formData, "pilot_id"),

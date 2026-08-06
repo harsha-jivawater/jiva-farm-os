@@ -6,6 +6,7 @@ import {
   farmerLeadPayloadFromForm,
   validateFarmerLeadPayload
 } from "@/lib/farmer-leads/form-data";
+import { farmerLeadInteractionTypeOptions } from "@/lib/farmer-leads/options";
 import type {
   FarmerLead,
   FarmerLeadFollowupInsert,
@@ -574,11 +575,22 @@ export async function updateFarmerLeadFollowupAction(
   const lastInteractionDate = textValue(formData, "last_interaction_date");
   const followupDueDate = textValue(formData, "followup_due_date");
   const nextActionDate = textValue(formData, "next_action_date");
+  const interactionType = textValue(formData, "interaction_type");
   const interactionNote = textValue(formData, "last_interaction_note");
   const remarks = textValue(formData, "remarks");
+  const allowedInteractionTypes = farmerLeadInteractionTypeOptions.map(
+    (option) => option.value
+  );
 
   if (!followupPriority || !["High", "Medium", "Low"].includes(followupPriority)) {
     redirectWithFollowupError(id, "Select a valid follow-up priority.");
+  }
+
+  if (
+    !interactionType ||
+    !allowedInteractionTypes.some((allowedType) => allowedType === interactionType)
+  ) {
+    redirectWithFollowupError(id, "Select a valid interaction type.");
   }
 
   if (!nextActionDate) {
@@ -604,6 +616,7 @@ export async function updateFarmerLeadFollowupAction(
 
   const hasMeaningfulFollowup = Boolean(
     followupPriority ||
+      interactionType ||
       lastInteractionDate ||
       followupDueDate ||
       nextActionDate ||
@@ -616,6 +629,7 @@ export async function updateFarmerLeadFollowupAction(
       farmer_lead_id: id,
       followed_up_by_user_id: profile.id,
       followup_date: lastInteractionDate ?? todayDate(),
+      interaction_type: interactionType,
       priority: followupPriority,
       interaction_note: interactionNote,
       next_action_date: nextActionDate,

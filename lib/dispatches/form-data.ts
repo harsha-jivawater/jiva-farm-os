@@ -50,6 +50,7 @@ export function dispatchPayloadFromForm(
     destination_type: getRequiredText(formData, "destination_type"),
     destination_farmer_lead_id: getText(formData, "destination_farmer_lead_id"),
     destination_dealer_id: getText(formData, "destination_dealer_id"),
+    destination_institution_id: getText(formData, "destination_institution_id"),
     destination_pilot_id: getText(formData, "destination_pilot_id"),
     destination_name_snapshot: getRequiredText(
       formData,
@@ -83,7 +84,13 @@ export function dispatchPayloadFromForm(
     delivery_remarks: getText(formData, "delivery_remarks"),
     linked_farmer_lead_id: getText(formData, "destination_farmer_lead_id"),
     linked_dealer_id: getText(formData, "destination_dealer_id"),
-    linked_pilot_id: getText(formData, "destination_pilot_id")
+    linked_institution_id: getText(formData, "destination_institution_id"),
+    linked_pilot_id: getText(formData, "destination_pilot_id"),
+    institution_sale_order_id: getText(formData, "institution_sale_order_id"),
+    institution_sale_order_line_id: getText(
+      formData,
+      "institution_sale_order_line_id"
+    )
   };
 }
 
@@ -130,6 +137,20 @@ export function validateDispatchPayload(payload: DispatchFormPayload) {
     !payload.destination_dealer_id
   ) {
     return "Select a dealer before creating a Dealer Dispatch.";
+  }
+
+  if (payload.dispatch_type === "Institution Dispatch") {
+    if (!payload.destination_farmer_lead_id) {
+      return "Select the farmer receiving the institution-paid device.";
+    }
+
+    if (!payload.destination_institution_id) {
+      return "Institution payer is required for Institution Dispatch.";
+    }
+
+    if (!payload.institution_sale_order_id || !payload.institution_sale_order_line_id) {
+      return "Select an institution-funded farmer allocation before dispatch.";
+    }
   }
 
   if (!payload.destination_type) {

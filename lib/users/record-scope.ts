@@ -96,6 +96,7 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Agronomist",
     "Viewer"
   ],
+  "pilot-monitoring": ["Admin", "Management", "R&D Head", "Agronomist"],
   installations: [
     "Admin",
     "Management",

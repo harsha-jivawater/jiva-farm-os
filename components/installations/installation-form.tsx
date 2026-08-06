@@ -191,6 +191,16 @@ export function InstallationForm({
       initialFarmer?.linked_institution_id ??
       ""
   );
+  const [institutionSaleOrderId, setInstitutionSaleOrderId] = useState(
+    installation?.institution_sale_order_id ??
+      initialDispatch?.institution_sale_order_id ??
+      ""
+  );
+  const [institutionSaleOrderLineId, setInstitutionSaleOrderLineId] = useState(
+    installation?.institution_sale_order_line_id ??
+      initialDispatch?.institution_sale_order_line_id ??
+      ""
+  );
   const [pilotId, setPilotId] = useState(
     installation?.pilot_id ??
       initialDispatch?.linked_pilot_id ??
@@ -232,7 +242,8 @@ export function InstallationForm({
     selectedInstallationType === "Dealer Farmer Installation";
   const isDispatchDerivedInstallation =
     selectedInstallationType === "Farmer Sale Installation" ||
-    selectedInstallationType === "Pilot Installation";
+    selectedInstallationType === "Pilot Installation" ||
+    selectedInstallationType === "Institution Installation";
   const visibleFarmerLeads = isDealerFarmerInstallation
     ? farmerLeads
     : selectedDispatchFarmerLeadId
@@ -298,6 +309,9 @@ export function InstallationForm({
     setSelectedDispatchId(value);
 
     if (!dispatch) {
+      setInstitutionSaleOrderId("");
+      setInstitutionSaleOrderLineId("");
+
       if (!isDealerFarmerInstallation) {
         applyFarmerLead("");
       }
@@ -315,6 +329,8 @@ export function InstallationForm({
         dispatch.destination_institution_id ??
         institutionId
     );
+    setInstitutionSaleOrderId(dispatch.institution_sale_order_id ?? "");
+    setInstitutionSaleOrderLineId(dispatch.institution_sale_order_line_id ?? "");
     setPilotId(
       dispatch.linked_pilot_id ?? dispatch.destination_pilot_id ?? pilotId
     );
@@ -344,6 +360,16 @@ export function InstallationForm({
       />
       <input name="dealer_id" type="hidden" value={dealerId} />
       <input name="institution_id" type="hidden" value={institutionId} />
+      <input
+        name="institution_sale_order_id"
+        type="hidden"
+        value={institutionSaleOrderId}
+      />
+      <input
+        name="institution_sale_order_line_id"
+        type="hidden"
+        value={institutionSaleOrderLineId}
+      />
       <input name="pilot_id" type="hidden" value={pilotId} />
       <input name="previous_holder_id" type="hidden" value={previousHolderId} />
 

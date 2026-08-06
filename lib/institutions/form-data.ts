@@ -2,6 +2,7 @@ import {
   legacyCropNames,
   legacyCropValidationMessage
 } from "@/lib/crops/crop-library";
+import { productModelOptions } from "@/lib/devices/options";
 import {
   agreementStatusOptions,
   cropFocusOptions,
@@ -37,8 +38,15 @@ import {
 import type {
   ContactFormPayload,
   InstitutionFormPayload,
+  InstitutionSaleOrderFormPayload,
+  InstitutionSaleOrderLineFormPayload,
   MeetingFormPayload
 } from "@/lib/institutions/types";
+import {
+  institutionSaleAllocationStatusOptions,
+  institutionSaleOrderStatusOptions,
+  institutionSalePaymentStatusOptions
+} from "@/lib/institutions/sale-orders";
 import {
   normalizeOptionalIndianMobileNumber,
   validateIndianMobileNumber
@@ -483,6 +491,115 @@ export function validateMeetingPayload(payload: MeetingFormPayload) {
 
   if (!isOptionValue(payload.outcome, meetingOutcomeOptions)) {
     return "Meeting outcome is not valid.";
+  }
+
+  return null;
+}
+
+export function institutionSaleOrderPayloadFromForm(
+  formData: FormData
+): InstitutionSaleOrderFormPayload {
+  const orderedQuantity = getNumber(formData, "ordered_quantity");
+  const unitPrice = getNumber(formData, "unit_price_inr");
+  const submittedTotal = getNumber(formData, "total_amount_inr");
+  const computedTotal =
+    typeof orderedQuantity === "number" && typeof unitPrice === "number"
+      ? Number((orderedQuantity * unitPrice).toFixed(2))
+      : null;
+
+  return {
+    order_date: getText(formData, "order_date") ?? todayDate(),
+    order_status: getText(formData, "order_status") ?? "Pending Payment",
+    payment_status: getText(formData, "payment_status") ?? "Pending",
+    product_model: getText(formData, "product_model"),
+    ordered_quantity:
+      typeof orderedQuantity === "number" ? Math.trunc(orderedQuantity) : 1,
+    unit_price_inr: typeof unitPrice === "number" ? unitPrice : null,
+    total_amount_inr:
+      typeof submittedTotal === "number" ? submittedTotal : computedTotal,
+    zoho_invoice_reference: getText(formData, "zoho_invoice_reference"),
+    zoho_estimate_reference: getText(formData, "zoho_estimate_reference"),
+    notes: getText(formData, "notes")
+  };
+}
+
+export function validateInstitutionSaleOrderPayload(
+  payload: InstitutionSaleOrderFormPayload
+) {
+  if (!payload.order_date) {
+    return "Order date is required.";
+  }
+
+  if (
+    typeof payload.ordered_quantity !== "number" ||
+    payload.ordered_quantity < 1
+  ) {
+    return "Ordered quantity must be at least 1.";
+  }
+
+  if (
+    payload.unit_price_inr !== null &&
+    payload.unit_price_inr !== undefined &&
+    payload.unit_price_inr < 0
+  ) {
+    return "Unit price cannot be negative.";
+  }
+
+  if (
+    payload.total_amount_inr !== null &&
+    payload.total_amount_inr !== undefined &&
+    payload.total_amount_inr < 0
+  ) {
+    return "Total amount cannot be negative.";
+  }
+
+  if (!isOptionValue(payload.product_model, productModelOptions)) {
+    return "Product model is not valid.";
+  }
+
+  if (!isOptionValue(payload.order_status, institutionSaleOrderStatusOptions)) {
+    return "Institution sale order status is not valid.";
+  }
+
+  if (
+    !isOptionValue(payload.payment_status, institutionSalePaymentStatusOptions)
+  ) {
+    return "Institution sale payment status is not valid.";
+  }
+
+  return null;
+}
+
+export function institutionSaleOrderLinePayloadFromForm(
+  formData: FormData
+): InstitutionSaleOrderLineFormPayload {
+  return {
+    farmer_lead_id: getText(formData, "farmer_lead_id") ?? "",
+    product_model: getText(formData, "product_model"),
+    allocation_status:
+      getText(formData, "allocation_status") ?? "Ready for Dispatch",
+    notes: getText(formData, "notes")
+  };
+}
+
+export function validateInstitutionSaleOrderLinePayload(
+  payload: InstitutionSaleOrderLineFormPayload
+) {
+  if (!payload.farmer_lead_id) {
+    return "Select the farmer who will receive the institution-paid device.";
+  }
+
+  if (!isOptionValue(payload.product_model, productModelOptions)) {
+    return "Product model is not valid.";
+  }
+
+  if (
+    !isOptionValue(
+      payload.allocation_status,
+      institutionSaleAllocationStatusOptions
+    )
+  ) {
+    return "Institution sale allocation status is not valid.";
   }
 
   return null;

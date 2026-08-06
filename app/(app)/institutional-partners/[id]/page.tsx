@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, IndianRupee, Pencil, Plus, Trash2, Truck } from "lucide-react";
 import {
+  confirmInstitutionSaleOrderPaymentAction,
   createInstitutionContactAction,
   createInstitutionMeetingAction,
+  createInstitutionSaleOrderAction,
+  createInstitutionSaleOrderLineAction,
   deleteInstitutionAction,
   deleteInstitutionContactAction,
   restoreInstitutionAction,
@@ -21,6 +24,7 @@ import { MeetingForm } from "@/components/institutions/meeting-form";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
 import { cropDisplayLabel } from "@/lib/crops/crop-library";
+import { productModelOptions } from "@/lib/devices/options";
 import {
   dealerInstitutionRelationshipStatusOptions,
   labelFor as dealerLabelFor
@@ -54,6 +58,13 @@ import {
   institutionStatusNeedsPilotRecord
 } from "@/lib/institutions/opportunity-summary";
 import {
+  institutionSaleAllocationStatusOptions,
+  institutionSaleOrderStatusOptions,
+  institutionSalePaymentStatusOptions,
+  isInstitutionSalePaymentReady,
+  labelForInstitutionSaleOption
+} from "@/lib/institutions/sale-orders";
+import {
   display,
   displayList,
   formatDate,
@@ -62,6 +73,8 @@ import {
   type InstitutionContact,
   type InstitutionMeeting,
   type InstitutionReview,
+  type InstitutionSaleOrder,
+  type InstitutionSaleOrderLine,
   type RegionOption,
   type UserOption
 } from "@/lib/institutions/types";
@@ -71,9 +84,11 @@ import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import {
   canApproveLegalDocuments,
+  canConfirmPayment,
   canManageInstitutionProfile,
   canSoftDeleteInstitution,
   canWriteModule,
+  hasAnyRole,
   isAdmin
 } from "@/lib/users/permissions";
 import { institutionScope } from "@/lib/users/record-scope";
@@ -122,6 +137,35 @@ type LinkedDealer = Pick<
   Dealer,
   "dealer_code" | "dealer_name" | "firm_name" | "id" | "rsm_user_id"
 >;
+
+type InstitutionSaleFarmerLead = {
+  id: string;
+  lead_code: string;
+  farmer_name: string;
+  mobile_number: string;
+  state: string;
+  district: string;
+  village: string;
+  product_recommended: string | null;
+  linked_institution_id: string | null;
+  funnel_stage: string;
+  lead_status: string;
+};
+
+type InstitutionSaleDispatch = {
+  id: string;
+  dispatch_code: string;
+  dispatch_status: string;
+  dispatch_date: string | null;
+  delivered_date: string | null;
+};
+
+type InstitutionSaleInstallation = {
+  id: string;
+  installation_code: string;
+  installation_status: string;
+  installation_date: string;
+};
 
 function DetailItem({
   label,
@@ -217,6 +261,34 @@ function formatNumber(value: number | null | undefined, suffix = "") {
   }
 
   return `${new Intl.NumberFormat("en-IN").format(value)}${suffix}`;
+}
+
+function formatCurrency(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "Not set";
+  }
+
+  return new Intl.NumberFormat("en-IN", {
+    currency: "INR",
+    maximumFractionDigits: 0,
+    style: "currency"
+  }).format(value);
+}
+
+function institutionSaleTone(status: string | null | undefined) {
+  if (["Installed", "Payment Confirmed", "Confirmed"].includes(status ?? "")) {
+    return "success" as const;
+  }
+
+  if (
+    ["Pending Payment", "Pending", "Partially Dispatched", "Partially Installed"].includes(
+      status ?? ""
+    )
+  ) {
+    return "warning" as const;
+  }
+
+  return "neutral" as const;
 }
 
 function isOverdue(value: string | null | undefined) {
@@ -462,6 +534,11 @@ export default async function InstitutionDetailPage({
     "/institutional-partners"
   );
   const canManageProfileActive = canManageInstitutionProfile(currentUser);
+  const canManageInstitutionSalesActive = hasAnyRole(currentUser, [
+    "Admin",
+    "Sales Head",
+    "RSM"
+  ]);
   const canCreatePilotActive = canWriteModule(currentUser, "pilots");
   const canDeleteActive = canSoftDeleteInstitution(currentUser);
   const canApproveLegal = canApproveLegalDocuments(currentUser);
@@ -493,10 +570,16 @@ export default async function InstitutionDetailPage({
   const institution = data as Institution;
   const isDeleted = Boolean(institution.deleted_at);
   const canManageProfile = canManageProfileActive && !isDeleted;
+  const canManageInstitutionSales =
+    canManageInstitutionSalesActive && !isDeleted;
   const canCreatePilot = canCreatePilotActive && !isDeleted;
+  const canCreateDispatch = canWriteModule(currentUser, "dispatches") && !isDeleted;
+  const canCreateInstallation =
+    canWriteModule(currentUser, "installations") && !isDeleted;
   const canDelete = canDeleteActive && !isDeleted;
   const canRestore = canViewDeletedRecords && isDeleted;
   const canOpenLegalOnly = canApproveLegal && !canManageProfile && !isDeleted;
+  const canConfirmInstitutionPayment = canConfirmPayment(currentUser) && !isDeleted;
   const [
     { data: users },
     { data: regions },
@@ -505,7 +588,8 @@ export default async function InstitutionDetailPage({
     { data: institutionReviews },
     { data: relatedPilots },
     { data: dealerConnections },
-    { data: dealers }
+    { data: dealers },
+    { data: institutionSaleOrders }
   ] = await Promise.all([
     supabase
       .from("users")
@@ -558,7 +642,15 @@ export default async function InstitutionDetailPage({
       .from("dealers")
       .select("id, dealer_code, dealer_name, firm_name, rsm_user_id")
       .is("deleted_at", null)
-      .order("firm_name", { ascending: true })
+      .order("firm_name", { ascending: true }),
+    supabase
+      .from("institution_sale_orders")
+      .select("*")
+      .eq("institution_id", institution.id)
+      .is("deleted_at", null)
+      .order("order_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(50)
   ]);
 
   const usersList = (users ?? []) as UserOption[];
@@ -604,6 +696,111 @@ export default async function InstitutionDetailPage({
     | "rsm_user_id"
   >[];
   const linkedDealers = (dealers ?? []) as LinkedDealer[];
+  const institutionSaleOrdersList =
+    (institutionSaleOrders ?? []) as InstitutionSaleOrder[];
+  const institutionSaleOrderIds = institutionSaleOrdersList.map((order) => order.id);
+  let institutionSaleLinesList: InstitutionSaleOrderLine[] = [];
+  let institutionSaleFarmerLeadsList: InstitutionSaleFarmerLead[] = [];
+  let institutionSaleDispatchesList: InstitutionSaleDispatch[] = [];
+  let institutionSaleInstallationsList: InstitutionSaleInstallation[] = [];
+
+  if (institutionSaleOrderIds.length) {
+    const { data: saleLines } = await supabase
+      .from("institution_sale_order_lines")
+      .select("*")
+      .in("order_id", institutionSaleOrderIds)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    institutionSaleLinesList = (saleLines ?? []) as InstitutionSaleOrderLine[];
+  }
+
+  const institutionSaleFarmerLeadIds = Array.from(
+    new Set(institutionSaleLinesList.map((line) => line.farmer_lead_id))
+  );
+  const institutionSaleDispatchIds = Array.from(
+    new Set(
+      institutionSaleLinesList
+        .map((line) => line.dispatch_id)
+        .filter(Boolean) as string[]
+    )
+  );
+  const institutionSaleInstallationIds = Array.from(
+    new Set(
+      institutionSaleLinesList
+        .map((line) => line.installation_id)
+        .filter(Boolean) as string[]
+    )
+  );
+
+  const saleFarmerLeadColumns = [
+    "id",
+    "lead_code",
+    "farmer_name",
+    "mobile_number",
+    "state",
+    "district",
+    "village",
+    "product_recommended",
+    "linked_institution_id",
+    "funnel_stage",
+    "lead_status"
+  ].join(",");
+
+  const [
+    { data: saleLineFarmerLeads },
+    { data: saleCandidateFarmerLeads },
+    { data: saleDispatches },
+    { data: saleInstallations }
+  ] = await Promise.all([
+    institutionSaleFarmerLeadIds.length
+      ? supabase
+          .from("farmer_leads")
+          .select(saleFarmerLeadColumns)
+          .in("id", institutionSaleFarmerLeadIds)
+          .is("deleted_at", null)
+      : Promise.resolve({ data: [] }),
+    canManageInstitutionSales
+      ? supabase
+          .from("farmer_leads")
+          .select(saleFarmerLeadColumns)
+          .or(`linked_institution_id.is.null,linked_institution_id.eq.${institution.id}`)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false })
+          .limit(300)
+      : Promise.resolve({ data: [] }),
+    institutionSaleDispatchIds.length
+      ? supabase
+          .from("dispatches")
+          .select("id, dispatch_code, dispatch_status, dispatch_date, delivered_date")
+          .in("id", institutionSaleDispatchIds)
+          .is("deleted_at", null)
+      : Promise.resolve({ data: [] }),
+    institutionSaleInstallationIds.length
+      ? supabase
+          .from("installations")
+          .select("id, installation_code, installation_status, installation_date")
+          .in("id", institutionSaleInstallationIds)
+          .is("deleted_at", null)
+      : Promise.resolve({ data: [] })
+  ]);
+
+  const saleFarmerLeadMap = new Map<string, InstitutionSaleFarmerLead>();
+
+  for (const lead of [
+    ...((saleLineFarmerLeads ?? []) as unknown as InstitutionSaleFarmerLead[]),
+    ...((saleCandidateFarmerLeads ?? []) as unknown as InstitutionSaleFarmerLead[])
+  ]) {
+    saleFarmerLeadMap.set(lead.id, lead);
+  }
+
+  institutionSaleFarmerLeadsList = Array.from(saleFarmerLeadMap.values()).sort(
+    (a, b) => a.farmer_name.localeCompare(b.farmer_name)
+  );
+  institutionSaleDispatchesList =
+    (saleDispatches ?? []) as InstitutionSaleDispatch[];
+  institutionSaleInstallationsList =
+    (saleInstallations ?? []) as InstitutionSaleInstallation[];
   const institutionFileReferences = [
     institution.proposal_link,
     institution.presentation_link,
@@ -628,6 +825,26 @@ export default async function InstitutionDetailPage({
   const contactMap = new Map(
     contactsList.map((contact) => [contact.id, contact])
   );
+  const institutionSaleLinesByOrder = new Map<string, InstitutionSaleOrderLine[]>();
+
+  for (const line of institutionSaleLinesList) {
+    const lines = institutionSaleLinesByOrder.get(line.order_id) ?? [];
+    lines.push(line);
+    institutionSaleLinesByOrder.set(line.order_id, lines);
+  }
+
+  const institutionSaleFarmerLeadMap = new Map(
+    institutionSaleFarmerLeadsList.map((lead) => [lead.id, lead])
+  );
+  const institutionSaleDispatchMap = new Map(
+    institutionSaleDispatchesList.map((dispatch) => [dispatch.id, dispatch])
+  );
+  const institutionSaleInstallationMap = new Map(
+    institutionSaleInstallationsList.map((installation) => [
+      installation.id,
+      installation
+    ])
+  );
   const createContactAction = createInstitutionContactAction.bind(
     null,
     institution.id
@@ -637,6 +854,10 @@ export default async function InstitutionDetailPage({
     institution.id
   );
   const updateReviewAction = updateInstitutionReviewAction.bind(
+    null,
+    institution.id
+  );
+  const createSaleOrderAction = createInstitutionSaleOrderAction.bind(
     null,
     institution.id
   );
@@ -680,6 +901,7 @@ export default async function InstitutionDetailPage({
       institution.technical_owner_user_id
     )
   );
+  const todayValue = new Date().toISOString().slice(0, 10);
   const activityItems: ActivityTimelineItem[] = [
     {
       actor: actorLabel(userMap.get(institution.created_by_user_id)),
@@ -761,6 +983,25 @@ export default async function InstitutionDetailPage({
       href: `/farmer-leads/${lead.id}`,
       title: "Linked Farmer Lead recorded"
     })),
+    ...institutionSaleOrdersList.map((order) => ({
+      actor: actorLabel(userMap.get(order.created_by_user_id)),
+      category: "Institution Sale",
+      date: order.created_at,
+      description: `${order.order_code} · ${order.payment_status} · ${order.ordered_quantity} device${order.ordered_quantity === 1 ? "" : "s"}`,
+      title: "Institution-funded sale order created"
+    })),
+    ...institutionSaleLinesList.map((line) => {
+      const lead = institutionSaleFarmerLeadMap.get(line.farmer_lead_id);
+
+      return {
+        actor: actorLabel(userMap.get(line.created_by_user_id)),
+        category: "Institution Sale",
+        date: line.created_at,
+        description: `${lead?.farmer_name ?? "Farmer allocation"} · ${line.allocation_status}`,
+        href: lead ? `/farmer-leads/${lead.id}` : undefined,
+        title: "Institution-paid farmer allocation added"
+      };
+    }),
     ...dealerConnectionsList.map((connection) => ({
       actor: actorLabel(
         connection.owner_user_id
@@ -819,6 +1060,24 @@ export default async function InstitutionDetailPage({
       {query.saved === "review" ? (
         <div className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
           Institution review saved.
+        </div>
+      ) : null}
+
+      {query.saved === "institution_sale_order" ? (
+        <div className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
+          Institution-funded sale order saved.
+        </div>
+      ) : null}
+
+      {query.saved === "institution_payment" ? (
+        <div className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
+          Institution payment confirmed.
+        </div>
+      ) : null}
+
+      {query.saved === "institution_sale_line" ? (
+        <div className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
+          Farmer allocation added to the institution-funded order.
         </div>
       ) : null}
 
@@ -1017,6 +1276,443 @@ export default async function InstitutionDetailPage({
             label="Scale-up next step"
             value={display(institution.scale_up_next_step)}
           />
+        </div>
+      </Section>
+
+      <Section
+        description="Use this when the institution pays Jiva and Jiva installs the devices at selected farmer sites."
+        title="Institution-funded farmer sales"
+      >
+        <div className="space-y-5 p-4">
+          <div className="grid gap-4 xl:grid-cols-[1.1fr_1fr]">
+            {canManageInstitutionSales ? (
+              <form
+                action={createSaleOrderAction}
+                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="flex items-center gap-2">
+                  <IndianRupee className="h-4 w-4 text-brand-700" aria-hidden="true" />
+                  <h3 className="text-sm font-semibold text-slate-950">
+                    Create institution sale order
+                  </h3>
+                </div>
+                <input name="payment_status" type="hidden" value="Pending" />
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Order date
+                    <input
+                      className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                      defaultValue={todayValue}
+                      name="order_date"
+                      required
+                      type="date"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Product model
+                    <select
+                      className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                      name="product_model"
+                    >
+                      <option value="">Not fixed yet</option>
+                      {productModelOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Ordered quantity
+                    <input
+                      className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                      defaultValue={1}
+                      min={1}
+                      name="ordered_quantity"
+                      required
+                      type="number"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Unit price
+                    <input
+                      className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                      min={0}
+                      name="unit_price_inr"
+                      step="0.01"
+                      type="number"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Total amount
+                    <input
+                      className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                      min={0}
+                      name="total_amount_inr"
+                      step="0.01"
+                      type="number"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Zoho invoice reference
+                    <input
+                      className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                      name="zoho_invoice_reference"
+                      type="text"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700 md:col-span-2">
+                    Notes
+                    <textarea
+                      className="mt-2 min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                      name="notes"
+                    />
+                  </label>
+                </div>
+                <button
+                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                  type="submit"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Create order
+                </button>
+              </form>
+            ) : null}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SummaryCard
+                label="Institution orders"
+                value={formatNumber(institutionSaleOrdersList.length)}
+              />
+              <SummaryCard
+                label="Farmer allocations"
+                value={formatNumber(institutionSaleLinesList.length)}
+              />
+              <SummaryCard
+                label="Dispatched allocations"
+                value={formatNumber(
+                  institutionSaleLinesList.filter((line) => line.dispatch_id).length
+                )}
+              />
+              <SummaryCard
+                label="Installed allocations"
+                value={formatNumber(
+                  institutionSaleLinesList.filter((line) => line.installation_id).length
+                )}
+              />
+            </div>
+          </div>
+
+          {institutionSaleOrdersList.length ? (
+            <div className="space-y-4">
+              {institutionSaleOrdersList.map((order) => {
+                const orderLines = institutionSaleLinesByOrder.get(order.id) ?? [];
+                const allocatedFarmerIds = new Set(
+                  orderLines.map((line) => line.farmer_lead_id)
+                );
+                const addLineAction = createInstitutionSaleOrderLineAction.bind(
+                  null,
+                  institution.id,
+                  order.id
+                );
+                const confirmPaymentAction =
+                  confirmInstitutionSaleOrderPaymentAction.bind(
+                    null,
+                    institution.id,
+                    order.id
+                  );
+                const paymentReady = isInstitutionSalePaymentReady(
+                  order.payment_status
+                );
+                const allocationOptions = institutionSaleFarmerLeadsList.filter(
+                  (lead) =>
+                    !allocatedFarmerIds.has(lead.id) &&
+                    (!lead.linked_institution_id ||
+                      lead.linked_institution_id === institution.id)
+                );
+
+                return (
+                  <div
+                    className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                    key={order.id}
+                  >
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-brand-700">
+                          {order.order_code}
+                        </p>
+                        <h3 className="mt-1 text-base font-semibold text-slate-950">
+                          {display(order.product_model)} ·{" "}
+                          {formatNumber(order.ordered_quantity, " devices")}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {formatDate(order.order_date)} ·{" "}
+                          {formatCurrency(order.total_amount_inr)}
+                        </p>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <SummaryCard
+                          label="Payment"
+                          tone={institutionSaleTone(order.payment_status)}
+                          value={labelForInstitutionSaleOption(
+                            order.payment_status,
+                            institutionSalePaymentStatusOptions
+                          )}
+                        />
+                        <SummaryCard
+                          label="Order status"
+                          tone={institutionSaleTone(order.order_status)}
+                          value={labelForInstitutionSaleOption(
+                            order.order_status,
+                            institutionSaleOrderStatusOptions
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <DetailItem
+                        label="Payment received date"
+                        value={formatDate(order.payment_received_date)}
+                      />
+                      <DetailItem
+                        label="Zoho invoice"
+                        value={display(order.zoho_invoice_reference)}
+                      />
+                      <DetailItem
+                        label="Allocated farmers"
+                        value={`${orderLines.length} / ${order.ordered_quantity}`}
+                      />
+                    </div>
+
+                    {!paymentReady && canConfirmInstitutionPayment ? (
+                      <form
+                        action={confirmPaymentAction}
+                        className="mt-4 flex flex-col gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 sm:flex-row sm:items-end"
+                      >
+                        <input name="payment_status" type="hidden" value="Confirmed" />
+                        <label className="block text-sm font-medium text-amber-950">
+                          Payment received date
+                          <input
+                            className="mt-2 h-10 w-full rounded-md border border-amber-200 bg-white px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 sm:w-56"
+                            defaultValue={todayValue}
+                            name="payment_received_date"
+                            required
+                            type="date"
+                          />
+                        </label>
+                        <button
+                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                          type="submit"
+                        >
+                          <IndianRupee className="h-4 w-4" aria-hidden="true" />
+                          Confirm payment
+                        </button>
+                      </form>
+                    ) : null}
+
+                    {canManageInstitutionSales &&
+                    orderLines.length < order.ordered_quantity ? (
+                      <form
+                        action={addLineAction}
+                        className="mt-4 grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 lg:grid-cols-[1.2fr_0.8fr_1fr_auto]"
+                      >
+                        <label className="block text-sm font-medium text-slate-700">
+                          Farmer receiving device
+                          <select
+                            className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                            name="farmer_lead_id"
+                            required
+                          >
+                            <option value="">Select farmer lead</option>
+                            {allocationOptions.map((lead) => (
+                              <option key={lead.id} value={lead.id}>
+                                {lead.lead_code} · {lead.farmer_name} ·{" "}
+                                {lead.district}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block text-sm font-medium text-slate-700">
+                          Product model
+                          <select
+                            className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                            defaultValue={order.product_model ?? ""}
+                            name="product_model"
+                          >
+                            <option value="">Use order/default</option>
+                            {productModelOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block text-sm font-medium text-slate-700">
+                          Notes
+                          <input
+                            className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                            name="notes"
+                            type="text"
+                          />
+                        </label>
+                        <button
+                          className="mt-7 inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 shadow-sm hover:bg-brand-50"
+                          type="submit"
+                        >
+                          <Plus className="h-4 w-4" aria-hidden="true" />
+                          Add farmer
+                        </button>
+                      </form>
+                    ) : null}
+
+                    {orderLines.length ? (
+                      <div className="mt-4 overflow-x-auto">
+                        <table className="min-w-[980px] divide-y divide-slate-200 text-left text-sm">
+                          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                            <tr>
+                              <th className="px-4 py-3 font-semibold">Farmer</th>
+                              <th className="px-4 py-3 font-semibold">Product</th>
+                              <th className="px-4 py-3 font-semibold">Allocation</th>
+                              <th className="px-4 py-3 font-semibold">Dispatch</th>
+                              <th className="px-4 py-3 font-semibold">Installation</th>
+                              <th className="px-4 py-3 font-semibold">Next step</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {orderLines.map((line) => {
+                              const lead = institutionSaleFarmerLeadMap.get(
+                                line.farmer_lead_id
+                              );
+                              const dispatch = line.dispatch_id
+                                ? institutionSaleDispatchMap.get(line.dispatch_id)
+                                : null;
+                              const installation = line.installation_id
+                                ? institutionSaleInstallationMap.get(
+                                    line.installation_id
+                                  )
+                                : null;
+                              const dispatchHref = `/dispatches/new?route=institution&institution_id=${institution.id}&institution_sale_order_id=${order.id}&institution_sale_order_line_id=${line.id}&farmer_lead_id=${line.farmer_lead_id}`;
+                              const installationHref = dispatch
+                                ? `/installations/new?dispatch_id=${dispatch.id}&farmer_lead_id=${line.farmer_lead_id}&installation_type=Institution%20Installation`
+                                : "";
+
+                              return (
+                                <tr key={line.id} className="align-top">
+                                  <td className="px-4 py-3">
+                                    {lead ? (
+                                      <Link
+                                        className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                                        href={`/farmer-leads/${lead.id}`}
+                                      >
+                                        {lead.farmer_name}
+                                        <span className="block text-xs font-medium text-slate-500">
+                                          {lead.lead_code} · {lead.mobile_number}
+                                        </span>
+                                      </Link>
+                                    ) : (
+                                      <span className="font-semibold text-slate-950">
+                                        Farmer lead not visible
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-700">
+                                    {display(line.product_model)}
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-700">
+                                    {labelForInstitutionSaleOption(
+                                      line.allocation_status,
+                                      institutionSaleAllocationStatusOptions
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-700">
+                                    {dispatch ? (
+                                      <Link
+                                        className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                                        href={`/dispatches/${dispatch.id}`}
+                                      >
+                                        {dispatch.dispatch_code}
+                                        <span className="block text-xs font-medium text-slate-500">
+                                          {dispatch.dispatch_status}
+                                        </span>
+                                      </Link>
+                                    ) : (
+                                      "Not dispatched"
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-700">
+                                    {installation ? (
+                                      <Link
+                                        className="font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                                        href={`/installations/${installation.id}`}
+                                      >
+                                        {installation.installation_code}
+                                        <span className="block text-xs font-medium text-slate-500">
+                                          {installation.installation_status}
+                                        </span>
+                                      </Link>
+                                    ) : (
+                                      "Not installed"
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {!paymentReady ? (
+                                      <span className="text-sm font-medium text-amber-700">
+                                        Accounts to confirm payment
+                                      </span>
+                                    ) : !dispatch ? (
+                                      canCreateDispatch ? (
+                                        <Link
+                                          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-700"
+                                          href={dispatchHref}
+                                        >
+                                          <Truck className="h-4 w-4" aria-hidden="true" />
+                                          Create dispatch
+                                        </Link>
+                                      ) : (
+                                        <span className="text-sm text-slate-500">
+                                          Customer Service to dispatch
+                                        </span>
+                                      )
+                                    ) : !installation ? (
+                                      canCreateInstallation ? (
+                                        <Link
+                                          className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                                          href={installationHref}
+                                        >
+                                          Create installation
+                                        </Link>
+                                      ) : (
+                                        <span className="text-sm text-slate-500">
+                                          Installation team to update
+                                        </span>
+                                      )
+                                    ) : (
+                                      <span className="text-sm font-medium text-emerald-700">
+                                        Complete
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="mt-4 rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500">
+                        No farmer allocations added to this order yet.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-slate-300 p-6 text-sm text-slate-500">
+              No institution-funded sale orders yet.
+            </div>
+          )}
         </div>
       </Section>
 

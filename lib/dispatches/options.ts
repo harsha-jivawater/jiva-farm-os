@@ -45,6 +45,10 @@ export const paymentRequirementOptions = [
 
 export const dispatchRouteOptions = [
   { value: "Paid Farmer Sale", label: "Paid Farmer Sale" },
+  {
+    value: "Institution Funded Farmer Sale",
+    label: "Institution-funded Farmer Sale"
+  },
   { value: "Free Pilot", label: "Free Pilot" },
   { value: "Dealer Dispatch", label: "Dealer Dispatch" },
   {

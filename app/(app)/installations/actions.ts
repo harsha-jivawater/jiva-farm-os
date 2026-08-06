@@ -11,6 +11,7 @@ import {
   farmerSaleFollowupInstallationTypes,
   installedInstallationStatuses
 } from "@/lib/installations/options";
+import { rollupInstitutionSaleOrderStatus } from "@/lib/institutions/sale-orders";
 import type {
   DeviceMovementInsert,
   DeviceUpdate,
@@ -48,6 +49,14 @@ function isFarmerSaleFollowupType(type: string | null | undefined) {
   return (farmerSaleFollowupInstallationTypes as readonly string[]).includes(
     type ?? ""
   );
+}
+
+function isDispatchRequiredInstallation(type: string | null | undefined) {
+  return [
+    "Farmer Sale Installation",
+    "Pilot Installation",
+    "Institution Installation"
+  ].includes(type ?? "");
 }
 
 function holderTypeForInstallation(type: string | null | undefined) {
@@ -175,6 +184,8 @@ async function getDispatchForInstallation(
         "destination_type",
         "dispatch_status",
         "device_id",
+        "institution_sale_order_id",
+        "institution_sale_order_line_id",
         "serial_number_snapshot",
         "product_model",
         "destination_farmer_lead_id",
@@ -303,7 +314,9 @@ async function validateDealerFarmerInstallation({
 }
 
 function dispatchFarmerLeadId(dispatch: InstallationDispatchOption | null) {
-  return dispatch?.destination_farmer_lead_id ?? dispatch?.linked_farmer_lead_id ?? null;
+  return (
+    dispatch?.destination_farmer_lead_id ?? dispatch?.linked_farmer_lead_id ?? null
+  );
 }
 
 function validateDispatchInstallationConsistency({
@@ -315,10 +328,7 @@ function validateDispatchInstallationConsistency({
   errorPath: string;
   payload: InstallationFormPayload;
 }) {
-  if (
-    payload.installation_type === "Farmer Sale Installation" ||
-    payload.installation_type === "Pilot Installation"
-  ) {
+  if (isDispatchRequiredInstallation(payload.installation_type)) {
     if (!dispatch) {
       redirectWithError(
         errorPath,
@@ -361,9 +371,39 @@ function validateDispatchInstallationConsistency({
   }
 
   if (
-    payload.installation_type === "Farmer Sale Installation" ||
-    payload.installation_type === "Pilot Installation"
+    payload.installation_type === "Institution Installation" &&
+    dispatch.dispatch_type !== "Institution Dispatch"
   ) {
+    redirectWithError(
+      errorPath,
+      "Institution Installation must use an Institution Dispatch."
+    );
+  }
+
+  if (
+    payload.installation_type === "Institution Installation" &&
+    (!dispatch.institution_sale_order_id ||
+      !dispatch.institution_sale_order_line_id)
+  ) {
+    redirectWithError(
+      errorPath,
+      "The linked institution dispatch does not have an institution sale allocation."
+    );
+  }
+
+  if (
+    payload.installation_type === "Institution Installation" &&
+    (payload.institution_sale_order_id !== dispatch.institution_sale_order_id ||
+      payload.institution_sale_order_line_id !==
+        dispatch.institution_sale_order_line_id)
+  ) {
+    redirectWithError(
+      errorPath,
+      "Selected institution sale allocation does not match the linked dispatch."
+    );
+  }
+
+  if (isDispatchRequiredInstallation(payload.installation_type)) {
     if (!linkedFarmerLeadId) {
       redirectWithError(
         errorPath,
@@ -407,6 +447,14 @@ function hydrateInstallationPayload({
     device_id: device.id,
     farmer_lead_id: farmerLead.id,
     dispatch_id: dispatch?.id ?? payload.dispatch_id ?? null,
+    institution_sale_order_id:
+      dispatch?.institution_sale_order_id ??
+      payload.institution_sale_order_id ??
+      null,
+    institution_sale_order_line_id:
+      dispatch?.institution_sale_order_line_id ??
+      payload.institution_sale_order_line_id ??
+      null,
     dealer_id:
       dispatch?.linked_dealer_id ??
       dispatch?.destination_dealer_id ??
@@ -491,6 +539,61 @@ async function createFarmerSaleFollowup({
     id: followupId,
     dueDate: followupDueDate
   };
+}
+
+async function updateInstitutionSaleOrderRollup({
+  supabase,
+  orderId,
+  errorPath
+}: {
+  supabase: SupabaseClient;
+  orderId: string | null | undefined;
+  errorPath: string;
+}) {
+  if (!orderId) {
+    return;
+  }
+
+  const [{ data: order, error: orderError }, { data: lines, error: linesError }] =
+    await Promise.all([
+      supabase
+        .from("institution_sale_orders")
+        .select("payment_status")
+        .eq("id", orderId)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      supabase
+        .from("institution_sale_order_lines")
+        .select("allocation_status")
+        .eq("order_id", orderId)
+        .is("deleted_at", null)
+    ]);
+
+  if (orderError) {
+    redirectWithError(errorPath, orderError.message);
+  }
+
+  if (linesError) {
+    redirectWithError(errorPath, linesError.message);
+  }
+
+  if (!order) {
+    return;
+  }
+
+  const nextStatus = rollupInstitutionSaleOrderStatus({
+    lineStatuses: (lines ?? []).map((line) => line.allocation_status),
+    paymentStatus: order.payment_status
+  });
+
+  const { error } = await supabase
+    .from("institution_sale_orders")
+    .update({ order_status: nextStatus })
+    .eq("id", orderId);
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
 }
 
 async function applyInstalledSideEffects({
@@ -604,6 +707,27 @@ async function applyInstalledSideEffects({
 
   if (leadError) {
     redirectWithError(errorPath, leadError.message);
+  }
+
+  if (payload.institution_sale_order_line_id) {
+    const { error: lineError } = await supabase
+      .from("institution_sale_order_lines")
+      .update({
+        allocation_status: "Installed",
+        assigned_device_id: payload.device_id ?? null,
+        installation_id: installationId
+      })
+      .eq("id", payload.institution_sale_order_line_id);
+
+    if (lineError) {
+      redirectWithError(errorPath, lineError.message);
+    }
+
+    await updateInstitutionSaleOrderRollup({
+      supabase,
+      orderId: payload.institution_sale_order_id,
+      errorPath
+    });
   }
 
   if (createFollowup && isFarmerSaleInstallation) {
@@ -725,7 +849,9 @@ export async function createInstallationAction(formData: FormData) {
       installationId,
       payload: insertPayload,
       createMovement: true,
-      createFollowup: farmerLead.payment_confirmed,
+      createFollowup:
+        farmerLead.payment_confirmed ||
+        Boolean(insertPayload.institution_sale_order_id),
       errorPath: `/installations/${installationId}/edit`
     });
   }
@@ -733,6 +859,10 @@ export async function createInstallationAction(formData: FormData) {
   revalidatePath("/installations");
   revalidatePath("/devices");
   revalidatePath("/farmer-leads");
+  revalidatePath("/institutional-partners");
+  if (insertPayload.institution_id) {
+    revalidatePath(`/institutional-partners/${insertPayload.institution_id}`);
+  }
   revalidatePath(`/installations/${installationId}`);
   redirect(`/installations/${installationId}`);
 }
@@ -856,7 +986,10 @@ export async function updateInstallationAction(id: string, formData: FormData) {
       installationId: id,
       payload: updatePayload,
       createMovement: !wasInstalled,
-      createFollowup: !existing.linked_followup_id && farmerLead.payment_confirmed,
+      createFollowup:
+        !existing.linked_followup_id &&
+        (farmerLead.payment_confirmed ||
+          Boolean(updatePayload.institution_sale_order_id)),
       errorPath
     });
   }
@@ -865,5 +998,9 @@ export async function updateInstallationAction(id: string, formData: FormData) {
   revalidatePath(`/installations/${id}`);
   revalidatePath("/devices");
   revalidatePath("/farmer-leads");
+  revalidatePath("/institutional-partners");
+  if (updatePayload.institution_id) {
+    revalidatePath(`/institutional-partners/${updatePayload.institution_id}`);
+  }
   redirect(`/installations/${id}`);
 }

@@ -59,7 +59,8 @@ export const installedInstallationStatuses = ["Installed", "Verified"] as const;
 
 export const farmerSaleFollowupInstallationTypes = [
   "Farmer Sale Installation",
-  "Dealer Farmer Installation"
+  "Dealer Farmer Installation",
+  "Institution Installation"
 ] as const;
 
 export function labelFor(

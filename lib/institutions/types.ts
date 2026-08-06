@@ -23,6 +23,18 @@ export type InstitutionReview =
   Database["public"]["Tables"]["institution_reviews"]["Row"];
 export type InstitutionReviewInsert =
   Database["public"]["Tables"]["institution_reviews"]["Insert"];
+export type InstitutionSaleOrder =
+  Database["public"]["Tables"]["institution_sale_orders"]["Row"];
+export type InstitutionSaleOrderInsert =
+  Database["public"]["Tables"]["institution_sale_orders"]["Insert"];
+export type InstitutionSaleOrderUpdate =
+  Database["public"]["Tables"]["institution_sale_orders"]["Update"];
+export type InstitutionSaleOrderLine =
+  Database["public"]["Tables"]["institution_sale_order_lines"]["Row"];
+export type InstitutionSaleOrderLineInsert =
+  Database["public"]["Tables"]["institution_sale_order_lines"]["Insert"];
+export type InstitutionSaleOrderLineUpdate =
+  Database["public"]["Tables"]["institution_sale_order_lines"]["Update"];
 
 export type InstitutionFormPayload = InstitutionInsert | InstitutionUpdate;
 export type ContactFormPayload =
@@ -31,6 +43,12 @@ export type ContactFormPayload =
 export type MeetingFormPayload =
   | InstitutionMeetingInsert
   | InstitutionMeetingUpdate;
+export type InstitutionSaleOrderFormPayload =
+  | InstitutionSaleOrderInsert
+  | InstitutionSaleOrderUpdate;
+export type InstitutionSaleOrderLineFormPayload =
+  | InstitutionSaleOrderLineInsert
+  | InstitutionSaleOrderLineUpdate;
 
 export type InstitutionFilters = {
   q: string;

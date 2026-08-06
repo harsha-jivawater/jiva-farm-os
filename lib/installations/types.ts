@@ -62,6 +62,8 @@ export type InstallationDispatchOption = Pick<
   | "destination_type"
   | "dispatch_status"
   | "device_id"
+  | "institution_sale_order_id"
+  | "institution_sale_order_line_id"
   | "serial_number_snapshot"
   | "product_model"
   | "destination_address"
