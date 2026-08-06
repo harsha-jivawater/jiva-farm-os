@@ -29,7 +29,10 @@ import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { RefreshKpiDashboardSubmitButton } from "@/components/kpi-dashboard/refresh-submit-button";
 import { deviceStatusOptions, productModelOptions } from "@/lib/devices/options";
 import { formatDisplayDateTime } from "@/lib/date-utils";
-import { primaryCropOptions } from "@/lib/farmer-leads/options";
+import {
+  primaryCropOptions,
+  salesActivityInteractionTypeValues
+} from "@/lib/farmer-leads/options";
 import { businessSectorOptions } from "@/lib/sector/options";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import type { Database } from "@/lib/supabase/database.types";
@@ -618,18 +621,42 @@ async function countResearchAssistantKpis(
   }
 
   let followupsQuery = supabase
-    .from("followups")
-    .select("id", { count: "exact", head: true })
-    .eq("followup_owner_user_id", currentUser.id)
-    .eq("followup_status", "Completed")
+    .from("farmer_lead_followups")
+    .select(
+      "id, farmer_leads!inner(state, region_id, rsm_user_id, product_recommended, primary_crop, deleted_at)",
+      { count: "exact", head: true }
+    )
+    .eq("followed_up_by_user_id", currentUser.id)
+    .in("interaction_type", [...salesActivityInteractionTypeValues])
     .is("deleted_at", null)
-    .gte("followup_due_date", filters.startDate)
-    .lte("followup_due_date", filters.endDate);
+    .is("farmer_leads.deleted_at", null)
+    .gte("followup_date", filters.startDate)
+    .lte("followup_date", filters.endDate);
 
-  if (shouldFilterByPilotIds) {
-    followupsQuery = filterPilotIds.length
-      ? followupsQuery.in("pilot_id", filterPilotIds)
-      : followupsQuery.is("pilot_id", null);
+  if (filters.state) {
+    followupsQuery = followupsQuery.eq("farmer_leads.state", filters.state);
+  }
+
+  if (filters.regionId) {
+    followupsQuery = followupsQuery.eq("farmer_leads.region_id", filters.regionId);
+  }
+
+  if (filters.rsmUserId) {
+    followupsQuery = followupsQuery.eq(
+      "farmer_leads.rsm_user_id",
+      filters.rsmUserId
+    );
+  }
+
+  if (filters.productModel) {
+    followupsQuery = followupsQuery.eq(
+      "farmer_leads.product_recommended",
+      filters.productModel
+    );
+  }
+
+  if (filters.crop) {
+    followupsQuery = followupsQuery.eq("farmer_leads.primary_crop", filters.crop);
   }
 
   const [
@@ -645,7 +672,7 @@ async function countResearchAssistantKpis(
     ),
     timeAsync("kpi dashboard ra visits completed live count", () => visitsQuery),
     timeAsync("kpi dashboard ra reports submitted live count", () => reportsQuery),
-    timeAsync("kpi dashboard ra followups completed live count", () =>
+    timeAsync("kpi dashboard ra lead interactions live count", () =>
       followupsQuery
     )
   ]);
@@ -655,7 +682,7 @@ async function countResearchAssistantKpis(
     ["assigned pilots", assignedPilotsResult],
     ["visits completed", visitsResult],
     ["reports submitted", reportsResult],
-    ["follow-ups completed", followupsResult]
+    ["lead interactions", followupsResult]
   ] as const) {
     if (result.error) {
       console.error(`[KPI Dashboard] Research Assistant ${label} count failed`, result.error);
@@ -1549,7 +1576,7 @@ function KpiDashboardSummaryView({
               />
               <KpiCard
                 icon={CheckCircle2}
-                label="Follow-ups Completed"
+                label="Lead Interactions"
                 value={formatNumber(
                   summary.researchAssistant.followupsCompleted
                 )}

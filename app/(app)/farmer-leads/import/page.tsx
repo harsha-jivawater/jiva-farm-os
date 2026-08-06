@@ -30,7 +30,7 @@ export default async function FarmerLeadsImportPage() {
       <CsvImporter
         action={importFarmerLeadsAction}
         columns={[...farmerLeadImportColumns]}
-        instructions="Required fields are farmer_name, mobile_number, state, and district. Village, crop, acre, crop stage, and irrigation details are optional. Blank or unrecognized optional values are normalized so valid rows can still import. Region/RSM assignment is automatic, and unassigned regions route to the default Sales Head."
+        instructions="Required fields are farmer_name, mobile_number, state, and district. Business sector defaults to Agriculture if blank. Village, crop, acre, crop stage, and irrigation details are optional. Blank or unrecognized optional values are normalized so valid rows can still import. Region/RSM assignment is automatic, and new state names create an active region for Sales Head routing."
         submitLabel="Import valid rows"
         templateHref="/templates/farmer-leads-import-template.csv"
         title="Farmer Leads CSV import"

@@ -34,6 +34,7 @@ const farmerLeadColumns = [
   "rsm_user_id",
   "region_id",
   "owner_user_id",
+  "payment_confirmed",
   "linked_dealer_id",
   "linked_institution_id",
   "linked_pilot_id"
@@ -54,7 +55,12 @@ const deviceColumns = [
 const dispatchColumns = [
   "id",
   "dispatch_code",
+  "dispatch_type",
+  "destination_type",
+  "dispatch_status",
   "device_id",
+  "institution_sale_order_id",
+  "institution_sale_order_line_id",
   "serial_number_snapshot",
   "product_model",
   "destination_farmer_lead_id",

@@ -32,6 +32,7 @@ const farmerLeadColumns = [
   "rsm_user_id",
   "region_id",
   "owner_user_id",
+  "payment_confirmed",
   "linked_dealer_id",
   "linked_institution_id",
   "linked_pilot_id"
@@ -57,6 +58,8 @@ const dispatchColumns = [
   "destination_type",
   "dispatch_status",
   "device_id",
+  "institution_sale_order_id",
+  "institution_sale_order_line_id",
   "serial_number_snapshot",
   "product_model",
   "destination_farmer_lead_id",
@@ -115,12 +118,37 @@ export default async function NewInstallationPage({
     ]);
   let farmerLeadOptions =
     (farmerLeads ?? []) as unknown as InstallationFarmerLeadOption[];
-  const dispatchOptions =
+  let deviceOptions = (devices ?? []) as unknown as InstallationDeviceOption[];
+  let dispatchOptions =
     (dispatches ?? []) as unknown as InstallationDispatchOption[];
+
+  if (
+    params.dispatch_id &&
+    !dispatchOptions.some((dispatch) => dispatch.id === params.dispatch_id)
+  ) {
+    const { data: selectedDispatch } = await supabase
+      .from("dispatches")
+      .select(dispatchColumns)
+      .eq("id", params.dispatch_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (selectedDispatch) {
+      dispatchOptions = [
+        selectedDispatch as unknown as InstallationDispatchOption,
+        ...dispatchOptions
+      ];
+    }
+  }
+
   const loadedFarmerLeadIds = new Set(farmerLeadOptions.map((lead) => lead.id));
-  const missingDispatchFarmerLeadIds = dispatchFarmerLeadIds(
-    dispatchOptions
-  ).filter((leadId) => !loadedFarmerLeadIds.has(leadId));
+  const selectedDispatch = params.dispatch_id
+    ? dispatchOptions.find((dispatch) => dispatch.id === params.dispatch_id)
+    : undefined;
+  const missingDispatchFarmerLeadIds = unique([
+    ...dispatchFarmerLeadIds(dispatchOptions),
+    params.farmer_lead_id
+  ]).filter((leadId) => !loadedFarmerLeadIds.has(leadId));
 
   if (missingDispatchFarmerLeadIds.length) {
     const { data: dispatchFarmerLeads } = await supabase
@@ -135,6 +163,25 @@ export default async function NewInstallationPage({
     ];
   }
 
+  const loadedDeviceIds = new Set(deviceOptions.map((device) => device.id));
+  const missingDeviceIds = unique([
+    params.device_id,
+    selectedDispatch?.device_id
+  ]).filter((deviceId) => !loadedDeviceIds.has(deviceId));
+
+  if (missingDeviceIds.length) {
+    const { data: selectedDevices } = await supabase
+      .from("devices")
+      .select(deviceColumns)
+      .in("id", missingDeviceIds)
+      .is("deleted_at", null);
+
+    deviceOptions = [
+      ...((selectedDevices ?? []) as unknown as InstallationDeviceOption[]),
+      ...deviceOptions
+    ];
+  }
+
   return (
     <section>
       <PageHeader
@@ -145,7 +192,7 @@ export default async function NewInstallationPage({
       <InstallationForm
         action={createInstallationAction}
         cancelHref="/installations"
-        devices={(devices ?? []) as unknown as InstallationDeviceOption[]}
+        devices={deviceOptions}
         dispatches={dispatchOptions}
         error={params.error}
         farmerLeads={farmerLeadOptions}

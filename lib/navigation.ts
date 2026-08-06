@@ -91,6 +91,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/pilots",
         module: "pilots",
         icon: Gauge
+      },
+      {
+        label: "Pilot Monitoring",
+        href: "/pilot-monitoring",
+        module: "pilot-monitoring",
+        icon: CalendarCheck2
       }
     ]
   },

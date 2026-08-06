@@ -23,6 +23,7 @@ import type {
   DispatchDealerOption,
   DispatchDeviceOption,
   DispatchFarmerLeadOption,
+  DispatchInstitutionSaleLineOption,
   DispatchPilotOption
 } from "@/lib/dispatches/types";
 
@@ -34,8 +35,10 @@ type DispatchFormProps = {
   devices: DispatchDeviceOption[];
   error?: string | null;
   farmerLeads?: DispatchFarmerLeadOption[];
+  institutionSaleLines?: DispatchInstitutionSaleLineOption[];
   initialDispatchRoute?: string;
   initialFarmerLeadId?: string;
+  initialInstitutionSaleOrderLineId?: string;
   initialPilotId?: string;
   canConfirmPayment?: boolean;
   canUseManualException?: boolean;
@@ -90,6 +93,10 @@ function dealerLabel(dealer: DispatchDealerOption) {
   return `${dealer.dealer_code} · ${primaryName} · ${dealer.district}, ${dealer.state}`;
 }
 
+function institutionSaleLineLabel(line: DispatchInstitutionSaleLineOption) {
+  return `${line.order_code} · ${line.organization_name} pays · ${line.farmer_name}, ${line.district}`;
+}
+
 function isWarehouseDispatchDevice(device: DispatchDeviceOption) {
   return (
     ["In Warehouse", "Reserved"].includes(device.device_status) &&
@@ -98,6 +105,10 @@ function isWarehouseDispatchDevice(device: DispatchDeviceOption) {
 }
 
 function routeForDispatch(dispatch?: Dispatch) {
+  if (dispatch?.dispatch_type === "Institution Dispatch") {
+    return "Institution Funded Farmer Sale";
+  }
+
   if (dispatch?.dispatch_type === "Farmer Sale Dispatch") {
     return "Paid Farmer Sale";
   }
@@ -146,8 +157,10 @@ export function DispatchForm({
   devices,
   error,
   farmerLeads = [],
+  institutionSaleLines = [],
   initialDispatchRoute,
   initialFarmerLeadId,
+  initialInstitutionSaleOrderLineId,
   initialPilotId,
   canConfirmPayment = false,
   canUseManualException = false,
@@ -155,10 +168,17 @@ export function DispatchForm({
   pilots = [],
   pilotsLoadError
 }: DispatchFormProps) {
+  const initialInstitutionSaleLine = institutionSaleLines.find(
+    (line) =>
+      line.id ===
+      (initialInstitutionSaleOrderLineId ??
+        dispatch?.institution_sale_order_line_id)
+  );
   const initialLead = farmerLeads.find(
     (lead) =>
       lead.id ===
-      (initialFarmerLeadId ??
+      (initialInstitutionSaleLine?.farmer_lead_id ??
+        initialFarmerLeadId ??
         dispatch?.destination_farmer_lead_id ??
         dispatch?.linked_farmer_lead_id)
   );
@@ -201,6 +221,8 @@ export function DispatchForm({
     initialDispatchRoute ??
       (initialPilotId
       ? "Free Pilot"
+      : initialInstitutionSaleLine
+        ? "Institution Funded Farmer Sale"
       : initialFarmerLeadId
         ? "Paid Farmer Sale"
         : mode === "edit"
@@ -231,6 +253,13 @@ export function DispatchForm({
   const [selectedDealerId, setSelectedDealerId] = useState(
     dispatch?.destination_dealer_id ?? dispatch?.linked_dealer_id ?? ""
   );
+  const [selectedInstitutionSaleLineId, setSelectedInstitutionSaleLineId] =
+    useState(
+      initialInstitutionSaleOrderLineId ??
+        dispatch?.institution_sale_order_line_id ??
+        initialInstitutionSaleLine?.id ??
+        ""
+    );
   const [destinationName, setDestinationName] = useState(
     initialLead?.farmer_name ??
       initialPilot?.pilot_name ??
@@ -254,7 +283,10 @@ export function DispatchForm({
       ""
   );
   const [paymentConfirmed, setPaymentConfirmed] = useState(
-    initialLead?.payment_confirmed ?? dispatch?.payment_confirmed ?? false
+    Boolean(initialInstitutionSaleLine) ||
+      initialLead?.payment_confirmed ||
+      dispatch?.payment_confirmed ||
+      false
   );
   const [stateValue, setStateValue] = useState(
     initialLead?.state ??
@@ -271,14 +303,18 @@ export function DispatchForm({
       ""
   );
   const isFarmerSaleRoute = dispatchRoute === "Paid Farmer Sale";
+  const isInstitutionSaleRoute =
+    dispatchRoute === "Institution Funded Farmer Sale";
   const isPilotRoute = dispatchRoute === "Free Pilot";
   const isDealerRoute = dispatchRoute === "Dealer Dispatch";
   const isManualRoute = dispatchRoute === "Admin Manual Exception";
   const paymentConfirmationLocked =
-    isFarmerSaleRoute || isPilotRoute || !canConfirmPayment;
+    isFarmerSaleRoute || isInstitutionSaleRoute || isPilotRoute || !canConfirmPayment;
   const submitDisabled = isPilotRoute && Boolean(pilotsLoadError);
   const effectiveDispatchType = isFarmerSaleRoute
     ? "Farmer Sale Dispatch"
+    : isInstitutionSaleRoute
+      ? "Institution Dispatch"
     : isPilotRoute
       ? "Pilot Dispatch"
       : isDealerRoute
@@ -286,6 +322,8 @@ export function DispatchForm({
         : dispatchType;
   const effectiveDestinationType = isFarmerSaleRoute
     ? "Farmer"
+    : isInstitutionSaleRoute
+      ? "Farmer"
     : isPilotRoute
       ? "Pilot"
       : isDealerRoute
@@ -301,7 +339,7 @@ export function DispatchForm({
       return true;
     }
 
-    if (isFarmerSaleRoute || isDealerRoute) {
+    if (isFarmerSaleRoute || isInstitutionSaleRoute || isDealerRoute) {
       return (
         device.inventory_pool === "Fresh Sale" &&
         isWarehouseDispatchDevice(device)
@@ -353,6 +391,9 @@ export function DispatchForm({
   const firstSelectedDealerDevice = dealerDispatchDevices.find(
     (device) => device.id === selectedDealerDeviceIds[0]
   );
+  const selectedInstitutionSaleLine = institutionSaleLines.find(
+    (line) => line.id === selectedInstitutionSaleLineId
+  );
   const visibleDealerDeviceIds = visibleDealerDispatchDevices.map(
     (device) => device.id
   );
@@ -381,6 +422,31 @@ export function DispatchForm({
     setDistrictValue(lead.district);
     setDestinationAddress(lead.village);
     setPaymentConfirmed(lead.payment_confirmed);
+  }
+
+  function applyInstitutionSaleLine(lineId: string) {
+    setSelectedInstitutionSaleLineId(lineId);
+    const line = institutionSaleLines.find((option) => option.id === lineId);
+
+    if (!line) {
+      setSelectedLeadId("");
+      setDestinationName("");
+      setDestinationContact("");
+      setStateValue("");
+      setDistrictValue("");
+      setDestinationAddress("");
+      setPaymentConfirmed(false);
+      return;
+    }
+
+    setDestinationType("Farmer");
+    setSelectedLeadId(line.farmer_lead_id);
+    setDestinationName(line.farmer_name);
+    setDestinationContact(line.mobile_number);
+    setStateValue(line.state);
+    setDistrictValue(line.district);
+    setDestinationAddress(line.village);
+    setPaymentConfirmed(true);
   }
 
   function applyPilot(pilotId: string) {
@@ -437,6 +503,7 @@ export function DispatchForm({
     setSelectedLeadId("");
     setSelectedPilotId("");
     setSelectedDealerId("");
+    setSelectedInstitutionSaleLineId("");
     setDeviceSearch("");
     setSelectedDealerDeviceIds([]);
     setDealerDeviceSearch("");
@@ -444,6 +511,13 @@ export function DispatchForm({
 
     if (nextRoute === "Paid Farmer Sale") {
       setDispatchType("Farmer Sale Dispatch");
+      setDestinationType("Farmer");
+      setPaymentConfirmed(false);
+      return;
+    }
+
+    if (nextRoute === "Institution Funded Farmer Sale") {
+      setDispatchType("Institution Dispatch");
       setDestinationType("Farmer");
       setPaymentConfirmed(false);
       return;
@@ -523,6 +597,8 @@ export function DispatchForm({
             <p className="mt-1 text-xs leading-5 text-slate-500">
               {isFarmerSaleRoute
                 ? "Paid farmer dispatches use fresh sale devices only."
+                : isInstitutionSaleRoute
+                  ? "Institution-funded farmer sales use Fresh Sale devices, with the institution as payer and the farmer as recipient."
                 : isPilotRoute
                   ? "Free pilots use pilot-dedicated devices only."
                   : isDealerRoute
@@ -911,6 +987,49 @@ export function DispatchForm({
                 leads that have not yet been dispatched.
               </p>
             </div>
+          ) : isInstitutionSaleRoute ? (
+            <div className="md:col-span-2">
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="institution_sale_order_line_id"
+              >
+                Institution-paid farmer allocation
+              </label>
+              <select
+                className={inputClassName()}
+                id="institution_sale_order_line_id"
+                name="institution_sale_order_line_id"
+                onChange={(event) => applyInstitutionSaleLine(event.target.value)}
+                required
+                value={selectedInstitutionSaleLineId}
+              >
+                <option value="">Select paid institution allocation</option>
+                {institutionSaleLines.map((line) => (
+                  <option key={line.id} value={line.id}>
+                    {institutionSaleLineLabel(line)}
+                  </option>
+                ))}
+              </select>
+              <input
+                name="institution_sale_order_id"
+                type="hidden"
+                value={selectedInstitutionSaleLine?.order_id ?? ""}
+              />
+              <input
+                name="destination_institution_id"
+                type="hidden"
+                value={selectedInstitutionSaleLine?.institution_id ?? ""}
+              />
+              <input
+                name="destination_farmer_lead_id"
+                type="hidden"
+                value={selectedInstitutionSaleLine?.farmer_lead_id ?? ""}
+              />
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Accounts must confirm institution payment before this allocation
+                appears here.
+              </p>
+            </div>
           ) : (
             <input name="destination_farmer_lead_id" type="hidden" value="" />
           )}
@@ -990,6 +1109,14 @@ export function DispatchForm({
             <input name="destination_dealer_id" type="hidden" value="" />
           )}
 
+          {!isInstitutionSaleRoute ? (
+            <>
+              <input name="destination_institution_id" type="hidden" value="" />
+              <input name="institution_sale_order_id" type="hidden" value="" />
+              <input name="institution_sale_order_line_id" type="hidden" value="" />
+            </>
+          ) : null}
+
           {!isManualRoute ? (
             <>
               <input
@@ -1048,6 +1175,14 @@ export function DispatchForm({
                       {dispatchRoute}
                     </dd>
                   </div>
+                  {isInstitutionSaleRoute ? (
+                    <div>
+                      <dt className="text-slate-500">Payer</dt>
+                      <dd className="mt-1 font-semibold text-slate-950">
+                        {selectedInstitutionSaleLine?.organization_name ?? "Not set"}
+                      </dd>
+                    </div>
+                  ) : null}
                 </dl>
               </div>
             </>

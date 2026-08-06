@@ -84,6 +84,29 @@ export const leadSourceOptions = [
   { value: "Other", label: "Other" }
 ] as const;
 
+export const farmerLeadInteractionTypeOptions = [
+  { value: "Field Visit", label: "Field Visit" },
+  { value: "Phone Call", label: "Phone Call" },
+  { value: "WhatsApp", label: "WhatsApp" },
+  {
+    value: "Dealer / Customer Meeting",
+    label: "Dealer / Customer Meeting"
+  },
+  {
+    value: "Other Customer Interaction",
+    label: "Other Customer Interaction"
+  },
+  { value: "Internal Note", label: "Internal Note" }
+] as const;
+
+export const salesActivityInteractionTypeValues = [
+  "Field Visit",
+  "Phone Call",
+  "WhatsApp",
+  "Dealer / Customer Meeting",
+  "Other Customer Interaction"
+] as const;
+
 export const primaryCropOptions = selectableCropOptions;
 
 export const cropStageOptions = [

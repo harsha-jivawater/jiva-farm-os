@@ -29,6 +29,7 @@ export type ModuleKey =
   | "dealers"
   | "institutional-partners"
   | "pilots"
+  | "pilot-monitoring"
   | "installations"
   | "follow-ups"
   | "monitoring-devices"
@@ -138,6 +139,7 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Salesperson",
     "Viewer"
   ],
+  "pilot-monitoring": ["Admin", "Management", "R&D Head", "Agronomist"],
   installations: [
     "Admin",
     "Sales Head",
@@ -242,6 +244,7 @@ const moduleWriteRoles: Record<ModuleKey, readonly UserRole[]> = {
     "HR & Legal"
   ],
   pilots: ["Admin", "R&D Head", "Agronomist", "Research Assistant"],
+  "pilot-monitoring": [],
   installations: [
     "Admin",
     "Sales Head",
