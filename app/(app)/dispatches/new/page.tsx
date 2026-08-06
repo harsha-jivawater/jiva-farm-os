@@ -2,12 +2,13 @@ import { DispatchForm } from "@/components/dispatches/dispatch-form";
 import { PageHeader } from "@/components/page-header";
 import { createDispatchAction } from "@/app/(app)/dispatches/actions";
 import { preferredDispatchDeviceStatuses } from "@/lib/dispatches/options";
-import type {
-  DispatchDealerOption,
-  DispatchDeviceOption,
-  DispatchFarmerLeadOption,
-  DispatchInstitutionSaleLineOption,
-  DispatchPilotOption
+import {
+  mergeFarmerLeadOptions,
+  type DispatchDealerOption,
+  type DispatchDeviceOption,
+  type DispatchFarmerLeadOption,
+  type DispatchInstitutionSaleLineOption,
+  type DispatchPilotOption
 } from "@/lib/dispatches/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -57,6 +58,7 @@ const farmerLeadSelectColumns = [
   "village",
   "district",
   "state",
+  "funnel_stage",
   "product_recommended",
   "payment_confirmed",
   "device_dispatched",
@@ -174,6 +176,14 @@ export default async function NewDispatchPage({
     .eq("device_dispatched", false)
     .order("created_at", { ascending: false })
     .limit(200);
+  const { data: pilotAgreedLeads } = await supabase
+    .from("farmer_leads")
+    .select(farmerLeadSelectColumns)
+    .is("deleted_at", null)
+    .eq("funnel_stage", "Pilot Agreed")
+    .order("farmer_name", { ascending: true })
+    .order("lead_code", { ascending: true })
+    .limit(500);
   const { data: activePilots, error: activePilotsError } = await supabase
     .from("pilots")
     .select(pilotSelectColumns)
@@ -322,6 +332,10 @@ export default async function NewDispatchPage({
       } as DispatchInstitutionSaleLineOption;
     })
     .filter(Boolean) as DispatchInstitutionSaleLineOption[];
+  const institutionFarmerLeads = mergeFarmerLeadOptions(
+    (pilotAgreedLeads ?? []) as unknown as DispatchFarmerLeadOption[],
+    (saleLeads ?? []) as unknown as DispatchFarmerLeadOption[]
+  );
 
   return (
     <section>
@@ -339,6 +353,7 @@ export default async function NewDispatchPage({
         devices={eligibleDevices}
         error={params.error}
         farmerLeads={eligibleFarmerLeads}
+        institutionFarmerLeads={institutionFarmerLeads}
         institutionSaleLines={institutionSaleLines}
         initialDispatchRoute={initialDispatchRoute}
         initialFarmerLeadId={params.farmer_lead_id}

@@ -37,6 +37,7 @@ export type DispatchFarmerLeadOption = {
   village: string;
   district: string;
   state: string;
+  funnel_stage: string;
   product_recommended: string;
   payment_confirmed: boolean;
   device_dispatched: boolean;
@@ -107,6 +108,28 @@ export type DispatchFilters = {
 
 export function display(value: string | null | undefined) {
   return value || "Not set";
+}
+
+export function mergeFarmerLeadOptions(
+  ...optionGroups: DispatchFarmerLeadOption[][]
+) {
+  const options = new Map<string, DispatchFarmerLeadOption>();
+
+  for (const group of optionGroups) {
+    for (const option of group) {
+      options.set(option.id, option);
+    }
+  }
+
+  return Array.from(options.values()).sort((first, second) => {
+    const nameCompare = first.farmer_name.localeCompare(second.farmer_name);
+
+    if (nameCompare !== 0) {
+      return nameCompare;
+    }
+
+    return first.lead_code.localeCompare(second.lead_code);
+  });
 }
 
 export function formatDate(value: string | null | undefined) {
