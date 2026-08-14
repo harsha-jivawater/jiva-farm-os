@@ -70,6 +70,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
         icon: Store
       },
       {
+        label: "Dealer Reporting",
+        href: "/dealers/reporting",
+        module: "dealers",
+        icon: BarChart3
+      },
+      {
         label: "Institutional Partners",
         href: "/institutional-partners",
         module: "institutional-partners",

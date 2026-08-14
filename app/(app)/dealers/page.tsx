@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Award,
+  BarChart3,
   Boxes,
   CheckCircle2,
   Download,
@@ -438,8 +439,15 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
           title="Dealers"
           description="Manage dealer onboarding, territory ownership, stock, and dealer-linked installations."
         />
-        {canExportCsv || canCreate ? (
         <div className="flex flex-col gap-2 sm:flex-row">
+          <Link
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            href="/dealers/reporting"
+            prefetch={false}
+          >
+            <BarChart3 className="h-4 w-4" aria-hidden="true" />
+            Dealer reporting
+          </Link>
           {canExportCsv ? (
           <Link
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
@@ -460,7 +468,6 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
           </Link>
           ) : null}
         </div>
-        ) : null}
       </div>
 
       {paramValue(params.deleted) ? (
