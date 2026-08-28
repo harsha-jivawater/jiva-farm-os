@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ClipboardList,
+  Download,
   Eye,
   PackageCheck,
   PackageOpen,
@@ -33,12 +34,13 @@ import {
   type Device,
   type DeviceFilters
 } from "@/lib/devices/types";
+import { exportLink } from "@/lib/export/csv";
 import { applyLocationFilter } from "@/lib/filters/location";
 import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { canWriteModule } from "@/lib/users/permissions";
+import { canViewModule, canWriteModule } from "@/lib/users/permissions";
 import { deviceScope } from "@/lib/users/record-scope";
 import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
@@ -352,6 +354,8 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
     })
   );
   const cleanedSearch = searchValue(filters.q);
+  const canExportCsv = canViewModule(currentUser, "inventory");
+  const csvExportHref = exportLink("/devices/export", params);
   let listLoadError: string | null = null;
   let summaryLoadError: string | null = null;
   let devices: Device[] = [];
@@ -432,22 +436,36 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
           title="Inventory"
           description="Track sale warehouse stock, pilot stock, devices in transit, dealer stock, farmer-held devices, installed devices, and individual device records."
         />
-        {canWrite ? (
+        {canExportCsv || canWrite ? (
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Link
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-              href="/devices/import"
-            >
-              <Upload className="h-4 w-4" aria-hidden="true" />
-              Import CSV
-            </Link>
-            <Link
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
-              href="/devices/new"
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Add device
-            </Link>
+            {canExportCsv ? (
+              <Link
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                href={csvExportHref}
+                prefetch={false}
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+                Export CSV
+              </Link>
+            ) : null}
+            {canWrite ? (
+              <>
+                <Link
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                  href="/devices/import"
+                >
+                  <Upload className="h-4 w-4" aria-hidden="true" />
+                  Import CSV
+                </Link>
+                <Link
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+                  href="/devices/new"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Add device
+                </Link>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -570,6 +588,10 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
           Filters
         </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Export CSV downloads the Inventory records currently visible to your
+          role using these filters.
+        </p>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="md:col-span-2">
