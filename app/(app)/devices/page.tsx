@@ -1,13 +1,16 @@
 import Link from "next/link";
 import {
+  ClipboardList,
   Eye,
   PackageCheck,
+  PackageOpen,
   Pencil,
   Plus,
   Search,
   SlidersHorizontal,
   Store,
   Truck,
+  Users,
   Upload,
   Warehouse,
   type LucideIcon
@@ -66,14 +69,14 @@ const listSelectColumns = [
   "stock_entry_date"
 ].join(",");
 
-const productModels = ["Vipasa", "Dihanga", "Jahnavi"] as const;
-const installedDeviceStatuses = [
-  "Installed at Farmer Site",
-  "Installed for Pilot"
-] as const;
+const productModels = ["Vipasa", "Jahnavi", "Dihanga"] as const;
+const freshSaleInventoryPool = "Fresh Sale";
+const pilotInventoryPool = "Pilot Stock";
+const installedSaleDeviceStatus = "Installed at Farmer Site";
 const warehouseStockDeviceStatuses = ["In Warehouse", "Reserved"] as const;
 const dealerStockDeviceStatus = "With Dealer";
 const inTransitDeviceStatus = "Dispatched";
+const withFarmerDeviceStatus = "With Farmer";
 const loadErrorMessage = "Unable to load records. Please contact Admin.";
 const inventorySummaryPageSize = 1_000;
 
@@ -83,12 +86,29 @@ type InventorySummary = {
   dealer: ProductCounts;
   inTransit: ProductCounts;
   installed: ProductCounts;
+  pilotOut: ProductCounts;
+  pilotWarehouse: ProductCounts;
+  withFarmer: ProductCounts;
   warehouse: ProductCounts;
 };
 type InventorySummaryDevice = Pick<
   Device,
-  "current_holder_type" | "device_status" | "product_model"
+  "current_holder_type" | "device_status" | "inventory_pool" | "product_model"
 >;
+type InventorySummaryKey = keyof InventorySummary;
+
+const inventorySummaryColumns: Array<{
+  key: InventorySummaryKey;
+  label: string;
+}> = [
+  { key: "warehouse", label: "Sale Warehouse" },
+  { key: "pilotWarehouse", label: "Pilot Warehouse" },
+  { key: "pilotOut", label: "Pilot Out" },
+  { key: "inTransit", label: "In Transit" },
+  { key: "dealer", label: "Dealer Stock" },
+  { key: "withFarmer", label: "With Farmers" },
+  { key: "installed", label: "Installed" }
+];
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -141,8 +161,8 @@ function logLoadError(area: "list" | "summary", error: unknown) {
 function emptyProductCounts(): ProductCounts {
   return {
     Vipasa: 0,
-    Dihanga: 0,
-    Jahnavi: 0
+    Jahnavi: 0,
+    Dihanga: 0
   };
 }
 
@@ -155,8 +175,20 @@ function emptyInventorySummary(): InventorySummary {
     dealer: emptyProductCounts(),
     inTransit: emptyProductCounts(),
     installed: emptyProductCounts(),
+    pilotOut: emptyProductCounts(),
+    pilotWarehouse: emptyProductCounts(),
+    withFarmer: emptyProductCounts(),
     warehouse: emptyProductCounts()
   };
+}
+
+function isWarehouseStockDevice(device: InventorySummaryDevice) {
+  return (
+    device.current_holder_type === "Warehouse" &&
+    warehouseStockDeviceStatuses.includes(
+      device.device_status as (typeof warehouseStockDeviceStatuses)[number]
+    )
+  );
 }
 
 async function loadInventorySummary({
@@ -175,7 +207,7 @@ async function loadInventorySummary({
   for (let from = 0; ; from += inventorySummaryPageSize) {
     let query = supabase
       .from("devices")
-      .select("product_model,device_status,current_holder_type")
+      .select("product_model,inventory_pool,device_status,current_holder_type")
       .is("deleted_at", null)
       .order("id", { ascending: true })
       .range(from, from + inventorySummaryPageSize - 1);
@@ -198,21 +230,28 @@ async function loadInventorySummary({
       }
 
       const product = device.product_model as ProductModel;
+      const isFreshSale = device.inventory_pool === freshSaleInventoryPool;
+      const isPilotStock = device.inventory_pool === pilotInventoryPool;
+      const isWarehouseStock = isWarehouseStockDevice(device);
 
-      if (
-        device.current_holder_type === "Warehouse" &&
-        warehouseStockDeviceStatuses.includes(
-          device.device_status as (typeof warehouseStockDeviceStatuses)[number]
-        )
-      ) {
+      if (isFreshSale && isWarehouseStock) {
         summary.warehouse[product] += 1;
       }
 
-      if (device.device_status === inTransitDeviceStatus) {
+      if (isPilotStock && isWarehouseStock) {
+        summary.pilotWarehouse[product] += 1;
+      }
+
+      if (isPilotStock && !isWarehouseStock) {
+        summary.pilotOut[product] += 1;
+      }
+
+      if (isFreshSale && device.device_status === inTransitDeviceStatus) {
         summary.inTransit[product] += 1;
       }
 
       if (
+        isFreshSale &&
         device.current_holder_type === "Dealer" &&
         device.device_status === dealerStockDeviceStatus
       ) {
@@ -220,9 +259,16 @@ async function loadInventorySummary({
       }
 
       if (
-        installedDeviceStatuses.includes(
-          device.device_status as (typeof installedDeviceStatuses)[number]
-        )
+        isFreshSale &&
+        device.current_holder_type === "Farmer" &&
+        device.device_status === withFarmerDeviceStatus
+      ) {
+        summary.withFarmer[product] += 1;
+      }
+
+      if (
+        isFreshSale &&
+        device.device_status === installedSaleDeviceStatus
       ) {
         summary.installed[product] += 1;
       }
@@ -384,7 +430,7 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
         <PageHeader
           eyebrow="Operations"
           title="Inventory"
-          description="Track warehouse stock, devices in transit, dealer stock, installed devices, and individual device records."
+          description="Track sale warehouse stock, pilot stock, devices in transit, dealer stock, farmer-held devices, installed devices, and individual device records."
         />
         {canWrite ? (
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -411,12 +457,24 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
           {summaryLoadError}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
           <InventorySummaryCard
             breakdown={inventorySummary.warehouse}
             icon={Warehouse}
-            label="Warehouse Stock"
+            label="Sale Warehouse Stock"
             value={sumProductCounts(inventorySummary.warehouse)}
+          />
+          <InventorySummaryCard
+            breakdown={inventorySummary.pilotWarehouse}
+            icon={PackageOpen}
+            label="Pilot Stock in Warehouse"
+            value={sumProductCounts(inventorySummary.pilotWarehouse)}
+          />
+          <InventorySummaryCard
+            breakdown={inventorySummary.pilotOut}
+            icon={ClipboardList}
+            label="Pilot Stock Out"
+            value={sumProductCounts(inventorySummary.pilotOut)}
           />
           <InventorySummaryCard
             breakdown={inventorySummary.inTransit}
@@ -429,6 +487,12 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
             icon={Store}
             label="Dealer Stock"
             value={sumProductCounts(inventorySummary.dealer)}
+          />
+          <InventorySummaryCard
+            breakdown={inventorySummary.withFarmer}
+            icon={Users}
+            label="With Farmers"
+            value={sumProductCounts(inventorySummary.withFarmer)}
           />
           <InventorySummaryCard
             breakdown={inventorySummary.installed}
@@ -447,14 +511,15 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
             </h2>
           </div>
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[42rem] text-left text-sm">
+            <table className="w-full min-w-[72rem] text-left text-sm">
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Device Model</th>
-                  <th className="px-4 py-3 text-right">Warehouse Stock</th>
-                  <th className="px-4 py-3 text-right">In Transit</th>
-                  <th className="px-4 py-3 text-right">Dealer Stock</th>
-                  <th className="px-4 py-3 text-right">Installed Devices</th>
+                  {inventorySummaryColumns.map((column) => (
+                    <th className="px-4 py-3 text-right" key={column.key}>
+                      {column.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -463,18 +528,14 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
                     <td className="px-4 py-3 font-semibold text-slate-950">
                       {product}
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-700">
-                      {inventorySummary.warehouse[product]}
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-700">
-                      {inventorySummary.inTransit[product]}
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-700">
-                      {inventorySummary.dealer[product]}
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-700">
-                      {inventorySummary.installed[product]}
-                    </td>
+                    {inventorySummaryColumns.map((column) => (
+                      <td
+                        className="px-4 py-3 text-right text-slate-700"
+                        key={column.key}
+                      >
+                        {inventorySummary[column.key][product]}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -487,30 +548,14 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
                   {product}
                 </h3>
                 <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <dt className="text-slate-400">Warehouse</dt>
-                    <dd className="mt-1 font-semibold text-slate-700">
-                      {inventorySummary.warehouse[product]}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-400">In Transit</dt>
-                    <dd className="mt-1 font-semibold text-slate-700">
-                      {inventorySummary.inTransit[product]}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-400">Dealer</dt>
-                    <dd className="mt-1 font-semibold text-slate-700">
-                      {inventorySummary.dealer[product]}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-400">Installed</dt>
-                    <dd className="mt-1 font-semibold text-slate-700">
-                      {inventorySummary.installed[product]}
-                    </dd>
-                  </div>
+                  {inventorySummaryColumns.map((column) => (
+                    <div key={column.key}>
+                      <dt className="text-slate-400">{column.label}</dt>
+                      <dd className="mt-1 font-semibold text-slate-700">
+                        {inventorySummary[column.key][product]}
+                      </dd>
+                    </div>
+                  ))}
                 </dl>
               </article>
             ))}
