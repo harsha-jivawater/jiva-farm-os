@@ -23,6 +23,7 @@ import type {
   DispatchDealerOption,
   DispatchDeviceOption,
   DispatchFarmerLeadOption,
+  DispatchInstitutionOption,
   DispatchInstitutionSaleLineOption,
   DispatchPilotOption
 } from "@/lib/dispatches/types";
@@ -36,9 +37,11 @@ type DispatchFormProps = {
   error?: string | null;
   farmerLeads?: DispatchFarmerLeadOption[];
   institutionFarmerLeads?: DispatchFarmerLeadOption[];
+  institutionOptions?: DispatchInstitutionOption[];
   institutionSaleLines?: DispatchInstitutionSaleLineOption[];
   initialDispatchRoute?: string;
   initialFarmerLeadId?: string;
+  initialInstitutionId?: string;
   initialInstitutionSaleOrderLineId?: string;
   initialPilotId?: string;
   canConfirmPayment?: boolean;
@@ -99,14 +102,17 @@ function institutionSaleLineLabel(line: DispatchInstitutionSaleLineOption) {
 }
 
 function institutionSalePayerLabel(
-  institution: { id: string; organization_name: string },
+  institution: DispatchInstitutionOption,
   institutionSaleLines: DispatchInstitutionSaleLineOption[]
 ) {
   const allocationCount = institutionSaleLines.filter(
     (line) => line.institution_id === institution.id
   ).length;
+  const code = institution.institution_code
+    ? ` · ${institution.institution_code}`
+    : "";
 
-  return `${institution.organization_name} (${allocationCount} ready allocation${
+  return `${institution.organization_name}${code} (${allocationCount} ready allocation${
     allocationCount === 1 ? "" : "s"
   })`;
 }
@@ -172,9 +178,11 @@ export function DispatchForm({
   error,
   farmerLeads = [],
   institutionFarmerLeads = [],
+  institutionOptions = [],
   institutionSaleLines = [],
   initialDispatchRoute,
   initialFarmerLeadId,
+  initialInstitutionId,
   initialInstitutionSaleOrderLineId,
   initialPilotId,
   canConfirmPayment = false,
@@ -277,6 +285,7 @@ export function DispatchForm({
     );
   const [selectedInstitutionId, setSelectedInstitutionId] = useState(
     initialInstitutionSaleLine?.institution_id ??
+      initialInstitutionId ??
       dispatch?.destination_institution_id ??
       dispatch?.linked_institution_id ??
       ""
@@ -418,13 +427,21 @@ export function DispatchForm({
   const selectedInstitutionFarmerLead = institutionFarmerLeads.find(
     (lead) => lead.id === selectedLeadId
   );
+  const selectedInstitution = institutionOptions.find(
+    (institution) => institution.id === selectedInstitutionId
+  );
   const institutionSalePayers = useMemo(() => {
-    const payers = new Map<string, { id: string; organization_name: string }>();
+    const payers = new Map<string, DispatchInstitutionOption>();
+
+    for (const institution of institutionOptions) {
+      payers.set(institution.id, institution);
+    }
 
     for (const line of institutionSaleLines) {
       if (!payers.has(line.institution_id)) {
         payers.set(line.institution_id, {
           id: line.institution_id,
+          institution_code: "",
           organization_name: line.organization_name
         });
       }
@@ -433,7 +450,7 @@ export function DispatchForm({
     return Array.from(payers.values()).sort((first, second) =>
       first.organization_name.localeCompare(second.organization_name)
     );
-  }, [institutionSaleLines]);
+  }, [institutionOptions, institutionSaleLines]);
   const filteredInstitutionSaleLines = selectedInstitutionId
     ? institutionSaleLines.filter(
         (line) =>
@@ -501,6 +518,12 @@ export function DispatchForm({
 
   function applyInstitutionPayer(institutionId: string) {
     setSelectedInstitutionId(institutionId);
+
+    if (!institutionId) {
+      setSelectedInstitutionSaleLineId("");
+      setPaymentConfirmed(false);
+      return;
+    }
 
     const selectedLine = institutionSaleLines.find(
       (line) => line.id === selectedInstitutionSaleLineId
@@ -1125,13 +1148,12 @@ export function DispatchForm({
                 </select>
                 {institutionSalePayers.length === 0 ? (
                   <p className="mt-1 text-xs leading-5 text-amber-700">
-                    No confirmed institution-paid farmer allocations are ready
-                    for dispatch.
+                    No active institution payers are visible to your role.
                   </p>
                 ) : (
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Only institutions with confirmed, undispatched farmer
-                    allocations appear here.
+                    Choose the paying institution. A confirmed farmer allocation
+                    is still required before dispatch can be saved.
                   </p>
                 )}
               </div>
@@ -1205,7 +1227,9 @@ export function DispatchForm({
                 filteredInstitutionSaleLines.length === 0 ? (
                   <p className="mt-1 text-xs leading-5 text-amber-700">
                     This institution and farmer lead do not have a confirmed
-                    allocation ready for dispatch.
+                    allocation ready for dispatch. Create and confirm the
+                    institution-funded sale order from the institution page
+                    first.
                   </p>
                 ) : (
                   <p className="mt-1 text-xs leading-5 text-slate-500">
@@ -1385,7 +1409,9 @@ export function DispatchForm({
                     <div>
                       <dt className="text-slate-500">Payer</dt>
                       <dd className="mt-1 font-semibold text-slate-950">
-                        {selectedInstitutionSaleLine?.organization_name ?? "Not set"}
+                        {selectedInstitutionSaleLine?.organization_name ??
+                          selectedInstitution?.organization_name ??
+                          "Not set"}
                       </dd>
                     </div>
                   ) : null}
