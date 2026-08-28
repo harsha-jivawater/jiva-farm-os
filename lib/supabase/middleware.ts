@@ -6,6 +6,41 @@ import {
   requireSupabaseEnv
 } from "@/lib/supabase/env";
 
+const sessionRefreshTimeoutMs = 4_000;
+
+class SessionRefreshTimeoutError extends Error {
+  constructor() {
+    super(
+      `Supabase session refresh exceeded ${sessionRefreshTimeoutMs}ms in middleware.`
+    );
+    this.name = "SessionRefreshTimeoutError";
+  }
+}
+
+async function refreshSessionWithTimeout(
+  supabase: ReturnType<typeof createServerClient<Database>>
+) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    await Promise.race([
+      supabase.auth.getClaims(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new SessionRefreshTimeoutError()),
+          sessionRefreshTimeoutMs
+        );
+      })
+    ]);
+  } catch (error) {
+    console.warn("[Supabase middleware] Session refresh skipped.", error);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 export async function updateSession(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.next({ request });
@@ -34,7 +69,7 @@ export async function updateSession(request: NextRequest) {
   });
 
   // Refresh before Server Components run so they all receive one valid session.
-  await supabase.auth.getClaims();
+  await refreshSessionWithTimeout(supabase);
 
   return response;
 }
