@@ -7,6 +7,7 @@ import {
   type DispatchDealerOption,
   type DispatchDeviceOption,
   type DispatchFarmerLeadOption,
+  type DispatchInstitutionOption,
   type DispatchInstitutionSaleLineOption,
   type DispatchPilotOption
 } from "@/lib/dispatches/types";
@@ -96,6 +97,12 @@ const dealerSelectColumns = [
   "state",
   "district",
   "dealer_address"
+].join(",");
+
+const institutionSelectColumns = [
+  "id",
+  "institution_code",
+  "organization_name"
 ].join(",");
 
 const dispatchDeviceOptionLimit = 2000;
@@ -198,6 +205,12 @@ export default async function NewDispatchPage({
     .order("firm_name", { ascending: true, nullsFirst: false })
     .order("dealer_name", { ascending: true })
     .limit(200);
+  const { data: institutions } = await supabase
+    .from("institutions")
+    .select(institutionSelectColumns)
+    .is("deleted_at", null)
+    .order("organization_name", { ascending: true })
+    .limit(500);
   const { data: openDispatches, error: openDispatchesError } = await supabase
     .from("dispatches")
     .select(
@@ -354,9 +367,13 @@ export default async function NewDispatchPage({
         error={params.error}
         farmerLeads={eligibleFarmerLeads}
         institutionFarmerLeads={institutionFarmerLeads}
+        institutionOptions={
+          (institutions ?? []) as unknown as DispatchInstitutionOption[]
+        }
         institutionSaleLines={institutionSaleLines}
         initialDispatchRoute={initialDispatchRoute}
         initialFarmerLeadId={params.farmer_lead_id}
+        initialInstitutionId={params.institution_id}
         initialInstitutionSaleOrderLineId={params.institution_sale_order_line_id}
         initialPilotId={params.pilot_id}
         mode="create"
