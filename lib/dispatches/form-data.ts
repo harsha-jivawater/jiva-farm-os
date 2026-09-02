@@ -140,16 +140,8 @@ export function validateDispatchPayload(payload: DispatchFormPayload) {
   }
 
   if (payload.dispatch_type === "Institution Dispatch") {
-    if (!payload.destination_farmer_lead_id) {
-      return "Select the farmer receiving the institution-paid device.";
-    }
-
     if (!payload.destination_institution_id) {
       return "Institution payer is required for Institution Dispatch.";
-    }
-
-    if (!payload.institution_sale_order_id || !payload.institution_sale_order_line_id) {
-      return "Select an institution-funded farmer allocation before dispatch.";
     }
   }
 

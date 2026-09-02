@@ -14,6 +14,7 @@ import {
 import { rollupInstitutionSaleOrderStatus } from "@/lib/institutions/sale-orders";
 import type {
   DeviceMovementInsert,
+  DispatchUpdate,
   DeviceUpdate,
   FarmerLeadUpdate,
   FollowupInsert,
@@ -382,33 +383,39 @@ function validateDispatchInstallationConsistency({
 
   if (
     payload.installation_type === "Institution Installation" &&
-    (!dispatch.institution_sale_order_id ||
-      !dispatch.institution_sale_order_line_id)
+    (dispatch.institution_sale_order_id || dispatch.institution_sale_order_line_id)
   ) {
-    redirectWithError(
-      errorPath,
-      "The linked institution dispatch does not have an institution sale allocation."
-    );
-  }
+    if (
+      !dispatch.institution_sale_order_id ||
+      !dispatch.institution_sale_order_line_id
+    ) {
+      redirectWithError(
+        errorPath,
+        "The linked institution dispatch has an incomplete institution sale allocation."
+      );
+    }
 
-  if (
-    payload.installation_type === "Institution Installation" &&
-    (payload.institution_sale_order_id !== dispatch.institution_sale_order_id ||
+    if (
+      payload.institution_sale_order_id !== dispatch.institution_sale_order_id ||
       payload.institution_sale_order_line_id !==
-        dispatch.institution_sale_order_line_id)
-  ) {
-    redirectWithError(
-      errorPath,
-      "Selected institution sale allocation does not match the linked dispatch."
-    );
+        dispatch.institution_sale_order_line_id
+    ) {
+      redirectWithError(
+        errorPath,
+        "Selected institution sale allocation does not match the linked dispatch."
+      );
+    }
   }
 
   if (isDispatchRequiredInstallation(payload.installation_type)) {
     if (!linkedFarmerLeadId) {
-      redirectWithError(
-        errorPath,
-        "The linked dispatch does not have a Farmer Lead."
-      );
+      if (payload.installation_type !== "Institution Installation") {
+        redirectWithError(
+          errorPath,
+          "The linked dispatch does not have a Farmer Lead."
+        );
+      }
+      return;
     }
 
     if (payload.farmer_lead_id !== linkedFarmerLeadId) {
@@ -709,6 +716,38 @@ async function applyInstalledSideEffects({
     redirectWithError(errorPath, leadError.message);
   }
 
+  if (payload.dispatch_id) {
+    const dispatchUpdate: DispatchUpdate = {
+      linked_installation_id: installationId
+    };
+
+    if (payload.installation_type === "Institution Installation") {
+      dispatchUpdate.destination_type = "Farmer";
+      dispatchUpdate.destination_farmer_lead_id = payload.farmer_lead_id ?? null;
+      dispatchUpdate.linked_farmer_lead_id = payload.farmer_lead_id ?? null;
+      dispatchUpdate.destination_name_snapshot =
+        payload.farmer_name_snapshot ?? "";
+      dispatchUpdate.destination_contact_snapshot =
+        payload.farmer_mobile_snapshot ?? null;
+      dispatchUpdate.destination_address =
+        payload.village ?? payload.installation_address ?? null;
+      dispatchUpdate.destination_state = payload.state ?? null;
+      dispatchUpdate.destination_district = payload.district ?? null;
+      dispatchUpdate.destination_institution_id =
+        payload.institution_id ?? null;
+      dispatchUpdate.linked_institution_id = payload.institution_id ?? null;
+    }
+
+    const { error: dispatchError } = await supabase
+      .from("dispatches")
+      .update(dispatchUpdate)
+      .eq("id", payload.dispatch_id);
+
+    if (dispatchError) {
+      redirectWithError(errorPath, dispatchError.message);
+    }
+  }
+
   if (payload.institution_sale_order_line_id) {
     const { error: lineError } = await supabase
       .from("institution_sale_order_lines")
@@ -851,7 +890,8 @@ export async function createInstallationAction(formData: FormData) {
       createMovement: true,
       createFollowup:
         farmerLead.payment_confirmed ||
-        Boolean(insertPayload.institution_sale_order_id),
+        Boolean(insertPayload.institution_sale_order_id) ||
+        Boolean(insertPayload.institution_id),
       errorPath: `/installations/${installationId}/edit`
     });
   }
@@ -989,7 +1029,8 @@ export async function updateInstallationAction(id: string, formData: FormData) {
       createFollowup:
         !existing.linked_followup_id &&
         (farmerLead.payment_confirmed ||
-          Boolean(updatePayload.institution_sale_order_id)),
+          Boolean(updatePayload.institution_sale_order_id) ||
+          Boolean(updatePayload.institution_id)),
       errorPath
     });
   }

@@ -64,10 +64,15 @@ export type DispatchInstitutionSaleLineOption = {
   payment_received_date: string | null;
 };
 
-export type DispatchInstitutionOption = Pick<
-  Database["public"]["Tables"]["institutions"]["Row"],
-  "id" | "institution_code" | "organization_name"
->;
+export type DispatchInstitutionOption = {
+  id: string;
+  business_sector?: string | null;
+  institution_code?: string | null;
+  organization_name: string;
+  main_contact_number?: string | null;
+  primary_state?: string | null;
+  districts_covered?: string | null;
+};
 
 export type DispatchPilotOption = {
   id: string;

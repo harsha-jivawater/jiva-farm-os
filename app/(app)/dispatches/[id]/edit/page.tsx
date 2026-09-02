@@ -9,6 +9,7 @@ import {
   type DispatchDealerOption,
   type DispatchDeviceOption,
   type DispatchFarmerLeadOption,
+  type DispatchInstitutionOption,
   type DispatchInstitutionSaleLineOption,
   type DispatchPilotOption
 } from "@/lib/dispatches/types";
@@ -93,6 +94,16 @@ const dealerSelectColumns = [
   "state",
   "district",
   "dealer_address"
+].join(",");
+
+const institutionSelectColumns = [
+  "id",
+  "business_sector",
+  "institution_code",
+  "organization_name",
+  "main_contact_number",
+  "primary_state",
+  "districts_covered"
 ].join(",");
 
 function collectPilotIdsWithOpenDispatch(
@@ -292,6 +303,35 @@ export default async function EditDispatchPage({
     }
   }
 
+  const { data: activeInstitutions } = await supabase
+    .from("institutions")
+    .select(institutionSelectColumns)
+    .is("deleted_at", null)
+    .order("organization_name", { ascending: true })
+    .limit(500);
+  let institutions =
+    (activeInstitutions ?? []) as unknown as DispatchInstitutionOption[];
+  const selectedInstitutionId =
+    dispatch.destination_institution_id ?? dispatch.linked_institution_id;
+
+  if (
+    selectedInstitutionId &&
+    !institutions.some((institution) => institution.id === selectedInstitutionId)
+  ) {
+    const { data: selectedInstitution } = await supabase
+      .from("institutions")
+      .select(institutionSelectColumns)
+      .eq("id", selectedInstitutionId)
+      .single();
+
+    if (selectedInstitution) {
+      institutions = [
+        selectedInstitution as unknown as DispatchInstitutionOption,
+        ...institutions
+      ];
+    }
+  }
+
   let institutionSaleLines: DispatchInstitutionSaleLineOption[] = [];
 
   if (dispatch.institution_sale_order_line_id) {
@@ -380,6 +420,7 @@ export default async function EditDispatchPage({
         error={query.error}
         farmerLeads={farmerLeads}
         institutionFarmerLeads={institutionFarmerLeads}
+        institutionOptions={institutions}
         institutionSaleLines={institutionSaleLines}
         mode="edit"
         pilots={pilots}

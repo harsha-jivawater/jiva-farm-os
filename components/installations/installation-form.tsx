@@ -244,7 +244,12 @@ export function InstallationForm({
     selectedInstallationType === "Farmer Sale Installation" ||
     selectedInstallationType === "Pilot Installation" ||
     selectedInstallationType === "Institution Installation";
-  const visibleFarmerLeads = isDealerFarmerInstallation
+  const selectedDispatchNeedsInstitutionFarmer =
+    selectedInstallationType === "Institution Installation" &&
+    selectedDispatch?.dispatch_type === "Institution Dispatch" &&
+    !selectedDispatchFarmerLeadId;
+  const visibleFarmerLeads =
+    isDealerFarmerInstallation || selectedDispatchNeedsInstitutionFarmer
     ? farmerLeads
     : selectedDispatchFarmerLeadId
       ? farmerLeads.filter((lead) => lead.id === selectedDispatchFarmerLeadId)
@@ -253,6 +258,7 @@ export function InstallationForm({
         : [];
   const farmerLeadSelectDisabled =
     !isDealerFarmerInstallation &&
+    !selectedDispatchNeedsInstitutionFarmer &&
     (isDispatchDerivedInstallation || Boolean(selectedDispatchId));
 
   function applyFarmerLead(
@@ -556,6 +562,8 @@ export function InstallationForm({
               <option value="">
                 {isDealerFarmerInstallation
                   ? "Select farmer lead"
+                  : selectedDispatchNeedsInstitutionFarmer
+                    ? "Select farmer receiving this institution device"
                   : "Select a linked dispatch first"}
               </option>
               {visibleFarmerLeads.map((farmerLead) => (
@@ -586,6 +594,11 @@ export function InstallationForm({
             ) : farmerLeadSelectDisabled && selectedFarmerLeadId ? (
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 Farmer Lead is derived from the selected dispatch.
+              </p>
+            ) : selectedDispatchNeedsInstitutionFarmer ? (
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                This institution dispatch has no farmer assigned yet. Select
+                the farmer receiving this device during installation.
               </p>
             ) : !isDealerFarmerInstallation ? (
               <p className="mt-1 text-xs leading-5 text-slate-500">
