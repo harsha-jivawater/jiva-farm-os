@@ -19,6 +19,8 @@ export type FarmerLead = Database["public"]["Tables"]["farmer_leads"]["Row"];
 export type FarmerLeadUpdate =
   Database["public"]["Tables"]["farmer_leads"]["Update"];
 export type Dispatch = Database["public"]["Tables"]["dispatches"]["Row"];
+export type DispatchUpdate =
+  Database["public"]["Tables"]["dispatches"]["Update"];
 
 export type InstallationFarmerLeadOption = Pick<
   FarmerLead,

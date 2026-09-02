@@ -197,13 +197,22 @@ export function DispatchForm({
       (initialInstitutionSaleOrderLineId ??
         dispatch?.institution_sale_order_line_id)
   );
-  const initialLead = farmerLeads.find(
+  const allFarmerLeadOptions = [...farmerLeads, ...institutionFarmerLeads];
+  const initialLead = allFarmerLeadOptions.find(
     (lead) =>
       lead.id ===
       (initialInstitutionSaleLine?.farmer_lead_id ??
         initialFarmerLeadId ??
         dispatch?.destination_farmer_lead_id ??
         dispatch?.linked_farmer_lead_id)
+  );
+  const initialInstitution = institutionOptions.find(
+    (institution) =>
+      institution.id ===
+      (initialInstitutionSaleLine?.institution_id ??
+        initialInstitutionId ??
+        dispatch?.destination_institution_id ??
+        dispatch?.linked_institution_id)
   );
   const initialPilot = pilots.find(
     (pilot) =>
@@ -225,12 +234,12 @@ export function DispatchForm({
   const [selectedDeviceId, setSelectedDeviceId] = useState(
     dispatch?.device_id ?? initialDevice?.id ?? ""
   );
-  const [selectedDealerDeviceIds, setSelectedDealerDeviceIds] = useState<
-    string[]
-  >([]);
+  const [selectedBatchDeviceIds, setSelectedBatchDeviceIds] = useState<string[]>(
+    []
+  );
   const [deviceSearch, setDeviceSearch] = useState("");
-  const [dealerDeviceSearch, setDealerDeviceSearch] = useState("");
-  const [dealerProductModelFilter, setDealerProductModelFilter] = useState("");
+  const [batchDeviceSearch, setBatchDeviceSearch] = useState("");
+  const [batchProductModelFilter, setBatchProductModelFilter] = useState("");
   const [serialNumber, setSerialNumber] = useState(
     dispatch?.serial_number_snapshot ?? initialDevice?.serial_number ?? ""
   );
@@ -259,7 +268,9 @@ export function DispatchForm({
         ? "Pilot"
         : initialDealer
           ? "Dealer"
-          : dispatch?.destination_type ?? ""
+          : initialInstitution
+            ? "Institution"
+            : dispatch?.destination_type ?? ""
   );
   const [selectedLeadId, setSelectedLeadId] = useState(
     initialFarmerLeadId ??
@@ -295,18 +306,20 @@ export function DispatchForm({
       initialPilot?.pilot_name ??
       initialDealer?.firm_name ??
       initialDealer?.dealer_name ??
+      initialInstitution?.organization_name ??
       dispatch?.destination_name_snapshot ??
       ""
   );
   const [destinationContact, setDestinationContact] = useState(
-    initialLead?.mobile_number ??
+      initialLead?.mobile_number ??
       initialPilot?.farmer_mobile_snapshot ??
       initialDealer?.contact_number ??
+      initialInstitution?.main_contact_number ??
       dispatch?.destination_contact_snapshot ??
       ""
   );
   const [destinationAddress, setDestinationAddress] = useState(
-    initialLead?.village ??
+      initialLead?.village ??
       initialPilot?.village ??
       initialDealer?.dealer_address ??
       dispatch?.destination_address ??
@@ -319,9 +332,10 @@ export function DispatchForm({
       false
   );
   const [stateValue, setStateValue] = useState(
-    initialLead?.state ??
+      initialLead?.state ??
       initialPilot?.state ??
       initialDealer?.state ??
+      initialInstitution?.primary_state ??
       dispatch?.destination_state ??
       ""
   );
@@ -329,6 +343,7 @@ export function DispatchForm({
     initialLead?.district ??
       initialPilot?.district ??
       initialDealer?.district ??
+      initialInstitution?.districts_covered ??
       dispatch?.destination_district ??
       ""
   );
@@ -338,8 +353,13 @@ export function DispatchForm({
   const isPilotRoute = dispatchRoute === "Free Pilot";
   const isDealerRoute = dispatchRoute === "Dealer Dispatch";
   const isManualRoute = dispatchRoute === "Admin Manual Exception";
+  const isBatchDeviceRoute =
+    mode === "create" && (isDealerRoute || isInstitutionSaleRoute);
   const paymentConfirmationLocked =
-    isFarmerSaleRoute || isInstitutionSaleRoute || isPilotRoute || !canConfirmPayment;
+    isFarmerSaleRoute ||
+    (isInstitutionSaleRoute && Boolean(selectedInstitutionSaleLineId)) ||
+    isPilotRoute ||
+    !canConfirmPayment;
   const submitDisabled = isPilotRoute && Boolean(pilotsLoadError);
   const effectiveDispatchType = isFarmerSaleRoute
     ? "Farmer Sale Dispatch"
@@ -353,7 +373,9 @@ export function DispatchForm({
   const effectiveDestinationType = isFarmerSaleRoute
     ? "Farmer"
     : isInstitutionSaleRoute
-      ? "Farmer"
+      ? selectedLeadId || selectedInstitutionSaleLineId
+        ? "Farmer"
+        : "Institution"
     : isPilotRoute
       ? "Pilot"
       : isDealerRoute
@@ -402,24 +424,20 @@ export function DispatchForm({
         deviceSearchText(device).includes(normalizedDeviceSearch)
       ).length
     : routeEligibleDevices.length;
-  const dealerDispatchDevices = devices.filter(
-    (device) =>
-      device.inventory_pool === "Fresh Sale" &&
-      isWarehouseDispatchDevice(device)
-  );
-  const visibleDealerDispatchDevices = dealerDispatchDevices.filter((device) => {
+  const batchDispatchDevices = routeEligibleDevices;
+  const visibleBatchDispatchDevices = batchDispatchDevices.filter((device) => {
     const matchesSearch =
-      !dealerDeviceSearch.trim() ||
-      deviceSearchText(device).includes(dealerDeviceSearch.trim().toLowerCase());
+      !batchDeviceSearch.trim() ||
+      deviceSearchText(device).includes(batchDeviceSearch.trim().toLowerCase());
     const matchesProductModel =
-      !dealerProductModelFilter ||
-      device.product_model === dealerProductModelFilter;
+      !batchProductModelFilter ||
+      device.product_model === batchProductModelFilter;
 
     return matchesSearch && matchesProductModel;
   });
-  const selectedDealerDeviceSet = new Set(selectedDealerDeviceIds);
-  const firstSelectedDealerDevice = dealerDispatchDevices.find(
-    (device) => device.id === selectedDealerDeviceIds[0]
+  const selectedBatchDeviceSet = new Set(selectedBatchDeviceIds);
+  const firstSelectedBatchDevice = batchDispatchDevices.find(
+    (device) => device.id === selectedBatchDeviceIds[0]
   );
   const selectedInstitutionSaleLine = institutionSaleLines.find(
     (line) => line.id === selectedInstitutionSaleLineId
@@ -441,8 +459,12 @@ export function DispatchForm({
       if (!payers.has(line.institution_id)) {
         payers.set(line.institution_id, {
           id: line.institution_id,
+          business_sector: null,
           institution_code: "",
-          organization_name: line.organization_name
+          organization_name: line.organization_name,
+          main_contact_number: null,
+          primary_state: null,
+          districts_covered: null
         });
       }
     }
@@ -460,12 +482,34 @@ export function DispatchForm({
     : institutionSaleLines.filter(
         (line) => !selectedLeadId || line.farmer_lead_id === selectedLeadId
       );
-  const visibleDealerDeviceIds = visibleDealerDispatchDevices.map(
+  const visibleBatchDeviceIds = visibleBatchDispatchDevices.map(
     (device) => device.id
   );
-  const allVisibleDealerDevicesSelected =
-    visibleDealerDeviceIds.length > 0 &&
-    visibleDealerDeviceIds.every((id) => selectedDealerDeviceSet.has(id));
+  const allVisibleBatchDevicesSelected =
+    visibleBatchDeviceIds.length > 0 &&
+    visibleBatchDeviceIds.every((id) => selectedBatchDeviceSet.has(id));
+
+  function applyInstitutionDestination(institutionId: string) {
+    const institution = institutionOptions.find(
+      (option) => option.id === institutionId
+    );
+
+    if (!institution) {
+      setDestinationName("");
+      setDestinationContact("");
+      setStateValue("");
+      setDistrictValue("");
+      setDestinationAddress("");
+      return;
+    }
+
+    setDestinationType("Institution");
+    setDestinationName(institution.organization_name);
+    setDestinationContact(institution.main_contact_number ?? "");
+    setStateValue(institution.primary_state ?? "");
+    setDistrictValue(institution.districts_covered ?? "");
+    setDestinationAddress("");
+  }
 
   function applyLead(leadId: string) {
     setSelectedLeadId(leadId);
@@ -496,12 +540,17 @@ export function DispatchForm({
 
     if (!line) {
       setSelectedLeadId("");
+      setPaymentConfirmed(false);
+      if (selectedInstitutionId) {
+        applyInstitutionDestination(selectedInstitutionId);
+        return;
+      }
+
       setDestinationName("");
       setDestinationContact("");
       setStateValue("");
       setDistrictValue("");
       setDestinationAddress("");
-      setPaymentConfirmed(false);
       return;
     }
 
@@ -522,6 +571,13 @@ export function DispatchForm({
     if (!institutionId) {
       setSelectedInstitutionSaleLineId("");
       setPaymentConfirmed(false);
+      if (!selectedLeadId) {
+        setDestinationName("");
+        setDestinationContact("");
+        setStateValue("");
+        setDistrictValue("");
+        setDestinationAddress("");
+      }
       return;
     }
 
@@ -539,6 +595,13 @@ export function DispatchForm({
       return;
     }
 
+    if (!selectedLeadId) {
+      setSelectedInstitutionSaleLineId("");
+      setPaymentConfirmed(false);
+      applyInstitutionDestination(institutionId);
+      return;
+    }
+
     if (!selectedLine || selectedLine.institution_id === institutionId) {
       return;
     }
@@ -549,6 +612,22 @@ export function DispatchForm({
 
   function applyInstitutionFarmerLead(leadId: string) {
     setSelectedLeadId(leadId);
+
+    if (!leadId) {
+      setSelectedInstitutionSaleLineId("");
+      setPaymentConfirmed(false);
+      if (selectedInstitutionId) {
+        applyInstitutionDestination(selectedInstitutionId);
+        return;
+      }
+
+      setDestinationName("");
+      setDestinationContact("");
+      setStateValue("");
+      setDistrictValue("");
+      setDestinationAddress("");
+      return;
+    }
 
     const matchingLines = institutionSaleLines.filter(
       (line) =>
@@ -641,9 +720,9 @@ export function DispatchForm({
     setSelectedInstitutionSaleLineId("");
     setSelectedInstitutionId("");
     setDeviceSearch("");
-    setSelectedDealerDeviceIds([]);
-    setDealerDeviceSearch("");
-    setDealerProductModelFilter("");
+    setSelectedBatchDeviceIds([]);
+    setBatchDeviceSearch("");
+    setBatchProductModelFilter("");
 
     if (nextRoute === "Paid Farmer Sale") {
       setDispatchType("Farmer Sale Dispatch");
@@ -654,7 +733,7 @@ export function DispatchForm({
 
     if (nextRoute === "Institution Funded Farmer Sale") {
       setDispatchType("Institution Dispatch");
-      setDestinationType("Farmer");
+      setDestinationType("Institution");
       setPaymentConfirmed(false);
       return;
     }
@@ -734,7 +813,7 @@ export function DispatchForm({
               {isFarmerSaleRoute
                 ? "Paid farmer dispatches use fresh sale devices only."
                 : isInstitutionSaleRoute
-                  ? "Institution-funded farmer sales use Fresh Sale devices, with the institution as payer and the farmer as recipient."
+                  ? "Institution-funded farmer sales use Fresh Sale devices, with the institution as payer. Farmer assignment can be added now or during installation."
                 : isPilotRoute
                   ? "Free pilots use pilot-dedicated devices only."
                   : isDealerRoute
@@ -835,29 +914,29 @@ export function DispatchForm({
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-base font-semibold text-slate-950">
-          {isDealerRoute && mode === "create"
+          {isBatchDeviceRoute
             ? "Devices for dispatch"
             : "Device for dispatch"}
         </h2>
-        {isDealerRoute && mode === "create" ? (
+        {isBatchDeviceRoute ? (
           <div className="mt-4 space-y-4">
-            {selectedDealerDeviceIds.map((deviceId) => (
+            {selectedBatchDeviceIds.map((deviceId) => (
               <input key={deviceId} name="device_ids" type="hidden" value={deviceId} />
             ))}
             <input
               name="device_id"
               type="hidden"
-              value={firstSelectedDealerDevice?.id ?? ""}
+              value={firstSelectedBatchDevice?.id ?? ""}
             />
             <input
               name="serial_number_snapshot"
               type="hidden"
-              value={firstSelectedDealerDevice?.serial_number ?? ""}
+              value={firstSelectedBatchDevice?.serial_number ?? ""}
             />
             <input
               name="product_model"
               type="hidden"
-              value={firstSelectedDealerDevice?.product_model ?? ""}
+              value={firstSelectedBatchDevice?.product_model ?? ""}
             />
 
             <div className="grid gap-3 md:grid-cols-[1fr_220px]">
@@ -867,10 +946,10 @@ export function DispatchForm({
                 </span>
                 <input
                   className={inputClassName()}
-                  onChange={(event) => setDealerDeviceSearch(event.target.value)}
+                  onChange={(event) => setBatchDeviceSearch(event.target.value)}
                   placeholder="Search by serial number or product model"
                   type="search"
-                  value={dealerDeviceSearch}
+                  value={batchDeviceSearch}
                 />
               </label>
               <label>
@@ -880,13 +959,13 @@ export function DispatchForm({
                 <select
                   className={inputClassName()}
                   onChange={(event) =>
-                    setDealerProductModelFilter(event.target.value)
+                    setBatchProductModelFilter(event.target.value)
                   }
-                  value={dealerProductModelFilter}
+                  value={batchProductModelFilter}
                 >
                   <option value="">All models</option>
                   {Array.from(
-                    new Set(dealerDispatchDevices.map((device) => device.product_model))
+                    new Set(batchDispatchDevices.map((device) => device.product_model))
                   ).map((productModelOption) => (
                     <option key={productModelOption} value={productModelOption}>
                       {productModelOption}
@@ -898,16 +977,16 @@ export function DispatchForm({
 
             <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm font-semibold text-slate-700">
-                {selectedDealerDeviceIds.length} devices selected
+                {selectedBatchDeviceIds.length} devices selected
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
                   className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={visibleDealerDeviceIds.length === 0}
+                  disabled={visibleBatchDeviceIds.length === 0}
                   onClick={() => {
-                    setSelectedDealerDeviceIds((current) => {
+                    setSelectedBatchDeviceIds((current) => {
                       const merged = new Set(current);
-                      for (const id of visibleDealerDeviceIds) {
+                      for (const id of visibleBatchDeviceIds) {
                         merged.add(id);
                       }
                       return Array.from(merged);
@@ -915,14 +994,14 @@ export function DispatchForm({
                   }}
                   type="button"
                 >
-                  {allVisibleDealerDevicesSelected
+                  {allVisibleBatchDevicesSelected
                     ? "All visible selected"
                     : "Select all visible"}
                 </button>
                 <button
                   className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={selectedDealerDeviceIds.length === 0}
-                  onClick={() => setSelectedDealerDeviceIds([])}
+                  disabled={selectedBatchDeviceIds.length === 0}
+                  onClick={() => setSelectedBatchDeviceIds([])}
                   type="button"
                 >
                   Clear selection
@@ -930,25 +1009,25 @@ export function DispatchForm({
               </div>
             </div>
 
-            {dealerDispatchDevices.length === 0 ? (
+            {batchDispatchDevices.length === 0 ? (
               <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
                 No eligible Fresh Sale devices are available. Check device pool
                 and warehouse status.
               </p>
             ) : (
               <div className="max-h-80 overflow-y-auto rounded-md border border-slate-200">
-                {visibleDealerDispatchDevices.length ? (
+                {visibleBatchDispatchDevices.length ? (
                   <div className="divide-y divide-slate-200">
-                    {visibleDealerDispatchDevices.map((device) => (
+                    {visibleBatchDispatchDevices.map((device) => (
                       <label
                         className="flex cursor-pointer gap-3 bg-white px-3 py-3 text-sm hover:bg-slate-50"
                         key={device.id}
                       >
                         <input
-                          checked={selectedDealerDeviceSet.has(device.id)}
+                          checked={selectedBatchDeviceSet.has(device.id)}
                           className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                           onChange={(event) => {
-                            setSelectedDealerDeviceIds((current) =>
+                            setSelectedBatchDeviceIds((current) =>
                               event.target.checked
                                 ? [...current, device.id]
                                 : current.filter((id) => id !== device.id)
@@ -1152,8 +1231,8 @@ export function DispatchForm({
                   </p>
                 ) : (
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Choose the paying institution. A confirmed farmer allocation
-                    is still required before dispatch can be saved.
+                    Choose the paying institution. Farmer selection can be added
+                    now if known, or later during installation.
                   </p>
                 )}
               </div>
@@ -1163,7 +1242,7 @@ export function DispatchForm({
                   className="mb-1.5 block text-sm font-medium text-slate-700"
                   htmlFor="institution_farmer_lead_filter_id"
                 >
-                  Farmer lead
+                  Farmer lead optional
                 </label>
                 <select
                   className={inputClassName()}
@@ -1171,10 +1250,9 @@ export function DispatchForm({
                   onChange={(event) =>
                     applyInstitutionFarmerLead(event.target.value)
                   }
-                  required
                   value={selectedLeadId}
                 >
-                  <option value="">Select Pilot Agreed farmer lead</option>
+                  <option value="">Assign farmer later</option>
                   {institutionFarmerLeads.map((lead) => (
                     <option key={lead.id} value={lead.id}>
                       {leadLabel(lead)}
@@ -1188,7 +1266,8 @@ export function DispatchForm({
                   </p>
                 ) : (
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Choose the farmer receiving the institution-funded device.
+                    Choose a Pilot Agreed farmer only when the recipient is
+                    already known.
                   </p>
                 )}
               </div>
@@ -1202,19 +1281,18 @@ export function DispatchForm({
                 </label>
                 <select
                   className={inputClassName()}
-                  disabled={!selectedInstitutionId || !selectedLeadId}
+                  disabled={!selectedInstitutionId}
                   id="institution_sale_order_line_id"
                   name="institution_sale_order_line_id"
                   onChange={(event) =>
                     applyInstitutionSaleLine(event.target.value)
                   }
-                  required
                   value={selectedInstitutionSaleLineId}
                 >
                   <option value="">
-                    {selectedInstitutionId && selectedLeadId
-                      ? "Select paid institution allocation"
-                      : "Select institution and farmer lead first"}
+                    {selectedInstitutionId
+                      ? "Select paid allocation if available"
+                      : "Select institution first"}
                   </option>
                   {filteredInstitutionSaleLines.map((line) => (
                     <option key={line.id} value={line.id}>
@@ -1223,18 +1301,16 @@ export function DispatchForm({
                   ))}
                 </select>
                 {selectedInstitutionId &&
-                selectedLeadId &&
                 filteredInstitutionSaleLines.length === 0 ? (
                   <p className="mt-1 text-xs leading-5 text-amber-700">
-                    This institution and farmer lead do not have a confirmed
-                    allocation ready for dispatch. Create and confirm the
-                    institution-funded sale order from the institution page
-                    first.
+                    No confirmed institution-paid allocations are ready for this
+                    selection. You can still create an institution-only dispatch
+                    request and attach the farmer later.
                   </p>
                 ) : (
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Accounts must confirm institution payment before an
-                    allocation appears here.
+                    Use this when a paid institution order already identifies
+                    the farmer allocation.
                   </p>
                 )}
               </div>

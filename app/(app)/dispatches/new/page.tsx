@@ -101,8 +101,12 @@ const dealerSelectColumns = [
 
 const institutionSelectColumns = [
   "id",
+  "business_sector",
   "institution_code",
-  "organization_name"
+  "organization_name",
+  "main_contact_number",
+  "primary_state",
+  "districts_covered"
 ].join(",");
 
 const dispatchDeviceOptionLimit = 2000;

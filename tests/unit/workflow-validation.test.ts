@@ -84,6 +84,33 @@ describe("dispatch workflow validation", () => {
     );
   });
 
+  it("accepts an institution dispatch with the institution as destination", () => {
+    const payload = validDispatch({
+      destination_dealer_id: "",
+      destination_institution_id: "44444444-4444-4444-4444-444444444444",
+      destination_name_snapshot: "Test Institution",
+      destination_type: "Institution",
+      dispatch_type: "Institution Dispatch"
+    });
+
+    expect(validateDispatchPayload(payload)).toBeNull();
+  });
+
+  it("does not require a farmer allocation for institution dispatches", () => {
+    const payload = validDispatch({
+      destination_dealer_id: "",
+      destination_farmer_lead_id: "",
+      destination_institution_id: "44444444-4444-4444-4444-444444444444",
+      destination_name_snapshot: "Test Institution",
+      destination_type: "Institution",
+      dispatch_type: "Institution Dispatch",
+      institution_sale_order_id: "",
+      institution_sale_order_line_id: ""
+    });
+
+    expect(validateDispatchPayload(payload)).toBeNull();
+  });
+
   it("blocks approval until payment is confirmed", () => {
     const payload = validDispatch({ dispatch_status: "Approved for Dispatch" });
 
