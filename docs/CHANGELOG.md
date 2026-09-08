@@ -2,6 +2,30 @@
 
 Simple reverse chronological record of major Jiva Farm OS work.
 
+## 2026-09-08
+
+### Pilots
+
+- Made all Pilots KPI cards respect the active search and filter criteria.
+- Made Pilot KPI cards clickable so the list drills down to the matching pilots;
+  clicking the active card again clears that card-specific drill-down while
+  preserving the other filters.
+- Added planned-visit KPI drill-downs for total planned visits, upcoming visits,
+  visits due in the next seven days, overdue visits, planned visit reports
+  pending, and completed planned visits.
+- Made Pilot CSV export follow the active search, filters, and KPI card
+  drill-down.
+- Scoped Pilot owner, Research Assistant, Agronomist, and R&D Head filters to
+  users with the corresponding effective role and sorted the choices by role
+  and name.
+
+### Dispatches
+
+- Exposed one-click dealer group delivery from the Dispatch list for Customer
+  Support, using the existing payment, status, device-stock, and audit checks.
+- Dealer orders can now move all eligible serial-numbered rows to `Delivered`
+  together, including rows outside the current pagination page.
+
 ## 2026-08-05
 
 ### Operations and management
