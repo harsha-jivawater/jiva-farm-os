@@ -33,6 +33,7 @@ import {
 type PilotDispatch = Database["public"]["Tables"]["dispatches"]["Row"];
 
 type DashboardMetric = {
+  href: string;
   label: string;
   value: string | number;
   helper: string;
@@ -297,7 +298,11 @@ function MonitoringMetricCard({ metric }: { metric: DashboardMetric }) {
   const Icon = metric.icon;
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <Link
+      className="block rounded-lg border border-slate-200 bg-white p-4 shadow-sm outline-none transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+      href={metric.href}
+      prefetch={false}
+    >
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-semibold text-slate-600">{metric.label}</p>
         <span
@@ -312,7 +317,7 @@ function MonitoringMetricCard({ metric }: { metric: DashboardMetric }) {
         {metric.value}
       </p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{metric.helper}</p>
-    </article>
+    </Link>
   );
 }
 
@@ -610,12 +615,14 @@ export default async function PilotMonitoringPage() {
 
   const metrics: DashboardMetric[] = [
     {
+      href: "/pilots?card_filter=monitoring_active_pilots",
       label: "Active Pilots",
       value: numberValue(activePilots.length),
       helper: "Open pilots that are not closed, parked, or cancelled.",
       icon: Microscope
     },
     {
+      href: "/pilots?card_filter=monitoring_no_active_plan",
       label: "No Active Plan",
       value: numberValue(activePilotsWithoutActivePlan.length),
       helper: "Active pilots with no open planned visit.",
@@ -623,6 +630,7 @@ export default async function PilotMonitoringPage() {
       tone: activePilotsWithoutActivePlan.length ? "danger" : "success"
     },
     {
+      href: "/pilots?card_filter=monitoring_overdue_visits",
       label: "Overdue Visits",
       value: numberValue(overdueVisits.length),
       helper: "Planned visits past the due date without a report.",
@@ -630,6 +638,7 @@ export default async function PilotMonitoringPage() {
       tone: overdueVisits.length ? "danger" : "success"
     },
     {
+      href: "/pilots?card_filter=monitoring_due_in_7_days",
       label: "Due in 7 Days",
       value: numberValue(dueThisWeekVisits.length),
       helper: "Visits due today through the next seven days.",
@@ -637,6 +646,7 @@ export default async function PilotMonitoringPage() {
       tone: dueThisWeekVisits.length ? "warning" : "neutral"
     },
     {
+      href: "/pilots?card_filter=monitoring_reports_for_review",
       label: "Reports for Review",
       value: numberValue(submittedReports.length),
       helper: "Submitted visit reports waiting for R&D review.",
@@ -644,6 +654,7 @@ export default async function PilotMonitoringPage() {
       tone: submittedReports.length ? "warning" : "success"
     },
     {
+      href: "/pilots?card_filter=monitoring_dispatched_no_plan",
       label: "Dispatched No Plan",
       value: numberValue(dispatchedWithoutPlan.length),
       helper: "Pilot dispatches linked to pilots with no monitoring plan.",
