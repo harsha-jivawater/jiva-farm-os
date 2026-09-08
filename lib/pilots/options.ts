@@ -33,6 +33,84 @@ export const pilotStatusOptions = [
   { value: "Cancelled", label: "Cancelled" }
 ] as const;
 
+export const activePilotStatusValues = [
+  "Approved",
+  "Device Assigned",
+  "Device Dispatched",
+  "Device Installed",
+  "Monitoring Active",
+  "Visit Report Pending",
+  "Final Report Pending",
+  "Final Report Submitted"
+] as const;
+
+export const activePlannedVisitStatusValues = [
+  "Planned",
+  "Assigned",
+  "Due",
+  "In Progress",
+  "Rescheduled"
+] as const;
+
+export const pilotCardFilterOptions = [
+  { value: "active_pilots", label: "Active Pilots" },
+  { value: "device_installed", label: "Device Installed" },
+  { value: "visit_report_pending", label: "Visit Report Pending" },
+  { value: "final_report_pending", label: "Final Report Pending" },
+  { value: "final_report_reviewed", label: "Final Report Reviewed" },
+  { value: "scale_up_recommended", label: "Scale-up Recommended" },
+  { value: "closed_successful", label: "Closed Successful" },
+  { value: "total_planned_visits", label: "Total Planned Visits" },
+  { value: "upcoming_visits", label: "Upcoming Visits" },
+  { value: "visits_due_this_week", label: "Visits Due This Week" },
+  { value: "overdue_visits", label: "Overdue Visits" },
+  {
+    value: "planned_visit_reports_pending",
+    label: "Planned Visit Reports Pending"
+  },
+  { value: "planned_visits_completed", label: "Planned Visits Completed" }
+] as const;
+
+export type PilotCardFilterValue =
+  (typeof pilotCardFilterOptions)[number]["value"];
+
+const plannedVisitPilotCardFilterValues = [
+  "total_planned_visits",
+  "upcoming_visits",
+  "visits_due_this_week",
+  "overdue_visits",
+  "planned_visit_reports_pending",
+  "planned_visits_completed"
+] satisfies PilotCardFilterValue[];
+
+export function pilotCardFilterValue(
+  value: string | null | undefined
+): PilotCardFilterValue | "" {
+  if (
+    value &&
+    pilotCardFilterOptions.some((option) => option.value === value)
+  ) {
+    return value as PilotCardFilterValue;
+  }
+
+  return "";
+}
+
+export function pilotCardFilterLabel(value: PilotCardFilterValue) {
+  return (
+    pilotCardFilterOptions.find((option) => option.value === value)?.label ??
+    value
+  );
+}
+
+export function isPlannedVisitPilotCardFilter(
+  value: string
+): value is PilotCardFilterValue {
+  return (plannedVisitPilotCardFilterValues as readonly string[]).includes(
+    value
+  );
+}
+
 export const pilotResultStatusOptions = [
   { value: "Not Started", label: "Not Started" },
   { value: "Ongoing", label: "Ongoing" },
