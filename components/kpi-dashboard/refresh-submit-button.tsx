@@ -1,10 +1,28 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
+import { useEffect } from "react";
 import { useFormStatus } from "react-dom";
+
+const REFRESH_RECOVERY_TIMEOUT_MS = 55_000;
 
 export function RefreshKpiDashboardSubmitButton() {
   const { pending } = useFormStatus();
+
+  useEffect(() => {
+    if (!pending) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const recoveryUrl = new URL(window.location.href);
+      recoveryUrl.searchParams.set("refresh_status", "failed");
+      recoveryUrl.searchParams.set("refresh_error", "timeout");
+      window.location.assign(recoveryUrl.toString());
+    }, REFRESH_RECOVERY_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [pending]);
 
   return (
     <button

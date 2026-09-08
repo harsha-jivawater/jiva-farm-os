@@ -4,6 +4,15 @@ Simple reverse chronological record of major Jiva Farm OS work.
 
 ## 2026-09-08
 
+### KPI Dashboard
+
+- Fixed full KPI refreshes that timed out after 60 seconds and left the refresh
+  button spinning against the July cache.
+- Replaced the RSM fact-table fan-out with independent aggregates, reducing the
+  production full-summary runtime from about 100 seconds to about 10 seconds.
+- Added browser recovery after 55 seconds so a future server timeout returns the
+  dashboard to an actionable error state instead of waiting indefinitely.
+
 ### Pilots
 
 - Made all Pilots KPI cards respect the active search and filter criteria.
