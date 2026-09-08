@@ -37,6 +37,7 @@ export type ModuleKey =
   | "marketing-requests"
   | "marketing-library"
   | "payment-links"
+  | "sales"
   | "internal-users"
   | "regions";
 
@@ -214,6 +215,7 @@ const moduleViewRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Viewer"
   ],
   "payment-links": ["Sales Head", "RSM", "Salesperson"],
+  sales: ["Admin", "Management", "Sales Head", "RSM", "Salesperson", "Accounts", "Viewer"],
   "internal-users": ["Admin"],
   regions: ["Admin", "Sales Head", "Management"]
 };
@@ -276,6 +278,7 @@ const moduleWriteRoles: Record<ModuleKey, readonly UserRole[]> = {
   ],
   "marketing-library": ["Admin", "Marketing Head", "Designer"],
   "payment-links": [],
+  sales: ["Admin", "Sales Head", "RSM", "Salesperson"],
   "internal-users": ["Admin"],
   regions: ["Admin", "Sales Head"]
 };

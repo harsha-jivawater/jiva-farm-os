@@ -148,6 +148,7 @@ const fullRecordAccessRoles: Record<ModuleKey, readonly UserRole[]> = {
     "Viewer"
   ],
   "payment-links": ["Sales Head", "RSM", "Salesperson"],
+  sales: ["Admin", "Management", "Sales Head", "RSM", "Salesperson", "Accounts", "Viewer"],
   "internal-users": ["Admin"],
   regions: ["Admin", "Management", "Sales Head"]
 };
