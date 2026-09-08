@@ -45,6 +45,11 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 - Clicking a Pilot KPI card applies a matching card filter to the Pilot list.
   Clicking the active card again clears only that card filter and keeps the
   other search/filter selections.
+- Pilot Monitoring cards link to the exact active pilot population behind each
+  metric: active pilots, no active plan, overdue visits, due in seven days,
+  reports for review, and dispatched pilots without a plan.
+- The production planned-visit KPI function accepts the full Pilot filter set,
+  preventing visit metrics from falling back to `Unavailable`.
 - Planned-visit card matching is consistent between the KPI totals, list
   drill-down, and CSV export. Upcoming visits are future active visits without
   a linked report; visits due in the next seven days include today; overdue

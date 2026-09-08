@@ -6,6 +6,12 @@ import {
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 import { groupPaymentLinks, type PaymentLink } from "@/lib/payment-links";
 import {
+  isMonitoringPilotCardFilter,
+  isRelationalPilotCardFilter,
+  pilotCardFilterLabel,
+  pilotCardFilterValue
+} from "@/lib/pilots/options";
+import {
   isStorageReference,
   storagePathFromReference,
   storageReferenceFromPath,
@@ -46,6 +52,25 @@ describe("authentication input safety", () => {
 });
 
 describe("shared workflow utilities", () => {
+  it.each([
+    ["monitoring_active_pilots", "Active Pilots", false],
+    ["monitoring_no_active_plan", "No Active Plan", true],
+    ["monitoring_overdue_visits", "Overdue Visits", true],
+    ["monitoring_due_in_7_days", "Due in 7 Days", true],
+    ["monitoring_reports_for_review", "Reports for Review", true],
+    ["monitoring_dispatched_no_plan", "Dispatched No Plan", true]
+  ])(
+    "recognizes the %s pilot monitoring drill-down",
+    (value, label, isRelational) => {
+      const cardFilter = pilotCardFilterValue(value);
+
+      expect(cardFilter).toBe(value);
+      expect(isMonitoringPilotCardFilter(cardFilter)).toBe(true);
+      expect(isRelationalPilotCardFilter(cardFilter)).toBe(isRelational);
+      expect(cardFilter && pilotCardFilterLabel(cardFilter)).toBe(label);
+    }
+  );
+
   it.each([
     ["9876543210", "9876543210"],
     ["+91 98765 43210", "9876543210"],

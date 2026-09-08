@@ -44,6 +44,13 @@ export const activePilotStatusValues = [
   "Final Report Submitted"
 ] as const;
 
+export const monitoringActivePilotStatusValues = [
+  "Planned",
+  ...activePilotStatusValues,
+  "Final Report Reviewed",
+  "Scale-up Recommended"
+] as const;
+
 export const activePlannedVisitStatusValues = [
   "Planned",
   "Assigned",
@@ -68,7 +75,13 @@ export const pilotCardFilterOptions = [
     value: "planned_visit_reports_pending",
     label: "Planned Visit Reports Pending"
   },
-  { value: "planned_visits_completed", label: "Planned Visits Completed" }
+  { value: "planned_visits_completed", label: "Planned Visits Completed" },
+  { value: "monitoring_active_pilots", label: "Active Pilots" },
+  { value: "monitoring_no_active_plan", label: "No Active Plan" },
+  { value: "monitoring_overdue_visits", label: "Overdue Visits" },
+  { value: "monitoring_due_in_7_days", label: "Due in 7 Days" },
+  { value: "monitoring_reports_for_review", label: "Reports for Review" },
+  { value: "monitoring_dispatched_no_plan", label: "Dispatched No Plan" }
 ] as const;
 
 export type PilotCardFilterValue =
@@ -81,6 +94,25 @@ const plannedVisitPilotCardFilterValues = [
   "overdue_visits",
   "planned_visit_reports_pending",
   "planned_visits_completed"
+] satisfies PilotCardFilterValue[];
+
+const monitoringPilotCardFilterValues = [
+  "monitoring_active_pilots",
+  "monitoring_no_active_plan",
+  "monitoring_overdue_visits",
+  "monitoring_due_in_7_days",
+  "monitoring_reports_for_review",
+  "monitoring_dispatched_no_plan"
+] satisfies PilotCardFilterValue[];
+
+const monitoringRelationalPilotCardFilterValues =
+  monitoringPilotCardFilterValues.filter(
+    (value) => value !== "monitoring_active_pilots"
+  );
+
+const relationalPilotCardFilterValues = [
+  ...plannedVisitPilotCardFilterValues,
+  ...monitoringRelationalPilotCardFilterValues
 ] satisfies PilotCardFilterValue[];
 
 export function pilotCardFilterValue(
@@ -109,6 +141,18 @@ export function isPlannedVisitPilotCardFilter(
   return (plannedVisitPilotCardFilterValues as readonly string[]).includes(
     value
   );
+}
+
+export function isMonitoringPilotCardFilter(
+  value: string
+): value is PilotCardFilterValue {
+  return (monitoringPilotCardFilterValues as readonly string[]).includes(value);
+}
+
+export function isRelationalPilotCardFilter(
+  value: string
+): value is PilotCardFilterValue {
+  return (relationalPilotCardFilterValues as readonly string[]).includes(value);
 }
 
 export const pilotResultStatusOptions = [

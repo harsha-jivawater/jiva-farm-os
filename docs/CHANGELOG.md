@@ -15,6 +15,14 @@ Simple reverse chronological record of major Jiva Farm OS work.
   pending, and completed planned visits.
 - Made Pilot CSV export follow the active search, filters, and KPI card
   drill-down.
+- Restored the filtered planned-visit KPI function in production so visit
+  counts no longer display as unavailable.
+- Made every Pilot Monitoring KPI card open the exact contributing pilot
+  population in the Pilots list, with the same drill-down preserved in CSV
+  export.
+- Kept the Pilot Monitoring definition of an active pilot aligned with its
+  dashboard: planned, reviewed, and scale-up-recommended pilots remain active
+  until they are closed, parked, or cancelled.
 - Scoped Pilot owner, Research Assistant, Agronomist, and R&D Head filters to
   users with the corresponding effective role and sorted the choices by role
   and name.

@@ -26,12 +26,14 @@ import { NumberedPagination } from "@/components/pagination/numbered-pagination"
 import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
 import { formatDisplayDateTime } from "@/lib/date-utils";
 import { exportLink } from "@/lib/export/csv";
+import { getRelationalPilotIdsForCard } from "@/lib/pilots/card-filter-data";
 import {
   activePilotStatusValues,
-  activePlannedVisitStatusValues,
   cropOptions,
-  isPlannedVisitPilotCardFilter,
+  isMonitoringPilotCardFilter,
+  isRelationalPilotCardFilter,
   labelFor,
+  monitoringActivePilotStatusValues,
   pilotCardFilterLabel,
   pilotCardFilterValue,
   type PilotCardFilterValue,
@@ -279,12 +281,6 @@ function pilotCardHref(
   return query ? `/pilots?${query}` : "/pilots";
 }
 
-function addDays(dateValue: string, days: number) {
-  const date = new Date(`${dateValue}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
 function roleSortValue(user: UserOption) {
   const roles = [user.role, user.secondary_role].filter(Boolean) as string[];
   const matchedRanks = roles
@@ -310,51 +306,6 @@ function usersForRoles(
         roleSortValue(first) - roleSortValue(second) ||
         first.full_name.localeCompare(second.full_name)
     );
-}
-
-async function getPlannedVisitPilotIdsForCard(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  cardFilter: PilotCardFilterValue,
-  today: string
-) {
-  let query = supabase
-    .from("planned_pilot_visits")
-    .select("pilot_id")
-    .is("deleted_at", null)
-    .not("pilot_id", "is", null);
-
-  if (cardFilter !== "total_planned_visits") {
-    if (cardFilter === "planned_visits_completed") {
-      query = query.eq("planned_visit_status", "Completed");
-    } else {
-      query = query
-        .is("linked_visit_report_id", null)
-        .in("planned_visit_status", [...activePlannedVisitStatusValues]);
-    }
-  }
-
-  if (cardFilter === "upcoming_visits") {
-    query = query.gt("planned_visit_date", today);
-  } else if (cardFilter === "visits_due_this_week") {
-    query = query
-      .gte("planned_visit_date", today)
-      .lte("planned_visit_date", addDays(today, 7));
-  } else if (cardFilter === "overdue_visits") {
-    query = query.lt("planned_visit_date", today);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    return { error, pilotIds: [] };
-  }
-
-  return {
-    error: null,
-    pilotIds: Array.from(
-      new Set((data ?? []).map((visit) => visit.pilot_id).filter(Boolean))
-    ) as string[]
-  };
 }
 
 function KpiCard({
@@ -567,9 +518,15 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   let cardFilterErrorMessage = "";
 
   if (cardFilter) {
-    if (isPlannedVisitPilotCardFilter(cardFilter)) {
+    if (isRelationalPilotCardFilter(cardFilter)) {
       const { error: cardFilterError, pilotIds } =
-        await getPlannedVisitPilotIdsForCard(supabase, cardFilter, today);
+        await getRelationalPilotIdsForCard(supabase, cardFilter, today);
+
+      if (isMonitoringPilotCardFilter(cardFilter)) {
+        query = query.in("pilot_status", [
+          ...monitoringActivePilotStatusValues
+        ]);
+      }
 
       if (cardFilterError) {
         cardFilterErrorMessage = "Could not apply the selected card filter.";
@@ -582,6 +539,8 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
       }
     } else if (cardFilter === "active_pilots") {
       query = query.in("pilot_status", [...activePilotStatusValues]);
+    } else if (cardFilter === "monitoring_active_pilots") {
+      query = query.in("pilot_status", [...monitoringActivePilotStatusValues]);
     } else if (cardFilter === "device_installed") {
       query = query.eq("installation_completed", true);
     } else if (cardFilter === "visit_report_pending") {

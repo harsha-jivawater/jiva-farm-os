@@ -1,12 +1,13 @@
 import { applyLocationFilter } from "@/lib/filters/location";
+import { getRelationalPilotIdsForCard } from "@/lib/pilots/card-filter-data";
 import {
   activePilotStatusValues,
-  activePlannedVisitStatusValues,
   cropOptions,
-  isPlannedVisitPilotCardFilter,
+  isMonitoringPilotCardFilter,
+  isRelationalPilotCardFilter,
   labelFor,
+  monitoringActivePilotStatusValues,
   pilotCardFilterValue,
-  type PilotCardFilterValue,
   pilotResultStatusOptions,
   pilotStatusOptions,
   pilotTypeOptions
@@ -138,57 +139,6 @@ function scaleUpFilterValue(value: string) {
   if (value === "true") return true;
   if (value === "false") return false;
   return null;
-}
-
-function addDays(dateValue: string, days: number) {
-  const date = new Date(`${dateValue}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-async function getPlannedVisitPilotIdsForCard(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  cardFilter: PilotCardFilterValue,
-  today: string
-) {
-  let query = supabase
-    .from("planned_pilot_visits")
-    .select("pilot_id")
-    .is("deleted_at", null)
-    .not("pilot_id", "is", null);
-
-  if (cardFilter !== "total_planned_visits") {
-    if (cardFilter === "planned_visits_completed") {
-      query = query.eq("planned_visit_status", "Completed");
-    } else {
-      query = query
-        .is("linked_visit_report_id", null)
-        .in("planned_visit_status", [...activePlannedVisitStatusValues]);
-    }
-  }
-
-  if (cardFilter === "upcoming_visits") {
-    query = query.gt("planned_visit_date", today);
-  } else if (cardFilter === "visits_due_this_week") {
-    query = query
-      .gte("planned_visit_date", today)
-      .lte("planned_visit_date", addDays(today, 7));
-  } else if (cardFilter === "overdue_visits") {
-    query = query.lt("planned_visit_date", today);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    return { error, pilotIds: [] };
-  }
-
-  return {
-    error: null,
-    pilotIds: Array.from(
-      new Set((data ?? []).map((visit) => visit.pilot_id).filter(Boolean))
-    ) as string[]
-  };
 }
 
 function userLabel(userMap: Map<string, UserRow>, id: string | null) {
@@ -342,9 +292,9 @@ export async function GET(request: Request) {
   }
 
   if (cardFilter) {
-    if (isPlannedVisitPilotCardFilter(cardFilter)) {
+    if (isRelationalPilotCardFilter(cardFilter)) {
       const { error: cardFilterError, pilotIds } =
-        await getPlannedVisitPilotIdsForCard(supabase, cardFilter, today);
+        await getRelationalPilotIdsForCard(supabase, cardFilter, today);
 
       if (cardFilterError) {
         console.error("[Pilots Export] Card filter failed", cardFilterError);
@@ -353,9 +303,17 @@ export async function GET(request: Request) {
         });
       }
 
+      if (isMonitoringPilotCardFilter(cardFilter)) {
+        query = query.in("pilot_status", [
+          ...monitoringActivePilotStatusValues
+        ]);
+      }
+
       query = pilotIds.length ? query.in("id", pilotIds) : query.is("id", null);
     } else if (cardFilter === "active_pilots") {
       query = query.in("pilot_status", [...activePilotStatusValues]);
+    } else if (cardFilter === "monitoring_active_pilots") {
+      query = query.in("pilot_status", [...monitoringActivePilotStatusValues]);
     } else if (cardFilter === "device_installed") {
       query = query.eq("installation_completed", true);
     } else if (cardFilter === "visit_report_pending") {
