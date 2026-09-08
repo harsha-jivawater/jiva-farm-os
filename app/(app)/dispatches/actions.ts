@@ -129,8 +129,21 @@ type DispatchedDestinationSnapshot = {
   locationText?: string | null;
 };
 
+function redirectWithQuery(
+  path: string,
+  values: Record<string, string>
+): never {
+  const url = new URL(path, "http://dispatches.internal");
+
+  for (const [key, value] of Object.entries(values)) {
+    url.searchParams.set(key, value);
+  }
+
+  redirect(`${url.pathname}${url.search}`);
+}
+
 function redirectWithError(path: string, message: string): never {
-  redirect(`${path}?error=${encodeURIComponent(message)}`);
+  redirectWithQuery(path, { error: message });
 }
 
 function dispatchWriteErrorMessage(error: { code?: string; message: string }) {
@@ -1094,6 +1107,14 @@ function dealerPaymentBlockMessage() {
 function textValue(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
   return value || null;
+}
+
+function dispatchReturnPath(formData: FormData, fallback: string) {
+  const value = textValue(formData, "return_path");
+
+  return value && value.startsWith("/dispatches") && !value.startsWith("//")
+    ? value
+    : fallback;
 }
 
 function dealerGroupTargetStatus(formData: FormData) {
@@ -2445,7 +2466,10 @@ export async function updateDealerDispatchGroupLogisticsAction(
   formData: FormData
 ) {
   const supabase = await createClient();
-  const errorPath = `/dispatches/${dispatchId}`;
+  const errorPath = dispatchReturnPath(
+    formData,
+    `/dispatches/${dispatchId}`
+  );
   const profile = await getCurrentProfile(supabase, errorPath);
 
   if (!canManageDispatch(profile)) {
@@ -2631,17 +2655,24 @@ export async function updateDealerDispatchGroupLogisticsAction(
     revalidatePath(`/dealers/${dealerId}`);
   }
 
-  redirect(
-    `${errorPath}?saved=dealer_group_logistics&updated_count=${
-      preparedRows.length
-    }&status=${encodeURIComponent(targetStatus)}`
-  );
+  redirectWithQuery(errorPath, {
+    saved: "dealer_group_logistics",
+    updated_count: String(preparedRows.length),
+    status: targetStatus
+  });
 }
 
 export async function markDealerDispatchGroupDeliveredAction(
-  dispatchId: string
+  dispatchId: string,
+  submittedFormData: FormData
 ) {
   const formData = new FormData();
   formData.set("dispatch_status", "Delivered");
+  const returnPath = textValue(submittedFormData, "return_path");
+
+  if (returnPath) {
+    formData.set("return_path", returnPath);
+  }
+
   await updateDealerDispatchGroupLogisticsAction(dispatchId, formData);
 }
