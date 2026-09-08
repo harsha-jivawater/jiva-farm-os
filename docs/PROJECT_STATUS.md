@@ -663,6 +663,12 @@ Legacy crop rules:
 - Current KPI filtering uses crop values, not classification grouping.
 - My Work is the primary user-facing home for role KPI cards and pending work.
 - Legacy KPI cache/RPC patterns remain part of the backend where still used by management views; do not reintroduce expensive full-table fallbacks.
+- KPI Dashboard full refreshes use independent per-RSM aggregates. Do not join
+  multiple RSM fact tables before aggregation because the resulting Cartesian
+  product exceeds the Supabase and Vercel 60-second request ceiling.
+- The default FY cache was successfully rebuilt on 08 Sep 2026 after the RSM
+  aggregation repair. The refresh button recovers to a visible timeout error
+  after 55 seconds if a future regression exceeds that limit.
 
 ## Notifications And Action Center
 
