@@ -94,7 +94,10 @@ function pilotLabel(pilot: DispatchPilotOption) {
 
 function dealerLabel(dealer: DispatchDealerOption) {
   const primaryName = dealer.firm_name || dealer.dealer_name;
-  return `${dealer.dealer_code} · ${primaryName} · ${dealer.district}, ${dealer.state}`;
+  const code = dealer.dealer_code ? `${dealer.dealer_code} · ` : "";
+  const location = [dealer.district, dealer.state].filter(Boolean).join(", ");
+
+  return `${code}${primaryName}${location ? ` · ${location}` : ""}`;
 }
 
 function institutionSaleLineLabel(line: DispatchInstitutionSaleLineOption) {
@@ -198,6 +201,27 @@ export function DispatchForm({
         dispatch?.institution_sale_order_line_id)
   );
   const allFarmerLeadOptions = [...farmerLeads, ...institutionFarmerLeads];
+  const selectedDispatchDealerId =
+    dispatch?.destination_dealer_id ?? dispatch?.linked_dealer_id ?? "";
+  const dealerSnapshotOption =
+    selectedDispatchDealerId &&
+    dispatch &&
+    !dealers.some((dealer) => dealer.id === selectedDispatchDealerId)
+      ? ({
+          id: selectedDispatchDealerId,
+          dealer_code: "",
+          dealer_name:
+            dispatch.destination_name_snapshot || "Selected dealer",
+          firm_name: dispatch.destination_name_snapshot || null,
+          contact_number: dispatch.destination_contact_snapshot || "",
+          state: dispatch.destination_state || "",
+          district: dispatch.destination_district || "",
+          dealer_address: dispatch.destination_address || null
+        } satisfies DispatchDealerOption)
+      : null;
+  const dealerOptions = dealerSnapshotOption
+    ? [dealerSnapshotOption, ...dealers]
+    : dealers;
   const initialLead = allFarmerLeadOptions.find(
     (lead) =>
       lead.id ===
@@ -219,9 +243,9 @@ export function DispatchForm({
       pilot.id ===
       (initialPilotId ?? dispatch?.destination_pilot_id ?? dispatch?.linked_pilot_id)
   );
-  const initialDealer = dealers.find(
+  const initialDealer = dealerOptions.find(
     (dealer) =>
-      dealer.id === (dispatch?.destination_dealer_id ?? dispatch?.linked_dealer_id)
+      dealer.id === selectedDispatchDealerId
   );
   const initialDevice = useMemo(
     () =>
@@ -688,7 +712,7 @@ export function DispatchForm({
 
   function applyDealer(dealerId: string) {
     setSelectedDealerId(dealerId);
-    const dealer = dealers.find((option) => option.id === dealerId);
+    const dealer = dealerOptions.find((option) => option.id === dealerId);
 
     if (!dealer) {
       setDestinationName("");
@@ -1400,7 +1424,7 @@ export function DispatchForm({
                 value={selectedDealerId}
               >
                 <option value="">Select dealer</option>
-                {dealers.map((dealer) => (
+                {dealerOptions.map((dealer) => (
                   <option key={dealer.id} value={dealer.id}>
                     {dealerLabel(dealer)}
                   </option>
