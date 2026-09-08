@@ -38,6 +38,32 @@ Action Center is the global notification entry directly below the logo. Daily Wo
   an up-to-date branch, and resolved conversations are enforced; force pushes
   and branch deletion are blocked.
 
+## Current Release Update - 08 September 2026
+
+- Pilots KPI cards now use the active search and filter criteria, including the
+  planned-visit KPIs.
+- Clicking a Pilot KPI card applies a matching card filter to the Pilot list.
+  Clicking the active card again clears only that card filter and keeps the
+  other search/filter selections.
+- Planned-visit card matching is consistent between the KPI totals, list
+  drill-down, and CSV export. Upcoming visits are future active visits without
+  a linked report; visits due in the next seven days include today; overdue
+  visits are past active visits without a linked report; pending reports are
+  active visits without a linked report; completed visits use the `Completed`
+  planned-visit status.
+- Pilot CSV export now carries the same search, role, location, partner,
+  scale-up, record-state, and KPI card filters as the visible list.
+- Pilot role selectors now show only users with the relevant effective role.
+  Pilot owners are limited to Agronomists, Research Assistants, and R&D Heads;
+  the individual role selectors show only users in their named role and sort
+  the results consistently.
+- Added migration `20260908073125_filter_pilot_planned_visit_kpis.sql` for the
+  RLS-aware planned-visit KPI count path.
+- Dispatch list now exposes Customer Support one-click delivery for multi-device
+  Dealer Stock Dispatch orders. The action moves all eligible rows in the same
+  dealer group to `Delivered` and preserves payment, inventory, movement, and
+  audit validations.
+
 ## Current Release Update - 05 August 2026
 
 - Farmer Lead CSV import is preview-first: users can import valid rows while

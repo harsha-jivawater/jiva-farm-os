@@ -1122,7 +1122,9 @@ function canDealerGroupRowMoveToStatus(
     return !hasMovedDeviceFromWarehouse(currentStatus);
   }
 
-  return currentStatus !== "Delivered";
+  return ["Approved for Dispatch", "Dispatched"].includes(
+    currentStatus ?? ""
+  );
 }
 
 function validateDevicePoolForRoute({
@@ -2634,4 +2636,12 @@ export async function updateDealerDispatchGroupLogisticsAction(
       preparedRows.length
     }&status=${encodeURIComponent(targetStatus)}`
   );
+}
+
+export async function markDealerDispatchGroupDeliveredAction(
+  dispatchId: string
+) {
+  const formData = new FormData();
+  formData.set("dispatch_status", "Delivered");
+  await updateDealerDispatchGroupLogisticsAction(dispatchId, formData);
 }

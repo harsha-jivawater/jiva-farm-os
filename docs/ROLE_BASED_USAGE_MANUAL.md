@@ -1,8 +1,8 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.19
+Version: v0.20
 Status: Draft  
-Last updated: 05 Aug 2026
+Last updated: 08 Sep 2026
 Owner: Jiva Farm OS Admin / Management  
 Audience: Internal Jiva Farm OS users  
 
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.20 | 08 Sep 2026 | Draft | Adds filter-aware Pilots KPI cards, clickable Pilot card drill-downs, matching Pilot CSV exports, and role-scoped Pilot user filters. |
 | v0.19 | 05 Aug 2026 | Draft | Adds Operations Control, 50-row pagination, filtered Farmer Lead KPIs, safer Farmer Lead CSV import, dealer payment handoff notes, Pilot area units, Jet irrigation, and Marketing Head direct publish. |
 | v0.18 | 17 Jul 2026 | Draft | Adds Marketing Library browsing, cross-role approval, private file/YouTube content, and manually revocable customer links. |
 | v0.17 | 10 Jul 2026 | Draft | Adds My Work as home, Action Center sidebar placement, Inventory lifecycle cards, Dispatch and Free Pilot corrections, Installation auto-linking, Marketing completion tracking, and current operating guidance. |
@@ -1300,7 +1301,24 @@ Future/deferred R&D workflow decision:
 | Purpose | Track trials, monitoring visits, results, and scale-up proof. |
 | Used by | Admin, Management, R&D Head, Agronomist, Research Assistant, Sales Head, RSM, Salesperson, Viewer. |
 | Primary actions | Create pilot, add monitoring plan, assign visits, submit reports, review result, mark Pilot Device Installed where allowed. |
-| Important rules | R&D Head can soft-delete Pilots. Admin and Management can also soft-delete Pilots. Visit plans, reports, and linked context are preserved. Delete reason and deleted-by are captured. Admin can view deleted pilots explicitly and restore them. Research Assistant cannot mark Pilot Device Installed. |
+| Important rules | R&D Head can soft-delete Pilots. Admin and Management can also soft-delete Pilots. Visit plans, reports, and linked context are preserved. Delete reason and deleted-by are captured. Admin can view deleted pilots explicitly and restore them. Research Assistant cannot mark Pilot Device Installed. Pilot KPI cards follow the active filters; clicking a card shows only matching pilots. Pilot owner and individual role selectors show only users with the relevant effective role. |
+
+#### Pilots KPI cards and drill-down
+
+- Search, pilot type, status, result status, crop, state, district, role,
+  institution, dealer, scale-up, and record-state filters are applied to the
+  Pilot KPI cards.
+- Clicking a KPI card filters the Pilot table to pilots with a matching record
+  or planned visit. The Total Pilots card clears the card-specific drill-down
+  without clearing the other filters.
+- The visit cards distinguish future, due, overdue, pending-report, and
+  completed planned visits using the planned visit status, date, and linked
+  Visit Report. Deleted planned visits are excluded.
+- Export CSV uses the same filters and active KPI card drill-down as the Pilot
+  table.
+- The Pilot owner selector lists only Agronomists, Research Assistants, and
+  R&D Heads. The individual role selectors list only users with that role,
+  including users who hold it as a secondary role.
 
 ### My Visits
 
@@ -1318,7 +1336,17 @@ Future/deferred R&D workflow decision:
 | Purpose | Move devices from stock to farmer/dealer/institution/pilot destination. |
 | Used by | Admin, Accounts, Stock / Dispatch, Sales Head, RSM, Agronomist, R&D Head, Viewer. |
 | Primary actions | Request/approve/dispatch/deliver devices, track payment requirement. |
-| Important rules | Dispatched workflow depends on payment/approval rules and Stock / Dispatch authority. |
+| Important rules | Dispatched workflow depends on payment/approval rules and Stock / Dispatch authority. Customer Support can use the Dispatch list's Dealer group delivery action to mark all eligible rows in a paid multi-device dealer order as Delivered. |
+
+#### Dealer group delivery
+
+- Open Dispatches and use the `Dealer group delivery` section when it appears.
+- Select `Mark group delivered` for the dealer order. The action updates every
+  eligible active row in that order, including rows on other pagination pages.
+- Accounts payment confirmation is required for every row before delivery.
+- The action updates the device holder/status and movement history together
+  with the dispatch status. Use the dispatch detail page when delivery
+  logistics or remarks need to be entered.
 
 Dispatch creation routes:
 

@@ -434,6 +434,48 @@ The current Dispatch is excluded from duplicate checks on edit, so existing Disp
 - Follow-up due date after pilot completion is the completion date.
 - A lead is not `Won` unless `payment_confirmed = true`.
 
+### Pilot KPI cards and filters
+
+- The Pilots KPI cards always use the current search and filter selections.
+- Select a card to show only the pilots that match that KPI. Select the active
+  card again to remove the card-specific filter while retaining the other
+  filters.
+- The planned-visit cards use these definitions:
+  - Total Planned Visits: every non-deleted planned visit matching the active
+    Pilot filters.
+  - Upcoming Visits: future active planned visits without a linked Visit
+    Report.
+  - Visits Due This Week: active planned visits dated today through the next
+    seven days without a linked Visit Report.
+  - Overdue Visits: past active planned visits without a linked Visit Report.
+  - Planned Visit Reports Pending: active planned visits without a linked Visit
+    Report.
+  - Planned Visits Completed: planned visits with status `Completed`.
+- Active planned visits have status `Planned`, `Assigned`, `Due`, `In Progress`,
+  or `Rescheduled`. Deleted visits are excluded.
+- Pilot CSV export follows the same active filters and KPI card selection as the
+  visible list.
+- Pilot owner choices include only Agronomist, Research Assistant, and R&D Head
+  users. The Research Assistant, Agronomist, and R&D Head selectors show only
+  users with that effective role, including secondary roles, and are sorted for
+  quick selection.
+
+## Dealer Group Delivery
+
+- Customer Support uses the Dispatch list's `Dealer group delivery` section to
+  move a multi-device Dealer Stock Dispatch order to `Delivered` in one action.
+- The action is available when an eligible group row is visible in the current
+  filtered page. It updates every eligible active row in that dealer group,
+  including rows on other pagination pages.
+- Accounts must have confirmed payment for every active row in the group first.
+- The same group movement validation is applied as on the dispatch detail page:
+  cancelled, installed, or installation-pending rows are excluded; devices
+  must still be valid for the movement; and device holder/status plus movement
+  history are updated for rows leaving warehouse stock.
+- The delivery date defaults to the existing row date or the current date when
+  the group is delivered from the list. Use the detail page when transport,
+  reference, expected delivery, or remarks need to be entered or changed.
+
 ## Installation Operating Rules
 
 - Farmer Sale Installation and Dealer Farmer Installation completion updates the linked Farmer Lead:

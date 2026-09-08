@@ -12,6 +12,7 @@ import {
   Truck,
   type LucideIcon
 } from "lucide-react";
+import { markDealerDispatchGroupDeliveredAction } from "@/app/(app)/dispatches/actions";
 import { DispatchStatusPill } from "@/components/dispatches/dispatch-status-pill";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { NumberedPagination } from "@/components/pagination/numbered-pagination";
@@ -36,7 +37,7 @@ import { getPageNumber, getPaginationRange } from "@/lib/pagination";
 import { logPerf, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
-import { canWriteModule } from "@/lib/users/permissions";
+import { canManageDispatch, canWriteModule } from "@/lib/users/permissions";
 import { dispatchScope } from "@/lib/users/record-scope";
 import { INDIAN_STATES_AND_UTS } from "@/src/lib/india-locations";
 
@@ -67,7 +68,8 @@ const listSelectColumns = [
   "payment_confirmed",
   "payment_confirmed_date",
   "payment_requirement_type",
-  "dispatch_date"
+  "dispatch_date",
+  "dealer_dispatch_group_id"
 ].join(",");
 
 const loadErrorMessage = "Unable to load records. Please contact Admin.";
@@ -197,10 +199,11 @@ export default async function DispatchesPage({
   const createdCount = Number(paramValue(params.created_count));
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
-  const { canWrite, scope } = await timeAsync(
+  const { canManage, canWrite, scope } = await timeAsync(
     "dispatches role/permission resolution",
     async () => ({
       canWrite: canWriteModule(currentUser, "dispatches"),
+      canManage: canManageDispatch(currentUser),
       scope: await dispatchScope(supabase, currentUser)
     })
   );
@@ -392,6 +395,46 @@ export default async function DispatchesPage({
     loadError = loadErrorMessage;
   }
 
+  const dealerGroupActions = Array.from(
+    dispatches.reduce(
+      (groups, dispatch) => {
+        const groupId = dispatch.dealer_dispatch_group_id;
+
+        if (
+          dispatch.dispatch_type !== "Dealer Stock Dispatch" ||
+          !groupId ||
+          !["Approved for Dispatch", "Dispatched"].includes(
+            dispatch.dispatch_status
+          )
+        ) {
+          return groups;
+        }
+
+        const existing = groups.get(groupId);
+
+        if (existing) {
+          existing.visibleRowCount += 1;
+          return groups;
+        }
+
+        groups.set(groupId, {
+          dispatchId: dispatch.id,
+          destinationName: dispatch.destination_name_snapshot,
+          visibleRowCount: 1
+        });
+        return groups;
+      },
+      new Map<
+        string,
+        {
+          dispatchId: string;
+          destinationName: string;
+          visibleRowCount: number;
+        }
+      >()
+    ).values()
+  );
+
   logPerf("dispatches page total server render", startedAt);
 
   return (
@@ -450,6 +493,55 @@ export default async function DispatchesPage({
         <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
           Dealer Dispatch created for {createdCount}{" "}
           {createdCount === 1 ? "device" : "devices"}.
+        </div>
+      ) : null}
+
+      {canManage && dealerGroupActions.length > 0 ? (
+        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">
+              Dealer group delivery
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Mark every eligible device in a dealer order as Delivered in one
+              action. Payment must already be confirmed for the full order.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {dealerGroupActions.map((group) => {
+              const action = markDealerDispatchGroupDeliveredAction.bind(
+                null,
+                group.dispatchId
+              );
+
+              return (
+                <form
+                  action={action}
+                  className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                  key={group.dispatchId}
+                >
+                  <div>
+                    <p className="font-semibold text-slate-950">
+                      {group.destinationName}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {group.visibleRowCount} matching row
+                      {group.visibleRowCount === 1 ? "" : "s"} on this page.
+                      The action updates all eligible rows in this dealer
+                      order, including rows on other pages.
+                    </p>
+                  </div>
+                  <button
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                    type="submit"
+                  >
+                    <PackageCheck className="h-4 w-4" aria-hidden="true" />
+                    Mark group delivered
+                  </button>
+                </form>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
