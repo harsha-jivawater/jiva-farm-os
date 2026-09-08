@@ -79,6 +79,38 @@ function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
+function dispatchesReturnPath(
+  searchParams: Record<string, string | string[] | undefined>
+) {
+  const query = new URLSearchParams();
+  const flashParams = new Set([
+    "created_count",
+    "error",
+    "saved",
+    "status",
+    "updated_count"
+  ]);
+
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (flashParams.has(key) || value === undefined) {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item) {
+          query.append(key, item);
+        }
+      }
+    } else if (value) {
+      query.set(key, value);
+    }
+  }
+
+  const queryString = query.toString();
+  return queryString ? `/dispatches?${queryString}` : "/dispatches";
+}
+
 function optionFilterValue(
   value: string | string[] | undefined,
   options: ReadonlyArray<{ value: string; label: string }>
@@ -197,6 +229,11 @@ export default async function DispatchesPage({
   const filters = readFilters(params);
   const pagination = getPaginationRange(getPageNumber(params.page));
   const createdCount = Number(paramValue(params.created_count));
+  const errorMessage = paramValue(params.error);
+  const savedAction = paramValue(params.saved);
+  const updatedCount = Number(paramValue(params.updated_count));
+  const updatedStatus = paramValue(params.status);
+  const returnPath = dispatchesReturnPath(params);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
   const { canManage, canWrite, scope } = await timeAsync(
@@ -496,6 +533,20 @@ export default async function DispatchesPage({
         </div>
       ) : null}
 
+      {errorMessage ? (
+        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      {savedAction === "dealer_group_logistics" && updatedCount > 0 ? (
+        <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
+          {updatedCount} dealer dispatch{" "}
+          {updatedCount === 1 ? "row" : "rows"} marked{" "}
+          {updatedStatus || "updated"}.
+        </div>
+      ) : null}
+
       {canManage && dealerGroupActions.length > 0 ? (
         <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div>
@@ -520,6 +571,7 @@ export default async function DispatchesPage({
                   className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"
                   key={group.dispatchId}
                 >
+                  <input name="return_path" type="hidden" value={returnPath} />
                   <div>
                     <p className="font-semibold text-slate-950">
                       {group.destinationName}
@@ -911,7 +963,13 @@ export default async function DispatchesPage({
         {!loadError ? (
           <NumberedPagination
             basePath="/dispatches"
-            excludedParams={["created_count"]}
+            excludedParams={[
+              "created_count",
+              "error",
+              "saved",
+              "status",
+              "updated_count"
+            ]}
             label="dispatches"
             page={pagination.page}
             pageSize={pagination.pageSize}
