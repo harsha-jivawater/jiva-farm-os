@@ -985,6 +985,30 @@ function applyDealerDispatchSnapshot(
   payload.payment_confirmed_date = paymentState?.payment_confirmed_date ?? null;
 }
 
+function dealerPaymentStateForEdit({
+  canEditPayment,
+  existing,
+  payload
+}: {
+  canEditPayment: boolean;
+  existing: DealerDispatchPaymentState;
+  payload: DispatchInsert | DispatchUpdate;
+}): DealerDispatchPaymentState {
+  if (!canEditPayment) {
+    return existing;
+  }
+
+  return {
+    payment_confirmed: Boolean(payload.payment_confirmed),
+    payment_confirmed_by_user_id: payload.payment_confirmed
+      ? existing.payment_confirmed_by_user_id
+      : null,
+    payment_confirmed_date: payload.payment_confirmed
+      ? (payload.payment_confirmed_date ?? existing.payment_confirmed_date)
+      : null
+  };
+}
+
 function applyInstitutionPayerDispatchSnapshot(
   payload: DispatchInsert | DispatchUpdate,
   institution: InstitutionDispatchPayer,
@@ -1065,6 +1089,40 @@ function isDealerDispatch(dispatch: Pick<Dispatch, "dispatch_type">) {
 
 function dealerPaymentBlockMessage() {
   return "Accounts must confirm dealer payment before this dispatch can be marked Dispatched.";
+}
+
+function textValue(formData: FormData, key: string) {
+  const value = String(formData.get(key) ?? "").trim();
+  return value || null;
+}
+
+function dealerGroupTargetStatus(formData: FormData) {
+  const value = textValue(formData, "dispatch_status");
+
+  if (value === "Dispatched" || value === "Delivered") {
+    return value;
+  }
+
+  return null;
+}
+
+function canDealerGroupRowMoveToStatus(
+  currentStatus: string | null | undefined,
+  targetStatus: "Dispatched" | "Delivered"
+) {
+  if (
+    ["Cancelled", "Installation Pending", "Installed"].includes(
+      currentStatus ?? ""
+    )
+  ) {
+    return false;
+  }
+
+  if (targetStatus === "Dispatched") {
+    return !hasMovedDeviceFromWarehouse(currentStatus);
+  }
+
+  return currentStatus !== "Delivered";
 }
 
 function validateDevicePoolForRoute({
@@ -1723,7 +1781,7 @@ export async function createDispatchAction(formData: FormData) {
   ) {
     redirectWithError(
       "/dispatches/new",
-      "Only Customer Service Team or Admin can move a dispatch out of warehouse stock."
+      "Only Stock / Dispatch or Admin can move a dispatch out of warehouse stock."
     );
   }
 
@@ -2010,7 +2068,25 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   }
 
   if (dealerDispatch) {
-    applyDealerDispatchSnapshot(payload, dealerDispatch, existing);
+    applyDealerDispatchSnapshot(
+      payload,
+      dealerDispatch,
+      dealerPaymentStateForEdit({
+        canEditPayment: canConfirmPayment(profile),
+        existing,
+        payload
+      })
+    );
+
+    if (
+      !existing.payment_confirmed &&
+      payload.payment_confirmed &&
+      ["Dispatch Requested", "Pending Payment Confirmation"].includes(
+        payload.dispatch_status ?? ""
+      )
+    ) {
+      payload.dispatch_status = "Approved for Dispatch";
+    }
   }
 
   const device = await getDeviceForDispatch(
@@ -2067,7 +2143,7 @@ export async function updateDispatchAction(id: string, formData: FormData) {
   ) {
     redirectWithError(
       `/dispatches/${id}/edit`,
-      "Only Customer Service Team or Admin can move a dispatch out of warehouse stock."
+      "Only Stock / Dispatch or Admin can move a dispatch out of warehouse stock."
     );
   }
 
@@ -2360,4 +2436,202 @@ export async function confirmDealerDispatchPaymentAction(dispatchId: string) {
   revalidatePath("/my-pending-work");
   revalidatePath("/system-health");
   redirect(errorPath);
+}
+
+export async function updateDealerDispatchGroupLogisticsAction(
+  dispatchId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const errorPath = `/dispatches/${dispatchId}`;
+  const profile = await getCurrentProfile(supabase, errorPath);
+
+  if (!canManageDispatch(profile)) {
+    redirectWithError(
+      errorPath,
+      "Only Stock / Dispatch or Admin can update dealer dispatch movement."
+    );
+  }
+
+  const targetStatus = dealerGroupTargetStatus(formData);
+
+  if (!targetStatus) {
+    redirectWithError(
+      errorPath,
+      "Choose Dispatched or Delivered for the dealer dispatch group."
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("dispatches")
+    .select("*")
+    .eq("id", dispatchId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !data) {
+    redirectWithError(errorPath, "Dispatch was not found.");
+  }
+
+  const dispatch = data as Dispatch;
+
+  if (!isDealerDispatch(dispatch)) {
+    redirectWithError(
+      errorPath,
+      "Group movement can be updated only for Dealer Dispatches."
+    );
+  }
+
+  if (!dispatch.dealer_dispatch_group_id) {
+    redirectWithError(
+      errorPath,
+      "This dispatch is not part of a multi-device dealer order."
+    );
+  }
+
+  const dealerId = dispatch.destination_dealer_id ?? dispatch.linked_dealer_id;
+  const { data: groupData, error: groupError } = await supabase
+    .from("dispatches")
+    .select("*")
+    .eq("dealer_dispatch_group_id", dispatch.dealer_dispatch_group_id)
+    .eq("dispatch_type", "Dealer Stock Dispatch")
+    .is("deleted_at", null)
+    .neq("dispatch_status", "Cancelled")
+    .order("dispatch_code", { ascending: true });
+
+  if (groupError) {
+    redirectWithError(errorPath, groupError.message);
+  }
+
+  const groupRows = (groupData ?? []) as Dispatch[];
+
+  if (groupRows.length <= 1) {
+    redirectWithError(
+      errorPath,
+      "This dealer order does not have multiple active dispatch rows to update."
+    );
+  }
+
+  if (
+    dealerId &&
+    groupRows.some(
+      (row) => (row.destination_dealer_id ?? row.linked_dealer_id) !== dealerId
+    )
+  ) {
+    redirectWithError(
+      errorPath,
+      "This dealer dispatch group has mixed dealer records. Please contact Admin before moving it."
+    );
+  }
+
+  const unpaidRows = groupRows.filter((row) => !row.payment_confirmed);
+
+  if (unpaidRows.length) {
+    redirectWithError(
+      errorPath,
+      `Accounts must confirm payment for all devices before group movement. ${unpaidRows.length} device${
+        unpaidRows.length === 1 ? "" : "s"
+      } still pending.`
+    );
+  }
+
+  const rowsToUpdate = groupRows.filter((row) =>
+    canDealerGroupRowMoveToStatus(row.dispatch_status, targetStatus)
+  );
+
+  if (!rowsToUpdate.length) {
+    redirectWithError(
+      errorPath,
+      `No dealer dispatches in this group can be marked ${targetStatus}.`
+    );
+  }
+
+  const preparedRows: Array<{ device: DispatchDeviceOption; row: Dispatch }> = [];
+
+  for (const row of rowsToUpdate) {
+    const device = await getDeviceForDispatch(supabase, row.device_id, errorPath);
+
+    if (!hasMovedDeviceFromWarehouse(row.dispatch_status)) {
+      validateOutboundDispatchDeviceEligibility({
+        device,
+        errorPath,
+        route: "Dealer Dispatch"
+      });
+    }
+
+    preparedRows.push({ device, row });
+  }
+
+  const now = todayDate();
+  const submittedDispatchDate = textValue(formData, "dispatch_date");
+  const submittedDeliveredDate = textValue(formData, "delivered_date");
+  const submittedTransport = textValue(formData, "courier_or_transport_name");
+  const submittedReference = textValue(formData, "dispatch_reference_number");
+  const submittedExpectedDate = textValue(formData, "expected_delivery_date");
+  const submittedRemarks = textValue(formData, "delivery_remarks");
+
+  for (const { device, row } of preparedRows) {
+    const rowWasMoved = hasMovedDeviceFromWarehouse(row.dispatch_status);
+    const dispatchDate = submittedDispatchDate ?? row.dispatch_date ?? now;
+    const updatePayload: DispatchUpdate = {
+      dispatch_status: targetStatus,
+      dispatch_date: dispatchDate,
+      approved_by_user_id: row.approved_by_user_id ?? profile.id,
+      dispatched_by_user_id: row.dispatched_by_user_id ?? profile.id,
+      courier_or_transport_name:
+        submittedTransport ?? row.courier_or_transport_name,
+      dispatch_reference_number:
+        submittedReference ?? row.dispatch_reference_number,
+      expected_delivery_date: submittedExpectedDate ?? row.expected_delivery_date,
+      delivered_date:
+        targetStatus === "Delivered"
+          ? (submittedDeliveredDate ?? row.delivered_date ?? dispatchDate)
+          : row.delivered_date,
+      delivery_confirmed:
+        targetStatus === "Delivered" ? true : row.delivery_confirmed,
+      delivery_remarks: submittedRemarks ?? row.delivery_remarks
+    };
+
+    const sideEffectPayload = { ...row, ...updatePayload } as DispatchUpdate;
+
+    if (!canMoveToApprovedOrBeyond(sideEffectPayload)) {
+      redirectWithError(errorPath, dealerPaymentBlockMessage());
+    }
+
+    const { error: updateError } = await supabase
+      .from("dispatches")
+      .update(updatePayload)
+      .eq("id", row.id);
+
+    if (updateError) {
+      redirectWithError(errorPath, dispatchWriteErrorMessage(updateError));
+    }
+
+    await applyDispatchedSideEffects({
+      supabase,
+      profileId: profile.id,
+      dispatchId: row.id,
+      payload: sideEffectPayload,
+      device,
+      createMovement: !rowWasMoved,
+      errorPath
+    });
+
+    revalidatePath(`/dispatches/${row.id}`);
+  }
+
+  revalidatePath("/dispatches");
+  revalidatePath("/devices");
+  revalidatePath("/inventory");
+
+  if (dealerId) {
+    revalidatePath("/dealers");
+    revalidatePath(`/dealers/${dealerId}`);
+  }
+
+  redirect(
+    `${errorPath}?saved=dealer_group_logistics&updated_count=${
+      preparedRows.length
+    }&status=${encodeURIComponent(targetStatus)}`
+  );
 }

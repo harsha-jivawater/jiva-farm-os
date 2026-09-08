@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Pencil } from "lucide-react";
-import { confirmDealerDispatchPaymentAction } from "@/app/(app)/dispatches/actions";
+import {
+  confirmDealerDispatchPaymentAction,
+  updateDealerDispatchGroupLogisticsAction
+} from "@/app/(app)/dispatches/actions";
 import { DispatchStatusPill } from "@/components/dispatches/dispatch-status-pill";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -20,14 +23,29 @@ import { productModelOptions } from "@/lib/devices/options";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canConfirmPayment, canWriteModule } from "@/lib/users/permissions";
+import {
+  canConfirmPayment,
+  canManageDispatch,
+  canWriteModule
+} from "@/lib/users/permissions";
 import { dispatchScope } from "@/lib/users/record-scope";
 
 type DispatchDetailPageProps = {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{
+    error?: string;
+    saved?: string;
+    status?: string;
+    updated_count?: string;
+  }>;
 };
+
+type DealerDispatchGroupSummaryRow = Pick<
+  Dispatch,
+  "dispatch_status" | "id" | "payment_confirmed"
+>;
 
 function DetailItem({
   label,
@@ -241,13 +259,16 @@ function dispatchHandoff(
 }
 
 export default async function DispatchDetailPage({
-  params
+  params,
+  searchParams
 }: DispatchDetailPageProps) {
   const { id } = await params;
+  const query = await searchParams;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
   const canWrite = canWriteModule(currentUser, "dispatches");
   const canConfirmDealerPayment = canConfirmPayment(currentUser);
+  const canUpdateDealerGroupLogistics = canManageDispatch(currentUser);
   const canCreateInstallation = canWriteModule(currentUser, "installations");
   const scope = await dispatchScope(supabase, currentUser);
   let dispatchQuery = supabase
@@ -272,25 +293,48 @@ export default async function DispatchDetailPage({
 
   const dispatch = data as Dispatch;
   let dealerDispatchGroupCount = 0;
+  let dealerDispatchGroupRows: DealerDispatchGroupSummaryRow[] = [];
 
   if (dispatch.dealer_dispatch_group_id) {
-    const { count } = await supabase
+    const { data: groupRows } = await supabase
       .from("dispatches")
-      .select("id", { count: "exact", head: true })
+      .select("id, dispatch_status, payment_confirmed")
       .eq("dealer_dispatch_group_id", dispatch.dealer_dispatch_group_id)
       .eq("dispatch_type", "Dealer Stock Dispatch")
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .neq("dispatch_status", "Cancelled");
 
-    dealerDispatchGroupCount = count ?? 0;
+    dealerDispatchGroupRows =
+      (groupRows ?? []) as DealerDispatchGroupSummaryRow[];
+    dealerDispatchGroupCount = dealerDispatchGroupRows.length;
   }
 
   const source = dispatchSourceLink(dispatch);
   const handoff = dispatchHandoff(dispatch, canCreateInstallation);
   const isDealerRoute = dispatchRoute(dispatch) === "Dealer Dispatch";
+  const dealerDispatchGroupUnpaidCount = dealerDispatchGroupRows.filter(
+    (row) => !row.payment_confirmed
+  ).length;
+  const dealerDispatchGroupMovableCount = dealerDispatchGroupRows.filter(
+    (row) =>
+      !["Delivered", "Installation Pending", "Installed"].includes(
+        row.dispatch_status
+      )
+  ).length;
   const showConfirmDealerPayment =
     isDealerRoute && !dispatch.payment_confirmed && canConfirmDealerPayment;
   const confirmDealerPaymentAction =
     confirmDealerDispatchPaymentAction.bind(null, dispatch.id);
+  const showDealerGroupLogistics =
+    isDealerRoute &&
+    canUpdateDealerGroupLogistics &&
+    dispatch.payment_confirmed &&
+    dealerDispatchGroupCount > 1 &&
+    dealerDispatchGroupUnpaidCount === 0 &&
+    dealerDispatchGroupMovableCount > 0;
+  const dealerGroupLogisticsAction =
+    updateDealerDispatchGroupLogisticsAction.bind(null, dispatch.id);
+  const today = new Date().toISOString().slice(0, 10);
   let paymentConfirmedBy = null as
     | { full_name: string; role: string }
     | null;
@@ -352,6 +396,19 @@ export default async function DispatchDetailPage({
         <DispatchStatusPill status={dispatch.dispatch_status} />
       </div>
 
+      {query.error ? (
+        <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {query.error}
+        </div>
+      ) : null}
+      {query.saved === "dealer_group_logistics" ? (
+        <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+          Dealer group movement updated for {query.updated_count ?? "0"} device
+          {query.updated_count === "1" ? "" : "s"}
+          {query.status ? ` as ${query.status}` : ""}.
+        </div>
+      ) : null}
+
       <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div>
           <h2 className="text-base font-semibold text-slate-950">
@@ -389,6 +446,130 @@ export default async function DispatchDetailPage({
           </HandoffItem>
         </div>
       </div>
+
+      {isDealerRoute && dealerDispatchGroupCount > 1 ? (
+        <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">
+              Dealer group movement
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Update movement for this dealer order together instead of opening
+              each serial-numbered dispatch row.
+            </p>
+          </div>
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <span className="font-semibold text-slate-950">
+              {dealerDispatchGroupCount}
+            </span>{" "}
+            active devices in this dealer order.{" "}
+            <span className="font-semibold text-slate-950">
+              {dealerDispatchGroupMovableCount}
+            </span>{" "}
+            still available for movement update.
+          </div>
+          {dealerDispatchGroupUnpaidCount > 0 ? (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+              Accounts must confirm payment for all devices first.{" "}
+              {dealerDispatchGroupUnpaidCount} device
+              {dealerDispatchGroupUnpaidCount === 1 ? "" : "s"} still pending.
+            </p>
+          ) : showDealerGroupLogistics ? (
+            <form action={dealerGroupLogisticsAction} className="mt-4 space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-700">
+                    Mark group as
+                  </span>
+                  <select
+                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                    defaultValue="Delivered"
+                    name="dispatch_status"
+                  >
+                    <option value="Dispatched">Dispatched</option>
+                    <option value="Delivered">Delivered</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-700">
+                    Dispatch date
+                  </span>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                    defaultValue={dispatch.dispatch_date ?? today}
+                    name="dispatch_date"
+                    type="date"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-700">
+                    Delivered date
+                  </span>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                    defaultValue={dispatch.delivered_date ?? today}
+                    name="delivered_date"
+                    type="date"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-700">
+                    Transport
+                  </span>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                    defaultValue={dispatch.courier_or_transport_name ?? ""}
+                    name="courier_or_transport_name"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-700">
+                    Dispatch reference
+                  </span>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                    defaultValue={dispatch.dispatch_reference_number ?? ""}
+                    name="dispatch_reference_number"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-700">
+                    Expected delivery
+                  </span>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                    defaultValue={dispatch.expected_delivery_date ?? ""}
+                    name="expected_delivery_date"
+                    type="date"
+                  />
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-700">
+                  Delivery remarks
+                </span>
+                <textarea
+                  className="mt-1 min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                  defaultValue={dispatch.delivery_remarks ?? ""}
+                  name="delivery_remarks"
+                />
+              </label>
+              <button
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
+                type="submit"
+              >
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                Update dealer group
+              </button>
+            </form>
+          ) : (
+            <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+              This dealer order has no remaining devices available for group
+              movement.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <DetailItem label="Dispatch code" value={dispatch.dispatch_code} />
