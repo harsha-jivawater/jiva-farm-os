@@ -27,8 +27,14 @@ import { PilotStatusPill } from "@/components/pilots/pilot-status-pill";
 import { formatDisplayDateTime } from "@/lib/date-utils";
 import { exportLink } from "@/lib/export/csv";
 import {
+  activePilotStatusValues,
+  activePlannedVisitStatusValues,
   cropOptions,
+  isPlannedVisitPilotCardFilter,
   labelFor,
+  pilotCardFilterLabel,
+  pilotCardFilterValue,
+  type PilotCardFilterValue,
   pilotResultStatusOptions,
   pilotStatusOptions,
   pilotTypeOptions
@@ -47,7 +53,12 @@ import { logPerf, logSupabaseError, perfStart, timeAsync } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
-import { canDownloadCsv, canWriteModule, isAdmin } from "@/lib/users/permissions";
+import {
+  canDownloadCsv,
+  canWriteModule,
+  hasAnyRole,
+  isAdmin
+} from "@/lib/users/permissions";
 import { pilotScope } from "@/lib/users/record-scope";
 import {
   DISTRICTS_BY_STATE,
@@ -115,6 +126,36 @@ const defaultKpis: PilotKpis = {
   scaleUp: 0,
   successful: 0
 };
+
+const pilotOwnerRoles = ["Agronomist", "Research Assistant", "R&D Head"] as const;
+const roleFilterConfigs = [
+  {
+    label: "All pilot owners",
+    name: "pilot_owner_user_id",
+    roles: pilotOwnerRoles
+  },
+  {
+    label: "All research assistants",
+    name: "research_assistant_user_id",
+    roles: ["Research Assistant"] as const
+  },
+  {
+    label: "All agronomists",
+    name: "agronomist_user_id",
+    roles: ["Agronomist"] as const
+  },
+  {
+    label: "All R&D Heads",
+    name: "rd_head_user_id",
+    roles: ["R&D Head"] as const
+  }
+] as const;
+const roleSortOrder = new Map(
+  ["R&D Head", "Agronomist", "Research Assistant"].map((role, index) => [
+    role,
+    index
+  ])
+);
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -195,27 +236,172 @@ function readKpis(value: unknown): PilotKpis {
   };
 }
 
+function urlSearchParamsWithout(
+  searchParams: Record<string, string | string[] | undefined>,
+  excludedParams: readonly string[]
+) {
+  const params = new URLSearchParams();
+  const excluded = new Set(excludedParams);
+
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (excluded.has(key) || value === undefined) {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item) {
+          params.append(key, item);
+        }
+      }
+      continue;
+    }
+
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  return params;
+}
+
+function pilotCardHref(
+  searchParams: Record<string, string | string[] | undefined>,
+  cardFilter: PilotCardFilterValue | ""
+) {
+  const params = urlSearchParamsWithout(searchParams, ["card_filter", "page"]);
+
+  if (cardFilter) {
+    params.set("card_filter", cardFilter);
+  }
+
+  const query = params.toString();
+  return query ? `/pilots?${query}` : "/pilots";
+}
+
+function addDays(dateValue: string, days: number) {
+  const date = new Date(`${dateValue}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function roleSortValue(user: UserOption) {
+  const roles = [user.role, user.secondary_role].filter(Boolean) as string[];
+  const matchedRanks = roles
+    .map((role) => roleSortOrder.get(role))
+    .filter((rank) => rank !== undefined) as number[];
+
+  return matchedRanks.length ? Math.min(...matchedRanks) : roleSortOrder.size;
+}
+
+function roleLabel(user: UserOption) {
+  const roles = [user.role, user.secondary_role].filter(Boolean) as string[];
+  return Array.from(new Set(roles)).map(labelForRole).join(" / ");
+}
+
+function usersForRoles(
+  users: UserOption[],
+  roles: readonly string[]
+) {
+  return users
+    .filter((user) => hasAnyRole(user, roles))
+    .sort(
+      (first, second) =>
+        roleSortValue(first) - roleSortValue(second) ||
+        first.full_name.localeCompare(second.full_name)
+    );
+}
+
+async function getPlannedVisitPilotIdsForCard(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  cardFilter: PilotCardFilterValue,
+  today: string
+) {
+  let query = supabase
+    .from("planned_pilot_visits")
+    .select("pilot_id")
+    .is("deleted_at", null)
+    .not("pilot_id", "is", null);
+
+  if (cardFilter !== "total_planned_visits") {
+    if (cardFilter === "planned_visits_completed") {
+      query = query.eq("planned_visit_status", "Completed");
+    } else {
+      query = query
+        .is("linked_visit_report_id", null)
+        .in("planned_visit_status", [...activePlannedVisitStatusValues]);
+    }
+  }
+
+  if (cardFilter === "upcoming_visits") {
+    query = query.gt("planned_visit_date", today);
+  } else if (cardFilter === "visits_due_this_week") {
+    query = query
+      .gte("planned_visit_date", today)
+      .lte("planned_visit_date", addDays(today, 7));
+  } else if (cardFilter === "overdue_visits") {
+    query = query.lt("planned_visit_date", today);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    return { error, pilotIds: [] };
+  }
+
+  return {
+    error: null,
+    pilotIds: Array.from(
+      new Set((data ?? []).map((visit) => visit.pilot_id).filter(Boolean))
+    ) as string[]
+  };
+}
+
 function KpiCard({
   icon: Icon,
   label,
-  value
+  value,
+  href,
+  isActive = false
 }: {
+  href: string;
   icon: LucideIcon;
+  isActive?: boolean;
   label: string;
   value: number | null;
 }) {
+  const className = [
+    "block rounded-lg border p-4 shadow-sm outline-none transition",
+    "hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md",
+    "focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2",
+    isActive
+      ? "border-brand-500 bg-emerald-50 ring-1 ring-brand-500"
+      : "border-slate-200 bg-white"
+  ].join(" ");
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <Link
+      aria-current={isActive ? "true" : undefined}
+      className={className}
+      href={href}
+      prefetch={false}
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-slate-500">{label}</p>
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+        <span
+          className={`flex h-9 w-9 items-center justify-center rounded-md ${
+            isActive
+              ? "bg-brand-100 text-brand-700"
+              : "bg-slate-100 text-slate-600"
+          }`}
+        >
           <Icon className="h-4 w-4" aria-hidden="true" />
         </span>
       </div>
       <p className="mt-3 text-2xl font-semibold text-slate-950">
         {value === null ? "Unavailable" : value}
       </p>
-    </div>
+    </Link>
   );
 }
 
@@ -254,6 +440,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   const filters = readFilters(params);
   const pagination = getPaginationRange(getPageNumber(params.page));
   const cleanedSearch = searchValue(filters.q);
+  const today = new Date().toISOString().slice(0, 10);
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/pilots");
   const canViewDeletedRecords = isAdmin(currentUser);
@@ -261,6 +448,10 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
     canViewDeletedRecords && paramValue(params.record_state) === "deleted"
       ? "deleted"
       : "active";
+  const cardFilter =
+    recordState === "active"
+      ? pilotCardFilterValue(paramValue(params.card_filter))
+      : "";
   const { canWrite, scope } = await timeAsync(
     "pilots role/permission resolution",
     async () => ({
@@ -373,6 +564,39 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
     query = query.eq("scale_up_recommended", false);
   }
 
+  let cardFilterErrorMessage = "";
+
+  if (cardFilter) {
+    if (isPlannedVisitPilotCardFilter(cardFilter)) {
+      const { error: cardFilterError, pilotIds } =
+        await getPlannedVisitPilotIdsForCard(supabase, cardFilter, today);
+
+      if (cardFilterError) {
+        cardFilterErrorMessage = "Could not apply the selected card filter.";
+        logSupabaseError("Pilots card filter unavailable", cardFilterError);
+        query = query.is("id", null);
+      } else if (pilotIds.length) {
+        query = query.in("id", pilotIds);
+      } else {
+        query = query.is("id", null);
+      }
+    } else if (cardFilter === "active_pilots") {
+      query = query.in("pilot_status", [...activePilotStatusValues]);
+    } else if (cardFilter === "device_installed") {
+      query = query.eq("installation_completed", true);
+    } else if (cardFilter === "visit_report_pending") {
+      query = query.eq("pilot_status", "Visit Report Pending");
+    } else if (cardFilter === "final_report_pending") {
+      query = query.eq("pilot_status", "Final Report Pending");
+    } else if (cardFilter === "final_report_reviewed") {
+      query = query.eq("pilot_status", "Final Report Reviewed");
+    } else if (cardFilter === "scale_up_recommended") {
+      query = query.eq("scale_up_recommended", true);
+    } else if (cardFilter === "closed_successful") {
+      query = query.eq("pilot_status", "Closed - Successful");
+    }
+  }
+
   query = query.range(pagination.from, pagination.to);
 
   const { data, error, count } = await timeAsync(
@@ -385,6 +609,12 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   const institutionsList = (institutions ?? []) as PilotInstitutionOption[];
   const dealersList = (dealers ?? []) as PilotDealerOption[];
   const userMap = new Map(usersList.map((user) => [user.id, user]));
+  const usersByRoleFilter = new Map(
+    roleFilterConfigs.map((config) => [
+      config.name,
+      usersForRoles(usersList, config.roles)
+    ])
+  );
   const institutionMap = new Map(
     institutionsList.map((institution) => [institution.id, institution])
   );
@@ -395,10 +625,28 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   }
 
   const kpis = readKpis(kpiResult.data);
-  const today = new Date().toISOString().slice(0, 10);
   const { data: plannedVisitSummaryData, error: plannedVisitSummaryError } =
     await timeAsync("pilots planned visit summary rpc", () =>
-      supabase.rpc("get_visible_planned_visit_counts", { p_today: today })
+      supabase.rpc("get_visible_planned_visit_counts", {
+        p_today: today,
+        p_q: cleanedSearch || null,
+        p_pilot_type: filters.pilot_type || null,
+        p_pilot_status: filters.pilot_status || null,
+        p_pilot_result_status: filters.pilot_result_status || null,
+        p_crop: filters.crop || null,
+        p_state: filters.state || null,
+        p_district: filters.district || null,
+        p_pilot_owner_user_id: filters.pilot_owner_user_id || null,
+        p_research_assistant_user_id:
+          filters.research_assistant_user_id || null,
+        p_agronomist_user_id: filters.agronomist_user_id || null,
+        p_rd_head_user_id: filters.rd_head_user_id || null,
+        p_institution_id: filters.institution_id || null,
+        p_dealer_id: filters.dealer_id || null,
+        p_scale_up_recommended: scaleUpFilterValue(
+          filters.scale_up_recommended
+        )
+      })
     );
   const plannedVisitSummary = plannedVisitSummaryData as Record<
     string,
@@ -416,6 +664,12 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
 
   const canExportCsv = canDownloadCsv(currentUser);
   const csvExportHref = exportLink("/pilots/export", params);
+  const activeCardFilterLabel = cardFilter
+    ? pilotCardFilterLabel(cardFilter)
+    : "";
+  const clearCardFilterHref = pilotCardHref(params, "");
+  const cardHref = (nextCardFilter: PilotCardFilterValue) =>
+    pilotCardHref(params, cardFilter === nextCardFilter ? "" : nextCardFilter);
 
   logPerf("pilots page total server render", startedAt);
 
@@ -468,70 +722,127 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
 
       {recordState === "active" ? (
       <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard icon={Microscope} label="Total Pilots" value={kpis.total} />
-        <KpiCard icon={ClipboardList} label="Active Pilots" value={kpis.active} />
-        <KpiCard icon={Wrench} label="Device Installed" value={kpis.installed} />
         <KpiCard
+          href={clearCardFilterHref}
+          icon={Microscope}
+          label="Total Pilots"
+          value={kpis.total}
+        />
+        <KpiCard
+          href={cardHref("active_pilots")}
+          icon={ClipboardList}
+          isActive={cardFilter === "active_pilots"}
+          label="Active Pilots"
+          value={kpis.active}
+        />
+        <KpiCard
+          href={cardHref("device_installed")}
+          icon={Wrench}
+          isActive={cardFilter === "device_installed"}
+          label="Device Installed"
+          value={kpis.installed}
+        />
+        <KpiCard
+          href={cardHref("visit_report_pending")}
           icon={FileClock}
+          isActive={cardFilter === "visit_report_pending"}
           label="Visit Report Pending"
           value={kpis.visitPending}
         />
         <KpiCard
+          href={cardHref("final_report_pending")}
           icon={FileClock}
+          isActive={cardFilter === "final_report_pending"}
           label="Final Report Pending"
           value={kpis.finalPending}
         />
         <KpiCard
+          href={cardHref("final_report_reviewed")}
           icon={FileSearch}
+          isActive={cardFilter === "final_report_reviewed"}
           label="Final Report Reviewed"
           value={kpis.finalReviewed}
         />
         <KpiCard
+          href={cardHref("scale_up_recommended")}
           icon={TrendingUp}
+          isActive={cardFilter === "scale_up_recommended"}
           label="Scale-up Recommended"
           value={kpis.scaleUp}
         />
         <KpiCard
+          href={cardHref("closed_successful")}
           icon={CheckCircle2}
+          isActive={cardFilter === "closed_successful"}
           label="Closed Successful"
           value={kpis.successful}
         />
         <KpiCard
+          href={cardHref("total_planned_visits")}
           icon={CalendarCheck2}
+          isActive={cardFilter === "total_planned_visits"}
           label="Total Planned Visits"
           value={plannedVisitCount("total")}
         />
         <KpiCard
+          href={cardHref("upcoming_visits")}
           icon={CalendarClock}
+          isActive={cardFilter === "upcoming_visits"}
           label="Upcoming Visits"
           value={plannedVisitCount("upcoming")}
         />
         <KpiCard
+          href={cardHref("visits_due_this_week")}
           icon={CalendarCheck2}
+          isActive={cardFilter === "visits_due_this_week"}
           label="Visits Due This Week"
           value={plannedVisitCount("dueWeek")}
         />
         <KpiCard
+          href={cardHref("overdue_visits")}
           icon={AlertTriangle}
+          isActive={cardFilter === "overdue_visits"}
           label="Overdue Visits"
           value={plannedVisitCount("overdue")}
         />
         <KpiCard
+          href={cardHref("planned_visit_reports_pending")}
           icon={FileClock}
+          isActive={cardFilter === "planned_visit_reports_pending"}
           label="Planned Visit Reports Pending"
           value={plannedVisitCount("pendingReport")}
         />
         <KpiCard
+          href={cardHref("planned_visits_completed")}
           icon={CheckCircle2}
+          isActive={cardFilter === "planned_visits_completed"}
           label="Planned Visits Completed"
           value={plannedVisitCount("completed")}
         />
       </div>
       ) : null}
 
+      {cardFilter ? (
+        <div className="mt-4 flex flex-col gap-3 rounded-lg border border-brand-200 bg-emerald-50 px-4 py-3 text-sm text-brand-800 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-medium">
+            Filtered by {activeCardFilterLabel}
+          </p>
+          <Link
+            className="inline-flex min-h-9 items-center justify-center rounded-md border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 shadow-sm hover:bg-brand-50"
+            href={clearCardFilterHref}
+            prefetch={false}
+          >
+            Clear card filter
+          </Link>
+        </div>
+      ) : null}
+
       <LiveFilterForm
         className="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
       >
+        {cardFilter ? (
+          <input name="card_filter" type="hidden" value={cardFilter} />
+        ) : null}
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
           Search and filters
@@ -575,12 +886,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
             <option value="">All districts</option>
             {districtOptions.map((district) => <option key={district} value={district}>{district}</option>)}
           </select>
-          {[
-            ["pilot_owner_user_id", "All pilot owners"],
-            ["research_assistant_user_id", "All research assistants"],
-            ["agronomist_user_id", "All agronomists"],
-            ["rd_head_user_id", "All R&D Heads"]
-          ].map(([name, label]) => (
+          {roleFilterConfigs.map(({ name, label }) => (
             <select
               className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
               defaultValue={filters[name as keyof PilotFilters]}
@@ -588,9 +894,9 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
               name={name}
             >
               <option value="">{label}</option>
-              {usersList.map((user) => (
+              {(usersByRoleFilter.get(name) ?? []).map((user) => (
                 <option key={user.id} value={user.id}>
-                  {user.full_name} · {labelForRole(user.role)}
+                  {user.full_name} · {roleLabel(user)}
                 </option>
               ))}
             </select>
@@ -634,8 +940,10 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
           <p className="text-sm font-semibold text-slate-900">
             {totalCount} pilots
           </p>
-          {error ? (
-            <p className="text-sm font-medium text-red-600">{error.message}</p>
+          {error || cardFilterErrorMessage ? (
+            <p className="text-sm font-medium text-red-600">
+              {error?.message ?? cardFilterErrorMessage}
+            </p>
           ) : null}
         </div>
         <div className="overflow-x-auto">
@@ -731,8 +1039,9 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
                     className="px-4 py-10 text-center text-sm text-slate-500"
                     colSpan={13}
                   >
-                    No pilots match these filters. Reset filters or add a Pilot
-                    after selecting an eligible Farmer Lead.
+                    {cardFilter
+                      ? "No pilots match this card and filter selection."
+                      : "No pilots match these filters. Reset filters or add a Pilot after selecting an eligible Farmer Lead."}
                   </td>
                 </tr>
               ) : null}

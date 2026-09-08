@@ -3380,6 +3380,20 @@ export type Database = {
       get_visible_planned_visit_counts: {
         Args: {
           p_today: string;
+          p_q?: string | null;
+          p_pilot_type?: string | null;
+          p_pilot_status?: string | null;
+          p_pilot_result_status?: string | null;
+          p_crop?: string | null;
+          p_state?: string | null;
+          p_district?: string | null;
+          p_pilot_owner_user_id?: string | null;
+          p_research_assistant_user_id?: string | null;
+          p_agronomist_user_id?: string | null;
+          p_rd_head_user_id?: string | null;
+          p_institution_id?: string | null;
+          p_dealer_id?: string | null;
+          p_scale_up_recommended?: boolean | null;
         };
         Returns: Json;
       };
