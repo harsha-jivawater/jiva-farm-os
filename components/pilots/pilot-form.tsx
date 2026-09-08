@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowLeft, Info, Save } from "lucide-react";
+import { ArrowLeft, Info, Save, Search } from "lucide-react";
 import { CustomCropFields } from "@/components/crops/custom-crop-fields";
 import { CropSelect } from "@/components/crops/crop-select";
 import { PlannedVisitForm } from "@/components/pilots/planned-visit-form";
@@ -426,6 +426,21 @@ function farmerLabel(farmerLead: PilotFarmerLeadOption) {
   return `${farmerLead.lead_code} · ${farmerLead.farmer_name} · ${farmerLead.mobile_number}`;
 }
 
+function farmerSearchText(farmerLead: PilotFarmerLeadOption) {
+  return [
+    farmerLead.farmer_name,
+    farmerLead.mobile_number,
+    farmerLead.lead_code,
+    farmerLead.village,
+    farmerLead.district,
+    farmerLead.state,
+    farmerLead.primary_crop
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 function deviceLabel(device: PilotDeviceOption) {
   const code = device.device_code ? ` · ${device.device_code}` : "";
   return `${device.serial_number}${code} · ${device.product_model} · ${device.device_status}`;
@@ -493,6 +508,7 @@ export function PilotForm({
   const [selectedFarmerLeadId, setSelectedFarmerLeadId] = useState(
     pilot?.farmer_lead_id ?? initialFarmer?.id ?? ""
   );
+  const [farmerLeadSearch, setFarmerLeadSearch] = useState("");
   const [selectedDeviceId, setSelectedDeviceId] = useState(
     pilot?.device_id ?? initialDevice?.id ?? ""
   );
@@ -577,6 +593,34 @@ export function PilotForm({
     [pilot?.treatment_plot_description, pilot?.control_plot_description]
       .filter(Boolean)
       .join("\n\n");
+  const normalizedFarmerLeadSearch = farmerLeadSearch.trim().toLowerCase();
+  const matchingFarmerLeadOptions = useMemo(() => {
+    if (!normalizedFarmerLeadSearch) {
+      return farmerLeads;
+    }
+
+    return farmerLeads.filter((farmerLead) =>
+      farmerSearchText(farmerLead).includes(normalizedFarmerLeadSearch)
+    );
+  }, [farmerLeads, normalizedFarmerLeadSearch]);
+  const visibleFarmerLeadOptions = useMemo(() => {
+    if (
+      selectedFarmerLeadId &&
+      !matchingFarmerLeadOptions.some(
+        (farmerLead) => farmerLead.id === selectedFarmerLeadId
+      )
+    ) {
+      const selectedFarmerLead = farmerLeads.find(
+        (farmerLead) => farmerLead.id === selectedFarmerLeadId
+      );
+
+      if (selectedFarmerLead) {
+        return [selectedFarmerLead, ...matchingFarmerLeadOptions];
+      }
+    }
+
+    return matchingFarmerLeadOptions;
+  }, [farmerLeads, matchingFarmerLeadOptions, selectedFarmerLeadId]);
 
   function suggestName({
     nextDealerId = dealerId,
@@ -742,6 +786,28 @@ export function PilotForm({
         </h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
+            <div className="mb-3">
+              <label
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+                htmlFor="farmer_lead_search"
+              >
+                Search farmer lead
+              </label>
+              <span className="relative block">
+                <Search
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  className={`${inputClassName()} pl-9`}
+                  id="farmer_lead_search"
+                  onChange={(event) => setFarmerLeadSearch(event.target.value)}
+                  placeholder="Type farmer name, mobile, lead code, village, or crop"
+                  type="search"
+                  value={farmerLeadSearch}
+                />
+              </span>
+            </div>
             <label
               className="mb-1.5 block text-sm font-medium text-slate-700"
               htmlFor="farmer_lead_id"
@@ -757,7 +823,7 @@ export function PilotForm({
               value={selectedFarmerLeadId}
             >
               <option value="">Select Farmer Lead</option>
-              {farmerLeads.map((farmerLead) => (
+              {visibleFarmerLeadOptions.map((farmerLead) => (
                 <option key={farmerLead.id} value={farmerLead.id}>
                   {farmerLabel(farmerLead)}
                 </option>
@@ -766,7 +832,9 @@ export function PilotForm({
             <p className="mt-1 text-xs leading-5 text-slate-500">
               {farmerLeads.length === 0
                 ? "No eligible farmer leads found. Check lead status, funnel stage, or assignment."
-                : "Select a Farmer Lead to auto-fill farmer, crop, location, RSM, and linked institution or dealer details where available."}
+                : normalizedFarmerLeadSearch
+                  ? `Showing ${matchingFarmerLeadOptions.length} of ${farmerLeads.length} eligible farmer leads.`
+                  : "Select a Farmer Lead to auto-fill farmer, crop, location, RSM, and linked institution or dealer details where available."}
             </p>
           </div>
           <Field
