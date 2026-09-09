@@ -16,7 +16,6 @@ import type {
   MarketingAsset,
   MarketingAssetVersion
 } from "@/lib/marketing-assets/types";
-import { createClient } from "@/lib/supabase/client";
 import { uploadRules } from "@/lib/uploads/config";
 
 type MarketingAssetFormProps = {
@@ -187,6 +186,7 @@ export function MarketingAssetForm({
         throw new Error(payload.error ?? "The secure upload could not be started.");
       }
 
+      const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
       const uploadContentType =
         payload.contentType || file.type || "application/octet-stream";

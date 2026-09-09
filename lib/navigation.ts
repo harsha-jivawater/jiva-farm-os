@@ -17,6 +17,7 @@ import {
   Store,
   Tractor,
   Truck,
+  TrendingUp,
   type LucideIcon,
   UsersRound,
   Warehouse,
@@ -74,6 +75,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/dealers/reporting",
         module: "dealers",
         icon: BarChart3
+      },
+      {
+        label: "Sales",
+        href: "/sales",
+        module: "sales",
+        icon: TrendingUp
       },
       {
         label: "Institutional Partners",

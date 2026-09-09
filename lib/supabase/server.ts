@@ -1,9 +1,11 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { createServerClient, type SetAllCookies } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/database.types";
 import { requireSupabaseEnv } from "@/lib/supabase/env";
 
-export async function createClient() {
+// Reuse one client within a server render, never across users or requests.
+export const createClient = cache(async function createClient() {
   const { url, anonKey } = requireSupabaseEnv();
   const cookieStore = await cookies();
   const setAllCookies: SetAllCookies = (cookiesToSet) => {
@@ -24,4 +26,4 @@ export async function createClient() {
       setAll: setAllCookies
     }
   });
-}
+});

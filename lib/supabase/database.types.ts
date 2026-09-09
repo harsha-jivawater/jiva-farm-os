@@ -9,6 +9,34 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      sales_targets: {
+        Row: {
+          id: string; month_start: string; owner_type: string; owner_user_id: string;
+          target_devices: number; status: string; notes: string | null; created_by_user_id: string;
+          approved_by_user_id: string | null; approved_at: string | null; rejection_reason: string | null;
+          created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; month_start: string; owner_type: string; owner_user_id: string;
+          target_devices: number; status?: string; notes?: string | null; created_by_user_id: string;
+          approved_by_user_id?: string | null; approved_at?: string | null; rejection_reason?: string | null;
+          created_at?: string; updated_at?: string;
+        };
+        Update: { id?: string; month_start?: string; owner_type?: string; owner_user_id?: string; target_devices?: number; status?: string; notes?: string | null; created_by_user_id?: string; approved_by_user_id?: string | null; approved_at?: string | null; rejection_reason?: string | null; created_at?: string; updated_at?: string; };
+        Relationships: [];
+      };
+      sales_forecast_overrides: {
+        Row: { id: string; month_start: string; entity_type: string; entity_id: string; category: string; expected_devices: number; assigned_by_user_id: string; created_at: string; updated_at: string; };
+        Insert: { id?: string; month_start: string; entity_type: string; entity_id: string; category: string; expected_devices: number; assigned_by_user_id: string; created_at?: string; updated_at?: string; };
+        Update: { id?: string; month_start?: string; entity_type?: string; entity_id?: string; category?: string; expected_devices?: number; assigned_by_user_id?: string; created_at?: string; updated_at?: string; };
+        Relationships: [];
+      };
+      sales_forecast_snapshots: {
+        Row: { id: string; month_start: string; snapshot: Json; created_by_user_id: string; created_at: string; };
+        Insert: { id?: string; month_start: string; snapshot: Json; created_by_user_id: string; created_at?: string; };
+        Update: { id?: string; month_start?: string; snapshot?: Json; created_by_user_id?: string; created_at?: string; };
+        Relationships: [];
+      };
       sales_payment_links: {
         Row: {
           id: string;
@@ -3267,6 +3295,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      get_sales_forecast_summary: {
+        Args: { p_month_start: string };
+        Returns: Json;
+      };
       record_marketing_asset_share_access: {
         Args: { p_token_hash: string };
         Returns: string | null;
