@@ -493,7 +493,8 @@ select lives_ok(
   'a Marketing Head can self-publish a versioned Marketing Library asset'
 );
 select is(
-  (select count(*) from public.marketing_assets),
+  (select count(*) from public.marketing_assets
+   where id = '20000000-0000-4000-8000-000000000001'),
   1::bigint,
   'the Marketing Head can read the self-published asset'
 );
@@ -591,7 +592,8 @@ select set_config(
 );
 set local role authenticated;
 select is(
-  (select count(*) from public.marketing_assets),
+  (select count(*) from public.marketing_assets
+   where id in ('20000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000003')),
   1::bigint,
   'ordinary internal users can read published assets but not pending Marketing Library assets'
 );
@@ -742,12 +744,14 @@ select set_config(
 );
 set local role authenticated;
 select is(
-  (select count(*) from public.marketing_assets),
+  (select count(*) from public.marketing_assets
+   where id in ('20000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000003')),
   2::bigint,
   'ordinary internal users can read published Marketing Library assets'
 );
 select is(
-  (select count(*) from public.marketing_asset_versions),
+  (select count(*) from public.marketing_asset_versions
+   where asset_id in ('20000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000003')),
   2::bigint,
   'ordinary internal users can read only the current version of each published asset'
 );

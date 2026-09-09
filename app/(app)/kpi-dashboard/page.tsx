@@ -1941,16 +1941,18 @@ export default async function KpiDashboardPage({
   const shouldUseLiveRsmSummary =
     hasRole(currentUser, "RSM") &&
     !hasAnyRole(currentUser, ["Admin", "Management", "Sales Head"]);
-  const sectorPerformance = await timeAsync(
-    "kpi dashboard sector performance",
-    () => loadSectorPerformance(supabase, filters)
-  );
-
-  if (shouldUseLiveRsmSummary) {
-    const { data: liveSummaryData, error: liveSummaryError } = await timeAsync(
-      "kpi dashboard rsm live summary rpc",
+  const [sectorPerformance, summaryResult] = await Promise.all([
+    timeAsync("kpi dashboard sector performance", () =>
+      loadSectorPerformance(supabase, filters)
+    ),
+    timeAsync(
+      shouldUseLiveRsmSummary
+        ? "kpi dashboard rsm live summary rpc"
+        : "kpi dashboard cached summary rpc",
       () =>
-        supabase.rpc("get_kpi_dashboard_summary", {
+        supabase.rpc(shouldUseLiveRsmSummary
+          ? "get_kpi_dashboard_summary"
+          : "get_cached_kpi_dashboard_summary", {
           p_start_date: filters.startDate,
           p_end_date: filters.endDate,
           p_state: filters.state || null,
@@ -1959,7 +1961,11 @@ export default async function KpiDashboardPage({
           p_product_model: filters.productModel || null,
           p_crop: filters.crop || null
         })
-    );
+    )
+  ]);
+
+  if (shouldUseLiveRsmSummary) {
+    const { data: liveSummaryData, error: liveSummaryError } = summaryResult;
 
     if (liveSummaryError) {
       console.error("[KPI Dashboard] RSM live summary RPC unavailable", liveSummaryError);
@@ -2001,19 +2007,7 @@ export default async function KpiDashboardPage({
     );
   }
 
-  const { data: summaryData, error: summaryError } = await timeAsync(
-    "kpi dashboard cached summary rpc",
-    () =>
-      supabase.rpc("get_cached_kpi_dashboard_summary", {
-        p_start_date: filters.startDate,
-        p_end_date: filters.endDate,
-        p_state: filters.state || null,
-        p_region_id: filters.regionId || null,
-        p_rsm_user_id: filters.rsmUserId || null,
-        p_product_model: filters.productModel || null,
-        p_crop: filters.crop || null
-      })
-  );
+  const { data: summaryData, error: summaryError } = summaryResult;
 
   if (summaryError) {
     console.error("[KPI Dashboard] Cached summary RPC unavailable", summaryError);

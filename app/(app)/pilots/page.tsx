@@ -415,12 +415,7 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
       ? DISTRICTS_BY_STATE[filters.state as keyof typeof DISTRICTS_BY_STATE]
       : [];
 
-  const [
-    { data: users },
-    { data: institutions },
-    { data: dealers },
-    kpiResult
-  ] = await timeAsync("pilots option and kpi queries", () =>
+  const loadOptionsAndKpis = () => timeAsync("pilots option and kpi queries", () =>
     Promise.all([
       timeAsync("pilots users query", () =>
         supabase
@@ -517,51 +512,81 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
 
   let cardFilterErrorMessage = "";
 
-  if (cardFilter) {
-    if (isRelationalPilotCardFilter(cardFilter)) {
-      const { error: cardFilterError, pilotIds } =
-        await getRelationalPilotIdsForCard(supabase, cardFilter, today);
+  const loadList = async () => {
+    if (cardFilter) {
+      if (isRelationalPilotCardFilter(cardFilter)) {
+        const { error: cardFilterError, pilotIds } =
+          await getRelationalPilotIdsForCard(supabase, cardFilter, today);
 
-      if (isMonitoringPilotCardFilter(cardFilter)) {
-        query = query.in("pilot_status", [
-          ...monitoringActivePilotStatusValues
-        ]);
-      }
+        if (isMonitoringPilotCardFilter(cardFilter)) {
+          query = query.in("pilot_status", [
+            ...monitoringActivePilotStatusValues
+          ]);
+        }
 
-      if (cardFilterError) {
-        cardFilterErrorMessage = "Could not apply the selected card filter.";
-        logSupabaseError("Pilots card filter unavailable", cardFilterError);
-        query = query.is("id", null);
-      } else if (pilotIds.length) {
-        query = query.in("id", pilotIds);
-      } else {
-        query = query.is("id", null);
+        if (cardFilterError) {
+          cardFilterErrorMessage = "Could not apply the selected card filter.";
+          logSupabaseError("Pilots card filter unavailable", cardFilterError);
+          query = query.is("id", null);
+        } else if (pilotIds.length) {
+          query = query.in("id", pilotIds);
+        } else {
+          query = query.is("id", null);
+        }
+      } else if (cardFilter === "active_pilots") {
+        query = query.in("pilot_status", [...activePilotStatusValues]);
+      } else if (cardFilter === "monitoring_active_pilots") {
+        query = query.in("pilot_status", [...monitoringActivePilotStatusValues]);
+      } else if (cardFilter === "device_installed") {
+        query = query.eq("installation_completed", true);
+      } else if (cardFilter === "visit_report_pending") {
+        query = query.eq("pilot_status", "Visit Report Pending");
+      } else if (cardFilter === "final_report_pending") {
+        query = query.eq("pilot_status", "Final Report Pending");
+      } else if (cardFilter === "final_report_reviewed") {
+        query = query.eq("pilot_status", "Final Report Reviewed");
+      } else if (cardFilter === "scale_up_recommended") {
+        query = query.eq("scale_up_recommended", true);
+      } else if (cardFilter === "closed_successful") {
+        query = query.eq("pilot_status", "Closed - Successful");
       }
-    } else if (cardFilter === "active_pilots") {
-      query = query.in("pilot_status", [...activePilotStatusValues]);
-    } else if (cardFilter === "monitoring_active_pilots") {
-      query = query.in("pilot_status", [...monitoringActivePilotStatusValues]);
-    } else if (cardFilter === "device_installed") {
-      query = query.eq("installation_completed", true);
-    } else if (cardFilter === "visit_report_pending") {
-      query = query.eq("pilot_status", "Visit Report Pending");
-    } else if (cardFilter === "final_report_pending") {
-      query = query.eq("pilot_status", "Final Report Pending");
-    } else if (cardFilter === "final_report_reviewed") {
-      query = query.eq("pilot_status", "Final Report Reviewed");
-    } else if (cardFilter === "scale_up_recommended") {
-      query = query.eq("scale_up_recommended", true);
-    } else if (cardFilter === "closed_successful") {
-      query = query.eq("pilot_status", "Closed - Successful");
     }
-  }
 
-  query = query.range(pagination.from, pagination.to);
+    query = query.range(pagination.from, pagination.to);
 
-  const { data, error, count } = await timeAsync(
-    "pilots list query",
-    () => query
-  );
+    return timeAsync("pilots list query", () => query);
+  };
+
+  const [
+    [{ data: users }, { data: institutions }, { data: dealers }, kpiResult],
+    { data, error, count },
+    { data: plannedVisitSummaryData, error: plannedVisitSummaryError }
+  ] = await Promise.all([
+    loadOptionsAndKpis(),
+    loadList(),
+    timeAsync("pilots planned visit summary rpc", () =>
+      supabase.rpc("get_visible_planned_visit_counts", {
+        p_today: today,
+        p_q: cleanedSearch || null,
+        p_pilot_type: filters.pilot_type || null,
+        p_pilot_status: filters.pilot_status || null,
+        p_pilot_result_status: filters.pilot_result_status || null,
+        p_crop: filters.crop || null,
+        p_state: filters.state || null,
+        p_district: filters.district || null,
+        p_pilot_owner_user_id: filters.pilot_owner_user_id || null,
+        p_research_assistant_user_id:
+          filters.research_assistant_user_id || null,
+        p_agronomist_user_id: filters.agronomist_user_id || null,
+        p_rd_head_user_id: filters.rd_head_user_id || null,
+        p_institution_id: filters.institution_id || null,
+        p_dealer_id: filters.dealer_id || null,
+        p_scale_up_recommended: scaleUpFilterValue(
+          filters.scale_up_recommended
+        )
+      })
+    )
+  ]);
   const pilots = (data ?? []) as unknown as Pilot[];
   const totalCount = count ?? pilots.length;
   const usersList = (users ?? []) as UserOption[];
@@ -584,29 +609,6 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
   }
 
   const kpis = readKpis(kpiResult.data);
-  const { data: plannedVisitSummaryData, error: plannedVisitSummaryError } =
-    await timeAsync("pilots planned visit summary rpc", () =>
-      supabase.rpc("get_visible_planned_visit_counts", {
-        p_today: today,
-        p_q: cleanedSearch || null,
-        p_pilot_type: filters.pilot_type || null,
-        p_pilot_status: filters.pilot_status || null,
-        p_pilot_result_status: filters.pilot_result_status || null,
-        p_crop: filters.crop || null,
-        p_state: filters.state || null,
-        p_district: filters.district || null,
-        p_pilot_owner_user_id: filters.pilot_owner_user_id || null,
-        p_research_assistant_user_id:
-          filters.research_assistant_user_id || null,
-        p_agronomist_user_id: filters.agronomist_user_id || null,
-        p_rd_head_user_id: filters.rd_head_user_id || null,
-        p_institution_id: filters.institution_id || null,
-        p_dealer_id: filters.dealer_id || null,
-        p_scale_up_recommended: scaleUpFilterValue(
-          filters.scale_up_recommended
-        )
-      })
-    );
   const plannedVisitSummary = plannedVisitSummaryData as Record<
     string,
     unknown

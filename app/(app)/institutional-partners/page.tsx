@@ -262,7 +262,7 @@ export default async function InstitutionalPartnersPage({
     })
   );
 
-  const [{ data: users }, kpiResult] = await timeAsync(
+  const loadOptionsAndKpis = () => timeAsync(
     "institution option and kpi queries",
     () =>
       Promise.all([
@@ -331,10 +331,10 @@ export default async function InstitutionalPartnersPage({
   query = applyLocationFilter(query, "primary_state", filters.primary_state);
   query = query.range(pagination.from, pagination.to);
 
-  const { data, error, count } = await timeAsync(
-    "institutional partners list query",
-    () => query
-  );
+  const [[{ data: users }, kpiResult], { data, error, count }] = await Promise.all([
+    loadOptionsAndKpis(),
+    timeAsync("institutional partners list query", () => query)
+  ]);
   const institutions = (data ?? []) as unknown as Institution[];
   const totalCount = count ?? institutions.length;
   const usersList = (users ?? []) as UserOption[];

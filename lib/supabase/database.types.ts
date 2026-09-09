@@ -3295,6 +3295,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      get_sales_forecast_summary: {
+        Args: { p_month_start: string };
+        Returns: Json;
+      };
       record_marketing_asset_share_access: {
         Args: { p_token_hash: string };
         Returns: string | null;

@@ -38,10 +38,21 @@ async function staticFilesSize(files) {
 
 const sharedSize = await staticFilesSize(buildManifest.rootMainFiles ?? []);
 const routeSizes = await Promise.all(
-  Object.entries(appBuildManifest.pages ?? {}).map(async ([route, files]) => ({
-    route,
-    size: await staticFilesSize(files)
-  }))
+  Object.entries(appBuildManifest.pages ?? {})
+    .filter(([route]) => route.endsWith("/page"))
+    .map(async ([route, files]) => {
+      const segments = route.split("/").filter(Boolean).slice(0, -1);
+      const layoutFiles = [];
+      for (let depth = 0; depth <= segments.length; depth += 1) {
+        const prefix = segments.slice(0, depth).join("/");
+        const layout = `${prefix ? `/${prefix}` : ""}/layout`;
+        layoutFiles.push(...(appBuildManifest.pages[layout] ?? []));
+      }
+      return {
+        route,
+        size: await staticFilesSize([...files, ...layoutFiles])
+      };
+    })
 );
 const largestRoute = routeSizes.sort((left, right) => right.size - left.size)[0];
 let middlewareSize = 0;

@@ -215,7 +215,7 @@ export default async function InstallationsPage({
   );
   const cleanedSearch = searchValue(filters.q);
 
-  const [{ data: users }, { data: regions }] = await timeAsync(
+  const loadOptions = () => timeAsync(
     "installations filter option queries",
     () =>
       Promise.all([
@@ -271,7 +271,8 @@ export default async function InstallationsPage({
   query = applyLocationFilter(query, "district", filters.district);
   query = query.range(pagination.from, pagination.to);
 
-  const [listResult, kpiResult] = await Promise.all([
+  const [[{ data: users }, { data: regions }], listResult, kpiResult] = await Promise.all([
+    loadOptions(),
     timeAsync("installations list query", () => query),
     timeAsync("installations kpi summary rpc", () =>
       supabase.rpc("get_installations_page_kpis", {
