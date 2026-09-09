@@ -23,6 +23,9 @@ Simple reverse chronological record of major Jiva Farm OS work.
 - Added unit coverage for financial-year periods, regional target totals,
   primary-sale qualification, dealer secondary-sales grouping, and
   sell-through.
+- Isolated Playwright's Chromium installation from the unrelated Google Chrome
+  apt source so transient package-mirror metadata cannot block integration
+  checks.
 
 ### Pilot device workflow
 
