@@ -19,6 +19,7 @@ import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
 import { rollupInstitutionSaleOrderStatus } from "@/lib/institutions/sale-orders";
 import { appSearchUrl, sendN8nEvent } from "@/lib/integrations/n8n";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 import {
   canConfirmPayment,
@@ -1442,6 +1443,15 @@ async function applyDispatchedSideEffects({
     redirectWithError(errorPath, deviceError.message);
   }
 
+  if (payload.destination_type === "Pilot") {
+    await syncPilotDeviceAssignment({
+      dispatchId,
+      device,
+      pilotId: toHolderId ?? null,
+      errorPath
+    });
+  }
+
   if (!createMovement) {
     return;
   }
@@ -1492,6 +1502,44 @@ function pilotDeviceDestinationSnapshot(
     holderName: pilot.farmer_name_snapshot,
     locationText: compactLocation(pilot.village, pilot.district, pilot.state)
   };
+}
+
+async function syncPilotDeviceAssignment({
+  dispatchId,
+  device,
+  pilotId,
+  errorPath
+}: {
+  dispatchId: string;
+  device: DispatchDeviceOption;
+  pilotId: string | null;
+  errorPath: string;
+}) {
+  if (!pilotId) {
+    redirectWithError(errorPath, "Pilot dispatch is missing its pilot link.");
+  }
+
+  // Stock / Dispatch can move stock but does not have general pilot update access.
+  const service = createServiceClient();
+  const { data, error } = await service
+    .from("pilots")
+    .update({
+      device_id: device.id,
+      device_serial_number_snapshot: device.serial_number,
+      dispatch_id: dispatchId
+    })
+    .eq("id", pilotId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    redirectWithError(errorPath, error.message);
+  }
+
+  if (!data) {
+    redirectWithError(errorPath, "The linked pilot could not be updated with its device.");
+  }
 }
 
 function institutionSaleDestinationSnapshot(

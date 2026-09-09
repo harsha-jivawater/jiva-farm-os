@@ -2,6 +2,40 @@
 
 Simple reverse chronological record of major Jiva Farm OS work.
 
+## 2026-09-09
+
+### Sales dashboard and targets
+
+- Replaced the Sales navigation-only page with an operational dashboard for
+  approved targets, actual primary sales, secondary sales, dealer stock,
+  sell-through, committed forecast, and pending approvals.
+- Added an Overall/RSM scope selector that updates every Sales dashboard
+  metric, the planned-versus-actual financial-year chart, and the dealer
+  secondary-sales table.
+- Added an editable April-to-March annual target matrix for Sales Head/Admin,
+  including a live annual total and support for both RSM and Sales Head direct
+  targets.
+- Added the supplied FY 2026-27 Karnataka and Tamil Nadu target presets. They
+  appear for a matching RSM only when no saved targets exist and become the
+  approved dashboard source after saving.
+- Kept RSM-created targets in the Sales Head approval workflow and preserved
+  the original submitter when an approved target is edited.
+- Added unit coverage for financial-year periods, regional target totals,
+  primary-sale qualification, dealer secondary-sales grouping, and
+  sell-through.
+
+### Pilot device workflow
+
+- Removed manual device selection from Pilot creation and editing. Stock /
+  Dispatch now assigns the serial-numbered device through a Pilot Dispatch.
+- Synchronized a dispatched pilot device back to the Pilot record and retained
+  dispatch serial-number fallbacks on Pilot details.
+- Allowed Research Assistants to record the pilot device installation date
+  while keeping installation-complete authority with Admin, R&D Head, and
+  Agronomist.
+- Increased the Pilot register width and made horizontal scrolling explicit so
+  every column remains accessible on narrower screens.
+
 ## 2026-09-08
 
 ### KPI Dashboard

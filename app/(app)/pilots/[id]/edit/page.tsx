@@ -12,7 +12,6 @@ import { PlannedVisitForm } from "@/components/pilots/planned-visit-form";
 import type {
   Pilot,
   PilotDealerOption,
-  PilotDeviceOption,
   PilotFarmerLeadOption,
   PilotInstitutionOption,
   RegionOption,
@@ -44,8 +43,6 @@ type EditPilotPageProps = {
   }>;
 };
 
-const deviceColumns =
-  "id, serial_number, device_code, product_model, device_status";
 const institutionColumns = "id, institution_code, organization_name";
 const dealerColumns = "id, dealer_code, dealer_name, firm_name";
 
@@ -75,7 +72,6 @@ export default async function EditPilotPage({
   const [
     { data: pilot, error },
     { data: farmerLeads, error: farmerLeadsError },
-    { data: devices },
     { data: users },
     { data: regions },
     { data: institutions },
@@ -84,12 +80,6 @@ export default async function EditPilotPage({
   ] = await Promise.all([
     pilotQuery.single(),
     loadPilotFarmerLeadOptions(supabase, { user: currentUser }),
-    supabase
-      .from("devices")
-      .select(deviceColumns)
-      .is("deleted_at", null)
-      .order("serial_number", { ascending: true })
-      .limit(200),
     supabase
       .from("users")
       .select("id, full_name, role, secondary_role")
@@ -130,12 +120,10 @@ export default async function EditPilotPage({
 
   const pilotRow = pilot as Pilot;
   let farmerLeadOptions = (farmerLeads ?? []) as PilotFarmerLeadOption[];
-  let deviceOptions = (devices ?? []) as PilotDeviceOption[];
   let institutionOptions = (institutions ?? []) as PilotInstitutionOption[];
   let dealerOptions = (dealers ?? []) as PilotDealerOption[];
   const [
     { data: selectedFarmerLead },
-    { data: selectedDevice },
     { data: selectedInstitution },
     { data: selectedDealer }
   ] = await Promise.all([
@@ -145,14 +133,6 @@ export default async function EditPilotPage({
           .from("farmer_leads")
           .select(pilotFarmerLeadOptionColumns)
           .eq("id", pilotRow.farmer_lead_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    pilotRow.device_id &&
-    !deviceOptions.some((device) => device.id === pilotRow.device_id)
-      ? supabase
-          .from("devices")
-          .select(deviceColumns)
-          .eq("id", pilotRow.device_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     pilotRow.institution_id &&
@@ -180,10 +160,6 @@ export default async function EditPilotPage({
       selectedFarmerLead as PilotFarmerLeadOption,
       ...farmerLeadOptions
     ];
-  }
-
-  if (selectedDevice) {
-    deviceOptions = [selectedDevice as PilotDeviceOption, ...deviceOptions];
   }
 
   if (selectedInstitution) {
@@ -232,7 +208,6 @@ export default async function EditPilotPage({
         action={updateAction}
         cancelHref={`/pilots/${pilotRow.id}`}
         dealers={dealerOptions}
-        devices={deviceOptions}
         error={
           query.error ??
           (farmerLeadsError

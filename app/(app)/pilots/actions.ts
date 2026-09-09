@@ -34,6 +34,7 @@ import {
 import { notifyPlannedVisitAssignment } from "@/lib/notifications/create";
 import { suggestedPilotNameFromContext } from "@/lib/pilots/name-suggestions";
 import { plannedVisitTypeToActualVisitType } from "@/lib/pilots/visit-planning";
+import { createServiceClient } from "@/lib/supabase/service";
 import type {
   DeviceStatusUpdateTaskInsert,
   Device,
@@ -78,6 +79,10 @@ const reportSubmitterRoles = [
 const finalPilotReportApproverRoles = ["R&D Head", "Admin"];
 const visitPlanManagerRoles = ["Agronomist", "R&D Head", "Admin"];
 const pilotDeviceInstallRoles = ["Admin", "R&D Head", "Agronomist"];
+const pilotDeviceInstallationDateRoles = [
+  ...pilotDeviceInstallRoles,
+  "Research Assistant"
+];
 const pilotCompletionRoles = ["Admin", "Management", "R&D Head", "Agronomist"];
 
 function plannedVisitNotificationDetails(visit: {
@@ -284,6 +289,15 @@ function canManagePilotDeviceInstall(
   return hasAnyRole(profile, pilotDeviceInstallRoles);
 }
 
+function canManagePilotDeviceInstallationDate(
+  profile:
+    | Pick<InternalUser, "role" | "secondary_role">
+    | null
+    | undefined
+) {
+  return hasAnyRole(profile, pilotDeviceInstallationDateRoles);
+}
+
 function enforcePilotDeviceInstallAuthority({
   existingPilot,
   payload,
@@ -296,13 +310,17 @@ function enforcePilotDeviceInstallAuthority({
   payload: PilotFormPayload;
   profile: Pick<InternalUser, "role" | "secondary_role">;
 }) {
+  const canManageInstallationDate = canManagePilotDeviceInstallationDate(profile);
+
   if (canManagePilotDeviceInstall(profile)) {
     return;
   }
 
   if (existingPilot) {
     payload.installation_completed = existingPilot.installation_completed;
-    payload.device_installation_date = existingPilot.device_installation_date;
+    if (!canManageInstallationDate) {
+      payload.device_installation_date = existingPilot.device_installation_date;
+    }
 
     if (
       existingPilot.pilot_status === "Device Installed" ||
@@ -315,7 +333,9 @@ function enforcePilotDeviceInstallAuthority({
   }
 
   payload.installation_completed = false;
-  payload.device_installation_date = null;
+  if (!canManageInstallationDate) {
+    payload.device_installation_date = null;
+  }
 
   if (payload.pilot_status === "Device Installed") {
     payload.pilot_status = defaultPilotStatus;
@@ -610,8 +630,28 @@ async function applyPilotCompletionSideEffects({
   errorPath: string;
 }) {
   const completionDate = todayDate();
-  const deviceId = payload.device_id ?? pilot.device_id;
+  let deviceId = payload.device_id ?? pilot.device_id;
   const farmerLeadId = payload.farmer_lead_id ?? pilot.farmer_lead_id;
+
+  if (!deviceId) {
+    const service = createServiceClient();
+    const { data: linkedDispatch, error: linkedDispatchError } = await service
+      .from("dispatches")
+      .select("device_id")
+      .is("deleted_at", null)
+      .neq("dispatch_status", "Cancelled")
+      .not("device_id", "is", null)
+      .or(`linked_pilot_id.eq.${pilot.id},destination_pilot_id.eq.${pilot.id}`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (linkedDispatchError) {
+      redirectWithError(errorPath, linkedDispatchError.message);
+    }
+
+    deviceId = linkedDispatch?.device_id ?? null;
+  }
 
   if (deviceId) {
     const { data: deviceData, error: deviceLoadError } = await supabase
@@ -1024,6 +1064,8 @@ export async function createPilotAction(formData: FormData) {
     payload,
     profile
   });
+  payload.device_id = null;
+  payload.device_serial_number_snapshot = null;
   const validationError = validatePilotPayload(payload);
   const initialVisitValidationError =
     initialPlannedVisits.map(validatePlannedPilotVisitPayload).find(Boolean) ??
@@ -1204,6 +1246,9 @@ export async function updatePilotAction(id: string, formData: FormData) {
     payload,
     profile
   });
+  payload.device_id = existingPilot.device_id;
+  payload.device_serial_number_snapshot =
+    existingPilot.device_serial_number_snapshot;
   const validationError = validatePilotPayload(payload);
   const farmerLeadId = payload.farmer_lead_id;
 

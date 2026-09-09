@@ -379,6 +379,8 @@ export default async function PilotDetailPage({
   const visitsList = (visits ?? []) as PilotVisit[];
   const reportsList = (reports ?? []) as VisitReport[];
   const dispatch = linkedDispatch as LinkedDispatch | null;
+  const effectiveDeviceSerialNumber =
+    pilot.device_serial_number_snapshot ?? dispatch?.serial_number_snapshot ?? null;
 
   if (plannedVisitsError) {
     console.error("[pilots] Planned visit load failed", {
@@ -645,8 +647,8 @@ export default async function PilotDetailPage({
         }
       : pilot.installation_completed
         ? {
-            helper: pilot.device_serial_number_snapshot
-              ? `Device ${pilot.device_serial_number_snapshot}`
+            helper: effectiveDeviceSerialNumber
+              ? `Device ${effectiveDeviceSerialNumber}`
               : "Pilot device is marked installed.",
             tone: "emerald" as const,
             value: "Pilot Device Installed"
@@ -1777,7 +1779,7 @@ export default async function PilotDetailPage({
           <DetailItem label="Product Model" value={pilot.product_model} />
           <DetailItem
             label="Pilot Device Serial Number"
-            value={display(pilot.device_serial_number_snapshot)}
+            value={display(effectiveDeviceSerialNumber)}
           />
           <DetailItem
             label="Pilot Device Installation Date"

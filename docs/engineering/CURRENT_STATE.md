@@ -1,13 +1,11 @@
 # Jiva Farm OS Current Engineering State
 
-_Last updated: 2026-08-05_
+_Last updated: 2026-09-09_
 
 ## Production Baseline
 
 - Production branch: `main`
-- Latest confirmed production commit before this docs/update release:
-  `44f453e` (`Merge pull request #33 from
-  harsha-jivawater/codex/production-merge-owner-filter`)
+- Latest confirmed production baseline before this release: `8bc1e8b`
 - Deployment platform: Vercel
 - Database/Auth/Storage: Supabase production project `mzjmvenyzcnbgykxmjvc`
 - Branch protection: pull request, required checks, up-to-date branch, resolved
@@ -27,6 +25,11 @@ _Last updated: 2026-08-05_
   no-login customer links.
 - Payment Links is visible to Sales Head, RSM, and Salesperson.
 - Searchable list pages use 50-row pagination and numbered navigation.
+- Sales is an operational dashboard at `/sales` with role-scoped targets,
+  actual primary sales, dealer secondary sales, dealer stock, sell-through,
+  forecast, and approval visibility.
+- Sales Head/Admin can edit April-to-March target matrices at `/sales/targets`;
+  RSM submissions remain subject to Sales Head approval.
 
 ## Work Items Read Model
 
@@ -70,6 +73,9 @@ Device CSV import remains separate at `/devices/import`.
   moves.
 - Dealer Stock Dispatch payment confirmation is owned by Accounts/Admin.
 - Stock / Dispatch moves paid dispatches through logistics statuses.
+- Pilot Dispatch is the only device-assignment point for a Pilot. Once stock is
+  dispatched, the selected serial-numbered device is synchronized to the Pilot
+  record.
 
 ## Current Pilot Behavior
 
@@ -79,6 +85,24 @@ Device CSV import remains separate at `/devices/import`.
 - New Pilot creation supports `Jet` irrigation.
 - Pilot and control area entry supports value plus Acres, Cents, or Guntas while
   storing canonical acres.
+- Pilot creation does not manually reserve a device. Research Assistants can
+  record the installation date; Admin, R&D Head, and Agronomist control the
+  installation-complete state.
+
+## Current Sales Behavior
+
+- Actual primary sales are payment-confirmed Dealer Stock Dispatch records in a
+  dispatched or later state.
+- Committed forecast is payment-confirmed dealer stock that has not yet been
+  dispatched.
+- Secondary sales are Dealer Farmer Installations and are reported by dealer
+  and month.
+- Overall targets combine approved RSM targets plus the Sales Head's approved
+  direct target. Selecting an RSM limits every dashboard metric to that RSM's
+  dealer scope and approved target.
+- Dealer stock is counted from the current holder on serial-numbered devices.
+  Current-month sell-through is secondary sales divided by current stock plus
+  those secondary sales.
 
 ## Current Marketing Library Behavior
 
