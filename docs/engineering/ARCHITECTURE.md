@@ -1,6 +1,6 @@
 # Jiva Farm OS Architecture
 
-_Last updated: 2026-08-05_
+_Last updated: 2026-09-09_
 
 ## 1. System Overview
 
@@ -8,6 +8,7 @@ Jiva Farm OS is an internal operational system for Jiva Water Farm Devices. It c
 
 - Farmer Leads
 - Dealers and Institutional Partners
+- Sales targets, forecasts, primary sales, and dealer secondary sales
 - Devices and Inventory
 - Dispatches
 - Installations
@@ -169,22 +170,25 @@ Hard limits for My Work:
 - no broad RPC should control unrelated UI sections
 - passing lint/build alone is not sufficient evidence
 
+Permission helpers must be optimized with full cross-table RLS plans in mind.
+The September 2026 broad scalar-subquery wrapper experiment improved simple
+fixtures but caused nested operational RLS plans; migration `20260909071431`
+restored direct helper calls.
+
 ## 9. Migration Safety
-
-Do not use:
-
-```bash
-supabase db push
-```
-
-for production in the current project state.
 
 Production SQL changes must be:
 
 - manually reviewed
+- committed as forward-only migrations
+- applied only after local/remote migration history alignment
+- run in an attended production window through the linked Supabase CLI
 - applied in controlled order
 - reconciled
 - recorded in migration history where required
+
+Never use a linked database reset, edit an immutable baseline, weaken RLS, or
+apply untracked SQL directly to production.
 
 ## 10. Read-model Migration Status
 
@@ -237,3 +241,34 @@ Marketing Library uses:
 
 Marketing Head/Admin direct publish is allowed. Designer submissions require
 Marketing Head review.
+
+## 13. Sales Architecture
+
+Operational records remain the Sales source of truth:
+
+```text
+sales_targets -------------------------> planned sales
+dispatches + payment state ------------> actual / committed primary sales
+installations (Dealer Farmer) ---------> secondary sales
+devices held by Dealer ----------------> current dealer stock
+sales_forecast_overrides --------------> likely / upside / at-risk
+sales_forecast_snapshots --------------> saved monthly comparison
+```
+
+The `/sales` server page applies authenticated RLS, establishes the visible
+dealer scope, and then aggregates April-to-March values. Overall scope uses all
+visible dealers and approved targets; an RSM filter narrows both records and
+targets to the selected RSM.
+
+Target and forecast integrity is also enforced in PostgreSQL:
+
+- RSM targets are forced to Pending unless reviewed by Sales Head/Admin.
+- Sales Head direct targets are approved and managed only by Sales Head/Admin.
+- Target owner and original author cannot change during update.
+- Committed forecast cannot be manually overridden.
+- Forecast entity existence and authorship are validated.
+- Snapshot totals and creator are calculated by database triggers.
+
+The current dashboard uses paged server-side record loading followed by bounded
+aggregation. Future scale work should replace those loaders with RLS-aware
+database aggregates without widening permissions.

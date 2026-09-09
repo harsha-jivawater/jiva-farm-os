@@ -11,9 +11,13 @@ roughly 0.5-6.7 seconds to 25-68 milliseconds across tested roles. Marketing
 upload initial route JavaScript dropped by 36.0%. See
 [PERFORMANCE.md](PERFORMANCE.md) for methodology, exact results, and limitations.
 
-Changes remain local. Production was inspected read-only for query statistics
-and function/policy definitions. No production schema or data was changed and
-no release was pushed as part of this review.
+The Sales safeguards and application-level loading changes are now in
+production. The experimental statement-level permission-helper rewrite was
+restored by migration
+`20260909071431_restore_permission_query_performance.sql` after it caused deeply
+nested RLS plans on operational pages. The Sales dashboard and Pilot workflow
+release was merged through PR #60 as `3f7cd14`, and Vercel reported the
+production deployment successful on 09 September 2026.
 
 ## Review Coverage
 
@@ -27,7 +31,7 @@ no release was pushed as part of this review.
 | My Work | Reviewed scoped and lazy-loading design. Retained the existing work-item read model rather than restoring broad eager queries. |
 | KPI Dashboard | Loaded sector and primary summaries concurrently. Kept the previously implemented database aggregation fix and role-specific summary paths. |
 | Marketing Library | Deferred the upload SDK. Reviewed list/version retrieval; pagination and narrower projections remain a follow-up. |
-| Sales targets and forecast | Reviewed pending implementation; found the release blockers below. Did not expand or deploy that feature in a performance patch. |
+| Sales targets and forecast | Reviewed and hardened target ownership/approval, forecast categories, snapshot authorship, and role access. The operational dashboard and annual matrix were completed and released in PR #60. |
 | Exports and administration | Inspected row caps, broad projections, and unaggregated relationship counts for scaling risks. These were not all rewritten. |
 | Build and tests | Ran production build, lint, type checking, unit tests, SQL access comparisons, database security tests, browser smoke tests, and desktop/mobile login checks. Improved bundle accounting to include layouts. |
 
@@ -86,11 +90,11 @@ production; changing the local lockfile does not update the live site.
 
 ## Verification
 
-- `npm run release:check`: passed, including 94 unit tests, production build,
+- `npm run release:check`: passed on the release work, including 101 unit tests, production build,
   and a production dependency audit reporting zero vulnerabilities.
 - The full dependency audit, including development tools, also reports zero
   vulnerabilities after the compatible toolchain updates.
-- `npm run check:migrations`: passed, 29 active migrations.
+- `npm run check:migrations`: passed, 31 active migrations.
 - `npm run test:db`: passed, 73 assertions. Four existing marketing tests were
   scoped to their own fixture IDs so unrelated local content cannot distort them.
 - Transactional before/after benchmark: passed 15 role/scope combinations,
@@ -105,19 +109,23 @@ production; changing the local lockfile does not update the live site.
   in the Edge Runtime. The build and anonymous middleware smoke tests pass;
   authenticated production middleware behavior remains part of release checks.
 
-## Release Sequence
+## Completed Release Record
 
-1. Run the Sales security checks and performance checks on the exact release
-   commit before merging.
-2. Run the checks above on the exact release commit and a populated staging copy.
-   Confirm schema parity and review the additive performance migration diff.
-3. Apply migration `20260908175253` in a controlled deployment window. It alters
-   existing read policies and functions; it does not backfill business records.
-   Inspect lock waits and verify representative roles immediately afterward.
-4. Deploy the frontend/server changes, then measure protected-page response
-   times, database query latency, errors, LCP, INP, and CLS under normal use.
-5. Keep the prior policy/function definitions and previous application
-   deployment available for rollback. Do not disable RLS to improve timings.
+1. The production migration history was reconciled against the reviewed local
+   ledger.
+2. Migration `20260909071431_restore_permission_query_performance.sql` restored
+   direct helper calls in affected read policies and KPI functions. It was
+   applied successfully; the CLI's post-apply catalog-cache warning did not
+   prevent the migration from being recorded remotely.
+3. PR #60 passed Application quality, Integration, and Vercel Preview checks.
+4. Merge commit `3f7cd14` deployed successfully to Vercel production.
+5. The live application loaded at `www.jivawater.org`, and post-merge quality
+   and integration checks passed again.
+
+Continue measuring protected-page response times, database query latency,
+errors, LCP, INP, and CLS under normal use. Keep the prior policy/function
+definitions and application deployment available for rollback. Do not disable
+RLS to improve timings.
 
 ## References
 

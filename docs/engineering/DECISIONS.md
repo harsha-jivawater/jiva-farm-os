@@ -1,6 +1,6 @@
 # Jiva Farm OS Engineering Decisions
 
-_Last updated: 2026-08-05_
+_Last updated: 2026-09-09_
 
 This file records accepted engineering decisions. Add a new entry only when a decision changes architecture, delivery safety, permissions, or performance strategy.
 
@@ -85,7 +85,7 @@ Required evidence may include:
 
 ## ADR-007 — No production `supabase db push`
 
-**Status:** Accepted
+**Status:** Superseded by ADR-019
 
 The repository has mixed migration-history states. Production SQL is applied through controlled manual review and execution.
 
@@ -213,3 +213,62 @@ review.
 
 This matches the operating rule that the Marketing Head owns final marketing
 quality, while keeping Designer submissions under a separate approval path.
+
+---
+
+## ADR-016 — Dealer dispatch and dealer sell-through are separate sales events
+
+**Status:** Accepted
+
+A payment-confirmed Dealer Stock Dispatch counts as an actual primary sale only
+after it reaches a stock-moving dispatch status. The later dealer-to-farmer
+transaction counts as a secondary sale only through a qualifying Dealer Farmer
+Installation linked to that dealer.
+
+This avoids counting dealer procurement as market pull and prevents the same
+serial-numbered device from becoming both primary and secondary sales at the
+same operational event.
+
+---
+
+## ADR-017 — The Sales financial year and target approval are explicit
+
+**Status:** Accepted
+
+Sales targets run April through March and use one combined device count across
+models. Overall planned sales equal approved RSM targets plus the approved Sales
+Head direct target. Pending or rejected RSM targets are excluded.
+
+RSMs submit only their own monthly targets. Sales Head/Admin approval is
+required before those submissions affect the dashboard. Sales Head/Admin may
+also edit and approve the complete annual matrix while preserving original
+authorship.
+
+---
+
+## ADR-018 — Forecast facts are calculated; judgment is entered and snapshotted
+
+**Status:** Accepted
+
+Actual and Committed forecast values are derived from payment and dispatch
+records. Users may assign Likely, Upside, or At Risk judgment to visible
+dealers, institutions, or Farmer Leads. They cannot manually enter Committed.
+
+Saved monthly snapshots are recalculated in PostgreSQL and receive their author
+from the authenticated session so browser payloads cannot forge totals or
+ownership.
+
+---
+
+## ADR-019 — Production migrations use an attended, reconciled linked push
+
+**Status:** Accepted
+
+After the migration ledger was reconciled on 09 September 2026, reviewed
+forward migrations may be applied with the linked Supabase CLI during an
+attended deployment window.
+
+Before the push, local and remote migration versions must align, the migration
+must be committed and reviewed, and database tests must pass. After the push,
+the migration list and affected read/write paths must be verified. Production
+reset, untracked SQL, immutable-baseline edits, and RLS bypass remain forbidden.

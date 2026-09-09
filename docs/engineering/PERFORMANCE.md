@@ -6,8 +6,11 @@ Only measured results belong in this file. Estimates and expected improvements m
 
 ## September 2026 Loading Review
 
-Status: implemented and tested locally, not deployed to production. The broader
-review and release blockers are in [PERFORMANCE_REVIEW_2026_09.md](PERFORMANCE_REVIEW_2026_09.md).
+Status: measured local experiment, not the active production policy shape. The
+initial helper-wrapper migration was deployed briefly, then restored because it
+caused deeply nested RLS plans and failed operational page reads. The broader
+review and release record are in
+[PERFORMANCE_REVIEW_2026_09.md](PERFORMANCE_REVIEW_2026_09.md).
 
 ### Lead KPI Database Benchmark
 
@@ -27,11 +30,18 @@ follow role-scoped reads of the fixtures. No production records were modified.
 | RSM, second region | 6,091.66 ms | 33.60 ms |
 | Research Assistant, first region | 6,689.78 ms | 38.79 ms |
 
-Migration `20260908175253_optimize_request_permission_checks.sql` wraps
+Migration `20260909064444_optimize_request_permission_checks.sql` wraps
 zero-argument STABLE role/identity helpers in scalar subqueries in read policies
 and five list-summary RPCs. PostgreSQL can evaluate these as statement-level
 InitPlans instead of repeating profile/role lookups for every row. Correlated
 checks remain correlated. No grants, write predicates, or RLS bypasses are added.
+
+Production migration
+`20260909071431_restore_permission_query_performance.sql` removed those wrappers
+from the affected policies and KPI functions after production showed that the
+additional InitPlan nesting harmed complex cross-table RLS paths. The benchmark
+below remains useful evidence for simple fixtures, but it must not be treated as
+the current production implementation or a whole-site performance claim.
 
 The transactional comparison passed for 15 role/scope fixtures: visible IDs in
 11 tables and filtered/unfiltered KPI outputs matched before and after. Lead
