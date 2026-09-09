@@ -5,7 +5,8 @@ _Last updated: 2026-09-09_
 ## Production Baseline
 
 - Production branch: `main`
-- Latest confirmed production baseline before this release: `8bc1e8b`
+- Current application feature baseline: `3f7cd14` (PR #60); later
+  documentation-only commits do not change this behavior baseline
 - Deployment platform: Vercel
 - Database/Auth/Storage: Supabase production project `mzjmvenyzcnbgykxmjvc`
 - Branch protection: pull request, required checks, up-to-date branch, resolved
@@ -103,6 +104,15 @@ Device CSV import remains separate at `/devices/import`.
 - Dealer stock is counted from the current holder on serial-numbered devices.
   Current-month sell-through is secondary sales divided by current stock plus
   those secondary sales.
+- The financial year is April through March. Only approved targets contribute
+  to dashboard totals; pending and rejected RSM submissions do not.
+- Sales Head/Admin can save an RSM or Sales Head annual matrix as approved.
+  RSMs can submit and edit only their own pending monthly targets.
+- Karnataka and Tamil Nadu FY 2026-27 presets appear only when no saved target
+  exists for the matching RSM and become operative only after save.
+- Live forecast Actual and Committed are calculated from commercial dispatch
+  records. Likely, Upside, and At Risk are manual entity-level overrides.
+  Snapshots are recalculated server-side and preserve the creator.
 
 ## Current Marketing Library Behavior
 
@@ -118,11 +128,18 @@ Device CSV import remains separate at `/devices/import`.
 
 ## Current Risks And Guardrails
 
-- Production SQL is still manually controlled; do not use `supabase db push`
-  against production.
+- Production SQL is attended and migration-led. Use a linked push only after
+  local/remote migration history alignment, review, backup readiness, and
+  database verification.
 - Preview must stay isolated from production Supabase credentials.
 - Any schema change needs a committed migration and the normal release checks.
 - Operations Control is a triage page, not a source of truth; fixes still happen
   in the source modules.
 - Customer Marketing Library links are bearer links. Treat them as confidential
   because they work without login until manually revoked.
+- The Sales dashboard currently reads bounded operational records into the
+  server route for aggregation. Keep the paged loaders and move calculations to
+  permission-aware database aggregates before volumes exceed current limits.
+- The statement-level permission-helper wrapper experiment is not active.
+  Migration `20260909071431` restored direct helper calls after nested RLS plans
+  caused operational reads to fail; do not reapply that technique broadly.

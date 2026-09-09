@@ -11,7 +11,10 @@
 - Current production branch: `main`
 - Stack: Next.js App Router, TypeScript, Tailwind CSS, Supabase Auth/Database/Storage, Vercel
 
-Jiva Farm OS is the production operating system for Jiva Water's farmer sales, dealer network, institutional partner, pilot, inventory, dispatch, installation, follow-up, marketing, internal user, regional, and management workflows.
+Jiva Farm OS is the production operating system for Jiva Water's farmer sales,
+dealer network, institutional partners, Sales targets and forecasts, pilots,
+inventory, dispatch, installation, follow-up, marketing, internal user,
+regional, and management workflows.
 
 My Work is the primary signed-in home page. The former Dashboard route remains only as a compatibility redirect to My Work.
 
@@ -37,6 +40,41 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 - GitHub branch protection is active for `main`. Pull requests, required checks,
   an up-to-date branch, and resolved conversations are enforced; force pushes
   and branch deletion are blocked.
+
+## Current Release Update - 09 September 2026
+
+- Production release `3f7cd14` was merged through pull request #60 and deployed
+  successfully to Vercel production at `www.jivawater.org`.
+- Sales is now an operational dashboard at `/sales`. Its Overall/RSM selector
+  updates the primary target, actual primary sales, secondary sales, dealer
+  stock, sell-through, planned-versus-actual chart, dealer monthly table,
+  committed forecast, and pending approval count.
+- The Sales financial year runs April through March. Approved RSM targets plus
+  the approved Sales Head direct target form the Overall plan; an RSM selection
+  uses only that RSM's approved target and dealer scope.
+- Sales Head/Admin can edit and approve a full annual target matrix. RSMs submit
+  their own monthly targets as Pending, and those figures remain excluded from
+  the Sales dashboard until Sales Head/Admin approval.
+- FY 2026-27 presets are available for Karnataka and Tamil Nadu when the
+  matching RSM has no saved targets. Saving the matrix creates the approved
+  source records; the preset itself is not counted before save.
+- Actual primary sales are payment-confirmed Dealer Stock Dispatch devices in
+  Dispatched, Delivered, Installation Pending, or Installed status. Paid but
+  not dispatched commercial devices remain committed forecast, not actual.
+- Secondary sales are completed/qualifying Dealer Farmer Installations linked
+  to a dealer and are shown dealer-by-dealer for every month of the financial
+  year.
+- Forecasting supports live Actual and Committed values, manual Likely, Upside,
+  and At Risk assignments for dealers, institutions, and Farmer Leads, plus
+  server-calculated monthly snapshots.
+- Pilot creation/editing no longer assigns a serial-numbered device. Stock /
+  Dispatch selects the Pilot and Pilot Stock device in a Free Pilot Dispatch;
+  when dispatched, the device and serial number synchronize back to the Pilot.
+- Research Assistants can record the pilot device installation date, while only
+  Admin, R&D Head, and Agronomist can mark the device installation complete.
+- Permission-helper wrappers were restored to direct calls by migration
+  `20260909071431` after the broad optimization caused nested RLS plans and
+  unavailable operational reads. Do not reapply that rewrite across policies.
 
 ## Current Release Update - 08 September 2026
 
@@ -158,6 +196,8 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 - Regions
 - Internal Users
 - Payment Links for Sales Head, RSM, and Salesperson
+- Sales dashboard, targets, forecast, and approvals
+- Dealer monthly secondary-sales reporting and sell-through visibility
 - Help/SOP
 - Auth/password routes
 - Password change/reset
@@ -189,8 +229,10 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 
 ## Documentation Updates
 
-- Role-based usage manual updated to v0.19 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
-- Marketing Library guidance is included in v0.18 and v0.19.
+- Role-based usage manual updated to v0.21 draft at `docs/ROLE_BASED_USAGE_MANUAL.md`.
+- v0.20 documents filter-aware Pilot KPI drill-downs; v0.21 documents Sales
+  targets, forecasts, approvals, dealer sell-through, and Pilot Dispatch device
+  assignment.
 - It includes role-menu matrix, role ready-reckoners, workflow maps, menu cards, and status quick references.
 - Future updates to the manual should increment the version number.
 - The v0.2 update adds Marketing Requests, Marketing Head, and Designer guidance.
@@ -704,6 +746,14 @@ Legacy crop rules:
 - `202607100002_marketing_request_completion_tracking.sql` — applied and verified.
 - `202607100003_stock_dispatch_pilot_dispatch_lookup.sql` — applied and verified.
 - `202607100004_stock_dispatch_pilot_edit_lookup.sql` — applied and verified.
+- `20260908073125_filter_pilot_planned_visit_kpis.sql` — applied and verified.
+- `20260908100000_allow_dispatch_manager_group_delivery.sql` — applied and verified.
+- `20260908150000_harden_dispatch_manager_function.sql` — applied and verified.
+- `20260908151437_optimize_kpi_dashboard_refresh.sql` — applied and verified.
+- `20260909064436_sales_targets_and_forecast.sql` — applied and verified.
+- `20260909064444_optimize_request_permission_checks.sql` — applied and verified.
+- `20260909064456_harden_sales_targets_forecast.sql` — applied and verified.
+- `20260909071431_restore_permission_query_performance.sql` — applied and verified.
 
 ## Branding Status
 

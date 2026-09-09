@@ -1,6 +1,6 @@
 # Jiva Farm OS Engineering Roadmap
 
-_Last updated: 2026-08-05_
+_Last updated: 2026-09-09_
 
 ## Completed In Production
 
@@ -52,15 +52,32 @@ _Last updated: 2026-08-05_
 - [x] Designer to Marketing Head review
 - [x] Metadata editing with video/content compatibility guard
 
+### Sales operations
+
+- [x] Overall/RSM Sales dashboard scope
+- [x] April-to-March planned-versus-actual primary sales chart
+- [x] Sales Head/Admin annual target matrix
+- [x] RSM monthly target submission with Sales Head approval
+- [x] Approved Sales Head direct target added to Overall RSM targets
+- [x] Dealer-by-dealer monthly secondary-sales reporting
+- [x] Dealer stock and current-month sell-through cards
+- [x] Live Actual/Committed forecast plus manual Likely/Upside/At Risk
+- [x] Server-calculated monthly forecast snapshots
+
 ## Current Next Candidates
 
 These are planned candidates, not shipped behavior:
 
 - [ ] Razorpay/Zoho payment visibility page for recent received payments
 - [ ] Zoho Books estimate/billing integration planning and implementation
-- [ ] Monthly RSM targets by Direct, Dealer, and Institutional sales channels
+- [ ] Optional channel split for the current combined-device monthly targets
 - [ ] Sector-aware target and achievement reporting across Agriculture,
       Poultry, and Dairy
+- [ ] Dealer opening-stock reconciliation date, stock ageing, and report
+      completion reminders on the 1st, 5th, and 10th
+- [ ] Dedicated secondary-sale correction, return, and duplicate approval queue
+- [ ] Permission-aware database aggregates and server-side entity search for
+      Sales dashboard scale beyond current bounded loaders
 - [ ] Marketing Library usage analytics by asset, audience, and user
 - [ ] More automated operations alerts from Operations Control signals
 

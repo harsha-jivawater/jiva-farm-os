@@ -39,6 +39,15 @@ Simple reverse chronological record of major Jiva Farm OS work.
 - Increased the Pilot register width and made horizontal scrolling explicit so
   every column remains accessible on narrower screens.
 
+### Documentation
+
+- Added a consolidated Sales operations guide covering metric definitions,
+  April-to-March targets, RSM approval, forecasting, dealer secondary sales,
+  stock, sell-through, roles, and monthly operating cadence.
+- Updated the project status, operations guide, role manual, architecture,
+  decisions, roadmap, performance review, current engineering state, and root
+  README to match production release `3f7cd14`.
+
 ## 2026-09-08
 
 ### KPI Dashboard

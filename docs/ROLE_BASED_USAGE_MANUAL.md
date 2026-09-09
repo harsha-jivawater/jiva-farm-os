@@ -1,8 +1,8 @@
 # Jiva Farm OS Role-Based Usage Manual
 
-Version: v0.20
+Version: v0.21
 Status: Draft  
-Last updated: 08 Sep 2026
+Last updated: 09 Sep 2026
 Owner: Jiva Farm OS Admin / Management  
 Audience: Internal Jiva Farm OS users  
 
@@ -23,6 +23,7 @@ Use it when:
 
 | Version | Date | Status | Notes |
 |---|---|---|---|
+| v0.21 | 09 Sep 2026 | Draft | Adds the Sales dashboard, Overall/RSM scope, April-to-March target matrix, RSM target approval, primary/secondary sales definitions, dealer stock/sell-through, forecast snapshots, and Pilot Dispatch device assignment. |
 | v0.20 | 08 Sep 2026 | Draft | Adds filter-aware Pilots KPI cards, clickable Pilot card drill-downs, matching Pilot CSV exports, and role-scoped Pilot user filters. |
 | v0.19 | 05 Aug 2026 | Draft | Adds Operations Control, 50-row pagination, filtered Farmer Lead KPIs, safer Farmer Lead CSV import, dealer payment handoff notes, Pilot area units, Jet irrigation, and Marketing Head direct publish. |
 | v0.18 | 17 Jul 2026 | Draft | Adds Marketing Library browsing, cross-role approval, private file/YouTube content, and manually revocable customer links. |
@@ -94,7 +95,7 @@ Notes:
 | Group | Menus | Training notes |
 |---|---|---|
 | Daily Work | My Work; My Visits | Daily action areas. Notifications open from Action Center. Visit Reports are submitted through My Visits or Pilot detail, not as a standalone sidebar page. |
-| Sales & Partners | Farmer Leads; Dealers; Institutional Partners | Contacts and meetings are managed inside Institutional Partner detail where available. |
+| Sales & Partners | Farmer Leads; Dealers; Sales; Institutional Partners | Sales combines target, actual, forecast, dealer stock, and sell-through monitoring. Contacts and meetings are managed inside Institutional Partner detail where available. |
 | R&D | Pilots | Pilots stay under R&D only. |
 | Operations | Inventory; Dispatches; Installations; Post Installation Follow-ups | Inventory/device records, dispatch, installation, and after-installation work stay under Operations only. |
 | Team Workflows | Marketing Requests; Marketing Library | Creative request workflow plus approved material library for customer/internal use. |
@@ -283,6 +284,19 @@ fixed before import.
 | HR & Legal | 🔒 | 👁 | ⚠️ ✏️ | ⚠️ ✏️ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 👁 |
 | Viewer | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 🔒 | 🔒 | 🔒 | 👁 |
 
+### Sales Module Access
+
+| Role | Dashboard | Targets | Forecast | Approvals |
+|---|---:|---:|---:|---:|
+| Admin | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ | ✅ ✏️ |
+| Management | ✅ | 👁 | 👁 | 👁 |
+| Sales Head | ⭐ ✅ ✏️ | ⭐ ✅ ✏️ | ⭐ ✅ ✏️ | ⭐ ✅ ✏️ |
+| RSM | ⭐ ⚠️ ✏️ | Own pending target ✏️ | Scoped ✏️ | 👁 |
+| Salesperson | ⚠️ ✏️ | 👁 | Scoped ✏️ | 👁 |
+| Accounts | ✅ read only | 👁 | 👁 | 👁 |
+| Viewer | 👁 | 👁 | 👁 | 👁 |
+| Other roles | 🔒 | 🔒 | 🔒 | 🔒 |
+
 ### Team And Utility Menus
 
 | Role | Regions | Internal Users | Help / SOP | Change Password |
@@ -369,6 +383,7 @@ Review company-wide progress and major pilot/dealer/institution outcomes.
 |---|---|---|
 | My Work | Company operating overview, KPIs, and Oversight | ⭐ ✅ |
 | Data Quality / System Health | Review cleanup warnings and operational risk | ⭐ ✅ |
+| Sales | Review company and RSM target, actual, forecast, and dealer sell-through | 👁 |
 | Pilots | Read-only pilot oversight | 👁 |
 | Leads / Dealers / Institutions / Inventory / Installations | Review operational state | 👁 |
 
@@ -419,6 +434,7 @@ Own sales pipeline, dealer growth, institution opportunities, regional progress,
 | Farmer Leads | Review and manage pipeline | ⭐ ✏️ |
 | Dealers | Create dealer profiles and track progress | ⭐ ✏️ |
 | Institutional Partners | Create/manage institution opportunities | ⭐ ✏️ |
+| Sales | Review Overall/RSM targets, actuals, dealer sell-through, forecast, and approvals | ⭐ ✅ ✏️ |
 | My Work | Review sales KPIs, team actions, and dispatch readiness | ⭐ ✅ |
 | Regions | Maintain region setup where allowed | ✏️ |
 
@@ -426,10 +442,10 @@ Own sales pipeline, dealer growth, institution opportunities, regional progress,
 
 ```mermaid
 flowchart LR
-  A["Review My Work"] --> B["Check Farmer Leads"]
-  B --> C["Check Dealer / Institution pipeline"]
-  C --> D["Assign or follow up through RSM"]
-  D --> E["Review Dispatch / Installation movement"]
+  A["Review Sales dashboard"] --> B["Choose Overall or RSM"]
+  B --> C["Compare approved target with actual"]
+  C --> D["Review forecast and dealer sell-through"]
+  D --> E["Approve or correct RSM targets"]
 ```
 
 #### Do
@@ -437,6 +453,10 @@ flowchart LR
 - Create Dealer profiles when needed.
 - Use Dealer review and next action to keep dealer progress moving.
 - Use Institutions for partner opportunities and scale-up.
+- Enter the Sales Head direct target and edit RSM annual matrices in April-to-March order.
+- Approve or reject RSM target submissions before they contribute to planned sales.
+- Review primary sales, dealer secondary sales, dealer stock, and sell-through in the same reporting scope.
+- Save monthly forecast snapshots after the operating review.
 - Soft-delete Dealers or Institutional Partners only when they should be removed from active views; add a clear delete reason because Admin can audit and restore deleted records later.
 - Use My Work for sales KPIs and team action review.
 
@@ -473,6 +493,7 @@ Manage assigned region/state pipeline, dealer performance, installations, and fo
 | Farmer Leads | Work assigned regional leads | ⭐ ✏️ ⚠️ |
 | Dealers | Create/manage dealer records in scope | ⭐ ✏️ ⚠️ |
 | Institutional Partners | Manage region-linked institution opportunities | ✏️ ⚠️ |
+| Sales | Review own target/actuals, submit targets, and maintain scoped forecast | ⭐ ✏️ ⚠️ |
 | Installations | Track and update region installations | ✏️ ⚠️ |
 | My Work | Live scoped RSM KPIs and pending work | ⭐ ⚠️ |
 
@@ -492,6 +513,9 @@ flowchart LR
 - Use Dealer review and next action to drive dealer progress.
 - Use Installations and Follow-ups for field closure.
 - Use My Work for assigned-scope KPIs and pending actions.
+- Submit your monthly combined-device target; it remains Pending until Sales Head approval.
+- Keep Likely, Upside, and At Risk forecasts current for visible dealers, institutions, and Farmer Leads.
+- Ensure Customer Support records dealer-to-farmer sales against an existing Farmer Lead so secondary sales are complete.
 
 #### Don't
 
@@ -523,6 +547,7 @@ Capture and work farmer leads assigned to the salesperson.
 | Menu | What Salesperson does there | Access |
 |---|---|---|
 | Farmer Leads | Create and update assigned leads | ⭐ ✏️ ⚠️ |
+| Sales | Review permitted scope and maintain assigned forecast judgment | ✏️ ⚠️ |
 | Installations | Work sales-linked installation records | ✏️ ⚠️ |
 | Post Installation Follow-ups | Complete assigned follow-ups | ✏️ ⚠️ |
 | My Work | Scoped visibility and owned actions where available | 👁 ⚠️ |
@@ -542,6 +567,7 @@ flowchart LR
 - Capture accurate farmer, crop, location, product, and next action.
 - Keep lead stage current until payment/dispatch handoff.
 - Complete follow-ups assigned to you.
+- Keep Likely, Upside, and At Risk forecast assignments current for records in your scope.
 
 #### Don't
 
@@ -816,6 +842,7 @@ Confirm payment and support finance-controlled dispatch readiness.
 | Dispatches | Review payment-related dispatch readiness | ⭐ ✏️ |
 | Inventory | Device/stock visibility where allowed | 👁 |
 | Farmer Leads | View lead payment context | 👁 ⚠️ |
+| Sales | Read targets, actuals, dealer sales, stock, and forecast | 👁 |
 | My Work | Payment/dispatch readiness and operational KPI visibility | 👁 |
 
 #### Daily workflow map
@@ -834,6 +861,8 @@ flowchart LR
 - Coordinate with Stock / Dispatch after payment confirmation.
 - Confirm Dealer Dispatch payment before Dealer stock dispatch moves forward.
 - Use Inventory for read-only stock visibility where permitted.
+- Use Sales as read-only context when reconciling confirmed payments against
+  committed and actual primary sales.
 
 #### Don't
 
@@ -1040,11 +1069,45 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  A["Dealer Profile"] --> B["Dealer Review / Next Action"]
-  B --> C["Farmer Leads / Institution Opportunities"]
-  C --> D["Dealer Farmer Installation"]
-  D --> E["Dealer Performance"]
+  A["Payment-confirmed Dealer Dispatch"] --> B["Dispatched / Delivered"]
+  B --> C["Actual primary sale"]
+  C --> D["Dealer stock"]
+  D --> E["Existing Farmer Lead selected"]
+  E --> F["Dealer Farmer Installation"]
+  F --> G["Secondary sale and sell-through"]
 ```
+
+Rules:
+
+- Dealer procurement is the primary sale and counts only after payment
+  confirmation plus a stock-moving dispatch status.
+- Dealer-to-farmer market pull is the secondary sale and counts only from a
+  qualifying Dealer Farmer Installation.
+- Customer Support creates/selects the Farmer Lead before recording the
+  secondary sale.
+- Opening dealer stock is a controlled reconciliation input; dealer-to-dealer
+  transfer is outside the current workflow.
+
+### Sales Target And Forecast Review
+
+```mermaid
+flowchart LR
+  A["RSM submits monthly target"] --> B["Pending"]
+  B --> C["Sales Head approves or rejects"]
+  C --> D["Approved target enters dashboard"]
+  D --> E["Actual and committed recalculate"]
+  E --> F["Sales team updates likely / upside / at risk"]
+  F --> G["Save monthly snapshot"]
+```
+
+Rules:
+
+- The target year runs April through March and uses one combined device count.
+- Overall target equals approved RSM targets plus the approved Sales Head direct
+  target.
+- Pending and rejected targets do not enter planned totals.
+- Actual and Committed are system-calculated. Likely, Upside, and At Risk are
+  sales judgment assigned to a visible dealer, institution, or Farmer Lead.
 
 ### Research Assistant Field Visit
 
@@ -1294,6 +1357,27 @@ Future/deferred R&D workflow decision:
 | Primary actions | Create/manage institution profile, contacts/meetings, pilot opportunity, MOU/legal approval where allowed. |
 | Important rules | Sales Head can soft-delete Institutional Partners. Soft-deleted institutions are removed from active views, but contacts, meetings, linked pilots, and history are preserved. Delete reason and deleted-by are captured. Admin can view deleted institutions explicitly and restore them. Proposal and MOU fields remain. |
 
+### Sales
+
+| Item | Detail |
+|---|---|
+| Purpose | Monitor approved targets, actual primary sales, dealer secondary sales, current dealer stock, sell-through, forecast, and approvals. |
+| Used by | Admin, Management, Sales Head, RSM, Salesperson, Accounts, Viewer. |
+| Primary actions | Choose Overall/RSM scope, compare planned and actual by financial-year month, edit or submit targets, maintain forecast judgment, save snapshots, and review approvals. |
+| Important rules | Financial year is April-March. Actual primary sales require payment-confirmed Dealer Stock Dispatch in a stock-moving status. Secondary sales come from Dealer Farmer Installations. RSM targets require Sales Head/Admin approval. Accounts and Viewer are read-only. |
+
+Sales sub-pages:
+
+- `/sales`: scope-aware dashboard, cards, chart, and dealer monthly table.
+- `/sales/targets`: Sales Head/Admin annual matrix or RSM monthly submission.
+- `/sales/forecast`: live monthly categories and saved snapshot action.
+- `/sales/approvals`: pending RSM target review. Secondary-sale corrections,
+  returns, and duplicates are currently resolved in their source operational
+  records; they do not yet have a separate Sales approval queue.
+
+See `docs/SALES_OPERATIONS_GUIDE.md` for complete definitions and operating
+cadence.
+
 ### Pilots
 
 | Item | Detail |
@@ -1301,7 +1385,7 @@ Future/deferred R&D workflow decision:
 | Purpose | Track trials, monitoring visits, results, and scale-up proof. |
 | Used by | Admin, Management, R&D Head, Agronomist, Research Assistant, Sales Head, RSM, Salesperson, Viewer. |
 | Primary actions | Create pilot, add monitoring plan, assign visits, submit reports, review result, mark Pilot Device Installed where allowed. |
-| Important rules | R&D Head can soft-delete Pilots. Admin and Management can also soft-delete Pilots. Visit plans, reports, and linked context are preserved. Delete reason and deleted-by are captured. Admin can view deleted pilots explicitly and restore them. Research Assistant cannot mark Pilot Device Installed. Pilot KPI cards follow the active filters; clicking a card shows only matching pilots. Pilot owner and individual role selectors show only users with the relevant effective role. |
+| Important rules | R&D Head can soft-delete Pilots. Admin and Management can also soft-delete Pilots. Visit plans, reports, and linked context are preserved. Delete reason and deleted-by are captured. Admin can view deleted pilots explicitly and restore them. Pilot creation does not reserve a device; Stock / Dispatch assigns a Pilot Stock device through Free Pilot Dispatch. Research Assistant may record the installation date but cannot mark Pilot Device Installed. Pilot KPI cards follow the active filters; clicking a card shows only matching pilots. Pilot owner and individual role selectors show only users with the relevant effective role. |
 
 #### Pilots KPI cards and drill-down
 

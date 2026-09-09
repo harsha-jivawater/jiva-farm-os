@@ -1,11 +1,15 @@
 # Jiva Farm OS
 
-Internal operating system for managing Jiva Water farmer leads, dealers, institutional partners, pilots, inventory, dispatches, installations, follow-ups, marketing material, users, regions, daily work, operations control, and KPIs.
+Internal operating system for managing Jiva Water farmer leads, dealers, institutional partners, primary and secondary sales, targets, forecasts, pilots, inventory, dispatches, installations, follow-ups, marketing material, users, regions, daily work, operations control, and KPIs.
 
 ## Project documentation
 
 - [Project status](docs/PROJECT_STATUS.md)
 - [Operations guide](docs/OPERATIONS_GUIDE.md)
+- [Sales operations guide](docs/SALES_OPERATIONS_GUIDE.md)
+- [Role-based usage manual](docs/ROLE_BASED_USAGE_MANUAL.md)
+- [Current engineering state](docs/engineering/CURRENT_STATE.md)
+- [Engineering roadmap](docs/engineering/ROADMAP.md)
 - [Changelog](docs/CHANGELOG.md)
 
 ## What is included
@@ -55,8 +59,13 @@ Internal operating system for managing Jiva Water farmer leads, dealers, institu
 - `/farmer-leads`
 - `/farmer-leads/import`
 - `/dealers`
+- `/dealers/reporting`
 - `/institutional-partners`
 - `/payment-links`
+- `/sales`
+- `/sales/targets`
+- `/sales/forecast`
+- `/sales/approvals`
 - `/pilots`
 - `/devices`
 - `/devices/import`

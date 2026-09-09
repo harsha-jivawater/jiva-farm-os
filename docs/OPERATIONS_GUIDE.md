@@ -10,6 +10,7 @@
 - Supabase is used for authentication, database, RLS, and file storage.
 - Supabase Storage bucket for app uploads: `app-uploads`
 - Supabase Storage bucket for Marketing Library: private `marketing-assets`
+- Sales/Pilot feature release baseline: `3f7cd14` from PR #60
 
 ## Required Local Checks
 
@@ -51,7 +52,8 @@ For SQL-dependent changes:
 1. Create a reviewed migration in `supabase/migrations`.
 2. Run `npm run check:migrations`, local replay, pgTAP, and database lint.
 3. Verify a restorable production backup and the migration ledger.
-4. Apply the reviewed SQL to production before dependent app code.
+4. Confirm `supabase migration list --linked` has no unexplained local/remote
+   mismatch, then apply the reviewed forward migration in an attended window.
 5. Confirm the migration and targeted read-only checks succeed.
 6. Merge the dependent app code.
 7. Run the deployment smoke check and affected workflow tests.
@@ -78,6 +80,9 @@ Never deploy code that depends on unapplied SQL.
 - Keep production `NEXT_PUBLIC_ENABLE_QA_SEED` unset or `false`.
 - Never use `supabase db reset --linked` against production.
 - Never edit the immutable baseline migrations. Add a new migration instead.
+- Never repair migration history merely to make a command pass. Repair only
+  after verifying which reviewed SQL is already present remotely, then rerun
+  the migration list before any push.
 
 ## Marketing Library Operations
 
@@ -173,6 +178,53 @@ Recent related migrations:
   Dispatch moves paid dispatches through the logistics statuses.
 - Dealer stock dispatches that require payment should start or remain visible as
   payment pending until Accounts confirms payment.
+
+## Sales Operations
+
+- The Sales dashboard is available at `/sales` to permitted Sales, leadership,
+  Accounts, and Viewer roles. RLS remains the final record boundary.
+- The reporting scope selector applies to every figure on the page. Overall
+  uses all visible dealers; selecting an RSM limits the dashboard to that RSM's
+  dealers and approved target.
+- The financial year is April through March and targets cover all device models
+  as one combined device count.
+- Actual primary sales count payment-confirmed `Dealer Stock Dispatch` devices
+  only after status reaches Dispatched, Delivered, Installation Pending, or
+  Installed.
+- Paid but not dispatched commercial devices are Committed forecast and are not
+  actual sales.
+- Secondary sales are qualifying `Dealer Farmer Installation` records grouped
+  by dealer and installation month. Customer Support must first ensure that the
+  farmer exists as a Farmer Lead.
+- Dealer stock uses active serial-numbered devices currently held by the dealer.
+  Current-month sell-through is secondary sales divided by current dealer stock
+  plus current-month secondary sales.
+
+Target operating rules:
+
+- Sales Head/Admin can choose an RSM or Sales Head, select the financial year,
+  edit all twelve monthly values, review the annual total, and save the matrix.
+- RSMs submit only their own monthly combined-device target. It stays Pending
+  and is excluded from the dashboard until Sales Head/Admin approves it.
+- Rejected RSM targets remain excluded until corrected and approved.
+- The Overall target is approved RSM targets plus the approved Sales Head direct
+  target; an RSM view uses only that RSM's approved target.
+- Karnataka and Tamil Nadu FY 2026-27 presets are editable starting values that
+  become operative only after Sales Head/Admin saves them.
+
+Forecast operating rules:
+
+- Actual and Committed are calculated from payment-confirmed commercial
+  dispatches.
+- Likely, Upside, and At Risk may be assigned to a visible dealer, institution,
+  or Farmer Lead by a permitted Sales writer.
+- Committed cannot be entered manually.
+- Saving a snapshot causes the database to recalculate the visible month's
+  totals and record the authenticated creator.
+- Accounts has read-only Sales access. Management and Viewer are also read-only.
+
+See `docs/SALES_OPERATIONS_GUIDE.md` for definitions, role accountability,
+presets, and the monthly cadence.
 
 ## Environment Boundaries
 
@@ -433,6 +485,13 @@ The current Dispatch is excluded from duplicate checks on edit, so existing Disp
 - Pilot completion returns the device to inventory and moves the linked Farmer Lead to `Pilot Completed - Sales Follow-up`.
 - Follow-up due date after pilot completion is the completion date.
 - A lead is not `Won` unless `payment_confirmed = true`.
+- A Pilot is created without a serial-numbered device reservation. Stock /
+  Dispatch assigns the device later by creating a Free Pilot Dispatch from the
+  selected Pilot and an eligible Pilot Stock device.
+- When the Free Pilot Dispatch reaches Dispatched, the selected device and
+  serial number synchronize back to the Pilot record.
+- Research Assistants can record the pilot device installation date. Admin,
+  R&D Head, and Agronomist retain authority to mark installation complete.
 
 ### Pilot KPI cards and filters
 
