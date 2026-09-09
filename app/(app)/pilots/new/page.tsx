@@ -3,7 +3,6 @@ import { PageHeader } from "@/components/page-header";
 import { PilotForm } from "@/components/pilots/pilot-form";
 import type {
   PilotDealerOption,
-  PilotDeviceOption,
   PilotFarmerLeadOption,
   PilotInstitutionOption,
   RegionOption,
@@ -30,19 +29,12 @@ export default async function NewPilotPage({ searchParams }: NewPilotPageProps) 
   );
   const [
     { data: farmerLeads, error: farmerLeadsError },
-    { data: devices },
     { data: users },
     { data: regions },
     { data: institutions },
     { data: dealers }
   ] = await Promise.all([
     loadPilotFarmerLeadOptions(supabase, { user: currentUser }),
-    supabase
-      .from("devices")
-      .select("id, serial_number, device_code, product_model, device_status")
-      .is("deleted_at", null)
-      .order("serial_number", { ascending: true })
-      .limit(200),
     supabase
       .from("users")
       .select("id, full_name, role, secondary_role")
@@ -79,13 +71,12 @@ export default async function NewPilotPage({ searchParams }: NewPilotPageProps) 
       <PageHeader
         eyebrow="R&D and field validation"
         title="Add New Pilot"
-        description="Create a pilot for one farmer, crop, location, and device."
+        description="Create a pilot for one farmer, crop, and location. The device is assigned through dispatch."
       />
       <PilotForm
         action={createPilotAction}
         cancelHref="/pilots"
         dealers={(dealers ?? []) as PilotDealerOption[]}
-        devices={(devices ?? []) as PilotDeviceOption[]}
         error={query.error ?? farmerLeadLoadError}
         farmerLeads={(farmerLeads ?? []) as PilotFarmerLeadOption[]}
         institutions={(institutions ?? []) as PilotInstitutionOption[]}

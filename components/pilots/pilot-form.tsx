@@ -33,7 +33,6 @@ import { suggestedPilotNameFromContext } from "@/lib/pilots/name-suggestions";
 import type {
   Pilot,
   PilotDealerOption,
-  PilotDeviceOption,
   PilotFarmerLeadOption,
   PilotInstitutionOption,
   RegionOption,
@@ -47,7 +46,6 @@ type PilotFormProps = {
   action: (formData: FormData) => void | Promise<void>;
   cancelHref: string;
   dealers: PilotDealerOption[];
-  devices: PilotDeviceOption[];
   error?: string | null;
   farmerLeads: PilotFarmerLeadOption[];
   institutions: PilotInstitutionOption[];
@@ -62,6 +60,10 @@ type PilotFormProps = {
 
 const pilotOwnerRoles = new Set(["Agronomist", "Research Assistant", "R&D Head"]);
 const pilotDeviceInstallRoles = ["Admin", "R&D Head", "Agronomist"];
+const pilotDeviceInstallationDateRoles = [
+  ...pilotDeviceInstallRoles,
+  "Research Assistant"
+];
 
 function inputClassName() {
   return "h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500";
@@ -441,11 +443,6 @@ function farmerSearchText(farmerLead: PilotFarmerLeadOption) {
     .toLowerCase();
 }
 
-function deviceLabel(device: PilotDeviceOption) {
-  const code = device.device_code ? ` · ${device.device_code}` : "";
-  return `${device.serial_number}${code} · ${device.product_model} · ${device.device_status}`;
-}
-
 function suggestedPilotName({
   dealer,
   farmer,
@@ -479,7 +476,6 @@ export function PilotForm({
   action,
   cancelHref,
   dealers,
-  devices,
   error,
   farmerLeads,
   institutions,
@@ -491,10 +487,6 @@ export function PilotForm({
   const initialFarmer = useMemo(
     () => farmerLeads.find((lead) => lead.id === pilot?.farmer_lead_id),
     [farmerLeads, pilot?.farmer_lead_id]
-  );
-  const initialDevice = useMemo(
-    () => devices.find((device) => device.id === pilot?.device_id),
-    [devices, pilot?.device_id]
   );
   const pilotUsers = users.filter((user) =>
     Array.from(pilotOwnerRoles).some((role) => hasRole(user, role))
@@ -509,9 +501,6 @@ export function PilotForm({
     pilot?.farmer_lead_id ?? initialFarmer?.id ?? ""
   );
   const [farmerLeadSearch, setFarmerLeadSearch] = useState("");
-  const [selectedDeviceId, setSelectedDeviceId] = useState(
-    pilot?.device_id ?? initialDevice?.id ?? ""
-  );
   const [pilotType, setPilotType] = useState(
     pilot?.pilot_type ?? defaultPilotType
   );
@@ -566,16 +555,18 @@ export function PilotForm({
     pilot?.soil_type ?? initialFarmer?.soil_type ?? ""
   );
   const [productModel, setProductModel] = useState(
-    pilot?.product_model ?? initialDevice?.product_model ?? defaultProductModel
+    pilot?.product_model ?? defaultProductModel
   );
-  const [serialNumber, setSerialNumber] = useState(
-    pilot?.device_serial_number_snapshot ?? initialDevice?.serial_number ?? ""
-  );
+  const serialNumber = pilot?.device_serial_number_snapshot ?? "";
   const isInstitutionPilot = pilotType === "Institution Pilot";
   const isDealerPilot = pilotType === "Dealer Pilot";
   const canManagePilotDeviceInstall = hasAnyRole(
     currentUser,
     pilotDeviceInstallRoles
+  );
+  const canManagePilotDeviceInstallationDate = hasAnyRole(
+    currentUser,
+    pilotDeviceInstallationDateRoles
   );
   const canManageVisitPlans = hasAnyRole(currentUser, [
     "Admin",
@@ -682,13 +673,6 @@ export function PilotForm({
       nextFarmerLeadId: value,
       nextInstitutionId: farmerLead?.linked_institution_id ?? ""
     });
-  }
-
-  function applyDevice(value: string) {
-    const device = devices.find((option) => option.id === value);
-    setSelectedDeviceId(value);
-    setSerialNumber(device?.serial_number ?? "");
-    setProductModel(device?.product_model ?? defaultProductModel);
   }
 
   return (
@@ -1098,27 +1082,17 @@ export function PilotForm({
               ))}
             </select>
           </div>
-          <div>
-            <label
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-              htmlFor="device_id"
-            >
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="mb-1.5 text-sm font-medium text-slate-700">
               Pilot Device
-            </label>
-            <select
-              className={inputClassName()}
-              id="device_id"
-              name="device_id"
-              onChange={(event) => applyDevice(event.target.value)}
-              value={selectedDeviceId}
-            >
-              <option value="">No device assigned</option>
-              {devices.map((device) => (
-                <option key={device.id} value={device.id}>
-                  {deviceLabel(device)}
-                </option>
-              ))}
-            </select>
+            </p>
+            <p className="min-h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900">
+              {pilot?.device_serial_number_snapshot ??
+                (pilot?.device_id ? "Assigned device" : "No device assigned yet")}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Stock / Dispatch assigns the device through Pilot Dispatch after the pilot is created.
+            </p>
           </div>
           <SelectField
             label="Product Model"
@@ -1128,13 +1102,15 @@ export function PilotForm({
             required
             value={productModel}
           />
-          <Field
-            label="Pilot Device Serial Number"
-            name="device_serial_number_snapshot"
-            onChange={setSerialNumber}
-            value={serialNumber}
-          />
-          {canManagePilotDeviceInstall ? (
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-slate-700">
+              Pilot Device Serial Number
+            </p>
+            <p className="min-h-10 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
+              {serialNumber || "Assigned after dispatch"}
+            </p>
+          </div>
+          {canManagePilotDeviceInstallationDate ? (
             <Field
               defaultValue={pilot?.device_installation_date}
               label="Pilot Device Installation Date"
@@ -1174,8 +1150,8 @@ export function PilotForm({
               {pilot?.installation_completed ? "Yes" : "No"}
             </p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Only Admin, R&D Head, or Agronomist can mark the pilot device as
-              installed.
+              Research Assistants can record the date, but only Admin, R&D Head,
+              or Agronomist can mark the pilot device as installed.
             </p>
             <input
               name="installation_completed"

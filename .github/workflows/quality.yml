@@ -63,6 +63,13 @@ jobs:
         run: supabase start --exclude studio,imgproxy,edge-runtime,realtime,logflare,vector,mailpit,supavisor
       - name: Test database and RLS
         run: npm run test:db
+      - name: Disable unrelated Google Chrome package source
+        run: |
+          for source_file in /etc/apt/sources.list.d/*google*; do
+            if [ -f "$source_file" ]; then
+              sudo mv "$source_file" "$source_file.disabled"
+            fi
+          done
       - name: Install test browser
         run: npx playwright install --with-deps chromium
       - name: Test application boundaries

@@ -907,8 +907,8 @@ export default async function PilotsPage({ searchParams }: PilotsPageProps) {
             </p>
           ) : null}
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-[1200px] divide-y divide-slate-200 text-left text-sm">
+        <div className="overflow-x-scroll overscroll-x-contain pb-1">
+          <table className="w-max min-w-[1440px] divide-y divide-slate-200 text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-semibold">Pilot</th>
