@@ -4,12 +4,12 @@ select plan(6);
 
 insert into public.users (id, full_name, email, role, is_active)
 values
-  ('30000000-0000-4000-8000-000000000001', 'Forecast RSM', 'forecast-rsm@jivawater.test', 'RSM', true),
-  ('30000000-0000-4000-8000-000000000002', 'Forecast Sales Head', 'forecast-head@jivawater.test', 'Sales Head', true);
+  ('30000000-0000-4000-8000-000000000001', 'Forecast RSM', 'forecast-rsm@jivawater.com', 'RSM', true),
+  ('30000000-0000-4000-8000-000000000002', 'Forecast Sales Head', 'forecast-head@jivawater.com', 'Sales Head', true);
 
 select set_config(
   'request.jwt.claims',
-  '{"sub":"30000000-0000-4000-8000-000000000001","email":"forecast-rsm@jivawater.test","role":"authenticated"}',
+  '{"sub":"30000000-0000-4000-8000-000000000001","email":"forecast-rsm@jivawater.com","role":"authenticated"}',
   true
 );
 set local role authenticated;
@@ -73,7 +73,7 @@ reset role;
 
 select set_config(
   'request.jwt.claims',
-  '{"sub":"30000000-0000-4000-8000-000000000002","email":"forecast-head@jivawater.test","role":"authenticated"}',
+  '{"sub":"30000000-0000-4000-8000-000000000002","email":"forecast-head@jivawater.com","role":"authenticated"}',
   true
 );
 set local role authenticated;
