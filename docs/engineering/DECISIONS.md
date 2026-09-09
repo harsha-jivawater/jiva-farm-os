@@ -216,14 +216,15 @@ quality, while keeping Designer submissions under a separate approval path.
 
 ---
 
-## ADR-016 — Dealer dispatch and dealer sell-through are separate sales events
+## ADR-016 — Paid dispatch and dealer sell-through are separate sales events
 
 **Status:** Accepted
 
-A payment-confirmed Dealer Stock Dispatch counts as an actual primary sale only
-after it reaches a stock-moving dispatch status. The later dealer-to-farmer
-transaction counts as a secondary sale only through a qualifying Dealer Farmer
-Installation linked to that dealer.
+A payment-confirmed dispatch across any route, including a paid pilot, counts
+as an actual primary sale only after it reaches a stock-moving dispatch status.
+The later dealer-to-farmer transaction counts as a secondary sale only through
+a qualifying Dealer Farmer Installation linked to an onboarded Active or
+Dormant dealer.
 
 This avoids counting dealer procurement as market pull and prevents the same
 serial-numbered device from becoming both primary and secondary sales at the

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PageHeader } from "@/components/page-header";
+import { isOnboardedDealerStatus } from "@/lib/dealers/options";
 import { dealerSaleInstallationStatuses } from "@/lib/dealers/performance";
 import {
   aggregateApprovedTargets,
@@ -45,6 +46,7 @@ type RsmUser = {
 
 type DashboardDealer = {
   dealer_name: string;
+  dealer_status: string;
   firm_name: string | null;
   id: string;
   rsm_user_id: string;
@@ -52,7 +54,20 @@ type DashboardDealer = {
 
 type DispatchRow = PrimarySaleDashboardRow & {
   destination_dealer_id: string | null;
+  destination_farmer_lead_id: string | null;
+  destination_institution_id: string | null;
+  destination_pilot_id: string | null;
   linked_dealer_id: string | null;
+  linked_farmer_lead_id: string | null;
+  linked_institution_id: string | null;
+  linked_pilot_id: string | null;
+};
+
+type RsmEntityScope = {
+  dealerIds: Set<string>;
+  farmerLeadIds: Set<string>;
+  institutionIds: Set<string>;
+  pilotIds: Set<string>;
 };
 
 function paramValue(
@@ -198,30 +213,86 @@ function PrimarySalesChart({
   );
 }
 
-async function loadDealerDispatches(
+function dispatchMatchesRsmScope(row: DispatchRow, scope: RsmEntityScope) {
+  return (
+    scope.dealerIds.has(row.destination_dealer_id ?? "") ||
+    scope.dealerIds.has(row.linked_dealer_id ?? "") ||
+    scope.farmerLeadIds.has(row.destination_farmer_lead_id ?? "") ||
+    scope.farmerLeadIds.has(row.linked_farmer_lead_id ?? "") ||
+    scope.institutionIds.has(row.destination_institution_id ?? "") ||
+    scope.institutionIds.has(row.linked_institution_id ?? "") ||
+    scope.pilotIds.has(row.destination_pilot_id ?? "") ||
+    scope.pilotIds.has(row.linked_pilot_id ?? "")
+  );
+}
+
+async function loadRsmEntityScope(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  dealerIds: string[]
+  rsmUserId: string
 ) {
-  if (!dealerIds.length) return [] as DispatchRow[];
-  const allowedDealers = new Set(dealerIds);
+  const [dealerResult, leadResult, institutionResult, pilotResult] =
+    await Promise.all([
+      supabase
+        .from("dealers")
+        .select("id")
+        .eq("rsm_user_id", rsmUserId)
+        .is("deleted_at", null),
+      supabase
+        .from("farmer_leads")
+        .select("id")
+        .eq("rsm_user_id", rsmUserId)
+        .is("deleted_at", null),
+      supabase
+        .from("institutions")
+        .select("id")
+        .eq("rsm_user_id", rsmUserId)
+        .is("deleted_at", null),
+      supabase
+        .from("pilots")
+        .select("id")
+        .eq("rsm_user_id", rsmUserId)
+        .is("deleted_at", null)
+    ]);
+
+  const error =
+    dealerResult.error ||
+    leadResult.error ||
+    institutionResult.error ||
+    pilotResult.error;
+  if (error) throw error;
+
+  return {
+    dealerIds: new Set((dealerResult.data ?? []).map((row) => row.id)),
+    farmerLeadIds: new Set((leadResult.data ?? []).map((row) => row.id)),
+    institutionIds: new Set(
+      (institutionResult.data ?? []).map((row) => row.id)
+    ),
+    pilotIds: new Set((pilotResult.data ?? []).map((row) => row.id))
+  } satisfies RsmEntityScope;
+}
+
+async function loadPrimaryDispatches(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  rsmScope: RsmEntityScope | null
+) {
   const rows: DispatchRow[] = [];
 
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
       .from("dispatches")
       .select(
-        "dispatch_date,dispatch_status,payment_confirmed,payment_confirmed_date,quantity,destination_dealer_id,linked_dealer_id"
+        "dispatch_date,dispatch_status,dispatch_type,payment_confirmed,payment_confirmed_date,quantity,destination_dealer_id,destination_farmer_lead_id,destination_institution_id,destination_pilot_id,linked_dealer_id,linked_farmer_lead_id,linked_institution_id,linked_pilot_id"
       )
-      .eq("dispatch_type", "Dealer Stock Dispatch")
+      .eq("payment_confirmed", true)
       .is("deleted_at", null)
       .range(from, from + 999);
 
     if (error) throw error;
     const batch = (data ?? []) as DispatchRow[];
     rows.push(
-      ...batch.filter((row) =>
-        allowedDealers.has(row.destination_dealer_id ?? row.linked_dealer_id ?? "")
-      )
+      ...(rsmScope
+        ? batch.filter((row) => dispatchMatchesRsmScope(row, rsmScope))
+        : batch)
     );
     if (batch.length < 1000) break;
   }
@@ -311,7 +382,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
 
   let dealerQuery = supabase
     .from("dealers")
-    .select("id,dealer_name,firm_name,rsm_user_id")
+    .select("id,dealer_name,dealer_status,firm_name,rsm_user_id")
     .is("deleted_at", null)
     .order("firm_name", { ascending: true })
     .order("dealer_name", { ascending: true });
@@ -319,9 +390,17 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   if (scope.orFilter) dealerQuery = dealerQuery.or(scope.orFilter);
   if (selectedRsmId) dealerQuery = dealerQuery.eq("rsm_user_id", selectedRsmId);
 
-  const { data: dealerData, error: dealerError } = await dealerQuery;
+  const [dealerResult, rsmEntityScope] = await Promise.all([
+    dealerQuery,
+    selectedRsmId
+      ? loadRsmEntityScope(supabase, selectedRsmId)
+      : Promise.resolve(null)
+  ]);
+  const { data: dealerData, error: dealerError } = dealerResult;
   if (dealerError) throw dealerError;
-  const dealers = (dealerData ?? []) as DashboardDealer[];
+  const dealers = ((dealerData ?? []) as DashboardDealer[]).filter((dealer) =>
+    isOnboardedDealerStatus(dealer.dealer_status)
+  );
   const dealerIds = dealers.map((dealer) => dealer.id);
 
   let targetQuery = supabase
@@ -348,7 +427,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const [targetResult, dispatchRows, secondaryRows, pendingResult, currentStock] =
     await Promise.all([
       targetQuery,
-      loadDealerDispatches(supabase, dealerIds),
+      loadPrimaryDispatches(supabase, rsmEntityScope),
       loadSecondarySales(
         supabase,
         dealerIds,
@@ -439,7 +518,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
           value={formatNumber(plannedTotal)}
         />
         <MetricCard
-          detail={`${plannedTotal ? Math.round((actualTotal / plannedTotal) * 100) : 0}% of target`}
+          detail={`${plannedTotal ? Math.round((actualTotal / plannedTotal) * 100) : 0}% of target · every paid dispatch route`}
           icon={PackageCheck}
           label="Actual primary sales"
           value={formatNumber(actualTotal)}
@@ -494,7 +573,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
               Secondary sales by dealer
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Actual dealer-to-farmer installations by month.
+              Actual dealer-to-farmer installations by month for onboarded
+              Active and Dormant dealers.
             </p>
           </div>
           <Link
@@ -574,7 +654,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       <div className="mt-8 border-t border-slate-200 pt-5">
         <h2 className="text-sm font-semibold text-slate-950">Sales definitions</h2>
         <div className="mt-3 grid gap-3 text-sm text-slate-600 md:grid-cols-3">
-          <p><span className="font-semibold text-slate-900">Actual primary sale:</span> payment confirmed and dispatched.</p>
+          <p><span className="font-semibold text-slate-900">Actual primary sale:</span> any payment-confirmed dispatch, including a paid pilot, that has reached Dispatched or a later state.</p>
           <p><span className="font-semibold text-slate-900">Committed forecast:</span> payment confirmed but not yet dispatched.</p>
           <p><span className="font-semibold text-slate-900">Secondary sale:</span> dealer-to-farmer installation recorded against a Farmer Lead.</p>
         </div>

@@ -1069,7 +1069,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  A["Payment-confirmed Dealer Dispatch"] --> B["Dispatched / Delivered"]
+  A["Payment-confirmed Dispatch"] --> B["Dispatched / Delivered"]
   B --> C["Actual primary sale"]
   C --> D["Dealer stock"]
   D --> E["Existing Farmer Lead selected"]
@@ -1079,8 +1079,8 @@ flowchart LR
 
 Rules:
 
-- Dealer procurement is the primary sale and counts only after payment
-  confirmation plus a stock-moving dispatch status.
+- Any paid dispatch, including a paid pilot, is a primary sale and counts only
+  after payment confirmation plus a stock-moving dispatch status.
 - Dealer-to-farmer market pull is the secondary sale and counts only from a
   qualifying Dealer Farmer Installation.
 - Customer Support creates/selects the Farmer Lead before recording the
@@ -1364,7 +1364,7 @@ Future/deferred R&D workflow decision:
 | Purpose | Monitor approved targets, actual primary sales, dealer secondary sales, current dealer stock, sell-through, forecast, and approvals. |
 | Used by | Admin, Management, Sales Head, RSM, Salesperson, Accounts, Viewer. |
 | Primary actions | Choose Overall/RSM scope, compare planned and actual by financial-year month, edit or submit targets, maintain forecast judgment, save snapshots, and review approvals. |
-| Important rules | Financial year is April-March. Actual primary sales require payment-confirmed Dealer Stock Dispatch in a stock-moving status. Secondary sales come from Dealer Farmer Installations. RSM targets require Sales Head/Admin approval. Accounts and Viewer are read-only. |
+| Important rules | Financial year is April-March. Actual primary sales require any payment-confirmed dispatch, including a paid pilot, to reach a stock-moving status. Secondary sales come from Dealer Farmer Installations for completed-onboarding Active and Dormant dealers. RSM targets require Sales Head/Admin approval. Accounts and Viewer are read-only. |
 
 Sales sub-pages:
 

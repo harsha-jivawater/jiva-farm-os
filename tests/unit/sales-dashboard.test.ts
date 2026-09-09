@@ -8,6 +8,7 @@ import {
   regionalTargetPreset,
   salesFinancialYearMonths
 } from "@/lib/sales/dashboard";
+import { isOnboardedDealerStatus } from "@/lib/dealers/options";
 
 describe("sales dashboard helpers", () => {
   it("builds an April-to-March financial year", () => {
@@ -49,16 +50,28 @@ describe("sales dashboard helpers", () => {
     expect(aggregateApprovedTargets(rows, 2026, "rsm-1")[5]).toBe(0);
   });
 
-  it("counts only payment-confirmed dispatched primary sales", () => {
+  it("counts payment-confirmed dispatched sales across every route", () => {
     const rows = [
-      { dispatch_date: "2026-08-04", dispatch_status: "Dispatched", payment_confirmed: true, payment_confirmed_date: "2026-08-02", quantity: 2 },
-      { dispatch_date: "2026-08-05", dispatch_status: "Delivered", payment_confirmed: true, payment_confirmed_date: "2026-08-03", quantity: 1 },
-      { dispatch_date: "2026-08-06", dispatch_status: "Approved for Dispatch", payment_confirmed: true, payment_confirmed_date: "2026-08-03", quantity: 4 },
-      { dispatch_date: "2026-08-07", dispatch_status: "Dispatched", payment_confirmed: false, payment_confirmed_date: null, quantity: 8 }
+      { dispatch_date: "2026-08-04", dispatch_status: "Dispatched", dispatch_type: "Dealer Stock Dispatch", payment_confirmed: true, payment_confirmed_date: "2026-08-02", quantity: 2 },
+      { dispatch_date: "2026-08-05", dispatch_status: "Delivered", dispatch_type: "Farmer Sale Dispatch", payment_confirmed: true, payment_confirmed_date: "2026-08-03", quantity: 1 },
+      { dispatch_date: "2026-08-05", dispatch_status: "Installed", dispatch_type: "Institution Dispatch", payment_confirmed: true, payment_confirmed_date: "2026-08-03", quantity: 3 },
+      { dispatch_date: "2026-08-06", dispatch_status: "Approved for Dispatch", dispatch_type: "Institution Dispatch", payment_confirmed: true, payment_confirmed_date: "2026-08-03", quantity: 4 },
+      { dispatch_date: "2026-08-06", dispatch_status: "Dispatched", dispatch_type: "Pilot Dispatch", payment_confirmed: true, payment_confirmed_date: "2026-08-03", quantity: 5 },
+      { dispatch_date: "2026-08-07", dispatch_status: "Dispatched", dispatch_type: "Farmer Sale Dispatch", payment_confirmed: false, payment_confirmed_date: null, quantity: 8 }
     ];
 
-    expect(aggregatePrimarySales(rows, 2026)[4]).toBe(3);
+    expect(aggregatePrimarySales(rows, 2026)[4]).toBe(11);
     expect(countCommittedPrimarySales(rows, "2026-09-01")).toBe(4);
+  });
+
+  it("recognizes only completed dealer onboarding states", () => {
+    expect(isOnboardedDealerStatus("Active")).toBe(true);
+    expect(isOnboardedDealerStatus("Dormant")).toBe(true);
+    expect(isOnboardedDealerStatus("Active Dealer")).toBe(true);
+    expect(isOnboardedDealerStatus("Dormant Dealer")).toBe(true);
+    expect(isOnboardedDealerStatus("Prospect")).toBe(false);
+    expect(isOnboardedDealerStatus("Onboarding")).toBe(false);
+    expect(isOnboardedDealerStatus("Dropped")).toBe(false);
   });
 
   it("groups actual secondary sales by dealer and month", () => {

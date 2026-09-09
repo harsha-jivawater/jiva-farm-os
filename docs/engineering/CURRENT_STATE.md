@@ -92,12 +92,12 @@ Device CSV import remains separate at `/devices/import`.
 
 ## Current Sales Behavior
 
-- Actual primary sales are payment-confirmed Dealer Stock Dispatch records in a
-  dispatched or later state.
-- Committed forecast is payment-confirmed dealer stock that has not yet been
+- Actual primary sales are all payment-confirmed dispatch records in a
+  dispatched or later state, including paid Pilot Dispatches.
+- Committed forecast is any payment-confirmed dispatch that has not yet been
   dispatched.
 - Secondary sales are Dealer Farmer Installations and are reported by dealer
-  and month.
+  and month for completed-onboarding Active and Dormant dealers only.
 - Overall targets combine approved RSM targets plus the Sales Head's approved
   direct target. Selecting an RSM limits every dashboard metric to that RSM's
   dealer scope and approved target.

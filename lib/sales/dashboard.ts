@@ -53,6 +53,7 @@ export type SalesTargetDashboardRow = {
 export type PrimarySaleDashboardRow = {
   dispatch_date: string | null;
   dispatch_status: string;
+  dispatch_type: string;
   payment_confirmed: boolean;
   payment_confirmed_date: string | null;
   quantity: number;
