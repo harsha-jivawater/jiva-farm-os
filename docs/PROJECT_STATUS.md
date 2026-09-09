@@ -58,12 +58,13 @@ Action Center is the global notification entry directly below the logo. Daily Wo
 - FY 2026-27 presets are available for Karnataka and Tamil Nadu when the
   matching RSM has no saved targets. Saving the matrix creates the approved
   source records; the preset itself is not counted before save.
-- Actual primary sales are payment-confirmed Dealer Stock Dispatch devices in
-  Dispatched, Delivered, Installation Pending, or Installed status. Paid but
-  not dispatched commercial devices remain committed forecast, not actual.
+- Actual primary sales are payment-confirmed dispatches in Dispatched,
+  Delivered, Installation Pending, or Installed status across every route,
+  including paid pilots. Paid but not dispatched devices remain committed
+  forecast, not actual.
 - Secondary sales are completed/qualifying Dealer Farmer Installations linked
-  to a dealer and are shown dealer-by-dealer for every month of the financial
-  year.
+  to a completed-onboarding Active or Dormant dealer and are shown
+  dealer-by-dealer for every month of the financial year.
 - Forecasting supports live Actual and Committed values, manual Likely, Upside,
   and At Risk assignments for dealers, institutions, and Farmer Leads, plus
   server-calculated monthly snapshots.

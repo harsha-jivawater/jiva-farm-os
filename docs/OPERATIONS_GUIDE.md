@@ -188,14 +188,15 @@ Recent related migrations:
   dealers and approved target.
 - The financial year is April through March and targets cover all device models
   as one combined device count.
-- Actual primary sales count payment-confirmed `Dealer Stock Dispatch` devices
-  only after status reaches Dispatched, Delivered, Installation Pending, or
-  Installed.
+- Actual primary sales count every payment-confirmed dispatch, including a paid
+  pilot, only after status reaches Dispatched, Delivered, Installation Pending,
+  or Installed.
 - Paid but not dispatched commercial devices are Committed forecast and are not
   actual sales.
 - Secondary sales are qualifying `Dealer Farmer Installation` records grouped
-  by dealer and installation month. Customer Support must first ensure that the
-  farmer exists as a Farmer Lead.
+  by dealer and installation month for completed-onboarding Active and Dormant
+  dealers only. Customer Support must first ensure that the farmer exists as a
+  Farmer Lead.
 - Dealer stock uses active serial-numbered devices currently held by the dealer.
   Current-month sell-through is secondary sales divided by current dealer stock
   plus current-month secondary sales.

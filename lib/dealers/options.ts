@@ -62,6 +62,12 @@ export function simplifiedDealerStatus(value: string | null | undefined) {
   return legacyDealerStatusMap[value] ?? value;
 }
 
+export function isOnboardedDealerStatus(value: string | null | undefined) {
+  const status = simplifiedDealerStatus(value);
+
+  return status === "Active" || status === "Dormant";
+}
+
 export const existingCustomerBaseTypeOptions = [
   { value: "Small Farmers", label: "Small Farmers" },
   { value: "Medium Farmers", label: "Medium Farmers" },

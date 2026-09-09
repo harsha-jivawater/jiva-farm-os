@@ -1,6 +1,6 @@
 # Sales Operations Guide
 
-_Last updated: 2026-09-09_
+_Last updated: 2026-09-10_
 
 ## Purpose
 
@@ -15,16 +15,16 @@ Overall/RSM reporting scope and the user's database record access.
 
 ### Primary sale
 
-A primary sale is a serial-numbered device sold by Jiva to a dealer. It counts
-as actual only when:
+A primary sale is any serial-numbered device for which Jiva has received money
+and completed the dispatch step. It counts as actual only when:
 
-- the record is a `Dealer Stock Dispatch`
 - payment is confirmed
 - status is `Dispatched`, `Delivered`, `Installation Pending`, or `Installed`
 
-The actual month is based on `dispatch_date`. A paid device that has not reached
-a stock-moving status is excluded from actual sales and remains committed
-forecast.
+This applies across farmer, institution, dealer, and paid pilot dispatches. The
+actual month is based on `dispatch_date`. A paid device that has not reached a
+stock-moving status is excluded from actual sales and remains committed
+forecast. An unpaid pilot does not count as a sale.
 
 ### Secondary sale
 
@@ -33,7 +33,9 @@ A secondary sale is a dealer-to-farmer sale represented by a qualifying
 exist as a Farmer Lead before Customer Support records the dealer farmer sale.
 
 Secondary sales are grouped by dealer and `installation_date` for the selected
-April-to-March financial year. A Dealer Stock Dispatch alone is not a secondary
+April-to-March financial year. The table includes only completed-onboarding
+dealers whose simplified status is Active or Dormant; Prospect, Onboarding, and
+Dropped records are excluded. A Dealer Stock Dispatch alone is not a secondary
 sale.
 
 ### Dealer stock
@@ -41,7 +43,8 @@ sale.
 Dealer stock is the current number of active serial-numbered devices where:
 
 - `current_holder_type = Dealer`
-- `current_holder_id` belongs to a dealer in the active scope
+- `current_holder_id` belongs to an onboarded Active or Dormant dealer in the
+  active scope
 
 ### Sell-through
 
@@ -58,8 +61,9 @@ The dashboard rounds this percentage to one decimal place.
 ## Dashboard Scope
 
 - `Overall sales` combines all dealers visible to the user.
-- An RSM selection limits dealer stock, primary sales, secondary sales, chart
-  values, forecast card context, and approvals to that RSM's dealer scope.
+- An RSM selection limits dealer stock and secondary sales to that RSM's
+  onboarded dealers, and attributes primary sales through the RSM-linked
+  farmer, institution, dealer, or pilot record.
 - An RSM user is automatically restricted to their own scope.
 - Admin, Management, Sales Head, and Accounts can choose Overall or an RSM,
   subject to RLS visibility.
@@ -133,8 +137,9 @@ creator; browser-submitted totals and authorship are not trusted.
 - Sales Head reviews Overall and RSM scopes against the approved target.
 - RSMs keep Farmer Leads, dealer opportunities, and forecast categories current.
 - Accounts confirms payments; paid but undispatched devices move into Committed.
-- Stock / Dispatch advances eligible dispatches; qualifying dealer dispatches
-  then count as Actual primary sales.
+- Stock / Dispatch advances eligible dispatches; every payment-confirmed
+  dispatch then counts as Actual primary sales when it reaches Dispatched or a
+  later state.
 - Customer Support records dealer-to-farmer sales through the linked Dealer
   Farmer Installation after the Farmer Lead exists.
 

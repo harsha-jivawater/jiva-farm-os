@@ -2,6 +2,19 @@
 
 Simple reverse chronological record of major Jiva Farm OS work.
 
+## 2026-09-10
+
+### Sales qualification corrections
+
+- Expanded actual primary sales to every payment-confirmed dispatch that has
+  reached Dispatched or a later state, including paid farmer, institution,
+  dealer, and pilot dispatches.
+- Expanded committed forecast to payment-confirmed dispatches across all
+  routes that have not yet moved into an actual-sales state.
+- Restricted the Secondary sales by dealer table, dealer stock, and
+  sell-through figures to completed-onboarding Active and Dormant dealers,
+  including their legacy status equivalents.
+
 ## 2026-09-09
 
 ### Sales dashboard and targets
