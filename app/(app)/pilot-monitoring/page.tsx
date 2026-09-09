@@ -411,39 +411,39 @@ export default async function PilotMonitoringPage() {
   const childQueryErrors: string[] = [];
 
   if (pilots.length) {
-    const [plannedVisitResult, reportResult, dispatchResult] = await timeAsync(
-      "pilot monitoring child queries",
+    const plannedVisitResult = await timeAsync(
+      "pilot monitoring planned visits query",
       () =>
-        Promise.all([
-          timeAsync("pilot monitoring planned visits query", () =>
-            supabase
-              .from("planned_pilot_visits")
-              .select(plannedVisitSelectColumns)
-              .in("pilot_id", Array.from(visiblePilotIds))
-              .is("deleted_at", null)
-              .order("planned_visit_date", { ascending: true })
-              .limit(4000)
-          ),
-          timeAsync("pilot monitoring visit reports query", () =>
-            supabase
-              .from("visit_reports")
-              .select(reportSelectColumns)
-              .in("pilot_id", Array.from(visiblePilotIds))
-              .is("deleted_at", null)
-              .order("report_date", { ascending: false })
-              .limit(4000)
-          ),
-          timeAsync("pilot monitoring dispatch query", () =>
-            supabase
-              .from("dispatches")
-              .select(dispatchSelectColumns)
-              .is("deleted_at", null)
-              .neq("dispatch_status", "Cancelled")
-              .or("linked_pilot_id.not.is.null,destination_pilot_id.not.is.null")
-              .order("created_at", { ascending: false })
-              .limit(2000)
-          )
-        ])
+        supabase
+          .from("planned_pilot_visits")
+          .select(plannedVisitSelectColumns)
+          .in("pilot_id", Array.from(visiblePilotIds))
+          .is("deleted_at", null)
+          .order("planned_visit_date", { ascending: true })
+          .limit(4000)
+    );
+    const reportResult = await timeAsync(
+      "pilot monitoring visit reports query",
+      () =>
+        supabase
+          .from("visit_reports")
+          .select(reportSelectColumns)
+          .in("pilot_id", Array.from(visiblePilotIds))
+          .is("deleted_at", null)
+          .order("report_date", { ascending: false })
+          .limit(4000)
+    );
+    const dispatchResult = await timeAsync(
+      "pilot monitoring dispatch query",
+      () =>
+        supabase
+          .from("dispatches")
+          .select(dispatchSelectColumns)
+          .is("deleted_at", null)
+          .neq("dispatch_status", "Cancelled")
+          .or("linked_pilot_id.not.is.null,destination_pilot_id.not.is.null")
+          .order("created_at", { ascending: false })
+          .limit(2000)
     );
 
     logSupabaseError(

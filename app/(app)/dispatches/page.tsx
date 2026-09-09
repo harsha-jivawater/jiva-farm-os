@@ -361,18 +361,24 @@ export default async function DispatchesPage({
   }).eq("dispatch_type", "Pilot Dispatch");
 
   try {
+    const listResult = await timeAsync("dispatches list query", () =>
+      withQueryTimeout(query, "dispatches list")
+    );
+    const { data, error, count } = listResult;
+
+    if (error) {
+      throw error;
+    }
+
+    dispatches = (data ?? []) as unknown as Dispatch[];
+    totalCount = count ?? dispatches.length;
+    totalDispatches = totalCount;
+
     const [
-      listResult,
       pendingPaymentResult,
       approvedForDispatchResult,
       dispatchedCountResult,
-      deliveredResult,
-      dealerStockDispatchesResult,
-      pilotDispatchesResult
     ] = await Promise.all([
-      timeAsync("dispatches list query", () =>
-        withQueryTimeout(query, "dispatches list")
-      ),
       timeAsync("dispatches pending payment count", () =>
         withQueryTimeout(pendingPaymentQuery, "dispatches pending payment count")
       ),
@@ -384,7 +390,13 @@ export default async function DispatchesPage({
       ),
       timeAsync("dispatches dispatched count", () =>
         withQueryTimeout(dispatchedCountQuery, "dispatches dispatched count")
-      ),
+      )
+    ]);
+    const [
+      deliveredResult,
+      dealerStockDispatchesResult,
+      pilotDispatchesResult
+    ] = await Promise.all([
       timeAsync("dispatches delivered count", () =>
         withQueryTimeout(deliveredQuery, "dispatches delivered count")
       ),
@@ -398,15 +410,6 @@ export default async function DispatchesPage({
         withQueryTimeout(pilotDispatchesQuery, "dispatches pilot count")
       )
     ]);
-    const { data, error, count } = listResult;
-
-    if (error) {
-      throw error;
-    }
-
-    dispatches = (data ?? []) as unknown as Dispatch[];
-    totalCount = count ?? dispatches.length;
-    totalDispatches = totalCount;
 
     for (const result of [
       pendingPaymentResult,
