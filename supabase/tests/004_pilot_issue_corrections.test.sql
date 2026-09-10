@@ -34,9 +34,9 @@ select ok(
     from pg_policies
     where schemaname = 'public'
       and tablename = 'farmer_leads'
-      and policyname = 'farmer_leads_select_agronomist_all'
+      and policyname = 'farmer_leads_select_authorized_scope'
   ),
-  'Agronomist all-leads permission is evaluated once per statement'
+  'the canonical Farmer Lead policy evaluates Agronomist permission once per statement'
 );
 
 select ok(
@@ -56,22 +56,25 @@ select ok(
     from pg_policies
     where schemaname = 'public'
       and tablename = 'farmer_leads'
-      and policyname = 'farmer_leads_select_internal_scope'
+      and policyname = 'farmer_leads_select_authorized_scope'
   ),
-  'the shared Farmer Lead policy no longer repeats an Agronomist users lookup'
+  'the canonical Farmer Lead policy does not repeat a correlated Agronomist users lookup'
 );
 
 select ok(
-  (
-    select qual like '%SELECT is_admin()%'
-      and qual like '%SELECT is_research_assistant()%'
-      and qual like '%SELECT get_current_user_id()%'
+  not exists (
+    select 1
     from pg_policies
     where schemaname = 'public'
       and tablename = 'farmer_leads'
-      and policyname = 'farmer_leads_select_internal_scope'
+      and policyname = any (array[
+        'farmer_leads_select_agronomist_all',
+        'farmer_leads_select_internal_scope',
+        'farmer_leads_select_research_assistant_pilot_geography',
+        'viewer_select_farmer_leads_read_only'
+      ])
   ),
-  'the remaining row-independent Farmer Lead role checks are evaluated once per statement'
+  'the superseded permissive Farmer Lead SELECT policies are removed'
 );
 
 select ok(
