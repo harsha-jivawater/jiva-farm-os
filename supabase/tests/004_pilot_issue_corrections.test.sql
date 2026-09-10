@@ -2,7 +2,7 @@ begin;
 
 set local search_path = public, extensions;
 
-select plan(9);
+select plan(10);
 
 select ok(
   exists (
@@ -59,6 +59,19 @@ select ok(
       and policyname = 'farmer_leads_select_internal_scope'
   ),
   'the shared Farmer Lead policy no longer repeats an Agronomist users lookup'
+);
+
+select ok(
+  (
+    select qual like '%SELECT is_admin()%'
+      and qual like '%SELECT is_research_assistant()%'
+      and qual like '%SELECT get_current_user_id()%'
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'farmer_leads'
+      and policyname = 'farmer_leads_select_internal_scope'
+  ),
+  'the remaining row-independent Farmer Lead role checks are evaluated once per statement'
 );
 
 select ok(
