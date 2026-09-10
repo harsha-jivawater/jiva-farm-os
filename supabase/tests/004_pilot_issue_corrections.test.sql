@@ -164,17 +164,13 @@ select is(
   'a Research Assistant cannot read a deleted Institution pilot option'
 );
 
-select is(
-  (
-    with updated as (
-      update public.institutions
-      set organization_name = 'Unauthorized change'
-      where id = '40000000-0000-4000-8000-000000000011'
-      returning id
-    )
-    select count(*) from updated
-  ),
-  0::bigint,
+select is_empty(
+  $$
+    update public.institutions
+    set organization_name = 'Unauthorized change'
+    where id = '40000000-0000-4000-8000-000000000011'
+    returning id
+  $$,
   'the new Research Assistant option policy does not grant Institution writes'
 );
 
