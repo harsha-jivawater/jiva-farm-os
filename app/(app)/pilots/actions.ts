@@ -1922,21 +1922,45 @@ export async function createVisitReportAction(
   }
 
   if (payload.pilot_visit_id) {
-    await supabase
+    const {
+      data: linkedPilotVisit,
+      error: linkPilotVisitError
+    } = await supabase
       .from("pilot_visits")
       .update({ visit_report_id: reportId })
-      .eq("id", payload.pilot_visit_id);
+      .eq("id", payload.pilot_visit_id)
+      .select("id")
+      .maybeSingle();
+
+    if (linkPilotVisitError || !linkedPilotVisit) {
+      redirectWithError(
+        errorPath,
+        `The visit report was saved, but the pilot visit could not be linked: ${linkPilotVisitError?.message ?? "the visit is unavailable or you do not have permission"}`
+      );
+    }
   }
 
   if (plannedVisit) {
-    await supabase
+    const {
+      data: completedPlannedVisit,
+      error: completePlannedVisitError
+    } = await supabase
       .from("planned_pilot_visits")
       .update({
         linked_pilot_visit_id: payload.pilot_visit_id,
         linked_visit_report_id: reportId,
         planned_visit_status: "Completed"
       })
-      .eq("id", plannedVisit.id);
+      .eq("id", plannedVisit.id)
+      .select("id")
+      .maybeSingle();
+
+    if (completePlannedVisitError || !completedPlannedVisit) {
+      redirectWithError(
+        errorPath,
+        `The visit report was saved, but the planned visit could not be completed: ${completePlannedVisitError?.message ?? "the planned visit is unavailable or you do not have permission"}`
+      );
+    }
   }
 
   await updatePilotFromReport(supabase, pilotId, payload, formData);
@@ -2022,12 +2046,15 @@ export async function updateVisitReportAction(
 
   await validateReportUsers(supabase, errorPath, payload);
 
-  let plannedVisit: Pick<PlannedPilotVisit, "id"> | null = null;
+  let plannedVisit: Pick<
+    PlannedPilotVisit,
+    "id" | "linked_visit_report_id"
+  > | null = null;
 
   if (payload.planned_pilot_visit_id) {
     const { data: plannedVisitData } = await supabase
       .from("planned_pilot_visits")
-      .select("id")
+      .select("id, linked_visit_report_id")
       .eq("id", payload.planned_pilot_visit_id)
       .eq("pilot_id", pilotId)
       .is("deleted_at", null)
@@ -2038,6 +2065,16 @@ export async function updateVisitReportAction(
     }
 
     plannedVisit = plannedVisitData;
+
+    if (
+      plannedVisit.linked_visit_report_id &&
+      plannedVisit.linked_visit_report_id !== reportId
+    ) {
+      redirectWithError(
+        errorPath,
+        "This planned visit already has another linked visit report."
+      );
+    }
   }
 
   if (payload.pilot_visit_id) {
@@ -2072,21 +2109,45 @@ export async function updateVisitReportAction(
   }
 
   if (payload.pilot_visit_id) {
-    await supabase
+    const {
+      data: linkedPilotVisit,
+      error: linkPilotVisitError
+    } = await supabase
       .from("pilot_visits")
       .update({ visit_report_id: reportId })
-      .eq("id", payload.pilot_visit_id);
+      .eq("id", payload.pilot_visit_id)
+      .select("id")
+      .maybeSingle();
+
+    if (linkPilotVisitError || !linkedPilotVisit) {
+      redirectWithError(
+        errorPath,
+        `The visit report was updated, but the pilot visit could not be linked: ${linkPilotVisitError?.message ?? "the visit is unavailable or you do not have permission"}`
+      );
+    }
   }
 
   if (plannedVisit) {
-    await supabase
+    const {
+      data: completedPlannedVisit,
+      error: completePlannedVisitError
+    } = await supabase
       .from("planned_pilot_visits")
       .update({
         linked_pilot_visit_id: payload.pilot_visit_id,
         linked_visit_report_id: reportId,
         planned_visit_status: "Completed"
       })
-      .eq("id", plannedVisit.id);
+      .eq("id", plannedVisit.id)
+      .select("id")
+      .maybeSingle();
+
+    if (completePlannedVisitError || !completedPlannedVisit) {
+      redirectWithError(
+        errorPath,
+        `The visit report was updated, but the planned visit could not be completed: ${completePlannedVisitError?.message ?? "the planned visit is unavailable or you do not have permission"}`
+      );
+    }
   }
 
   await updatePilotFromReport(supabase, pilotId, payload, formData);

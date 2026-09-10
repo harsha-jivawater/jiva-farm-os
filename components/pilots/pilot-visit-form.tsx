@@ -54,12 +54,14 @@ function Field({
   name,
   defaultValue,
   required = false,
+  step,
   type = "text"
 }: {
   label: string;
   name: string;
   defaultValue?: string | number | null;
   required?: boolean;
+  step?: string;
   type?: string;
 }) {
   return (
@@ -77,6 +79,7 @@ function Field({
         min={type === "number" ? 0 : undefined}
         name={name}
         required={required}
+        step={step}
         type={type}
       />
     </div>
@@ -211,6 +214,7 @@ export function PilotVisitForm({
           defaultValue={visit?.visit_number}
           label="Visit number"
           name="visit_number"
+          step="1"
           type="number"
         />
         <div>
@@ -278,12 +282,14 @@ export function PilotVisitForm({
           defaultValue={visit?.gps_latitude}
           label="GPS latitude"
           name="gps_latitude"
+          step="any"
           type="number"
         />
         <Field
           defaultValue={visit?.gps_longitude}
           label="GPS longitude"
           name="gps_longitude"
+          step="any"
           type="number"
         />
         <FileUploadField
@@ -397,6 +403,7 @@ export function PilotVisitForm({
             key={name}
             label={label}
             name={name}
+            step="any"
             type="number"
           />
         ))}
