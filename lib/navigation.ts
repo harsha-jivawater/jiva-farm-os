@@ -72,12 +72,6 @@ export const navigationGroups: readonly NavigationGroup[] = [
         icon: Store
       },
       {
-        label: "Dealer Reporting",
-        href: "/dealers/reporting",
-        module: "dealers",
-        icon: BarChart3
-      },
-      {
         label: "Sales",
         href: "/sales",
         module: "sales",
@@ -105,6 +99,12 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/reports/sales",
         module: "sales",
         icon: TableProperties
+      },
+      {
+        label: "Dealer Sales & Stock",
+        href: "/dealers/reporting",
+        module: "dealers",
+        icon: BarChart3
       }
     ]
   },

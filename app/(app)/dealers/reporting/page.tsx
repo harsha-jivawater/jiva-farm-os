@@ -1,11 +1,11 @@
 import Link from "next/link";
 import {
   Award,
-  CalendarDays,
+  Boxes,
+  Clock3,
   Download,
   PackageCheck,
   PackageOpen,
-  Repeat2,
   Search,
   SlidersHorizontal,
   Store,
@@ -16,7 +16,7 @@ import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PageHeader } from "@/components/page-header";
 import {
   dealerAgreementStatusOptions,
-  dealerStatusOptions,
+  isOnboardedDealerStatus,
   dealerTypeOptions,
   priorityOptions,
   trainingStatusOptions
@@ -29,6 +29,7 @@ import {
   readDealerMonthlyReportFilters
 } from "@/lib/dealers/monthly-report";
 import type { RegionOption, UserOption } from "@/lib/dealers/types";
+import { formatDisplayDate } from "@/lib/date-utils";
 import { exportLink } from "@/lib/export/csv";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
@@ -49,6 +50,7 @@ type DealerOption = {
   dealer_name: string;
   firm_name: string | null;
   id: string;
+  dealer_status: string | null;
 };
 
 function KpiCard({
@@ -99,7 +101,7 @@ export default async function DealerReportingPage({
 
   let dealerOptionsQuery = supabase
     .from("dealers")
-    .select("id,dealer_code,firm_name,dealer_name")
+    .select("id,dealer_code,firm_name,dealer_name,dealer_status")
     .is("deleted_at", null)
     .order("firm_name", { ascending: true })
     .order("dealer_name", { ascending: true })
@@ -151,14 +153,24 @@ export default async function DealerReportingPage({
   const selectedMonth =
     monthOptions.find((option) => option.value === filters.month)?.label ??
     "Selected month";
+  const onboardedDealerOptions = ((dealerOptions ?? []) as DealerOption[]).filter(
+    (dealer) => isOnboardedDealerStatus(dealer.dealer_status)
+  );
+  const agingTotals = report.stockAgingRows.reduce(
+    (totals, device) => {
+      totals[device.ageBucket] += 1;
+      return totals;
+    },
+    { "0–30 days": 0, "31–60 days": 0, "61–90 days": 0, "91+ days": 0, "Date missing": 0 }
+  );
 
   return (
     <section>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
-          eyebrow="Dealers reporting"
-          title="Monthly Dealer Procurement and Sales"
-          description="Track dealer stock opening, daily procurement, daily farmer sales, and closing stock for any selected month."
+          eyebrow="Reports · Onboarded dealers"
+          title="Dealer Sales & Stock"
+          description="Understand dealer purchases, secondary sales, live stock, and how long unsold devices have been held."
         />
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link
@@ -181,41 +193,32 @@ export default async function DealerReportingPage({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         <KpiCard
           icon={Store}
-          label="Dealers"
+          label="Onboarded Dealers"
           value={report.summary.dealerCount}
         />
         <KpiCard
           icon={PackageOpen}
-          label="Existing Stock"
-          value={report.summary.totalOpeningStock}
+          label="Current Stock"
+          value={currentStockTotal}
         />
         <KpiCard
           icon={Truck}
-          label="Procurement"
+          label="Purchased This Month"
           value={report.summary.totalProcurement}
         />
         <KpiCard
           icon={PackageCheck}
-          label="Sales"
+          label="Secondary Sales"
           value={report.summary.totalSales}
         />
-        <KpiCard
-          icon={CalendarDays}
-          label="Closing Stock"
-          value={report.summary.totalClosingStock}
-        />
+        <KpiCard icon={Clock3} label="Stock 91+ Days" value={agingTotals["91+ days"]} />
         <KpiCard
           icon={Award}
           label="First Orders"
           value={report.summary.firstOrderDealers}
-        />
-        <KpiCard
-          icon={Repeat2}
-          label="Repeat Orders"
-          value={report.summary.repeatOrderDealers}
         />
       </div>
 
@@ -225,8 +228,8 @@ export default async function DealerReportingPage({
           Filters
         </div>
         <p className="mt-1 text-xs text-slate-500">
-          The CSV uses the same filters and includes one Procurement row and one
-          Sales row per dealer.
+          Every total, filter, table, and CSV is restricted to dealers whose
+          status is Active or Dormant.
         </p>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -273,8 +276,8 @@ export default async function DealerReportingPage({
               defaultValue={filters.dealer_id}
               name="dealer_id"
             >
-              <option value="">All dealers</option>
-              {((dealerOptions ?? []) as DealerOption[]).map((dealer) => (
+              <option value="">All onboarded dealers</option>
+              {onboardedDealerOptions.map((dealer) => (
                 <option key={dealer.id} value={dealer.id}>
                   {dealerOptionLabel(dealer)}
                 </option>
@@ -303,15 +306,15 @@ export default async function DealerReportingPage({
 
           <label>
             <span className="mb-1.5 block text-sm font-medium text-slate-700">
-              Dealer status
+              Onboarded status
             </span>
             <select
               className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
               defaultValue={filters.dealer_status}
               name="dealer_status"
             >
-              <option value="">All statuses</option>
-              {dealerStatusOptions.map((option) => (
+              <option value="">Active and dormant</option>
+              {[{ value: "Active", label: "Active" }, { value: "Dormant", label: "Dormant" }].map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -479,6 +482,62 @@ export default async function DealerReportingPage({
           </Link>
         </div>
       </LiveFilterForm>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="text-base font-semibold text-slate-950">Dealer position</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Purchases and secondary sales are for {selectedMonth} {filters.year}; stock and aging are live.
+          </p>
+        </div>
+        {report.dealerRows.length === 0 ? (
+          <div className="p-8 text-center text-sm text-slate-500">No onboarded dealers match these filters.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[72rem] text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Dealer</th><th className="px-3 py-3">Code</th>
+                  <th className="px-3 py-3">First purchase</th><th className="px-3 py-3">Latest purchase</th>
+                  <th className="px-3 py-3 text-right">Purchased</th><th className="px-3 py-3 text-right">Secondary sales</th>
+                  <th className="px-3 py-3 text-right">Stock</th><th className="px-3 py-3 text-right">0–30</th>
+                  <th className="px-3 py-3 text-right">31–60</th><th className="px-3 py-3 text-right">61–90</th>
+                  <th className="px-3 py-3 text-right">91+</th><th className="px-3 py-3 text-right">Date missing</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {report.dealerRows.map((row) => (
+                  <tr key={row.dealerId}>
+                    <td className="px-4 py-3 font-semibold text-slate-950">{row.dealerName}</td>
+                    <td className="px-3 py-3 text-slate-600">{row.dealerCode}</td>
+                    <td className="px-3 py-3 text-slate-600">{formatDisplayDate(row.firstPurchaseDate)}</td>
+                    <td className="px-3 py-3 text-slate-600">{formatDisplayDate(row.latestPurchaseDate)}</td>
+                    <td className="px-3 py-3 text-right font-medium">{row.purchases}</td>
+                    <td className="px-3 py-3 text-right font-medium text-emerald-700">{row.secondarySales}</td>
+                    <td className="px-3 py-3 text-right font-semibold">{row.currentStock}</td>
+                    <td className="px-3 py-3 text-right">{row.age0To30}</td><td className="px-3 py-3 text-right">{row.age31To60}</td>
+                    <td className="px-3 py-3 text-right">{row.age61To90}</td><td className="px-3 py-3 text-right text-amber-700">{row.age91Plus}</td>
+                    <td className="px-3 py-3 text-right">{row.ageDateMissing}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-slate-600"><Boxes className="h-4 w-4" aria-hidden="true" /></span>
+          <div><h2 className="text-base font-semibold text-slate-950">Current stock aging</h2><p className="mt-0.5 text-sm text-slate-500">Age starts from the device&apos;s latest dealer-receipt movement date, with dispatch date as fallback.</p></div>
+        </div>
+        {report.stockAgingRows.length === 0 ? <div className="p-8 text-center text-sm text-slate-500">No current dealer stock matches these filters.</div> : (
+          <div className="overflow-x-auto"><table className="w-full min-w-[52rem] text-left text-sm">
+            <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Dealer</th><th className="px-3 py-3">Serial</th><th className="px-3 py-3">Product</th><th className="px-3 py-3">Received</th><th className="px-3 py-3 text-right">Age</th><th className="px-3 py-3">Bucket</th></tr></thead>
+            <tbody className="divide-y divide-slate-200">{report.stockAgingRows.map((device) => <tr key={device.serialNumber}><td className="px-4 py-3 font-medium text-slate-950">{device.dealerName}</td><td className="px-3 py-3 text-slate-700">{device.serialNumber}</td><td className="px-3 py-3 text-slate-600">{device.productModel}</td><td className="px-3 py-3 text-slate-600">{formatDisplayDate(device.receivedDate)}</td><td className="px-3 py-3 text-right">{device.ageDays ?? "—"}</td><td className="px-3 py-3 font-medium text-slate-700">{device.ageBucket}</td></tr>)}</tbody>
+          </table></div>
+        )}
+      </div>
 
       {mismatchRows.length ? (
         <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
