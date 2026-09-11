@@ -1,19 +1,14 @@
 import {
-  isCurrentDealerReportMonth,
   loadDealerMonthlyReport,
   monthOptions,
   readDealerMonthlyReportFilters,
-  type DealerMonthlyReportRow
+  type DealerSalesStockRow
 } from "@/lib/dealers/monthly-report";
 import { csvDisplay, csvResponse, type CsvColumn } from "@/lib/export/csv";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canDownloadCsv, canViewModule } from "@/lib/users/permissions";
 import { dealerScope } from "@/lib/users/record-scope";
-
-function countCell(value: number | undefined) {
-  return value ? value : "";
-}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -40,44 +35,28 @@ export async function GET(request: Request) {
     scope,
     supabase
   });
-  const currentMonth = isCurrentDealerReportMonth(filters);
   const monthLabel =
     monthOptions.find((option) => option.value === filters.month)?.label ??
     String(filters.month);
-  const dayColumns: CsvColumn<DealerMonthlyReportRow>[] = Array.from(
-    { length: 31 },
-    (_, index) => ({
-      header: String(index + 1),
-      value: (row) =>
-        index < report.daysInMonth ? countCell(row.dailyCounts[index]) : ""
-    })
-  );
-
   return csvResponse({
     columns: [
       { header: "Dealer / Entity Name", value: (row) => row.dealerName },
       { header: "Dealer Code", value: (row) => row.dealerCode },
-      { header: "Metric", value: (row) => row.metric },
-      {
-        header: "Existing Stock",
-        value: (row) => csvDisplay(row.openingStock)
-      },
-      ...dayColumns,
-      { header: "Total", value: (row) => csvDisplay(row.total) },
-      {
-        header: "Closing Stock",
-        value: (row) => csvDisplay(row.calculatedClosingStock)
-      },
-      {
-        header: "Current Stock",
-        value: (row) => (currentMonth ? csvDisplay(row.currentStock) : "")
-      },
-      { header: "Order Type", value: (row) => row.orderType },
+      { header: "First Purchase Date", value: (row) => row.firstPurchaseDate ?? "" },
+      { header: "Latest Purchase Date", value: (row) => row.latestPurchaseDate ?? "" },
+      { header: "Purchased in Period", value: (row) => csvDisplay(row.purchases) },
+      { header: "Secondary Sales in Period", value: (row) => csvDisplay(row.secondarySales) },
+      { header: "Current Stock", value: (row) => csvDisplay(row.currentStock) },
+      { header: "Stock 0-30 Days", value: (row) => csvDisplay(row.age0To30) },
+      { header: "Stock 31-60 Days", value: (row) => csvDisplay(row.age31To60) },
+      { header: "Stock 61-90 Days", value: (row) => csvDisplay(row.age61To90) },
+      { header: "Stock 91+ Days", value: (row) => csvDisplay(row.age91Plus) },
+      { header: "Stock Date Missing", value: (row) => csvDisplay(row.ageDateMissing) },
       { header: "Report Month", value: () => `${monthLabel} ${filters.year}` }
-    ],
-    filenameBase: `dealer-monthly-procurement-sales-${filters.year}-${String(
+    ] satisfies CsvColumn<DealerSalesStockRow>[],
+    filenameBase: `dealer-sales-stock-${filters.year}-${String(
       filters.month
     ).padStart(2, "0")}`,
-    rows: report.rows
+    rows: report.dealerRows
   });
 }

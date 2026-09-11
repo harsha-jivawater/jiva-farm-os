@@ -6,6 +6,7 @@ import {
   dealerStatusFilterMap,
   dealerStatusOptions,
   dealerTypeOptions,
+  isOnboardedDealerStatus,
   priorityOptions,
   trainingStatusOptions
 } from "@/lib/dealers/options";
@@ -20,6 +21,7 @@ type DealerReportDealer = {
   dealer_code: string;
   dealer_name: string;
   firm_name: string | null;
+  dealer_status?: string | null;
 };
 
 type DealerMovementRow = {
@@ -44,7 +46,40 @@ type DealerInstallationRow = {
 
 type DealerDeviceRow = {
   current_holder_id: string | null;
+  dispatch_date: string | null;
   id: string;
+  last_movement_date: string | null;
+  product_model: string;
+  serial_number: string;
+};
+
+export type DealerStockAgeBucket = "0–30 days" | "31–60 days" | "61–90 days" | "91+ days" | "Date missing";
+
+export type DealerStockAgingRow = {
+  ageBucket: DealerStockAgeBucket;
+  ageDays: number | null;
+  dealerCode: string;
+  dealerId: string;
+  dealerName: string;
+  productModel: string;
+  receivedDate: string | null;
+  serialNumber: string;
+};
+
+export type DealerSalesStockRow = {
+  age0To30: number;
+  age31To60: number;
+  age61To90: number;
+  age91Plus: number;
+  ageDateMissing: number;
+  currentStock: number;
+  dealerCode: string;
+  dealerId: string;
+  dealerName: string;
+  firstPurchaseDate: string | null;
+  latestPurchaseDate: string | null;
+  purchases: number;
+  secondarySales: number;
 };
 
 export type DealerMonthlyReportFilters = DealerFilters & {
@@ -86,10 +121,24 @@ export type DealerMonthlyReport = {
     start: string;
   };
   rows: DealerMonthlyReportRow[];
+  dealerRows: DealerSalesStockRow[];
+  stockAgingRows: DealerStockAgingRow[];
   summary: DealerMonthlyReportSummary;
 };
 
 const pagedQuerySize = 1_000;
+
+function stockAge(receivedDate: string | null): { bucket: DealerStockAgeBucket; days: number | null } {
+  if (!receivedDate) return { bucket: "Date missing", days: null };
+  const received = new Date(`${receivedDate.slice(0, 10)}T00:00:00Z`);
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const days = Math.max(0, Math.floor((todayUtc - received.getTime()) / 86_400_000));
+  if (days <= 30) return { bucket: "0–30 days", days };
+  if (days <= 60) return { bucket: "31–60 days", days };
+  if (days <= 90) return { bucket: "61–90 days", days };
+  return { bucket: "91+ days", days };
+}
 
 export const monthOptions = [
   { value: 1, label: "January" },
@@ -445,12 +494,12 @@ async function loadCurrentDealerStock({
   dealerIds: string[];
   supabase: SupabaseClient;
 }) {
-  const counts = new Map<string, number>();
+  const rows: DealerDeviceRow[] = [];
 
   for (let from = 0; ; from += pagedQuerySize) {
     const { data, error } = await supabase
       .from("devices")
-      .select("id,current_holder_id")
+      .select("id,current_holder_id,serial_number,product_model,last_movement_date,dispatch_date")
       .eq("current_holder_type", "Dealer")
       .in("current_holder_id", dealerIds)
       .is("deleted_at", null)
@@ -462,18 +511,14 @@ async function loadCurrentDealerStock({
 
     const batch = (data ?? []) as DealerDeviceRow[];
 
-    for (const device of batch) {
-      if (device.current_holder_id) {
-        mapIncrement(counts, device.current_holder_id);
-      }
-    }
+    rows.push(...batch);
 
     if (batch.length < pagedQuerySize) {
       break;
     }
   }
 
-  return counts;
+  return rows;
 }
 
 export async function loadDealerMonthlyReport({
@@ -575,7 +620,9 @@ export async function loadDealerMonthlyReport({
     throw dealerError;
   }
 
-  const dealers = (dealerData ?? []) as unknown as DealerReportDealer[];
+  const dealers = ((dealerData ?? []) as unknown as DealerReportDealer[]).filter(
+    (dealer) => isOnboardedDealerStatus(dealer.dealer_status)
+  );
   const dealerIds = dealers.map((dealer) => dealer.id);
 
   if (!dealerIds.length) {
@@ -587,6 +634,8 @@ export async function loadDealerMonthlyReport({
         start: fullRange.start
       },
       rows: [],
+      dealerRows: [],
+      stockAgingRows: [],
       summary: {
         dealerCount: 0,
         firstOrderDealers: 0,
@@ -604,7 +653,7 @@ export async function loadDealerMonthlyReport({
     openingOutboundRows,
     procurementRows,
     saleRows,
-    currentStockCounts
+    currentStockRows
   ] = await Promise.all([
     loadOpeningMovementRows({
       dealerIds,
@@ -634,6 +683,28 @@ export async function loadDealerMonthlyReport({
   ]);
 
   const dealerIdSet = new Set(dealerIds);
+  const dealerById = new Map(dealers.map((dealer) => [dealer.id, dealer]));
+  const currentStockCounts = new Map<string, number>();
+  const stockAgingRows: DealerStockAgingRow[] = [];
+
+  for (const device of currentStockRows) {
+    if (!device.current_holder_id) continue;
+    const dealer = dealerById.get(device.current_holder_id);
+    if (!dealer) continue;
+    mapIncrement(currentStockCounts, dealer.id);
+    const receivedDate = device.last_movement_date ?? device.dispatch_date;
+    const age = stockAge(receivedDate);
+    stockAgingRows.push({
+      ageBucket: age.bucket,
+      ageDays: age.days,
+      dealerCode: dealer.dealer_code,
+      dealerId: dealer.id,
+      dealerName: dealerName(dealer),
+      productModel: device.product_model,
+      receivedDate,
+      serialNumber: device.serial_number
+    });
+  }
   const latestMovementByDevice = new Map<string, DealerMovementRow>();
 
   for (const movement of [...openingInboundRows, ...openingOutboundRows]) {
@@ -692,6 +763,7 @@ export async function loadDealerMonthlyReport({
       .map((movement) => movement.to_holder_id as string)
   );
   const rows: DealerMonthlyReportRow[] = [];
+  const dealerRows: DealerSalesStockRow[] = [];
   const summary: DealerMonthlyReportSummary = {
     dealerCount: dealers.length,
     firstOrderDealers: 0,
@@ -717,6 +789,29 @@ export async function loadDealerMonthlyReport({
           : "First Order"
         : "";
     const currentStock = countMapValue(currentStockCounts, dealer.id);
+    const purchaseDates = [...openingInboundRows, ...procurementRows]
+      .filter((movement) => movement.movement_type === "Dispatch" && movement.to_holder_id === dealer.id)
+      .map((movement) => movement.movement_date)
+      .sort();
+    const dealerStock = stockAgingRows.filter((device) => device.dealerId === dealer.id);
+    const countBucket = (bucket: DealerStockAgeBucket) =>
+      dealerStock.filter((device) => device.ageBucket === bucket).length;
+
+    dealerRows.push({
+      age0To30: countBucket("0–30 days"),
+      age31To60: countBucket("31–60 days"),
+      age61To90: countBucket("61–90 days"),
+      age91Plus: countBucket("91+ days"),
+      ageDateMissing: countBucket("Date missing"),
+      currentStock,
+      dealerCode: dealer.dealer_code,
+      dealerId: dealer.id,
+      dealerName: dealerName(dealer),
+      firstPurchaseDate: purchaseDates[0] ?? null,
+      latestPurchaseDate: purchaseDates.at(-1) ?? null,
+      purchases: procurementTotal,
+      secondarySales: salesTotal
+    });
 
     if (orderType) {
       if (orderType === "First Order") {
@@ -767,6 +862,8 @@ export async function loadDealerMonthlyReport({
       start: fullRange.start
     },
     rows,
+    dealerRows,
+    stockAgingRows: stockAgingRows.sort((a, b) => (b.ageDays ?? -1) - (a.ageDays ?? -1)),
     summary
   };
 }
