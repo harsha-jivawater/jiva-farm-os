@@ -42,14 +42,15 @@ import {
   type UserOption
 } from "@/lib/dealers/types";
 import {
-  countDealerSales,
+  countConfirmedSecondarySales,
   countIssueReportedInstallations,
   currentFinancialYearRange,
   currentMonthRange,
   currentQuarterRange,
   isOverdueDate,
   targetGap,
-  type DealerPerformanceInstallation
+  type DealerPerformanceInstallation,
+  type DealerSecondarySale
 } from "@/lib/dealers/performance";
 import { createClient } from "@/lib/supabase/server";
 import { resolveFileUrls } from "@/lib/uploads/server";
@@ -395,6 +396,7 @@ export default async function DealerDetailPage({
     { data: dealerStockDispatchRows },
     { data: farmerLeads },
     { data: installations },
+    { data: secondarySales },
     { data: relatedPilots },
     { data: institutionLinks },
     { data: institutions },
@@ -497,6 +499,12 @@ export default async function DealerDetailPage({
       .is("deleted_at", null)
       .order("installation_date", { ascending: false })
       .limit(100),
+    supabase
+      .from("secondary_sales")
+      .select("dealer_id, sale_date, sale_status")
+      .eq("dealer_id", dealer.id)
+      .eq("sale_status", "Confirmed")
+      .order("sale_date", { ascending: false }),
     supabase
       .from("pilots")
       .select(
@@ -655,15 +663,23 @@ export default async function DealerDetailPage({
   );
   const performanceInstallations =
     dealerInstallations as DealerPerformanceInstallation[];
+  const confirmedSecondarySales =
+    (secondarySales ?? []) as DealerSecondarySale[];
   const monthRange = currentMonthRange();
   const quarterRange = currentQuarterRange();
   const fyRange = currentFinancialYearRange();
-  const currentMonthActualSales = countDealerSales(
-    performanceInstallations,
+  const currentMonthActualSales = countConfirmedSecondarySales(
+    confirmedSecondarySales,
     monthRange
   );
-  const quarterActualSales = countDealerSales(performanceInstallations, quarterRange);
-  const fyActualSales = countDealerSales(performanceInstallations, fyRange);
+  const quarterActualSales = countConfirmedSecondarySales(
+    confirmedSecondarySales,
+    quarterRange
+  );
+  const fyActualSales = countConfirmedSecondarySales(
+    confirmedSecondarySales,
+    fyRange
+  );
   const issueReportedInstallations =
     countIssueReportedInstallations(performanceInstallations);
   const monthlyTarget = dealer.monthly_installation_target ?? 0;

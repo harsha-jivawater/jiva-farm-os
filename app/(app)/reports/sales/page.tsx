@@ -43,8 +43,8 @@ export default async function SalesReportPage({ searchParams }: Props) {
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <Kpi icon={PackageCheck} label="Total primary sales" value={summary.total} />
-      <Kpi icon={Store} label="Dealer stock sales" value={summary.dealer} />
-      <Kpi icon={Tractor} label="Farmer sales" value={summary.farmer} />
+      <Kpi icon={Store} label="Primary sales to dealers" value={summary.dealer} />
+      <Kpi icon={Tractor} label="Direct primary sales to farmers" value={summary.farmer} />
       <Kpi icon={Building2} label="Institution sales" value={summary.institution} />
       <Kpi icon={UsersRound} label="Paid pilots" value={summary.paidPilot} />
     </div>

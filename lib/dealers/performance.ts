@@ -15,6 +15,12 @@ export type DealerPerformanceInstallation = {
   installation_type: string | null;
 };
 
+export type DealerSecondarySale = {
+  dealer_id: string;
+  sale_date: string;
+  sale_status: string;
+};
+
 export type DateRange = {
   end: string;
   start: string;
@@ -107,6 +113,17 @@ export function countDealerSales(
     (installation) =>
       isDealerSaleInstallation(installation) &&
       (!range || dateInRange(installation.installation_date, range))
+  ).length;
+}
+
+export function countConfirmedSecondarySales(
+  sales: DealerSecondarySale[],
+  range?: DateRange
+) {
+  return sales.filter(
+    (sale) =>
+      sale.sale_status === "Confirmed" &&
+      (!range || dateInRange(sale.sale_date, range))
   ).length;
 }
 

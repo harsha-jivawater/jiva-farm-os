@@ -2,6 +2,7 @@ import { DispatchForm } from "@/components/dispatches/dispatch-form";
 import { PageHeader } from "@/components/page-header";
 import { createDispatchAction } from "@/app/(app)/dispatches/actions";
 import { preferredDispatchDeviceStatuses } from "@/lib/dispatches/options";
+import { isOnboardedDealerStatus } from "@/lib/dealers/options";
 import {
   mergeFarmerLeadOptions,
   type DispatchDealerOption,
@@ -96,7 +97,8 @@ const dealerSelectColumns = [
   "contact_number",
   "state",
   "district",
-  "dealer_address"
+  "dealer_address",
+  "dealer_status"
 ].join(",");
 
 const institutionSelectColumns = [
@@ -202,13 +204,16 @@ export default async function NewDispatchPage({
     .not("pilot_status", "in", "(Cancelled,Closed - Successful,Closed - Failed,Closed - Inconclusive)")
     .order("created_at", { ascending: false })
     .limit(200);
-  const { data: dealers } = await supabase
+  const { data: dealerRows } = await supabase
     .from("dealers")
     .select(dealerSelectColumns)
     .is("deleted_at", null)
     .order("firm_name", { ascending: true, nullsFirst: false })
     .order("dealer_name", { ascending: true })
     .limit(200);
+  const dealers = ((dealerRows ?? []) as unknown as DispatchDealerOption[]).filter(
+    (dealer) => isOnboardedDealerStatus(dealer.dealer_status)
+  );
   const { data: institutions } = await supabase
     .from("institutions")
     .select(institutionSelectColumns)
