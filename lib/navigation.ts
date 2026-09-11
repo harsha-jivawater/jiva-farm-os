@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   Stethoscope,
   Store,
+  TableProperties,
   Tractor,
   Truck,
   TrendingUp,
@@ -93,6 +94,17 @@ export const navigationGroups: readonly NavigationGroup[] = [
         href: "/payment-links",
         module: "payment-links",
         icon: Link2
+      }
+    ]
+  },
+  {
+    label: "Reports",
+    items: [
+      {
+        label: "Sales Report",
+        href: "/reports/sales",
+        module: "sales",
+        icon: TableProperties
       }
     ]
   },
