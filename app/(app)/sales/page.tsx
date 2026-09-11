@@ -166,6 +166,21 @@ function PrimarySalesChart({
 }) {
   const maximum = Math.max(1, ...planned, ...actual);
 
+  const series = [
+    {
+      barClassName: "bg-emerald-500",
+      label: "Planned",
+      valueClassName: "text-emerald-700",
+      values: planned
+    },
+    {
+      barClassName: "bg-blue-900",
+      label: "Actual",
+      valueClassName: "text-blue-900",
+      values: actual
+    }
+  ] as const;
+
   return (
     <div className="overflow-x-auto pb-2">
       <div className="min-w-[780px]">
@@ -177,32 +192,38 @@ function PrimarySalesChart({
             <span className="h-3 w-3 rounded-sm bg-blue-900" /> Actual
           </span>
         </div>
-        <div className="grid h-72 grid-cols-12 gap-3 border-b border-slate-200 px-2">
+        <div
+          aria-label="Primary sales planned versus actual by financial year month"
+          className="grid h-72 grid-cols-12 gap-2 border-b border-slate-200 px-2"
+          role="img"
+        >
           {months.map((month, index) => (
-            <div className="flex min-w-0 flex-col justify-end" key={month.key}>
-              <div className="flex h-60 items-end justify-center gap-1">
-                <div className="flex h-full w-1/2 flex-col justify-end">
-                  <span className="mb-1 text-center text-[10px] font-semibold text-emerald-700">
-                    {planned[index] || ""}
-                  </span>
-                  <div
-                    className="min-h-0 bg-emerald-500"
-                    style={{ height: `${(planned[index] / maximum) * 100}%` }}
-                    title={`${month.label} planned: ${planned[index]}`}
-                  />
-                </div>
-                <div className="flex h-full w-1/2 flex-col justify-end">
-                  <span className="mb-1 text-center text-[10px] font-semibold text-blue-900">
-                    {actual[index] || ""}
-                  </span>
-                  <div
-                    className="min-h-0 bg-blue-900"
-                    style={{ height: `${(actual[index] / maximum) * 100}%` }}
-                    title={`${month.label} actual: ${actual[index]}`}
-                  />
-                </div>
+            <div className="flex min-w-0 flex-col items-center justify-end" key={month.key}>
+              <div className="flex h-60 w-full items-end justify-center gap-1.5">
+                {series
+                  .filter((item) => item.values[index] > 0)
+                  .map((item) => {
+                    const value = item.values[index];
+
+                    return (
+                      <div
+                        className="flex h-full min-w-0 flex-1 basis-0 flex-col justify-end"
+                        key={item.label}
+                        style={{ maxWidth: "2rem" }}
+                      >
+                        <span className={`mb-1 text-center text-[10px] font-semibold ${item.valueClassName}`}>
+                          {value}
+                        </span>
+                        <div
+                          className={`w-full rounded-t-sm ${item.barClassName}`}
+                          style={{ height: `max(2px, ${(value / maximum) * 100}%)` }}
+                          title={`${month.label} ${item.label.toLowerCase()}: ${value}`}
+                        />
+                      </div>
+                    );
+                  })}
               </div>
-              <p className="mt-2 text-center text-xs font-medium text-slate-600">
+              <p className="mt-2 w-full text-center text-xs font-medium text-slate-600">
                 {month.label}
               </p>
             </div>
@@ -285,6 +306,7 @@ async function loadPrimaryDispatches(
       )
       .eq("payment_confirmed", true)
       .is("deleted_at", null)
+      .order("id", { ascending: true })
       .range(from, from + 999);
 
     if (error) throw error;
@@ -563,6 +585,15 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <PrimarySalesChart actual={actual} months={months} planned={planned} />
+          <div className="mt-3 flex flex-col gap-1 border-t border-slate-100 pt-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              Actual total: <span className="font-semibold tabular-nums text-slate-900">{formatNumber(actualTotal)}</span>
+              {" · "}Payment-confirmed dispatches at Dispatched or later.
+            </p>
+            <Link className="font-semibold text-brand-700 hover:text-brand-800" href="/reports/sales">
+              Reconcile in Sales Report
+            </Link>
+          </div>
         </div>
       </div>
 
