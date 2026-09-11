@@ -2,6 +2,7 @@ import {
   defaultDispatchStatus,
   defaultPaymentRequirementType,
   destinationTypeOptions,
+  dispatchDateRequiredStatuses,
   dispatchStatusOptions,
   dispatchTypeOptions,
   paymentBypassRequirementTypes,
@@ -179,8 +180,13 @@ export function validateDispatchPayload(payload: DispatchFormPayload) {
     return "Payment must be confirmed before this dispatch can be approved or moved forward.";
   }
 
-  if (payload.dispatch_status === "Dispatched" && !payload.dispatch_date) {
-    return "Dispatch date is required when status is Dispatched.";
+  if (
+    dispatchDateRequiredStatuses.includes(
+      payload.dispatch_status as (typeof dispatchDateRequiredStatuses)[number]
+    ) &&
+    !payload.dispatch_date
+  ) {
+    return "Dispatch date is required once stock has been dispatched.";
   }
 
   return null;
