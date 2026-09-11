@@ -49,6 +49,9 @@ on public.secondary_sales (recorded_by_user_id);
 
 alter table public.secondary_sales enable row level security;
 
+revoke all on table public.secondary_sales from anon;
+revoke all on table public.secondary_sales from authenticated;
+
 create policy secondary_sales_select_through_installation
 on public.secondary_sales
 for select
