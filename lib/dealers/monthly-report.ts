@@ -11,7 +11,6 @@ import {
   trainingStatusOptions
 } from "@/lib/dealers/options";
 import type { DealerFilters } from "@/lib/dealers/types";
-import { dealerSaleInstallationStatuses } from "@/lib/dealers/performance";
 import { CSV_EXPORT_LIMIT } from "@/lib/export/csv";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -36,12 +35,10 @@ type DealerMovementRow = {
   to_holder_type: string;
 };
 
-type DealerInstallationRow = {
+type DealerSecondarySaleRow = {
   dealer_id: string | null;
   id: string;
-  installation_date: string | null;
-  installation_status: string | null;
-  installation_type: string | null;
+  sale_date: string;
 };
 
 type DealerDeviceRow = {
@@ -449,34 +446,24 @@ async function loadMonthlyDealerSales({
   startDate: string;
   supabase: SupabaseClient;
 }) {
-  const rows: DealerInstallationRow[] = [];
+  const rows: DealerSecondarySaleRow[] = [];
 
   for (let from = 0; ; from += pagedQuerySize) {
     const { data, error } = await supabase
-      .from("installations")
-      .select(
-        [
-          "id",
-          "dealer_id",
-          "installation_date",
-          "installation_status",
-          "installation_type"
-        ].join(",")
-      )
-      .eq("installation_type", "Dealer Farmer Installation")
-      .in("installation_status", [...dealerSaleInstallationStatuses])
+      .from("secondary_sales")
+      .select("id,dealer_id,sale_date")
+      .eq("sale_status", "Confirmed")
       .in("dealer_id", dealerIds)
-      .gte("installation_date", startDate)
-      .lte("installation_date", endDate)
-      .is("deleted_at", null)
-      .order("installation_date", { ascending: true })
+      .gte("sale_date", startDate)
+      .lte("sale_date", endDate)
+      .order("sale_date", { ascending: true })
       .range(from, from + pagedQuerySize - 1);
 
     if (error) {
       throw error;
     }
 
-    const batch = (data ?? []) as unknown as DealerInstallationRow[];
+    const batch = (data ?? []) as unknown as DealerSecondarySaleRow[];
     rows.push(...batch);
 
     if (batch.length < pagedQuerySize) {
@@ -748,7 +735,7 @@ export async function loadDealerMonthlyReport({
     }
 
     const dailyCounts = salesDailyCounts.get(sale.dealer_id) ?? emptyDailyCounts();
-    incrementDay(dailyCounts, sale.installation_date);
+    incrementDay(dailyCounts, sale.sale_date);
     salesDailyCounts.set(sale.dealer_id, dailyCounts);
   }
 

@@ -81,9 +81,9 @@ describe("sales dashboard helpers", () => {
         { id: "dealer-2", dealerName: "Dealer Two" }
       ],
       [
-        { dealer_id: "dealer-1", installation_date: "2026-08-10" },
-        { dealer_id: "dealer-1", installation_date: "2026-08-11" },
-        { dealer_id: "dealer-2", installation_date: "2026-09-01" }
+        { dealer_id: "dealer-1", sale_date: "2026-08-10" },
+        { dealer_id: "dealer-1", sale_date: "2026-08-11" },
+        { dealer_id: "dealer-2", sale_date: "2026-09-01" }
       ],
       2026
     );

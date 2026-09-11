@@ -9,6 +9,60 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      secondary_sales: {
+        Row: {
+          id: string;
+          installation_id: string;
+          original_dispatch_id: string;
+          dealer_id: string;
+          farmer_lead_id: string;
+          device_id: string;
+          sale_date: string;
+          quantity: number;
+          sale_status: string;
+          source: string;
+          recorded_by_user_id: string;
+          reversed_at: string | null;
+          reversal_reason: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          installation_id: string;
+          original_dispatch_id: string;
+          dealer_id: string;
+          farmer_lead_id: string;
+          device_id: string;
+          sale_date: string;
+          quantity?: number;
+          sale_status?: string;
+          source?: string;
+          recorded_by_user_id: string;
+          reversed_at?: string | null;
+          reversal_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          installation_id?: string;
+          original_dispatch_id?: string;
+          dealer_id?: string;
+          farmer_lead_id?: string;
+          device_id?: string;
+          sale_date?: string;
+          quantity?: number;
+          sale_status?: string;
+          source?: string;
+          recorded_by_user_id?: string;
+          reversed_at?: string | null;
+          reversal_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       sales_targets: {
         Row: {
           id: string; month_start: string; owner_type: string; owner_user_id: string;

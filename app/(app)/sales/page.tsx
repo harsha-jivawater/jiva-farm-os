@@ -13,7 +13,6 @@ import {
 import { LiveFilterForm } from "@/components/filters/live-filter-form";
 import { PageHeader } from "@/components/page-header";
 import { isOnboardedDealerStatus } from "@/lib/dealers/options";
-import { dealerSaleInstallationStatuses } from "@/lib/dealers/performance";
 import {
   aggregateApprovedTargets,
   aggregateDealerSecondarySales,
@@ -333,14 +332,13 @@ async function loadSecondarySales(
 
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
-      .from("installations")
-      .select("dealer_id,installation_date")
+      .from("secondary_sales")
+      .select("dealer_id,sale_date")
       .in("dealer_id", dealerIds)
-      .eq("installation_type", "Dealer Farmer Installation")
-      .in("installation_status", [...dealerSaleInstallationStatuses])
-      .gte("installation_date", start)
-      .lt("installation_date", endExclusive)
-      .is("deleted_at", null)
+      .eq("sale_status", "Confirmed")
+      .gte("sale_date", start)
+      .lt("sale_date", endExclusive)
+      .order("sale_date", { ascending: true })
       .range(from, from + 999);
 
     if (error) throw error;
@@ -486,7 +484,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     monthBounds.nextMonthStart
   );
   const currentMonthSales = secondaryRows.filter(
-    (row) => row.installation_date?.slice(0, 7) === monthBounds.key
+    (row) => row.sale_date.slice(0, 7) === monthBounds.key
   ).length;
   const sellThrough = calculateSellThrough(
     currentMonthSales,

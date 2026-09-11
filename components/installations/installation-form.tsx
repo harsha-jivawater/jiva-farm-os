@@ -484,11 +484,12 @@ export function InstallationForm({
                 </option>
               ))}
             </select>
-            {initialInstallationType === "Dealer Farmer Installation" ? (
+            {isDealerFarmerInstallation ? (
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                This records a farmer sale from dealer stock. It uses the
-                original Dealer Dispatch and does not create a new Jiva to
-                farmer dispatch.
+                Saving a completed installation automatically records the
+                secondary sale, moves the device out of dealer stock, and
+                schedules follow-up. The original Jiva-to-dealer dispatch
+                remains unchanged; no separate sales entry is needed.
               </p>
             ) : null}
           </div>
@@ -579,7 +580,7 @@ export function InstallationForm({
                 value={selectedFarmerLeadId}
               />
             ) : null}
-            {initialInstallationType === "Dealer Farmer Installation" ? (
+            {isDealerFarmerInstallation ? (
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 Select an existing Farmer Lead. If this farmer is not yet in the
                 system,{" "}

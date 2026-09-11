@@ -43,12 +43,13 @@ import {
   type UserOption
 } from "@/lib/dealers/types";
 import {
-  countDealerSales,
+  countConfirmedSecondarySales,
   countIssueReportedInstallations,
   currentMonthRange,
   isOverdueDate,
   targetGap,
-  type DealerPerformanceInstallation
+  type DealerPerformanceInstallation,
+  type DealerSecondarySale
 } from "@/lib/dealers/performance";
 import { applyLocationFilter } from "@/lib/filters/location";
 import { formatDisplayDateTime } from "@/lib/date-utils";
@@ -333,9 +334,21 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
   monthStart.setDate(1);
   const monthStartDate = monthStart.toISOString().slice(0, 10);
 
-  const [{ data: stockDevices }, { data: installations }, { data: dispatches }] =
+  const [
+    { data: secondarySales },
+    { data: stockDevices },
+    { data: installations },
+    { data: dispatches }
+  ] =
     await timeAsync("dealers related count queries", () =>
       Promise.all([
+        dealerIds.length
+          ? supabase
+              .from("secondary_sales")
+              .select("dealer_id, sale_date, sale_status")
+              .in("dealer_id", dealerIds)
+              .eq("sale_status", "Confirmed")
+          : Promise.resolve({ data: [] }),
         dealerIds.length
           ? supabase
               .from("devices")
@@ -374,6 +387,13 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
     (dispatch) => dispatch.destination_dealer_id
   );
   const monthRange = currentMonthRange();
+  const secondarySalesByDealer = (
+    (secondarySales ?? []) as DealerSecondarySale[]
+  ).reduce<Record<string, DealerSecondarySale[]>>((acc, sale) => {
+    acc[sale.dealer_id] = acc[sale.dealer_id] ?? [];
+    acc[sale.dealer_id].push(sale);
+    return acc;
+  }, {});
   const installationsByDealer = (
     (installations ?? []) as DealerPerformanceInstallation[]
   ).reduce<Record<string, DealerPerformanceInstallation[]>>((acc, installation) => {
@@ -386,8 +406,8 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
   }, {});
   const dealerRows: DealerListItem[] = dealers.map((dealer) => ({
     ...dealer,
-    actualDealerSalesThisMonth: countDealerSales(
-      installationsByDealer[dealer.id] ?? [],
+    actualDealerSalesThisMonth: countConfirmedSecondarySales(
+      secondarySalesByDealer[dealer.id] ?? [],
       monthRange
     ),
     dealerStockCount: stockCounts[dealer.id] ?? 0,
@@ -398,7 +418,10 @@ export default async function DealersPage({ searchParams }: DealersPageProps) {
     ),
     monthlyGap: targetGap(
       dealer.monthly_installation_target,
-      countDealerSales(installationsByDealer[dealer.id] ?? [], monthRange)
+      countConfirmedSecondarySales(
+        secondarySalesByDealer[dealer.id] ?? [],
+        monthRange
+      )
     ),
     needsReview:
       isOverdueDate(dealer.next_dealer_review_date) ||

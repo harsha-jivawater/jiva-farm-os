@@ -102,6 +102,7 @@ export type DispatchDealerOption = {
   state: string;
   district: string;
   dealer_address: string | null;
+  dealer_status?: string;
 };
 
 export type DispatchFilters = {

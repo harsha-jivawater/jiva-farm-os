@@ -16,6 +16,7 @@ import type {
   DispatchUpdate
 } from "@/lib/dispatches/types";
 import { deriveLeadStatus } from "@/lib/farmer-leads/workflow";
+import { isOnboardedDealerStatus } from "@/lib/dealers/options";
 import { rollupInstitutionSaleOrderStatus } from "@/lib/institutions/sale-orders";
 import { appSearchUrl, sendN8nEvent } from "@/lib/integrations/n8n";
 import { createClient } from "@/lib/supabase/server";
@@ -77,6 +78,7 @@ type DealerDispatchSource = {
   state: string;
   district: string;
   dealer_address: string | null;
+  dealer_status: string;
 };
 
 type InstitutionDispatchPayer = {
@@ -731,7 +733,8 @@ async function getDealerForDispatch(
         "contact_number",
         "state",
         "district",
-        "dealer_address"
+        "dealer_address",
+        "dealer_status"
       ].join(",")
     )
     .eq("id", dealerId)
@@ -742,7 +745,16 @@ async function getDealerForDispatch(
     redirectWithError(errorPath, "Selected dealer was not found.");
   }
 
-  return data as unknown as DealerDispatchSource;
+  const dealer = data as unknown as DealerDispatchSource;
+
+  if (!isOnboardedDealerStatus(dealer.dealer_status)) {
+    redirectWithError(
+      errorPath,
+      "Devices can be dispatched only to onboarded dealers with Active or Dormant status."
+    );
+  }
+
+  return dealer;
 }
 
 async function getInstitutionPayerForDispatch(

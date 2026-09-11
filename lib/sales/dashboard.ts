@@ -61,7 +61,7 @@ export type PrimarySaleDashboardRow = {
 
 export type SecondarySaleDashboardRow = {
   dealer_id: string | null;
-  installation_date: string | null;
+  sale_date: string;
 };
 
 export type SalesDashboardDealer = {
@@ -217,7 +217,7 @@ export function aggregateDealerSecondarySales(
     }
 
     const totals = byDealer.get(row.dealer_id);
-    const index = monthIndex(months, row.installation_date);
+    const index = monthIndex(months, row.sale_date);
     if (totals && index >= 0) {
       totals[index] += 1;
     }

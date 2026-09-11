@@ -3,6 +3,7 @@ import { DispatchForm } from "@/components/dispatches/dispatch-form";
 import { PageHeader } from "@/components/page-header";
 import { updateDispatchAction } from "@/app/(app)/dispatches/actions";
 import { preferredDispatchDeviceStatuses } from "@/lib/dispatches/options";
+import { isOnboardedDealerStatus } from "@/lib/dealers/options";
 import {
   mergeFarmerLeadOptions,
   type Dispatch,
@@ -93,7 +94,8 @@ const dealerSelectColumns = [
   "contact_number",
   "state",
   "district",
-  "dealer_address"
+  "dealer_address",
+  "dealer_status"
 ].join(",");
 
 const institutionSelectColumns = [
@@ -284,7 +286,9 @@ export default async function EditDispatchPage({
     .order("firm_name", { ascending: true, nullsFirst: false })
     .order("dealer_name", { ascending: true })
     .limit(200);
-  let dealers = (activeDealers ?? []) as unknown as DispatchDealerOption[];
+  let dealers = (
+    (activeDealers ?? []) as unknown as DispatchDealerOption[]
+  ).filter((dealer) => isOnboardedDealerStatus(dealer.dealer_status));
   const selectedDealerId =
     dispatch.destination_dealer_id ?? dispatch.linked_dealer_id;
 
