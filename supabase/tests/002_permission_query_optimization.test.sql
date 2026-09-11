@@ -13,10 +13,10 @@ select ok(
 );
 select ok(
   (select qual from pg_policies where schemaname = 'public'
-    and tablename = 'farmer_leads' and policyname = 'farmer_leads_select_internal_scope')
+    and tablename = 'farmer_leads' and policyname = 'farmer_leads_select_authorized_scope')
     not like '%SELECT get_current_user_id()%'
   and (select qual from pg_policies where schemaname = 'public'
-    and tablename = 'farmer_leads' and policyname = 'farmer_leads_select_internal_scope')
+    and tablename = 'farmer_leads' and policyname = 'farmer_leads_select_authorized_scope')
     like '%get_current_user_id()%',
   'lead ownership avoids a nested scalar identity plan'
 );

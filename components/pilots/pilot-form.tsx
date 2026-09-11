@@ -860,12 +860,14 @@ export function PilotForm({
             defaultValue={pilot?.gps_latitude}
             label="GPS Latitude"
             name="gps_latitude"
+            step="any"
             type="number"
           />
           <Field
             defaultValue={pilot?.gps_longitude}
             label="GPS Longitude"
             name="gps_longitude"
+            step="any"
             type="number"
           />
           <UserSelect

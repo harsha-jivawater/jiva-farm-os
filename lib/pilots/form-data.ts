@@ -733,6 +733,12 @@ export function visitReportPayloadFromForm(
 export function validateVisitReportPayload(payload: VisitReportFormPayload) {
   if (!payload.report_date) return "Report date is required.";
   if (!payload.report_type) return "Report type is required.";
+  if (
+    payload.report_type === "Pilot Monitoring Visit Report" &&
+    !payload.planned_pilot_visit_id
+  ) {
+    return "Select the planned visit this monitoring report completes.";
+  }
   if (!payload.submitted_by_user_id) return "Select submitted by.";
   if (!payload.report_status) return "Report status is required.";
   if (!payload.report_title) return "Report title is required.";

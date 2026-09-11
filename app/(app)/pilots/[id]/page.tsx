@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarPlus, Pencil } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CalendarPlus, Pencil } from "lucide-react";
 import {
   createPlannedPilotVisitAction,
   createPilotVisitAction,
@@ -378,6 +378,11 @@ export default async function PilotDetailPage({
   const plannedVisitsList = (plannedVisits ?? []) as PlannedPilotVisit[];
   const visitsList = (visits ?? []) as PilotVisit[];
   const reportsList = (reports ?? []) as VisitReport[];
+  const unlinkedMonitoringReports = reportsList.filter(
+    (report) =>
+      report.report_type === "Pilot Monitoring Visit Report" &&
+      !report.planned_pilot_visit_id
+  );
   const dispatch = linkedDispatch as LinkedDispatch | null;
   const effectiveDeviceSerialNumber =
     pilot.device_serial_number_snapshot ?? dispatch?.serial_number_snapshot ?? null;
@@ -1333,6 +1338,22 @@ export default async function PilotDetailPage({
       </SectionCard>
 
       <SectionCard id="add-visit-report" title="Visit Reports">
+        {unlinkedMonitoringReports.length > 0 ? (
+          <div className="mb-4 flex gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+            <AlertTriangle
+              aria-hidden="true"
+              className="mt-0.5 h-5 w-5 shrink-0"
+            />
+            <p>
+              {unlinkedMonitoringReports.length} monitoring report
+              {unlinkedMonitoringReports.length === 1 ? " is" : "s are"} not
+              linked to a planned visit, so the pending-visit counts cannot be
+              updated. {canWrite
+                ? "Edit each report and select the planned visit it completes."
+                : "Ask the pilot owner to link each report to its planned visit."}
+            </p>
+          </div>
+        ) : null}
         <div className="space-y-3 md:hidden">
           {reportsList.map((report) => (
             <article

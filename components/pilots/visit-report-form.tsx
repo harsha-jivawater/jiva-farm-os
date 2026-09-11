@@ -286,6 +286,11 @@ export function VisitReportForm({
   const selectedPlannedVisit = plannedVisits.find(
     (visit) => visit.id === selectedPlannedVisitId
   );
+  const availablePlannedVisits = plannedVisits.filter(
+    (visit) =>
+      !visit.linked_visit_report_id ||
+      visit.id === report?.planned_pilot_visit_id
+  );
   const parameterObservations =
     report?.parameter_observations &&
     typeof report.parameter_observations === "object" &&
@@ -320,6 +325,8 @@ export function VisitReportForm({
     reportType === "Final Pilot Report" ||
     report?.report_type === "Final Pilot Report" ||
     report?.report_status === "Approved";
+  const requiresPlannedVisit =
+    reportType === "Pilot Monitoring Visit Report";
 
   return (
     <form action={action} className="space-y-4">
@@ -444,9 +451,14 @@ export function VisitReportForm({
             id="planned_pilot_visit_id"
             name="planned_pilot_visit_id"
             onChange={(event) => setSelectedPlannedVisitId(event.target.value)}
+            required={requiresPlannedVisit}
           >
-            <option value="">No linked planned visit</option>
-            {plannedVisits.map((visit) => (
+            <option value="">
+              {requiresPlannedVisit
+                ? "Select the planned visit completed"
+                : "No linked planned visit"}
+            </option>
+            {availablePlannedVisits.map((visit) => (
               <option key={visit.id} value={visit.id}>
                 Visit {visit.visit_number} ·{" "}
                 {formatDisplayDate(visit.planned_visit_date)} ·{" "}
@@ -454,6 +466,12 @@ export function VisitReportForm({
               </option>
             ))}
           </select>
+          {requiresPlannedVisit ? (
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Linking the planned visit marks it complete and updates the
+              pending-visit dashboard counts.
+            </p>
+          ) : null}
         </div>
         <div>
           <label

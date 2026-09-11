@@ -13,8 +13,10 @@ import {
 } from "@/lib/institutions/form-data";
 import {
   pilotPayloadFromForm,
+  pilotVisitPayloadFromForm,
   plannedPilotVisitPayloadFromForm,
   validatePilotPayload,
+  validatePilotVisitPayload,
   validatePlannedPilotVisitPayload,
   validateVisitReportPayload,
   visitReportPayloadFromForm
@@ -164,6 +166,32 @@ describe("pilot and monitoring workflow validation", () => {
     expect(validatePilotPayload(payload)).toBeNull();
   });
 
+  it("accepts a decimal pilot area such as 1.5 acres", () => {
+    const payload = validPilot({
+      pilot_area_unit: "Acres",
+      pilot_area_value: "1.5"
+    });
+
+    expect(payload.pilot_area_acres).toBe(1.5);
+    expect(validatePilotPayload(payload)).toBeNull();
+  });
+
+  it("accepts decimal field measurements on a pilot visit", () => {
+    const visit = pilotVisitPayloadFromForm(
+      form({
+        treatment_plant_height_cm: "1.5",
+        visit_date: "2026-07-17",
+        visit_status: "Planned",
+        visit_summary: "Recorded decimal measurements.",
+        visit_type: "Monitoring Visit",
+        visited_by_user_id: "55555555-5555-5555-5555-555555555555"
+      })
+    );
+
+    expect(visit.treatment_plant_height_cm).toBe(1.5);
+    expect(validatePilotVisitPayload(visit)).toBeNull();
+  });
+
   it("requires the linked institution for an Institution Pilot", () => {
     const payload = validPilot({ pilot_type: "Institution Pilot" });
 
@@ -218,6 +246,37 @@ describe("pilot and monitoring workflow validation", () => {
     expect(validateVisitReportPayload(report)).toBe(
       "Approved Final Pilot Report requires R&D Head reviewer."
     );
+  });
+
+  it("requires a planned visit for a monitoring report", () => {
+    const report = visitReportPayloadFromForm(
+      form({
+        report_date: "2026-07-17",
+        report_status: "Draft",
+        report_summary: "Monitoring observations",
+        report_type: "Pilot Monitoring Visit Report",
+        submitted_by_user_id: "66666666-6666-6666-6666-666666666666"
+      })
+    );
+
+    expect(validateVisitReportPayload(report)).toBe(
+      "Select the planned visit this monitoring report completes."
+    );
+  });
+
+  it("accepts a monitoring report linked to its planned visit", () => {
+    const report = visitReportPayloadFromForm(
+      form({
+        planned_pilot_visit_id: "77777777-7777-7777-7777-777777777777",
+        report_date: "2026-07-17",
+        report_status: "Draft",
+        report_summary: "Monitoring observations",
+        report_type: "Pilot Monitoring Visit Report",
+        submitted_by_user_id: "66666666-6666-6666-6666-666666666666"
+      })
+    );
+
+    expect(validateVisitReportPayload(report)).toBeNull();
   });
 });
 
