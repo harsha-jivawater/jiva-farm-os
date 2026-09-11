@@ -75,6 +75,13 @@ export const statusRequiresPaymentApproval = [
   "Installed"
 ] as const;
 
+export const dispatchDateRequiredStatuses = [
+  "Dispatched",
+  "Delivered",
+  "Installation Pending",
+  "Installed"
+] as const;
+
 export const preferredDispatchDeviceStatuses = [
   "In Warehouse",
   "Reserved"

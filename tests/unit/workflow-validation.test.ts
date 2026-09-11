@@ -139,6 +139,32 @@ describe("dispatch workflow validation", () => {
     expect(paidDispatch.payment_confirmed).toBe(true);
     expect(paidDispatch.payment_confirmed_date).toBe("2026-07-17");
   });
+
+  it.each([
+    "Dispatched",
+    "Delivered",
+    "Installation Pending",
+    "Installed"
+  ])("requires a dispatch date when status is %s", (dispatchStatus) => {
+    const payload = validDispatch({
+      dispatch_status: dispatchStatus,
+      payment_confirmed: "on"
+    });
+
+    expect(validateDispatchPayload(payload)).toBe(
+      "Dispatch date is required once stock has been dispatched."
+    );
+  });
+
+  it("accepts a delivered dispatch with a dispatch date", () => {
+    const payload = validDispatch({
+      dispatch_date: "2026-07-06",
+      dispatch_status: "Delivered",
+      payment_confirmed: "on"
+    });
+
+    expect(validateDispatchPayload(payload)).toBeNull();
+  });
 });
 
 describe("pilot and monitoring workflow validation", () => {
