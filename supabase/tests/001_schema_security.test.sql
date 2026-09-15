@@ -250,14 +250,13 @@ select is(
     where index_namespace.nspname = 'public'
       and index_relation.relname in (
         'uq_dispatches_active_device',
-        'uq_dispatches_active_farmer_destination',
         'uq_dispatches_active_pilot_destination'
       )
       and index_definition.indisunique
       and index_definition.indpred is not null
   ),
-  3,
-  'active dispatch uniqueness is enforced for devices, farmer leads, and pilots'
+  2,
+  'active dispatch uniqueness remains enforced for devices and pilots'
 );
 select ok(
   exists (

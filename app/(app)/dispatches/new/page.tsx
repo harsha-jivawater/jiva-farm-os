@@ -29,6 +29,7 @@ type NewDispatchPageProps = {
 };
 
 type DispatchLinkRow = {
+  dispatch_type?: string | null;
   device_id?: string | null;
   linked_farmer_lead_id?: string | null;
   destination_farmer_lead_id?: string | null;
@@ -186,7 +187,6 @@ export default async function NewDispatchPage({
     )
     .is("deleted_at", null)
     .eq("payment_confirmed", true)
-    .eq("device_dispatched", false)
     .order("created_at", { ascending: false })
     .limit(200);
   const { data: pilotAgreedLeads } = await supabase
@@ -229,6 +229,7 @@ export default async function NewDispatchPage({
         "linked_pilot_id",
         "destination_pilot_id",
         "institution_sale_order_line_id",
+        "dispatch_type",
         "device_id"
       ].join(",")
     )
@@ -236,7 +237,9 @@ export default async function NewDispatchPage({
     .neq("dispatch_status", "Cancelled")
     .limit(1000);
   const farmerLeadsWithOpenDispatch = collectLinkedIds(
-    (openDispatches ?? []) as unknown as DispatchLinkRow[],
+    ((openDispatches ?? []) as unknown as DispatchLinkRow[]).filter(
+      (dispatch) => dispatch.dispatch_type === "Farmer Sale Dispatch"
+    ),
     "farmerLead"
   );
   const pilotsWithOpenDispatch = collectLinkedIds(
@@ -249,9 +252,32 @@ export default async function NewDispatchPage({
   const institutionSaleLinesWithOpenDispatch = collectInstitutionSaleLineIds(
     (openDispatches ?? []) as unknown as DispatchLinkRow[]
   );
-  const eligibleFarmerLeads = (
-    (eligibleLeads ?? []) as unknown as DispatchFarmerLeadOption[]
-  ).filter((lead) => !farmerLeadsWithOpenDispatch.has(lead.id));
+  let eligibleFarmerLeads =
+    (eligibleLeads ?? []) as unknown as DispatchFarmerLeadOption[];
+  if (
+    params.farmer_lead_id &&
+    !eligibleFarmerLeads.some((lead) => lead.id === params.farmer_lead_id)
+  ) {
+    const { data: selectedFarmerLead } = await supabase
+      .from("farmer_leads")
+      .select(farmerLeadSelectColumns)
+      .eq("id", params.farmer_lead_id)
+      .eq("payment_confirmed", true)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (selectedFarmerLead) {
+      eligibleFarmerLeads = [
+        selectedFarmerLead as unknown as DispatchFarmerLeadOption,
+        ...eligibleFarmerLeads
+      ];
+    }
+  }
+  eligibleFarmerLeads = eligibleFarmerLeads.map((lead) => ({
+    ...lead,
+    has_prior_dispatch:
+      lead.device_dispatched || farmerLeadsWithOpenDispatch.has(lead.id)
+  }));
   const eligiblePilots = (
     (activePilots ?? []) as unknown as DispatchPilotOption[]
   ).filter((pilot) => !pilotsWithOpenDispatch.has(pilot.id));

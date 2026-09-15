@@ -41,6 +41,7 @@ export type DispatchFarmerLeadOption = {
   product_recommended: string;
   payment_confirmed: boolean;
   device_dispatched: boolean;
+  has_prior_dispatch?: boolean;
   owner_user_id: string;
   rsm_user_id: string;
   region_id: string;

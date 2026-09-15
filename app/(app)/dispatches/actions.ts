@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import {
   canMoveToApprovedOrBeyond,
   dispatchPayloadFromForm,
+  requiresFreshFarmerSalePayment,
   validateDispatchPayload
 } from "@/lib/dispatches/form-data";
 import type {
@@ -152,7 +153,7 @@ function redirectWithError(path: string, message: string): never {
 function dispatchWriteErrorMessage(error: { code?: string; message: string }) {
   if (
     error.code === "23505" &&
-    /uq_dispatches_active_(device|farmer_destination|pilot_destination)/.test(
+    /uq_dispatches_active_(device|pilot_destination)/.test(
       error.message
     )
   ) {
@@ -576,8 +577,7 @@ async function ensureNoOpenDispatchForPilot({
 async function getFarmerSaleLeadForDispatch(
   supabase: SupabaseClient,
   leadId: string | null | undefined,
-  errorPath: string,
-  existingDispatchId?: string
+  errorPath: string
 ) {
   if (!leadId) {
     redirectWithError(
@@ -624,17 +624,26 @@ async function getFarmerSaleLeadForDispatch(
     );
   }
 
-  if (
-    lead.device_dispatched &&
-    (!existingDispatchId || lead.linked_dispatch_id !== existingDispatchId)
-  ) {
-    redirectWithError(
-      errorPath,
-      "This farmer lead is already marked as dispatched."
-    );
+  return lead;
+}
+
+async function hasPriorFarmerSaleDispatch(
+  supabase: SupabaseClient,
+  farmerLeadId: string
+) {
+  const { data, error } = await supabase
+    .from("dispatches")
+    .select("id")
+    .eq("dispatch_type", "Farmer Sale Dispatch")
+    .eq("destination_farmer_lead_id", farmerLeadId)
+    .neq("dispatch_status", "Cancelled")
+    .limit(1);
+
+  if (error) {
+    redirectWithError("/dispatches/new", error.message);
   }
 
-  return lead;
+  return Boolean(data?.length);
 }
 
 function applyFarmerSaleLeadSnapshot(
@@ -1646,12 +1655,17 @@ export async function createDispatchAction(formData: FormData) {
       : null;
 
   if (farmerSaleLead) {
-    await ensureNoOpenDispatchForFarmerLead({
-      supabase,
-      farmerLeadId: farmerSaleLead.id,
-      errorPath: "/dispatches/new"
-    });
     applyFarmerSaleLeadSnapshot(payload, farmerSaleLead);
+    if (requiresFreshFarmerSalePayment(
+      farmerSaleLead.device_dispatched,
+      await hasPriorFarmerSaleDispatch(supabase, farmerSaleLead.id)
+    )) {
+      payload.dispatch_status = "Pending Payment Confirmation";
+      payload.dispatch_date = null;
+      payload.payment_confirmed = false;
+      payload.payment_confirmed_by_user_id = null;
+      payload.payment_confirmed_date = null;
+    }
   }
 
   if (institutionSaleDispatch) {
@@ -1695,12 +1709,13 @@ export async function createDispatchAction(formData: FormData) {
   }
 
   const batchDeviceIds =
+    effectiveRoute === "Paid Farmer Sale" ||
     effectiveRoute === "Dealer Dispatch" ||
     effectiveRoute === "Institution Funded Farmer Sale"
       ? batchDeviceIdsFromForm(formData)
       : [];
   const paymentBackedByConfirmedSource = Boolean(
-    farmerSaleLead || institutionSaleDispatch
+    (farmerSaleLead && payload.payment_confirmed) || institutionSaleDispatch
   );
 
   if (
@@ -1728,7 +1743,10 @@ export async function createDispatchAction(formData: FormData) {
     );
   }
 
-  if ((dealerDispatch || institutionDispatchPayer) && batchDeviceIds.length > 1) {
+  if (
+    (farmerSaleLead || dealerDispatch || institutionDispatchPayer) &&
+    batchDeviceIds.length > 1
+  ) {
     if (payload.dispatch_code) {
       redirectWithError(
         "/dispatches/new",
@@ -1795,7 +1813,10 @@ export async function createDispatchAction(formData: FormData) {
               ? (payload.payment_confirmed_date ?? todayDate())
               : null,
           dealer_dispatch_group_id: dealerDispatchGroupId,
-          dispatch_date: dealerDispatch ? null : payload.dispatch_date
+          dispatch_date: dealerDispatch ||
+            (farmerSaleLead && !payload.payment_confirmed)
+            ? null
+            : payload.dispatch_date
         }) as DispatchInsert
     );
 
@@ -1827,6 +1848,10 @@ export async function createDispatchAction(formData: FormData) {
       revalidatePath("/farmer-leads");
       revalidatePath(`/farmer-leads/${institutionDispatchLead.id}`);
     }
+    if (farmerSaleLead) {
+      revalidatePath("/farmer-leads");
+      revalidatePath(`/farmer-leads/${farmerSaleLead.id}`);
+    }
     redirect(
       `/dispatches?dispatch_type=${encodeURIComponent(
         payload.dispatch_type ?? ""
@@ -1835,7 +1860,8 @@ export async function createDispatchAction(formData: FormData) {
       )}&q=${encodeURIComponent(
         dealerDispatch
           ? dealerDispatch.firm_name || dealerDispatch.dealer_name
-          : institutionDispatchPayer?.organization_name ?? ""
+          : institutionDispatchPayer?.organization_name ??
+            farmerSaleLead?.farmer_name ?? ""
       )}&created_count=${devices.length}`
     );
   }
@@ -2055,8 +2081,7 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       ? await getFarmerSaleLeadForDispatch(
           supabase,
           payload.destination_farmer_lead_id,
-          `/dispatches/${id}/edit`,
-          id
+          `/dispatches/${id}/edit`
         )
       : null;
   const institutionSaleDispatch =
@@ -2104,13 +2129,19 @@ export async function updateDispatchAction(id: string, formData: FormData) {
       : null;
 
   if (farmerSaleLead) {
-    await ensureNoOpenDispatchForFarmerLead({
-      supabase,
-      farmerLeadId: farmerSaleLead.id,
-      errorPath: `/dispatches/${id}/edit`,
-      existingDispatchId: id
-    });
+    const paymentConfirmedOnForm = payload.payment_confirmed;
+    const paymentDateOnForm = payload.payment_confirmed_date;
     applyFarmerSaleLeadSnapshot(payload, farmerSaleLead);
+    if (!existing.payment_confirmed) {
+      payload.payment_confirmed =
+        canConfirmPayment(profile) && Boolean(paymentConfirmedOnForm);
+      payload.payment_confirmed_by_user_id = payload.payment_confirmed
+        ? profile.id
+        : null;
+      payload.payment_confirmed_date = payload.payment_confirmed
+        ? (paymentDateOnForm ?? todayDate())
+        : null;
+    }
   }
 
   if (institutionSaleDispatch) {

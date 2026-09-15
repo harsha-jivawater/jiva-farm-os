@@ -113,6 +113,13 @@ export function canMoveToApprovedOrBeyond(payload: DispatchFormPayload) {
   );
 }
 
+export function requiresFreshFarmerSalePayment(
+  devicePreviouslyDispatched: boolean,
+  priorFarmerSaleDispatchExists: boolean
+) {
+  return devicePreviouslyDispatched || priorFarmerSaleDispatchExists;
+}
+
 export function validateDispatchPayload(payload: DispatchFormPayload) {
   if (!payload.device_id) {
     return "Select a device for this dispatch.";
