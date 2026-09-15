@@ -350,10 +350,11 @@ export function DispatchForm({
       ""
   );
   const [paymentConfirmed, setPaymentConfirmed] = useState(
-    Boolean(initialInstitutionSaleLine) ||
-      initialLead?.payment_confirmed ||
-      dispatch?.payment_confirmed ||
-      false
+    dispatch?.payment_confirmed ??
+      Boolean(
+        initialInstitutionSaleLine ||
+          (initialLead?.payment_confirmed && !initialLead.has_prior_dispatch)
+      )
   );
   const [stateValue, setStateValue] = useState(
       initialLead?.state ??
@@ -378,13 +379,18 @@ export function DispatchForm({
   const isDealerRoute = dispatchRoute === "Dealer Dispatch";
   const isManualRoute = dispatchRoute === "Admin Manual Exception";
   const isBatchDeviceRoute =
-    mode === "create" && (isDealerRoute || isInstitutionSaleRoute);
+    mode === "create" &&
+    (isFarmerSaleRoute || isDealerRoute || isInstitutionSaleRoute);
   const paymentConfirmationLocked =
-    isFarmerSaleRoute ||
+    (isFarmerSaleRoute &&
+      (mode === "create" || Boolean(dispatch?.payment_confirmed) ||
+        !canConfirmPayment)) ||
     (isInstitutionSaleRoute && Boolean(selectedInstitutionSaleLineId)) ||
     isPilotRoute ||
     !canConfirmPayment;
-  const submitDisabled = isPilotRoute && Boolean(pilotsLoadError);
+  const submitDisabled =
+    (isPilotRoute && Boolean(pilotsLoadError)) ||
+    (isBatchDeviceRoute && selectedBatchDeviceIds.length === 0);
   const effectiveDispatchType = isFarmerSaleRoute
     ? "Farmer Sale Dispatch"
     : isInstitutionSaleRoute
@@ -555,7 +561,11 @@ export function DispatchForm({
     setStateValue(lead.state);
     setDistrictValue(lead.district);
     setDestinationAddress(lead.village);
-    setPaymentConfirmed(lead.payment_confirmed);
+    setPaymentConfirmed(
+      mode === "edit" && dispatch
+        ? dispatch.payment_confirmed
+        : lead.payment_confirmed && !lead.has_prior_dispatch
+    );
   }
 
   function applyInstitutionSaleLine(lineId: string) {
@@ -846,7 +856,7 @@ export function DispatchForm({
             </p>
           </div>
 
-          <div>
+          {!isBatchDeviceRoute ? <div>
             <label
               className="mb-1.5 block text-sm font-medium text-slate-700"
               htmlFor="dispatch_code"
@@ -861,7 +871,7 @@ export function DispatchForm({
               placeholder="Auto-generated if blank"
               type="text"
             />
-          </div>
+          </div> : null}
 
           <div>
             <label
@@ -1214,7 +1224,7 @@ export function DispatchForm({
                 required
                 value={selectedLeadId}
               >
-                <option value="">Select paid, not-yet-dispatched lead</option>
+                <option value="">Select a farmer with a confirmed purchase</option>
                 {farmerLeads.map((lead) => (
                   <option key={lead.id} value={lead.id}>
                     {leadLabel(lead)}
@@ -1222,9 +1232,18 @@ export function DispatchForm({
                 ))}
               </select>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Farmer Sale Dispatches can be created only for paid farmer
-                leads that have not yet been dispatched.
+                Use the existing farmer record and phone number. For a repeat
+                purchase, the new dispatch waits for Accounts to confirm its
+                payment before stock can move. Select all devices in this
+                purchase above; each receives its own dispatch code.
               </p>
+              {farmerLeads.find((lead) => lead.id === selectedLeadId)
+                ?.has_prior_dispatch ? (
+                <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
+                  Previous purchase found. These new devices will be requested
+                  with payment pending; Accounts must confirm this purchase.
+                </p>
+              ) : null}
             </div>
           ) : isInstitutionSaleRoute ? (
             <>
@@ -1848,7 +1867,13 @@ export function DispatchForm({
         </Link>
         <SubmitButton
           disabled={submitDisabled}
-          label={mode === "create" ? "Create dispatch" : "Save dispatch"}
+          label={
+            mode === "edit"
+              ? "Save dispatch"
+              : selectedBatchDeviceIds.length > 1
+                ? `Create ${selectedBatchDeviceIds.length} dispatches`
+                : "Create dispatch"
+          }
         />
       </div>
     </form>

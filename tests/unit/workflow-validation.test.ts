@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   dispatchPayloadFromForm,
+  requiresFreshFarmerSalePayment,
   validateDispatchPayload
 } from "@/lib/dispatches/form-data";
 import {
@@ -70,6 +71,12 @@ function validPilot(overrides: Record<string, string> = {}) {
 }
 
 describe("dispatch workflow validation", () => {
+  it("does not reuse an earlier farmer payment for a repeat dispatch", () => {
+    expect(requiresFreshFarmerSalePayment(false, false)).toBe(false);
+    expect(requiresFreshFarmerSalePayment(true, false)).toBe(true);
+    expect(requiresFreshFarmerSalePayment(false, true)).toBe(true);
+  });
+
   it("accepts a complete dealer dispatch and keeps one row per device", () => {
     const payload = validDispatch();
 

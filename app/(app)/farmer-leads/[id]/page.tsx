@@ -745,6 +745,21 @@ export default async function FarmerLeadDetailPage({
               )}
             </div>
           ) : null}
+          {lead.payment_confirmed && lead.device_dispatched && canCreateDispatch ? (
+            <div className="mt-4 rounded-md border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900">
+              <p className="font-semibold">Another purchase by this farmer?</p>
+              <p className="mt-1">
+                Keep this farmer record and phone number. Accounts will confirm
+                payment for the new dispatch before stock moves.
+              </p>
+              <Link
+                className="mt-3 inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+                href={`/dispatches/new?farmer_lead_id=${lead.id}`}
+              >
+                Create another farmer sale dispatch
+              </Link>
+            </div>
+          ) : null}
           {dispatchAlreadyRequested && dispatch ? (
             <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
               <p className="font-semibold">Dispatch already requested</p>
