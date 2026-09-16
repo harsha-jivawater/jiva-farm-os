@@ -2,7 +2,7 @@ begin;
 
 set local search_path = public, extensions;
 
-select plan(5);
+select plan(7);
 
 select has_column('public', 'devices', 'deleted_by_user_id', 'device deletion records the acting Admin');
 select has_column('public', 'devices', 'deletion_reason', 'device deletion records a business reason');
@@ -19,6 +19,22 @@ select ok(
 select ok(
   not has_function_privilege('authenticated', 'private.guard_unused_stock_device_deletion()', 'execute'),
   'signed-in users cannot call the internal trigger function directly'
+);
+
+select ok(
+  position(
+    'public.institution_sale_order_lines' in
+    pg_get_functiondef('private.guard_unused_stock_device_deletion()'::regprocedure)
+  ) > 0,
+  'deletion guard checks the deployed institution order-line relation'
+);
+
+select ok(
+  position(
+    'public.institution_sale_order_items' in
+    pg_get_functiondef('private.guard_unused_stock_device_deletion()'::regprocedure)
+  ) = 0,
+  'deletion guard does not reference the nonexistent institution order-item relation'
 );
 
 select * from finish();
