@@ -13,7 +13,8 @@ import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   canApproveDeviceReturn,
   canApproveManualDeviceAdjustment,
-  canWriteModule
+  canWriteModule,
+  isAdmin
 } from "@/lib/users/permissions";
 import { requireModuleWriteAccess } from "@/lib/users/server-permissions";
 
@@ -27,6 +28,54 @@ function deviceErrorMessage(message: string, code?: string) {
   }
 
   return message;
+}
+
+export async function deleteUnusedStockDeviceAction(
+  id: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const errorPath = `/devices/${id}`;
+  const profile = await getCurrentInternalUser(supabase, errorPath);
+  const deletionReason = String(formData.get("deletion_reason") ?? "").trim();
+
+  if (!isAdmin(profile)) {
+    redirectWithError(
+      errorPath,
+      "Only Admin can remove a device from active inventory."
+    );
+  }
+
+  if (!deletionReason) {
+    redirectWithError(errorPath, "Add a delete reason before removing this device.");
+  }
+
+  const { data, error } = await supabase
+    .from("devices")
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by_user_id: profile.id,
+      deletion_reason: deletionReason
+    })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    redirectWithError(errorPath, deviceErrorMessage(error.message, error.code));
+  }
+
+  if (!data) {
+    redirectWithError(
+      errorPath,
+      "This device was not found or has already been removed."
+    );
+  }
+
+  revalidatePath("/devices");
+  revalidatePath(`/devices/${id}`);
+  redirect("/devices?deleted=1");
 }
 
 export async function createDeviceAction(formData: FormData) {

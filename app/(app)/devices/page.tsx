@@ -470,6 +470,12 @@ export default async function DevicesPage({ searchParams }: DevicesPageProps) {
         ) : null}
       </div>
 
+      {paramValue(params.deleted) === "1" ? (
+        <p className="mt-6 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800">
+          The unused device was removed from active inventory.
+        </p>
+      ) : null}
+
       {summaryLoadError ? (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">
           {summaryLoadError}
