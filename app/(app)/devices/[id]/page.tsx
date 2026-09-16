@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { DeviceStatusPill } from "@/components/devices/device-status-pill";
 import { PageHeader } from "@/components/page-header";
 import { FileLink } from "@/components/uploads/file-link";
@@ -24,14 +25,17 @@ import { getCurrentInternalUser } from "@/lib/users/current-user";
 import {
   canApproveDeviceReturn,
   canApproveManualDeviceAdjustment,
-  canWriteModule
+  canWriteModule,
+  isAdmin
 } from "@/lib/users/permissions";
 import { deviceScope } from "@/lib/users/record-scope";
+import { deleteUnusedStockDeviceAction } from "../actions";
 
 type DeviceDetailPageProps = {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{ error?: string }>;
 };
 
 function DetailItem({
@@ -52,9 +56,11 @@ function DetailItem({
 }
 
 export default async function DeviceDetailPage({
-  params
+  params,
+  searchParams
 }: DeviceDetailPageProps) {
   const { id } = await params;
+  const query = await searchParams;
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/devices");
   const canWrite = canWriteModule(currentUser, "devices");
@@ -83,6 +89,24 @@ export default async function DeviceDetailPage({
   }
 
   const device = data as Device;
+  const canDelete =
+    isAdmin(currentUser) &&
+    device.current_holder_type === "Warehouse" &&
+    device.device_status === "In Warehouse" &&
+    !device.linked_farmer_lead_id &&
+    !device.linked_dealer_id &&
+    !device.linked_institution_id &&
+    !device.linked_pilot_id &&
+    !device.linked_dispatch_id &&
+    !device.linked_installation_id &&
+    !device.reserved_date &&
+    !device.dispatch_date &&
+    !device.installation_date &&
+    !device.return_date &&
+    !device.last_movement_date &&
+    device.return_approval_status !== "Pending" &&
+    device.manual_adjustment_approval_status !== "Pending";
+  const deleteAction = deleteUnusedStockDeviceAction.bind(null, device.id);
   const returnEvidenceUrl = await resolveFileUrl(
     supabase,
     device.return_photo_link
@@ -122,6 +146,12 @@ export default async function DeviceDetailPage({
       <div className="mb-5">
         <DeviceStatusPill status={device.device_status} />
       </div>
+
+      {query.error ? (
+        <p className="mb-5 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {query.error}
+        </p>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <DetailItem label="Serial number" value={device.serial_number} />
@@ -197,6 +227,30 @@ export default async function DeviceDetailPage({
           {display(device.remarks)}
         </p>
       </div>
+
+      {canDelete ? (
+        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="max-w-2xl">
+              <h2 className="text-sm font-semibold text-red-950">Danger zone</h2>
+              <p className="mt-1 text-sm leading-6 text-red-700">
+                Remove this unused device from active inventory. This is a
+                recoverable removal and is allowed only before the device has
+                any reservation, movement, dispatch, installation, pilot, or
+                sale history.
+              </p>
+            </div>
+            <DeleteRecordButton
+              action={deleteAction}
+              confirmMessage={`Remove device ${device.serial_number} from active inventory?`}
+              label="Remove Device from Stock"
+              pendingLabel="Removing..."
+              reasonLabel="Removal reason"
+              reasonPlaceholder="Explain why this unused stock record should be removed"
+            />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
