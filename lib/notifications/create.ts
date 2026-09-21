@@ -172,3 +172,47 @@ export async function notifyPlannedVisitAssignment({
     url: `/pilots/${pilotId}`
   });
 }
+
+export async function notifyVisitReportSubmitted({
+  actorUserId,
+  evidenceCount,
+  pilotId,
+  pilotName,
+  recipientUserIds,
+  reportCode,
+  reportId,
+  supabase
+}: {
+  actorUserId: string;
+  evidenceCount: number;
+  pilotId: string;
+  pilotName: string;
+  recipientUserIds: Array<string | null | undefined>;
+  reportCode: string;
+  reportId: string;
+  supabase: SupabaseClient;
+}) {
+  const recipients = [...new Set(recipientUserIds.filter(Boolean))] as string[];
+  const fileLabel = `${evidenceCount} evidence file${evidenceCount === 1 ? "" : "s"}`;
+
+  await Promise.all(
+    recipients.map((recipientUserId) =>
+      createNotification(supabase, {
+        actor_user_id: actorUserId,
+        category: "Submission",
+        dedupe_key: `visit-report:${reportId}:submitted:${recipientUserId}`,
+        due_date: null,
+        message: `A visit report with ${fileLabel} is ready for review.`,
+        notification_type: "visit_report_submitted",
+        record_code: reportCode,
+        record_id: reportId,
+        record_path: `/pilots/${pilotId}`,
+        record_type: "Visit Report",
+        recipient_user_id: recipientUserId,
+        severity: "Review",
+        source_event_key: "visit_report_submitted",
+        title: `Visit report submitted: ${pilotName}`
+      })
+    )
+  );
+}

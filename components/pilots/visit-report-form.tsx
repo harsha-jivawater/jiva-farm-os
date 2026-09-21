@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Save } from "lucide-react";
 import { CustomCropFields } from "@/components/crops/custom-crop-fields";
@@ -50,17 +50,17 @@ function textareaClassName() {
   return "min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100";
 }
 
-function SubmitButton() {
+function SubmitButton({ isUploading }: { isUploading: boolean }) {
   const { pending } = useFormStatus();
 
   return (
     <button
       className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
-      disabled={pending}
+      disabled={pending || isUploading}
       type="submit"
     >
       <Save className="h-4 w-4" aria-hidden="true" />
-      {pending ? "Saving..." : "Submit Visit Report"}
+      {isUploading ? "Uploading evidence..." : pending ? "Saving..." : "Submit Visit Report"}
     </button>
   );
 }
@@ -266,6 +266,14 @@ export function VisitReportForm({
   users,
   visits
 }: VisitReportFormProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const reportFileRef = useRef<HTMLInputElement>(null);
+  const photoFileRef = useRef<HTMLInputElement>(null);
+  const dataSheetFileRef = useRef<HTMLInputElement>(null);
+  const bypassDirectUploadRef = useRef(false);
+  const [reportRecordId] = useState(() => report?.id ?? crypto.randomUUID());
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [crop, setCrop] = useState(report?.crop ?? pilot.crop ?? "");
   const [selectedPlannedVisitId, setSelectedPlannedVisitId] = useState(
     report?.planned_pilot_visit_id ?? defaultPlannedVisitId ?? ""
@@ -328,8 +336,125 @@ export function VisitReportForm({
   const requiresPlannedVisit =
     reportType === "Pilot Monitoring Visit Report";
 
+  async function prepareEvidenceUploads(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    if (bypassDirectUploadRef.current) {
+      return;
+    }
+
+    const selectedUploads = [
+      { fieldName: "report_link", file: reportFileRef.current?.files?.[0] },
+      { fieldName: "photo_folder_link", file: photoFileRef.current?.files?.[0] },
+      { fieldName: "data_sheet_link", file: dataSheetFileRef.current?.files?.[0] }
+    ].filter(
+      (upload): upload is { fieldName: string; file: File } => Boolean(upload.file)
+    );
+
+    if (selectedUploads.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    setUploadError(null);
+    setIsUploading(true);
+    const uploadedPaths: string[] = [];
+
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const uploadedReferences = new Map<string, string>();
+
+      for (const { fieldName, file } of selectedUploads) {
+        const response = await fetch("/api/visit-report-uploads/upload-url", {
+          body: JSON.stringify({
+            fieldName,
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type,
+            reportId: reportRecordId
+          }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST"
+        });
+        const payload = (await response.json()) as {
+          contentType?: string;
+          error?: string;
+          path?: string;
+          reference?: string;
+          token?: string;
+        };
+
+        if (
+          !response.ok ||
+          !payload.path ||
+          !payload.reference ||
+          !payload.token
+        ) {
+          throw new Error(
+            payload.error ?? `The ${file.name} upload could not be started.`
+          );
+        }
+
+        const uploadContentType =
+          payload.contentType || file.type || "application/octet-stream";
+        const uploadBody =
+          file.type === uploadContentType
+            ? file
+            : new File([file], file.name, {
+                lastModified: file.lastModified,
+                type: uploadContentType
+              });
+        const { error } = await supabase.storage
+          .from("app-uploads")
+          .uploadToSignedUrl(payload.path, payload.token, uploadBody, {
+            contentType: uploadContentType,
+            upsert: false
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        uploadedPaths.push(payload.path);
+        uploadedReferences.set(fieldName, payload.reference);
+      }
+
+      const form = formRef.current;
+      if (!form) {
+        throw new Error("The visit report form is no longer available.");
+      }
+
+      for (const [fieldName, reference] of uploadedReferences) {
+        const input = form.elements.namedItem(fieldName) as HTMLInputElement | null;
+        if (input) input.value = reference;
+      }
+
+      [reportFileRef, photoFileRef, dataSheetFileRef].forEach((ref) => {
+        if (ref.current) ref.current.disabled = true;
+      });
+      bypassDirectUploadRef.current = true;
+      form.requestSubmit();
+    } catch (error) {
+      if (uploadedPaths.length > 0) {
+        const { createClient } = await import("@/lib/supabase/client");
+        await createClient().storage.from("app-uploads").remove(uploadedPaths);
+      }
+      setUploadError(
+        error instanceof Error ? error.message : "Evidence files could not be uploaded."
+      );
+      setIsUploading(false);
+    }
+  }
+
   return (
-    <form action={action} className="space-y-4">
+    <form
+      action={action}
+      className="space-y-4"
+      onSubmit={prepareEvidenceUploads}
+      ref={formRef}
+    >
+      <input name="report_id" type="hidden" value={reportRecordId} />
       <input name="pilot_id" type="hidden" value={pilot.id} />
       <input name="institution_id" type="hidden" value={pilot.institution_id ?? ""} />
       <input name="farmer_lead_id" type="hidden" value={pilot.farmer_lead_id} />
@@ -345,6 +470,11 @@ export function VisitReportForm({
         value={report?.reviewed_date ?? ""}
       />
       <input name="report_title" type="hidden" value={generatedReportTitle} />
+      {uploadError ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+          {uploadError}
+        </div>
+      ) : null}
       {legacyNarrativeFields.map(({ key }) => (
         <input
           key={key}
@@ -591,6 +721,7 @@ export function VisitReportForm({
             kind="document"
             label="Visit report document"
             name="report_link"
+            inputRef={reportFileRef}
           />
           <FileUploadField
             currentValue={report?.photo_folder_link}
@@ -598,12 +729,14 @@ export function VisitReportForm({
             kind="image"
             label="Report photos"
             name="photo_folder_link"
+            inputRef={photoFileRef}
           />
           <FileUploadField
             currentValue={report?.data_sheet_link}
             kind="sheet"
             label="Report data sheet"
             name="data_sheet_link"
+            inputRef={dataSheetFileRef}
           />
         </div>
       </div>
@@ -674,7 +807,7 @@ export function VisitReportForm({
             Cancel
           </Link>
         ) : null}
-        <SubmitButton />
+        <SubmitButton isUploading={isUploading} />
       </div>
     </form>
   );

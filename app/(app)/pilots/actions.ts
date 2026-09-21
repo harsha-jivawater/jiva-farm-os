@@ -31,7 +31,10 @@ import {
   sendN8nEvent,
   userDisplayName
 } from "@/lib/integrations/n8n";
-import { notifyPlannedVisitAssignment } from "@/lib/notifications/create";
+import {
+  notifyPlannedVisitAssignment,
+  notifyVisitReportSubmitted
+} from "@/lib/notifications/create";
 import { suggestedPilotNameFromContext } from "@/lib/pilots/name-suggestions";
 import { plannedVisitTypeToActualVisitType } from "@/lib/pilots/visit-planning";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -105,6 +108,8 @@ const pilotCompletionStatuses = [
   "Closed - Failed",
   "Closed - Inconclusive"
 ];
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const finalPilotReportApprovalError =
   "Only the R&D Head can approve final pilot reports.";
 
@@ -1795,7 +1800,10 @@ export async function createVisitReportAction(
   const supabase = await createClient();
   const errorPath = `/pilots/${pilotId}`;
   const profile = await getCurrentProfile(supabase, errorPath);
-  const reportId = crypto.randomUUID();
+  const requestedReportId = String(formData.get("report_id") ?? "").trim();
+  const reportId = uuidPattern.test(requestedReportId)
+    ? requestedReportId
+    : crypto.randomUUID();
   const payload = visitReportPayloadFromForm(formData);
   await enforcePartnerSharingApprovalGuard({
     errorPath,
@@ -1913,9 +1921,11 @@ export async function createVisitReportAction(
     pilot_id: pilotId
   } as VisitReportInsert;
 
-  const { error } = await supabase
+  const { data: createdReport, error } = await supabase
     .from("visit_reports")
-    .insert(insertPayload);
+    .insert(insertPayload)
+    .select("visit_report_code")
+    .single();
 
   if (error) {
     redirectWithError(errorPath, error.message);
@@ -1967,7 +1977,7 @@ export async function createVisitReportAction(
 
   const { data: pilotSummary } = await supabase
     .from("pilots")
-    .select("pilot_code, pilot_name, pilot_status")
+    .select("pilot_code, pilot_name, pilot_status, pilot_owner_user_id, agronomist_user_id, rd_head_user_id")
     .eq("id", pilotId)
     .maybeSingle();
 
@@ -1996,6 +2006,32 @@ export async function createVisitReportAction(
       reportType: insertPayload.report_type
     }
   });
+
+  const evidenceCount = [
+    insertPayload.report_link,
+    insertPayload.photo_folder_link,
+    insertPayload.data_sheet_link
+  ].filter(Boolean).length;
+
+  if (pilotSummary && evidenceCount > 0) {
+    await notifyVisitReportSubmitted({
+      actorUserId: profile.id,
+      evidenceCount,
+      pilotId,
+      pilotName: pilotSummary.pilot_name,
+      recipientUserIds: [
+        pilotSummary.pilot_owner_user_id,
+        pilotSummary.agronomist_user_id,
+        pilotSummary.rd_head_user_id
+      ],
+      reportCode:
+        createdReport.visit_report_code ??
+        insertPayload.visit_report_code ??
+        pilotSummary.pilot_code,
+      reportId,
+      supabase
+    });
+  }
 
   revalidatePilot(pilotId);
   redirect(errorPath);
