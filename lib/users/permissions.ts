@@ -453,6 +453,19 @@ export function canCreateTechnicalReport(
   ]);
 }
 
+export function canViewVisitReport(
+  user: RoleCapableUser | null | undefined
+) {
+  return hasAnyRole(user, [
+    "Admin",
+    "Management",
+    "Sales Head",
+    "R&D Head",
+    "Agronomist",
+    "Research Assistant"
+  ]);
+}
+
 export function canCreateMarketingRequest(
   user: RoleCapableUser | null | undefined
 ) {
