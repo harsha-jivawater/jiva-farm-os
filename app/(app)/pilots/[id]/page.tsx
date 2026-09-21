@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, CalendarPlus, Pencil } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CalendarPlus,
+  Eye,
+  Pencil
+} from "lucide-react";
 import {
   createPlannedPilotVisitAction,
   createPilotVisitAction,
@@ -56,6 +62,7 @@ import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { labelForRole } from "@/lib/users/options";
 import {
   canSoftDeletePilot,
+  canViewVisitReport,
   canWriteModule,
   hasAnyRole,
   isAdmin
@@ -270,6 +277,7 @@ export default async function PilotDetailPage({
   const supabase = await createClient();
   const currentUser = await getCurrentInternalUser(supabase, "/pilots");
   const canWriteActive = canWriteModule(currentUser, "pilots");
+  const canViewReports = canViewVisitReport(currentUser);
   const canCreateDispatchActive = canWriteModule(currentUser, "dispatches");
   const canDeleteActive = canSoftDeletePilot(currentUser);
   const canManageVisitPlansActive = hasAnyRole(currentUser, [
@@ -1412,7 +1420,15 @@ export default async function PilotDetailPage({
                 </div>
               </dl>
               <div className="mt-4 grid gap-2">
-                <FileLink href={reportUrls.get(report.id)} label="View report" />
+                {canViewReports ? (
+                  <Link
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 shadow-sm hover:bg-brand-100"
+                    href={`/pilots/${pilot.id}/reports/${report.id}`}
+                  >
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                    View report
+                  </Link>
+                ) : null}
                 {canWrite ? (
                   <Link
                     className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
@@ -1483,15 +1499,28 @@ export default async function PilotDetailPage({
                     </p>
                   </td>
                   <td className="px-4 py-3">
-                    {canWrite ? (
-                      <Link
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
-                        href={`/pilots/${pilot.id}/reports/${report.id}/edit`}
-                      >
-                        <Pencil className="h-4 w-4" aria-hidden="true" />
-                        <span className="sr-only">Edit report</span>
-                      </Link>
-                    ) : null}
+                    <div className="flex items-center gap-2">
+                      {canViewReports ? (
+                        <Link
+                          aria-label={`View report ${report.visit_report_code}`}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-brand-200 text-brand-700 hover:bg-brand-50"
+                          href={`/pilots/${pilot.id}/reports/${report.id}`}
+                          title="View report"
+                        >
+                          <Eye className="h-4 w-4" aria-hidden="true" />
+                        </Link>
+                      ) : null}
+                      {canWrite ? (
+                        <Link
+                          aria-label={`Edit report ${report.visit_report_code}`}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+                          href={`/pilots/${pilot.id}/reports/${report.id}/edit`}
+                          title="Edit report"
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                        </Link>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}

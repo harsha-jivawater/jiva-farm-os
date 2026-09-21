@@ -5,6 +5,7 @@ import {
   canManageDispatch,
   canManageInstitutionProfile,
   canViewModule,
+  canViewVisitReport,
   canWriteModule,
   getEffectiveRoles,
   hasReadOnlyRole,
@@ -98,4 +99,22 @@ describe("role permissions", () => {
     expect(hasReadOnlyRole(user("Management"))).toBe(true);
     expect(hasReadOnlyRole(user("RSM"))).toBe(false);
   });
+
+  it.each([
+    "Admin",
+    "Management",
+    "Sales Head",
+    "R&D Head",
+    "Agronomist",
+    "Research Assistant"
+  ] as UserRole[])("allows %s to view visit reports", (role) => {
+    expect(canViewVisitReport(user(role))).toBe(true);
+  });
+
+  it.each(["RSM", "Salesperson", "Viewer"] as UserRole[])(
+    "does not expose visit reports to %s",
+    (role) => {
+      expect(canViewVisitReport(user(role))).toBe(false);
+    }
+  );
 });
