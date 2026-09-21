@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { UploadCloud } from "lucide-react";
 import {
   isAllowedUploadMimeType,
@@ -16,6 +16,7 @@ type FileUploadFieldProps = {
   helperText?: string;
   name: string;
   required?: boolean;
+  inputRef?: RefObject<HTMLInputElement | null>;
 };
 
 export function FileUploadField({
@@ -25,9 +26,12 @@ export function FileUploadField({
   label,
   helperText,
   name,
-  required = false
+  required = false,
+  inputRef
 }: FileUploadFieldProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const fallbackInputRef = useRef<HTMLInputElement>(null);
+  const resolvedInputRef = inputRef ?? fallbackInputRef;
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const rule = uploadRules[kind];
 
   return (
@@ -59,7 +63,7 @@ export function FileUploadField({
         </span>
         <span className="mt-1 text-xs text-slate-500">{rule.description}</span>
         <input
-          ref={inputRef}
+          ref={resolvedInputRef}
           accept={rule.accept}
           className="sr-only"
           id={`${name}_file`}
@@ -68,6 +72,7 @@ export function FileUploadField({
             const file = event.target.files?.[0];
 
             if (!file) {
+              setSelectedFileName(null);
               return;
             }
 
@@ -81,12 +86,14 @@ export function FileUploadField({
             ) {
               window.alert("This file type is not supported for this upload.");
               event.target.value = "";
+              setSelectedFileName(null);
               return;
             }
 
             if (file.size > rule.maxBytes) {
               window.alert(`This file is too large. ${rule.description}`);
               event.target.value = "";
+              setSelectedFileName(null);
               return;
             }
 
@@ -95,13 +102,22 @@ export function FileUploadField({
               !window.confirm("Replace the current saved file with this new upload?")
             ) {
               event.target.value = "";
+              setSelectedFileName(null);
+              return;
             }
+
+            setSelectedFileName(file.name);
           }}
           required={required && !currentValue}
           disabled={disabled}
           type="file"
         />
       </label>
+      {selectedFileName ? (
+        <p className="mt-2 break-all text-xs font-medium text-brand-700">
+          Selected: {selectedFileName}
+        </p>
+      ) : null}
     </div>
   );
 }
