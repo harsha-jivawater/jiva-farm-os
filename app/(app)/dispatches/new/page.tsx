@@ -171,71 +171,89 @@ export default async function NewDispatchPage({
   const currentUser = await getCurrentInternalUser(supabase, "/dispatches");
   const canConfirmDispatchPayment = canConfirmPayment(currentUser);
   const canUseManualException = hasAnyRole(currentUser, ["Admin"]);
-  const { data } = await supabase
-    .from("devices")
-    .select(deviceSelectColumns)
-    .is("deleted_at", null)
-    .in("device_status", [...preferredDispatchDeviceStatuses])
-    .eq("current_holder_type", "Warehouse")
-    .order("created_at", { ascending: false })
-    .order("serial_number", { ascending: true })
-    .limit(dispatchDeviceOptionLimit);
-  const { data: eligibleLeads } = await supabase
-    .from("farmer_leads")
-    .select(
-      farmerLeadSelectColumns
-    )
-    .is("deleted_at", null)
-    .eq("payment_confirmed", true)
-    .order("created_at", { ascending: false })
-    .limit(200);
-  const { data: pilotAgreedLeads } = await supabase
-    .from("farmer_leads")
-    .select(farmerLeadSelectColumns)
-    .is("deleted_at", null)
-    .eq("funnel_stage", "Pilot Agreed")
-    .order("farmer_name", { ascending: true })
-    .order("lead_code", { ascending: true })
-    .limit(500);
-  const { data: activePilots, error: activePilotsError } = await supabase
-    .from("pilots")
-    .select(pilotSelectColumns)
-    .is("deleted_at", null)
-    .not("pilot_status", "in", "(Cancelled,Closed - Successful,Closed - Failed,Closed - Inconclusive)")
-    .order("created_at", { ascending: false })
-    .limit(200);
-  const { data: dealerRows } = await supabase
-    .from("dealers")
-    .select(dealerSelectColumns)
-    .is("deleted_at", null)
-    .order("firm_name", { ascending: true, nullsFirst: false })
-    .order("dealer_name", { ascending: true })
-    .limit(200);
+  const [
+    { data },
+    { data: eligibleLeads },
+    { data: pilotAgreedLeads },
+    { data: activePilots, error: activePilotsError },
+    { data: dealerRows },
+    { data: institutions },
+    { data: openDispatches, error: openDispatchesError },
+    { data: saleLineRows }
+  ] = await Promise.all([
+    supabase
+      .from("devices")
+      .select(deviceSelectColumns)
+      .is("deleted_at", null)
+      .in("device_status", [...preferredDispatchDeviceStatuses])
+      .eq("current_holder_type", "Warehouse")
+      .order("created_at", { ascending: false })
+      .order("serial_number", { ascending: true })
+      .limit(dispatchDeviceOptionLimit),
+    supabase
+      .from("farmer_leads")
+      .select(farmerLeadSelectColumns)
+      .is("deleted_at", null)
+      .eq("payment_confirmed", true)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("farmer_leads")
+      .select(farmerLeadSelectColumns)
+      .is("deleted_at", null)
+      .eq("funnel_stage", "Pilot Agreed")
+      .order("farmer_name", { ascending: true })
+      .order("lead_code", { ascending: true })
+      .limit(500),
+    supabase
+      .from("pilots")
+      .select(pilotSelectColumns)
+      .is("deleted_at", null)
+      .not("pilot_status", "in", "(Cancelled,Closed - Successful,Closed - Failed,Closed - Inconclusive)")
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("dealers")
+      .select(dealerSelectColumns)
+      .is("deleted_at", null)
+      .order("firm_name", { ascending: true, nullsFirst: false })
+      .order("dealer_name", { ascending: true })
+      .limit(200),
+    supabase
+      .from("institutions")
+      .select(institutionSelectColumns)
+      .is("deleted_at", null)
+      .order("organization_name", { ascending: true })
+      .limit(500),
+    supabase
+      .from("dispatches")
+      .select(
+        [
+          "linked_farmer_lead_id",
+          "destination_farmer_lead_id",
+          "linked_pilot_id",
+          "destination_pilot_id",
+          "institution_sale_order_line_id",
+          "dispatch_type",
+          "device_id"
+        ].join(",")
+      )
+      .is("deleted_at", null)
+      .neq("dispatch_status", "Cancelled")
+      .limit(1000),
+    supabase
+      .from("institution_sale_order_lines")
+      .select(
+        "id, order_id, institution_id, farmer_lead_id, product_model, allocation_status, dispatch_id"
+      )
+      .is("deleted_at", null)
+      .is("dispatch_id", null)
+      .neq("allocation_status", "Cancelled")
+      .limit(300)
+  ]);
   const dealers = ((dealerRows ?? []) as unknown as DispatchDealerOption[]).filter(
     (dealer) => isOnboardedDealerStatus(dealer.dealer_status)
   );
-  const { data: institutions } = await supabase
-    .from("institutions")
-    .select(institutionSelectColumns)
-    .is("deleted_at", null)
-    .order("organization_name", { ascending: true })
-    .limit(500);
-  const { data: openDispatches, error: openDispatchesError } = await supabase
-    .from("dispatches")
-    .select(
-      [
-        "linked_farmer_lead_id",
-        "destination_farmer_lead_id",
-        "linked_pilot_id",
-        "destination_pilot_id",
-        "institution_sale_order_line_id",
-        "dispatch_type",
-        "device_id"
-      ].join(",")
-    )
-    .is("deleted_at", null)
-    .neq("dispatch_status", "Cancelled")
-    .limit(1000);
   const farmerLeadsWithOpenDispatch = collectLinkedIds(
     ((openDispatches ?? []) as unknown as DispatchLinkRow[]).filter(
       (dispatch) => dispatch.dispatch_type === "Farmer Sale Dispatch"
@@ -288,15 +306,6 @@ export default async function NewDispatchPage({
   const eligibleDevices = ((data ?? []) as unknown as DispatchDeviceOption[]).filter(
     (device) => !devicesWithOpenDispatch.has(device.id)
   );
-  const { data: saleLineRows } = await supabase
-    .from("institution_sale_order_lines")
-    .select(
-      "id, order_id, institution_id, farmer_lead_id, product_model, allocation_status, dispatch_id"
-    )
-    .is("deleted_at", null)
-    .is("dispatch_id", null)
-    .neq("allocation_status", "Cancelled")
-    .limit(300);
   const rawSaleLines = (saleLineRows ?? []).filter(
     (line) =>
       !institutionSaleLinesWithOpenDispatch.has(line.id) &&

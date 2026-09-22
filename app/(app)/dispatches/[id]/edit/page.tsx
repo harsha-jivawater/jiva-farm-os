@@ -161,14 +161,70 @@ export default async function EditDispatchPage({
   }
 
   const dispatch = data as Dispatch;
-  const { data: preferredDevices } = await supabase
-    .from("devices")
-    .select(deviceSelectColumns)
-    .is("deleted_at", null)
-    .in("device_status", [...preferredDispatchDeviceStatuses])
-    .eq("current_holder_type", "Warehouse")
-    .order("serial_number", { ascending: true })
-    .limit(200);
+  const [
+    { data: preferredDevices },
+    { data: eligibleLeads },
+    { data: pilotAgreedLeads },
+    { data: activePilots, error: activePilotsError },
+    { data: openPilotDispatches, error: openPilotDispatchesError },
+    { data: activeDealers },
+    { data: activeInstitutions }
+  ] = await Promise.all([
+    supabase
+      .from("devices")
+      .select(deviceSelectColumns)
+      .is("deleted_at", null)
+      .in("device_status", [...preferredDispatchDeviceStatuses])
+      .eq("current_holder_type", "Warehouse")
+      .order("serial_number", { ascending: true })
+      .limit(200),
+    supabase
+      .from("farmer_leads")
+      .select(farmerLeadSelectColumns)
+      .is("deleted_at", null)
+      .eq("payment_confirmed", true)
+      .eq("device_dispatched", false)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("farmer_leads")
+      .select(farmerLeadSelectColumns)
+      .is("deleted_at", null)
+      .eq("funnel_stage", "Pilot Agreed")
+      .order("farmer_name", { ascending: true })
+      .order("lead_code", { ascending: true })
+      .limit(500),
+    supabase
+      .from("pilots")
+      .select(pilotSelectColumns)
+      .is("deleted_at", null)
+      .not(
+        "pilot_status",
+        "in",
+        "(Cancelled,Closed - Successful,Closed - Failed,Closed - Inconclusive)"
+      )
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("dispatches")
+      .select("id, linked_pilot_id, destination_pilot_id")
+      .is("deleted_at", null)
+      .neq("dispatch_status", "Cancelled")
+      .limit(1000),
+    supabase
+      .from("dealers")
+      .select(dealerSelectColumns)
+      .is("deleted_at", null)
+      .order("firm_name", { ascending: true, nullsFirst: false })
+      .order("dealer_name", { ascending: true })
+      .limit(200),
+    supabase
+      .from("institutions")
+      .select(institutionSelectColumns)
+      .is("deleted_at", null)
+      .order("organization_name", { ascending: true })
+      .limit(500)
+  ]);
   let devices = (preferredDevices ?? []) as unknown as DispatchDeviceOption[];
 
   if (!devices.some((device) => device.id === dispatch.device_id)) {
@@ -186,22 +242,6 @@ export default async function EditDispatchPage({
     }
   }
 
-  const { data: eligibleLeads } = await supabase
-    .from("farmer_leads")
-    .select(farmerLeadSelectColumns)
-    .is("deleted_at", null)
-    .eq("payment_confirmed", true)
-    .eq("device_dispatched", false)
-    .order("created_at", { ascending: false })
-    .limit(200);
-  const { data: pilotAgreedLeads } = await supabase
-    .from("farmer_leads")
-    .select(farmerLeadSelectColumns)
-    .is("deleted_at", null)
-    .eq("funnel_stage", "Pilot Agreed")
-    .order("farmer_name", { ascending: true })
-    .order("lead_code", { ascending: true })
-    .limit(500);
   let farmerLeads =
     (eligibleLeads ?? []) as unknown as DispatchFarmerLeadOption[];
   let institutionFarmerLeads =
@@ -227,24 +267,6 @@ export default async function EditDispatchPage({
     }
   }
 
-  const { data: activePilots, error: activePilotsError } = await supabase
-    .from("pilots")
-    .select(pilotSelectColumns)
-    .is("deleted_at", null)
-    .not(
-      "pilot_status",
-      "in",
-      "(Cancelled,Closed - Successful,Closed - Failed,Closed - Inconclusive)"
-    )
-    .order("created_at", { ascending: false })
-    .limit(200);
-  const { data: openPilotDispatches, error: openPilotDispatchesError } =
-    await supabase
-      .from("dispatches")
-      .select("id, linked_pilot_id, destination_pilot_id")
-      .is("deleted_at", null)
-      .neq("dispatch_status", "Cancelled")
-      .limit(1000);
   const pilotsWithOtherOpenDispatch = collectPilotIdsWithOpenDispatch(
     (openPilotDispatches ?? []) as unknown as DispatchPilotLinkRow[],
     dispatch.id
@@ -279,13 +301,6 @@ export default async function EditDispatchPage({
       ? "Unable to load eligible pilots for dispatch."
       : null);
 
-  const { data: activeDealers } = await supabase
-    .from("dealers")
-    .select(dealerSelectColumns)
-    .is("deleted_at", null)
-    .order("firm_name", { ascending: true, nullsFirst: false })
-    .order("dealer_name", { ascending: true })
-    .limit(200);
   let dealers = (
     (activeDealers ?? []) as unknown as DispatchDealerOption[]
   ).filter((dealer) => isOnboardedDealerStatus(dealer.dealer_status));
@@ -307,12 +322,6 @@ export default async function EditDispatchPage({
     }
   }
 
-  const { data: activeInstitutions } = await supabase
-    .from("institutions")
-    .select(institutionSelectColumns)
-    .is("deleted_at", null)
-    .order("organization_name", { ascending: true })
-    .limit(500);
   let institutions =
     (activeInstitutions ?? []) as unknown as DispatchInstitutionOption[];
   const selectedInstitutionId =
