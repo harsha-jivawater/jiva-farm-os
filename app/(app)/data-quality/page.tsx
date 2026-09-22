@@ -13,6 +13,7 @@ import {
 import { AccessDenied } from "@/components/access/access-denied";
 import { PageHeader } from "@/components/page-header";
 import { formatDisplayDate } from "@/lib/date-utils";
+import { logSupabaseError } from "@/lib/perf";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canViewModule } from "@/lib/users/permissions";
@@ -392,14 +393,14 @@ export default async function DataQualityPage() {
   }
 
   const [
-    { data: farmerLeadData },
-    { data: dealerData },
-    { data: institutionData },
-    { data: pilotData },
-    { data: plannedVisitData },
-    { data: dispatchData },
-    { data: marketingData },
-    { data: userData }
+    { data: farmerLeadData, error: farmerLeadError },
+    { data: dealerData, error: dealerError },
+    { data: institutionData, error: institutionError },
+    { data: pilotData, error: pilotError },
+    { data: plannedVisitData, error: plannedVisitError },
+    { data: dispatchData, error: dispatchError },
+    { data: marketingData, error: marketingError },
+    { data: userData, error: userError }
   ] = await Promise.all([
     supabase
       .from("farmer_leads")
@@ -451,6 +452,42 @@ export default async function DataQualityPage() {
       .limit(SCAN_LIMIT),
     supabase.from("users").select("id, full_name").limit(SCAN_LIMIT)
   ]);
+
+  const queryErrors = [
+    ["farmer_leads", farmerLeadError],
+    ["dealers", dealerError],
+    ["institutions", institutionError],
+    ["pilots", pilotError],
+    ["planned_pilot_visits", plannedVisitError],
+    ["dispatches", dispatchError],
+    ["marketing_requests", marketingError],
+    ["users", userError]
+  ] as const;
+
+  // Checks compare multiple sources. Missing data must not become a clean scan
+  // or a false warning about a record whose related source failed to load.
+  if (queryErrors.some(([, error]) => error)) {
+    for (const [source, error] of queryErrors) {
+      if (error) logSupabaseError(`Data quality ${source} query unavailable`, error);
+    }
+
+    return (
+      <section>
+        <PageHeader
+          eyebrow="Admin review"
+          title="Data Quality"
+          description="Duplicate, incomplete, or cleanup warnings to review before reporting or handoff."
+        />
+        <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+          <p className="font-semibold">Data quality checks could not be completed.</p>
+          <p className="mt-2">Some records could not be loaded. Retry to run the checks again.</p>
+          <a href="/data-quality" className="mt-3 inline-block font-semibold underline">
+            Retry checks
+          </a>
+        </div>
+      </section>
+    );
+  }
 
   const farmerLeads = (farmerLeadData ?? []) as FarmerLeadRow[];
   const dealers = (dealerData ?? []) as DealerRow[];

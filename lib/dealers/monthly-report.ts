@@ -366,6 +366,7 @@ async function loadOpeningMovementRows({
       .lt("movement_date", startDate)
       .order("movement_date", { ascending: true })
       .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, from + pagedQuerySize - 1);
 
     if (error) {
@@ -418,6 +419,7 @@ async function loadMonthlyProcurementMovements({
       .gte("movement_date", startDate)
       .lte("movement_date", endDate)
       .order("movement_date", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, from + pagedQuerySize - 1);
 
     if (error) {
@@ -457,6 +459,7 @@ async function loadMonthlyDealerSales({
       .gte("sale_date", startDate)
       .lte("sale_date", endDate)
       .order("sale_date", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, from + pagedQuerySize - 1);
 
     if (error) {
@@ -490,6 +493,7 @@ async function loadCurrentDealerStock({
       .eq("current_holder_type", "Dealer")
       .in("current_holder_id", dealerIds)
       .is("deleted_at", null)
+      .order("id", { ascending: true })
       .range(from, from + pagedQuerySize - 1);
 
     if (error) {
