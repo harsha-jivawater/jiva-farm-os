@@ -107,6 +107,10 @@ These results validate scheduling only. They are **not production speedup
 measurements**. A source-token comparison also confirmed unchanged fluent
 database query chains and JSX for these three scheduling changes.
 
+Reproduce with `node scripts/benchmark-page-loading.mjs --base 1a3ae81`.
+The script reads baseline source directly from Git and runs both versions with
+mocked queries; it needs no credentials and makes no network requests.
+
 ## Recommended next improvements, in priority order
 
 1. **Optimize authenticated counts and KPI queries, one module at a time.**
