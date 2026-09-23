@@ -42,9 +42,27 @@ Application regression coverage includes 1,005/2,000-row pagination, late page
 errors, dual-role scope predicates, notification streaming/auth gating/failures,
 pilot timeout versus missing-record handling, and upload validation/retry.
 
-Final benchmark, database, browser and release results will be recorded here
-after the release gates complete. A successful synthetic benchmark is not a
-production p95 measurement or proof that every page is now fast.
+Local checks passed: 176 unit tests, typecheck, lint, production build, bundle
+budgets, migration guard, environment contract, 111 database tests, and all 21
+benchmark identity comparisons. Database advisors found no error-level issues.
+Browser boundary tests passed (3); the credential-dependent Marketing Library
+workflow was skipped (1). The signed-in local Admin shell, notification bell,
+Farmer Leads and Pilot Monitoring were also checked through the browser.
+
+Independent CI run `35810775358` passed the same application, database,
+role-equivalence and browser gates. Representative lead KPI execution times:
+
+| Synthetic scope | Local before / after | CI before / after |
+| --- | ---: | ---: |
+| Management | 893 / 48 ms | 1,765 / 96 ms |
+| Agronomist | 2,598 / 194 ms | 3,384 / 260 ms |
+| Viewer | 2,632 / 83 ms | See CI log |
+
+Every identity's combined measured query sequence also became faster locally.
+These are single-run synthetic comparisons, not production p95s or proof that
+every page is now fast. Production rollout and post-deployment evidence are
+recorded in PR #75. Before rollout, the existing Management lead KPI took
+2,699 ms in one read-only production sample; its visible lead count was 920.
 
 ## Deliberately unchanged
 
