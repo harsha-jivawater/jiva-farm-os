@@ -304,9 +304,21 @@ export default async function PilotDetailPage({
     pilotQuery = pilotQuery.or(scope.orFilter);
   }
 
-  const { data, error } = await pilotQuery.single();
+  const { data, error } = await pilotQuery.maybeSingle();
 
-  if (error || !data) {
+  if (error) {
+    return (
+      <section>
+        <PageHeader eyebrow="R&D" title="Pilot details" description="Pilot monitoring and visit reports." />
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Pilot details could not be loaded right now. Please try again.
+          <Link href={`/pilots/${id}`} className="ml-2 font-semibold underline">Retry</Link>
+        </div>
+      </section>
+    );
+  }
+
+  if (!data) {
     notFound();
   }
 

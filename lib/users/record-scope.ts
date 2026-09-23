@@ -1,5 +1,6 @@
 import { cache } from "react";
 import type { createClient } from "@/lib/supabase/server";
+import { readAllRows } from "@/lib/supabase/read-all-rows";
 import type { InternalUser } from "@/lib/users/types";
 import {
   hasAnyRole,
@@ -189,11 +190,14 @@ const loadDirectReportIdsForRequest = cache(async (
   rolesKey: string
 ) => {
   const roles = rolesKey ? rolesKey.split(",") : [];
-  const { data } = await supabase
+  const { data, error } = await readAllRows(supabase
     .from("users")
     .select("id, role, secondary_role")
     .eq("reports_to_user_id", managerId)
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .order("id", { ascending: true }));
+
+  if (error) throw new Error("Team scope could not be loaded. Please try again.");
 
   return unique(
     (data ?? [])
@@ -219,57 +223,53 @@ export async function loadDirectReportIds(
   );
 }
 
+const loadLeadIdsForRequest = cache(async (
+  supabase: SupabaseClient,
+  user: InternalUser,
+  directReportIdsKey: string
+) => {
+  const directReportIds = directReportIdsKey ? directReportIdsKey.split(",") : [];
+  const filters: Array<string | null> = [];
+
+  if (hasRole(user, "Salesperson")) {
+    filters.push(eqFilter("owner_user_id", user.id));
+  }
+
+  if (hasRole(user, "Research Assistant")) {
+    filters.push(eqFilter("created_by_user_id", user.id));
+  }
+
+  if (hasRole(user, "Agronomist")) {
+    const userIds = unique([user.id, ...directReportIds]);
+    filters.push(inFilter("created_by_user_id", userIds));
+  }
+
+  if (hasRole(user, "RSM")) {
+    filters.push(
+      eqFilter("rsm_user_id", user.id),
+      eqFilter("region_id", user.region_id),
+      eqFilter("state", user.state)
+    );
+  }
+
+  const scopedFilters = compactFilters(filters);
+  if (!scopedFilters.length) return [];
+  const { data, error } = await readAllRows(supabase
+    .from("farmer_leads")
+    .select("id")
+    .or(scopedFilters.join(","))
+    .is("deleted_at", null)
+    .order("id", { ascending: true }));
+  if (error) throw new Error("Farmer lead scope could not be loaded. Please try again.");
+  return unique((data ?? []).map((lead) => lead.id));
+});
+
 async function leadIdsForScope(
   supabase: SupabaseClient,
   user: InternalUser,
   directReportIds: string[]
 ) {
-  const filters: Array<string | null> = [];
-
-  if (hasRole(user, "Salesperson")) {
-    const { data } = await supabase
-      .from("farmer_leads")
-      .select("id")
-      .eq("owner_user_id", user.id)
-      .is("deleted_at", null);
-    filters.push(...unique((data ?? []).map((lead) => lead.id)));
-  }
-
-  if (hasRole(user, "Research Assistant")) {
-    const { data } = await supabase
-      .from("farmer_leads")
-      .select("id")
-      .eq("created_by_user_id", user.id)
-      .is("deleted_at", null);
-    filters.push(...unique((data ?? []).map((lead) => lead.id)));
-  }
-
-  if (hasRole(user, "Agronomist")) {
-    const userIds = unique([user.id, ...directReportIds]);
-    const { data } = await supabase
-      .from("farmer_leads")
-      .select("id")
-      .in("created_by_user_id", userIds)
-      .is("deleted_at", null);
-    filters.push(...unique((data ?? []).map((lead) => lead.id)));
-  }
-
-  if (hasRole(user, "RSM")) {
-    const { data } = await supabase
-      .from("farmer_leads")
-      .select("id")
-      .or(
-        compactFilters([
-          eqFilter("rsm_user_id", user.id),
-          eqFilter("region_id", user.region_id),
-          eqFilter("state", user.state)
-        ]).join(",")
-      )
-      .is("deleted_at", null);
-    filters.push(...unique((data ?? []).map((lead) => lead.id)));
-  }
-
-  return unique(filters);
+  return loadLeadIdsForRequest(supabase, user, [...directReportIds].sort().join(","));
 }
 
 const loadManagedPilotIdsForRequest = cache(async (
@@ -288,7 +288,7 @@ const loadManagedPilotIdsForRequest = cache(async (
   const filters: string[] = [];
 
   if (hasRole(user, "Research Assistant")) {
-    const { data } = await supabase
+    const { data, error } = await readAllRows(supabase
       .from("pilots")
       .select("id")
       .or(
@@ -298,13 +298,15 @@ const loadManagedPilotIdsForRequest = cache(async (
           eqFilter("created_by_user_id", user.id)
         ]).join(",")
       )
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .order("id", { ascending: true }));
+    if (error) throw new Error("Pilot scope could not be loaded. Please try again.");
     filters.push(...unique((data ?? []).map((pilot) => pilot.id)));
   }
 
   if (hasRole(user, "Agronomist")) {
     const userIds = unique([user.id, ...directReportIds]);
-    const { data } = await supabase
+    const { data, error } = await readAllRows(supabase
       .from("pilots")
       .select("id")
       .or(
@@ -315,7 +317,9 @@ const loadManagedPilotIdsForRequest = cache(async (
           inFilter("research_assistant_user_id", userIds)
         ]).join(",")
       )
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .order("id", { ascending: true }));
+    if (error) throw new Error("Pilot scope could not be loaded. Please try again.");
     filters.push(...unique((data ?? []).map((pilot) => pilot.id)));
   }
 

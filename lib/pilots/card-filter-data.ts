@@ -6,13 +6,12 @@ import {
   type PilotCardFilterValue
 } from "@/lib/pilots/options";
 import type { Database } from "@/lib/supabase/database.types";
+import { readAllRows } from "@/lib/supabase/read-all-rows";
 
 type CardFilterResult = {
   error: unknown | null;
   pilotIds: string[];
 };
-
-const queryLimit = 10_000;
 
 function addDays(dateValue: string, days: number) {
   const date = new Date(`${dateValue}T00:00:00.000Z`);
@@ -34,7 +33,7 @@ async function plannedVisitPilotIds(
     .select("pilot_id")
     .is("deleted_at", null)
     .not("pilot_id", "is", null)
-    .limit(queryLimit);
+    .order("id", { ascending: true });
 
   if (cardFilter !== "total_planned_visits") {
     if (cardFilter === "planned_visits_completed") {
@@ -62,7 +61,7 @@ async function plannedVisitPilotIds(
     query = query.lt("planned_visit_date", today);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await readAllRows(query);
 
   return {
     error,
@@ -76,20 +75,20 @@ async function pilotsWithoutActivePlan(
   supabase: SupabaseClient<Database>
 ): Promise<CardFilterResult> {
   const [pilotResult, visitResult] = await Promise.all([
-    supabase
+    readAllRows(supabase
       .from("pilots")
       .select("id")
       .is("deleted_at", null)
       .in("pilot_status", [...monitoringActivePilotStatusValues])
-      .limit(queryLimit),
-    supabase
+      .order("id", { ascending: true })),
+    readAllRows(supabase
       .from("planned_pilot_visits")
       .select("pilot_id")
       .is("deleted_at", null)
       .is("linked_visit_report_id", null)
       .in("planned_visit_status", [...activePlannedVisitStatusValues])
       .not("pilot_id", "is", null)
-      .limit(queryLimit)
+      .order("id", { ascending: true }))
   ]);
   const error = pilotResult.error ?? visitResult.error;
 
@@ -112,13 +111,13 @@ async function pilotsWithoutActivePlan(
 async function pilotsWithReportsForReview(
   supabase: SupabaseClient<Database>
 ): Promise<CardFilterResult> {
-  const { data, error } = await supabase
+  const { data, error } = await readAllRows(supabase
     .from("visit_reports")
     .select("pilot_id")
     .is("deleted_at", null)
     .eq("report_status", "Submitted")
     .not("pilot_id", "is", null)
-    .limit(queryLimit);
+    .order("id", { ascending: true }));
 
   return {
     error,
@@ -132,19 +131,19 @@ async function dispatchedPilotsWithoutPlan(
   supabase: SupabaseClient<Database>
 ): Promise<CardFilterResult> {
   const [dispatchResult, visitResult] = await Promise.all([
-    supabase
+    readAllRows(supabase
       .from("dispatches")
       .select("linked_pilot_id, destination_pilot_id")
       .is("deleted_at", null)
       .neq("dispatch_status", "Cancelled")
       .or("linked_pilot_id.not.is.null,destination_pilot_id.not.is.null")
-      .limit(queryLimit),
-    supabase
+      .order("id", { ascending: true })),
+    readAllRows(supabase
       .from("planned_pilot_visits")
       .select("pilot_id")
       .is("deleted_at", null)
       .not("pilot_id", "is", null)
-      .limit(queryLimit)
+      .order("id", { ascending: true }))
   ]);
   const error = dispatchResult.error ?? visitResult.error;
 

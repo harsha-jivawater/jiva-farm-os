@@ -19,6 +19,7 @@ import { formatDate, type Pilot, type PlannedPilotVisit, type UserOption, type V
 import { addDays, todayDate } from "@/lib/pilots/form-data";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { readAllRows } from "@/lib/supabase/read-all-rows";
 import { getCurrentInternalUser } from "@/lib/users/current-user";
 import { canViewModule } from "@/lib/users/permissions";
 import { labelForRole } from "@/lib/users/options";
@@ -372,7 +373,7 @@ export default async function PilotMonitoringPage() {
     .select(pilotSelectColumns)
     .is("deleted_at", null)
     .order("next_visit_due_date", { ascending: true, nullsFirst: false })
-    .limit(2000);
+    .order("id", { ascending: true });
 
   if (scope.noRecords) {
     pilotQuery = pilotQuery.is("id", null);
@@ -386,13 +387,14 @@ export default async function PilotMonitoringPage() {
     "pilot monitoring primary queries",
     () =>
       Promise.all([
-        timeAsync("pilot monitoring pilot query", () => pilotQuery),
+        timeAsync("pilot monitoring pilot query", () => readAllRows(pilotQuery)),
         timeAsync("pilot monitoring users query", () =>
-          supabase
+          readAllRows(supabase
             .from("users")
             .select(userSelectColumns)
             .eq("is_active", true)
             .order("full_name", { ascending: true })
+            .order("id", { ascending: true }))
         )
       ])
   );
@@ -413,32 +415,32 @@ export default async function PilotMonitoringPage() {
   if (pilots.length) {
     const [plannedVisitResult, reportResult, dispatchResult] = await Promise.all([
       timeAsync("pilot monitoring planned visits query", () =>
-        supabase
+        readAllRows(supabase
           .from("planned_pilot_visits")
           .select(plannedVisitSelectColumns)
           .in("pilot_id", Array.from(visiblePilotIds))
           .is("deleted_at", null)
           .order("planned_visit_date", { ascending: true })
-          .limit(4000)
+          .order("id", { ascending: true }))
       ),
       timeAsync("pilot monitoring visit reports query", () =>
-        supabase
+        readAllRows(supabase
           .from("visit_reports")
           .select(reportSelectColumns)
           .in("pilot_id", Array.from(visiblePilotIds))
           .is("deleted_at", null)
           .order("report_date", { ascending: false })
-          .limit(4000)
+          .order("id", { ascending: true }))
       ),
       timeAsync("pilot monitoring dispatch query", () =>
-        supabase
+        readAllRows(supabase
           .from("dispatches")
           .select(dispatchSelectColumns)
           .is("deleted_at", null)
           .neq("dispatch_status", "Cancelled")
           .or("linked_pilot_id.not.is.null,destination_pilot_id.not.is.null")
           .order("created_at", { ascending: false })
-          .limit(2000)
+          .order("id", { ascending: true }))
       )
     ]);
 
@@ -661,7 +663,7 @@ export default async function PilotMonitoringPage() {
 
   logPerf("pilot monitoring page total server render", startedAt);
 
-  if (pilotResult.error) {
+  if (pilotResult.error || childQueryErrors.length) {
     return (
       <section>
         <PageHeader

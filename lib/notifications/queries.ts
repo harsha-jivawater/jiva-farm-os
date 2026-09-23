@@ -38,7 +38,7 @@ export async function getNotificationSummary(
   supabase: SupabaseClient,
   userId: string
 ): Promise<NotificationSummary> {
-  const [{ count }, { data }] = await Promise.all([
+  const [countResult, latestResult] = await Promise.all([
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
@@ -52,9 +52,12 @@ export async function getNotificationSummary(
       .limit(8)
   ]);
 
+  if (countResult.error) throw countResult.error;
+  if (latestResult.error) throw latestResult.error;
+
   return {
-    latest: (data ?? []) as unknown as Notification[],
-    unreadCount: count ?? 0
+    latest: (latestResult.data ?? []) as unknown as Notification[],
+    unreadCount: countResult.count ?? 0
   };
 }
 
@@ -95,4 +98,3 @@ export async function getNotificationsForUser({
 
   return (data ?? []) as unknown as Notification[];
 }
-
