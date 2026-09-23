@@ -30,13 +30,15 @@ select ok(
 
 select ok(
   (
-    select qual like '%SELECT is_agronomist()%'
+    select regexp_replace(qual, '[()]', '', 'g') like
+      '%SELECT is_agronomist OR is_viewer OR is_admin OR is_management OR is_sales_head OR is_rd_head OR is_accounts OR is_stock_dispatch%'
+      and regexp_count(qual, 'SELECT') = 1
     from pg_policies
     where schemaname = 'public'
       and tablename = 'farmer_leads'
       and policyname = 'farmer_leads_select_authorized_scope'
   ),
-  'the canonical Farmer Lead policy evaluates Agronomist permission once per statement'
+  'the canonical Farmer Lead policy caches broad read roles in one statement-local guard'
 );
 
 select ok(

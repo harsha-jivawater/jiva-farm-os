@@ -63,6 +63,8 @@ jobs:
         run: supabase start --exclude studio,imgproxy,edge-runtime,realtime,logflare,vector,mailpit,supavisor
       - name: Test database and RLS
         run: npm run test:db
+      - name: Compare lead optimization permissions and linked queries
+        run: node scripts/benchmark-permission-queries.mjs supabase_db_jiva-farm-os
       - name: Disable unrelated Google Chrome package source
         run: |
           for source_file in /etc/apt/sources.list.d/*google*; do

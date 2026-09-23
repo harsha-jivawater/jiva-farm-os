@@ -265,7 +265,7 @@ describe("monitoring empty/error behavior", () => {
     expect(metrics).toContainEqual(expect.objectContaining({ label: "Active Pilots", value: "0" }));
   });
 
-  it("keeps the existing child failure warning and other successful report results", async () => {
+  it("does not show misleading totals when a required monitoring source fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     mockQueries((query) => {
       if (query.table === "pilots") return ok([pilot]);
@@ -276,8 +276,8 @@ describe("monitoring empty/error behavior", () => {
       return ok([]);
     });
     const page = await PilotMonitoringPage();
-    expect(textContent(page)).toContain("Planned visits could not be loaded.");
+    expect(textContent(page)).toContain("Pilot monitoring data could not be loaded right now");
     const metrics = elements(page).flatMap((props) => props.metric ? [props.metric] : []);
-    expect(metrics).toContainEqual(expect.objectContaining({ label: "Reports for Review", value: "1" }));
+    expect(metrics).toHaveLength(0);
   });
 });

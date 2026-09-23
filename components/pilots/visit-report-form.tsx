@@ -1,5 +1,7 @@
 "use client";
 
+import { submitUploadedEvidence } from "@/lib/pilots/submit-uploaded-evidence";
+
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
@@ -425,25 +427,26 @@ export function VisitReportForm({
         throw new Error("The visit report form is no longer available.");
       }
 
-      for (const [fieldName, reference] of uploadedReferences) {
-        const input = form.elements.namedItem(fieldName) as HTMLInputElement | null;
-        if (input) input.value = reference;
-      }
-
-      [reportFileRef, photoFileRef, dataSheetFileRef].forEach((ref) => {
-        if (ref.current) ref.current.disabled = true;
-      });
-      bypassDirectUploadRef.current = true;
-      form.requestSubmit();
+      submitUploadedEvidence(
+        form,
+        uploadedReferences,
+        [reportFileRef.current, photoFileRef.current, dataSheetFileRef.current],
+        (value) => { bypassDirectUploadRef.current = value; }
+      );
     } catch (error) {
-      if (uploadedPaths.length > 0) {
-        const { createClient } = await import("@/lib/supabase/client");
-        await createClient().storage.from("app-uploads").remove(uploadedPaths);
-      }
       setUploadError(
         error instanceof Error ? error.message : "Evidence files could not be uploaded."
       );
       setIsUploading(false);
+      if (uploadedPaths.length > 0) {
+        // Cleanup is best-effort and must never leave the form disabled.
+        try {
+          const { createClient } = await import("@/lib/supabase/client");
+          await createClient().storage.from("app-uploads").remove(uploadedPaths);
+        } catch {
+          // Preserve the original actionable error; no report was submitted.
+        }
+      }
     }
   }
 
