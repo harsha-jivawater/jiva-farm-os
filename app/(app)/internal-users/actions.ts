@@ -548,8 +548,9 @@ export async function deactivateInternalUserAction(
 
   await getReplacementUser(supabase, replacementUserId, oldUser.id, errorPath);
 
+  let summary: TransferSummary;
   try {
-    const summary = await transferResponsibilities({
+    summary = await transferResponsibilities({
       oldUser,
       replacementUserId,
       supabase
@@ -567,11 +568,8 @@ export async function deactivateInternalUserAction(
       .eq("id", id);
 
     if (error) {
-      redirectWithError(errorPath, error.message);
+      throw new Error(error.message);
     }
-
-    revalidatePath("/internal-users");
-    redirect(`/internal-users?${summaryToParams(summary)}`);
   } catch (error) {
     redirectWithError(
       errorPath,
@@ -580,6 +578,10 @@ export async function deactivateInternalUserAction(
         : "User deactivation transfer failed."
     );
   }
+
+  // Next.js redirects throw; keep successful navigation outside the error handler.
+  revalidatePath("/internal-users");
+  redirect(`/internal-users?${summaryToParams(summary)}`);
 }
 
 export async function reactivateInternalUserAction(id: string) {
