@@ -163,6 +163,8 @@ export async function updateDealerAction(id: string, formData: FormData) {
     canApproveLegalDocuments(profile) && !dealerProfileEditor && !hasRole(profile, "Sales Head");
   const updatePayload: DealerUpdate = legalApprovalOnly
     ? {
+        dealer_status: payload.dealer_status,
+        dealer_agreement_status: payload.dealer_agreement_status,
         dealer_agreement_approval_status:
           String(formData.get("dealer_agreement_approval_status") ?? "Pending"),
         dealer_agreement_hr_legal_comments:
@@ -218,7 +220,9 @@ export async function updateDealerAction(id: string, formData: FormData) {
   const { error } = await supabase
     .from("dealers")
     .update(updatePayload)
-    .eq("id", existing.id);
+    .eq("id", existing.id)
+    .select("id")
+    .single();
 
   if (error) {
     redirectWithError(errorPath, error.message);
@@ -226,6 +230,7 @@ export async function updateDealerAction(id: string, formData: FormData) {
 
   revalidatePath("/dealers");
   revalidatePath(`/dealers/${id}`);
+  revalidatePath("/dispatches/new");
   redirect(`/dealers/${id}`);
 }
 
